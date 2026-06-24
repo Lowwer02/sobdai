@@ -41,24 +41,24 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] text-on-background pb-[100px]">
+    <div className="min-h-screen bg-[var(--bg-base)]  pb-[100px]">
       <Navbar />
       
       <main className="max-w-4xl mx-auto px-4 py-8">
         
         {/* Breadcrumb / Header */}
         <div className="mb-8">
-          <div className="text-sm text-text-muted mb-2 font-medium">แพ็กเกจข้อสอบ / {pkg.department}</div>
-          <h1 className="text-3xl font-bold font-display text-text-primary leading-tight mb-2">
+          <div className="text-sm text-muted mb-2 font-medium">แพ็กเกจข้อสอบ / {pkg.department}</div>
+          <h1 className="text-3xl font-bold font-display text-[var(--text-primary)] leading-tight mb-2">
             {pkg.position}
           </h1>
-          <p className="text-text-secondary text-lg">{pkg.subject}</p>
+          <p className="text-secondary text-lg">{pkg.subject}</p>
         </div>
 
         {/* Stats Banner */}
-        <div className="bg-white border border-[#EBE5DE] rounded-2xl p-5 flex items-center justify-between mb-10 shadow-sm">
+        <div className="card rounded-2xl p-5 flex items-center justify-between mb-10 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#F3EFE9] rounded-xl flex items-center justify-center text-primary">
+            <div className="w-12 h-12 bg-[var(--bg-card-2)] rounded-xl flex items-center justify-center text-primary">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
               </svg>
@@ -66,17 +66,17 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
             <div>
               <div className="font-semibold text-lg flex items-center gap-2">
                 ดูข้อสอบทั้งหมดในแพ็กเกจ 
-                <span className="text-sm font-normal text-[#27AE60] bg-[#EAF7ED] px-2 py-0.5 rounded-full">{allTopicsCount} ชุด</span>
-                <span className="text-sm font-normal text-[#5A67D8] bg-[#EEF0FE] px-2 py-0.5 rounded-full">{pkg.sections.length} หมวด</span>
+                <span className="text-sm font-normal text-[#27AE60] bg-[var(--bg-input)] px-2 py-0.5 rounded-full">{allTopicsCount} ชุด</span>
+                <span className="text-sm font-normal text-[#5A67D8] bg-[var(--bg-input)] px-2 py-0.5 rounded-full">{pkg.sections.length} หมวด</span>
               </div>
-              <div className="text-sm text-text-muted mt-1 truncate max-w-[500px]">
+              <div className="text-sm text-muted mt-1 truncate max-w-[500px]">
                 {pkg.sections[0]?.topics[0]?.title} และอีก {allTopicsCount - 1} ชุด
               </div>
             </div>
           </div>
           <button 
             onClick={toggleAll}
-            className="text-primary hover:bg-[#F3EFE9] px-4 py-2 rounded-full text-sm font-medium transition-colors border border-transparent hover:border-[#EBE5DE]"
+            className="text-primary hover:bg-[var(--bg-card-2)] px-4 py-2 rounded-full text-sm font-medium transition-colors border border-transparent hover:border-[var(--border-card)]"
           >
             {allExpanded ? 'ย่อทั้งหมด' : 'ดูทั้งหมด'}
           </button>
@@ -133,17 +133,17 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
             ไฟล์ตัวอย่าง
           </h2>
           
-          <div className="bg-white border border-[#EBE5DE] rounded-2xl overflow-hidden shadow-sm">
+          <div className="card rounded-2xl overflow-hidden shadow-sm">
             {pkg.sections.map((section, idx) => {
               const isExpanded = expandedSections.includes(section.title)
               const sectionQuestionCount = section.topics.reduce((acc, t) => acc + t.question_count, 0)
               
               return (
-                <div key={idx} className={idx !== 0 ? "border-t border-[#EBE5DE]" : ""}>
+                <div key={idx} className={idx !== 0 ? "border-t border-[var(--border-card)]" : ""}>
                   {/* Section Header */}
                   <div 
                     onClick={() => toggleSection(section.title)}
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#FDFCFB] transition-colors"
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-[var(--bg-base)] transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className={`text-[#5A67D8] transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
@@ -151,7 +151,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                           <polyline points="9 18 15 12 9 6"/>
                         </svg>
                       </div>
-                      <div className="font-bold text-text-primary">
+                      <div className="font-bold text-[var(--text-primary)]">
                         <span className="text-[#5A67D8] mr-2">
                           <svg className="inline pb-1" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -160,16 +160,16 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                         {section.title}
                       </div>
                     </div>
-                    <div className="text-sm text-[#5A67D8] bg-[#EEF0FE] px-2 py-1 rounded-md font-medium">
+                    <div className="text-sm text-[#5A67D8] bg-[var(--bg-input)] px-2 py-1 rounded-md font-medium">
                       {sectionQuestionCount.toLocaleString()} ข้อ
                     </div>
                   </div>
                   
                   {/* Topics List */}
                   {isExpanded && (
-                    <div className="bg-[#FAFAFA] py-2 px-4 border-t border-[#F0F0F0]">
+                    <div className="bg-[var(--bg-card-2)] py-2 px-4 border-t border-[var(--border-card)]">
                       {section.topics.map((topic, tIdx) => (
-                        <div key={tIdx} className="flex justify-between items-start py-3 pl-8 pr-2 group hover:bg-[#F3EFE9] rounded-lg transition-colors">
+                        <div key={tIdx} className="flex justify-between items-start py-3 pl-8 pr-2 group hover:bg-[var(--bg-card-2)] rounded-lg transition-colors">
                           <div className="flex gap-3">
                             <div className="text-[#A0AEC0] mt-0.5">
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -177,12 +177,12 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                               </svg>
                             </div>
                             <div>
-                              <div className="text-[15px] text-text-secondary group-hover:text-text-primary transition-colors">
+                              <div className="text-[15px] text-secondary group-hover:text-[var(--text-primary)] transition-colors">
                                 {topic.title}
                               </div>
                             </div>
                           </div>
-                          <div className="text-sm text-text-muted whitespace-nowrap ml-4">
+                          <div className="text-sm text-muted whitespace-nowrap ml-4">
                             {topic.question_count.toLocaleString()} ข้อ
                           </div>
                         </div>
@@ -198,11 +198,11 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
       </main>
 
       {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#EBE5DE] p-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-[var(--bg-card)] border-t border-[var(--border-card)] p-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-50">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="hidden sm:block">
-            <div className="font-bold text-text-primary">{pkg.department}</div>
-            <div className="text-sm text-text-muted">เหมาจ่ายครั้งเดียว ทำข้อสอบได้ 1 ปี</div>
+            <div className="font-bold text-[var(--text-primary)]">{pkg.department}</div>
+            <div className="text-sm text-muted">เหมาจ่ายครั้งเดียว ทำข้อสอบได้ 1 ปี</div>
           </div>
           
           <div className="flex gap-3 w-full sm:w-auto">
