@@ -327,9 +327,8 @@ export default async function Home() {
                 className="font-display"
                 style={{
                   fontSize: '36px',
-                  color: 'var(--gold-tint)',
-                  lineHeight: 1,
                   color: 'rgba(212, 168, 67, 0.25)',
+                  lineHeight: 1,
                 }}
               >
                 {step.num}
