@@ -162,10 +162,11 @@ h1, h2, h3, .heading {
   color: var(--text-secondary);
   border-radius: var(--radius-md);
   padding: 10px 24px;
-  font-size: 14px;
+  font-size: 15px;
   transition: all 0.2s;
   cursor: pointer;
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Supermarket', 'Sarabun', sans-serif;
+  letter-spacing: 0.02em;
 }
 
 .btn-outline:hover {

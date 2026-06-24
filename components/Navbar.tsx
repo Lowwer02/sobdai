@@ -232,15 +232,28 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <Link href="/login">
-              <button
-                className="btn-outline"
-                style={{ padding: '7px 16px', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <UserIcon />
-                เข้าสู่ระบบ
-              </button>
-            </Link>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Link href="/login">
+                <button
+                  className="font-display"
+                  style={{ color: 'var(--text-secondary)', fontSize: '15px', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'color 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                >
+                  เข้าสู่ระบบ
+                </button>
+              </Link>
+              <Link href="/register">
+                <button
+                  className="font-display"
+                  style={{ background: '#f59e0b', color: '#1a1208', padding: '7px 20px', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', border: 'none', cursor: 'pointer', transition: 'filter 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
+                >
+                  สมัครฟรี
+                </button>
+              </Link>
+            </div>
           )}
 
           {/* Mobile Menu Toggle */}
