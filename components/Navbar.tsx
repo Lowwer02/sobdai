@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import AuthModal from './AuthModal'
 
 // SVG Icons (ไม่มี emoji)
 function BookOpenIcon() {
@@ -73,12 +74,20 @@ export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  
+  // Auth Modal State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  
   const supabase = createClient()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) {
+        setIsAuthModalOpen(false) // Close modal on successful auth
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -233,26 +242,24 @@ export default function Navbar() {
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Link href="/login">
-                <button
-                  className="font-display"
-                  style={{ color: 'var(--text-secondary)', fontSize: '15px', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'color 0.2s' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                >
-                  เข้าสู่ระบบ
-                </button>
-              </Link>
-              <Link href="/register">
-                <button
-                  className="font-display"
-                  style={{ background: '#f59e0b', color: '#1a1208', padding: '7px 20px', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', border: 'none', cursor: 'pointer', transition: 'filter 0.2s' }}
-                  onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
-                >
-                  สมัครฟรี
-                </button>
-              </Link>
+              <button
+                onClick={() => { setAuthMode('login'); setIsAuthModalOpen(true); }}
+                className="font-display"
+                style={{ color: 'var(--text-secondary)', fontSize: '15px', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'color 0.2s' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+              >
+                เข้าสู่ระบบ
+              </button>
+              <button
+                onClick={() => { setAuthMode('register'); setIsAuthModalOpen(true); }}
+                className="font-display"
+                style={{ background: '#f59e0b', color: '#1a1208', padding: '7px 20px', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', border: 'none', cursor: 'pointer', transition: 'filter 0.2s' }}
+                onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
+              >
+                สมัครฟรี
+              </button>
             </div>
           )}
 
@@ -305,6 +312,13 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        initialMode={authMode} 
+      />
     </header>
   )
 }
