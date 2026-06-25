@@ -37,7 +37,19 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    // Check admin role (service role check done server-side)
+    
+    // Check admin role from profiles table
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+        
+      if (!profile || profile.role !== 'admin') {
+        return NextResponse.redirect(new URL('/', request.url)) // Redirect to home if not admin
+      }
+    }
   }
 
   return supabaseResponse
