@@ -72,6 +72,7 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   
@@ -82,9 +83,20 @@ export default function Navbar() {
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const fetchUserAndRole = async (sessionUser: User | null) => {
+      setUser(sessionUser)
+      if (sessionUser) {
+        const { data } = await supabase.from('profiles').select('role').eq('id', sessionUser.id).single()
+        setIsAdmin(data?.role === 'admin')
+      } else {
+        setIsAdmin(false)
+      }
+    }
+
+    supabase.auth.getUser().then(({ data }) => fetchUserAndRole(data.user))
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      fetchUserAndRole(session?.user ?? null)
       if (session?.user) {
         setIsAuthModalOpen(false) // Close modal on successful auth
       }
@@ -218,27 +230,36 @@ export default function Navbar() {
 
           {/* Auth */}
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                style={{
-                  fontSize: '13px',
-                  color: 'var(--text-muted)',
-                  maxWidth: '120px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {user.email?.split('@')[0]}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="btn-ghost"
-                style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}
-                title="ออกจากระบบ"
-              >
-                <LogOutIcon />
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {isAdmin && (
+                <Link href="/admin">
+                  <span className="text-[#D4AF37] hover:text-[#F1D17A] text-sm font-bold transition-colors">
+                    Admin Panel
+                  </span>
+                </Link>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--text-muted)',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {user.email?.split('@')[0]}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="btn-ghost"
+                  style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                  title="ออกจากระบบ"
+                >
+                  <LogOutIcon />
+                </button>
+              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

@@ -1,33 +1,29 @@
 import Link from 'next/link'
-import { Plus, Search, Filter, MoreVertical, Edit, Copy, Trash2, Archive } from 'lucide-react'
+import { Plus, Search, Filter, Edit, Copy, Archive } from 'lucide-react'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-// Dummy data to mock Supabase fetch for now
-const dummyPackages = [
-  {
-    id: 'pkg-1',
-    code: 'PM01',
-    name: 'นักวิเคราะห์นโยบายและแผน',
-    org: 'สำนักงานปลัดกระทรวง อว.',
-    price: 99,
-    status: 'Published',
-    questions: 2135,
-    sets: 23,
-    updatedAt: '2026-06-25',
-  },
-  {
-    id: 'pkg-2',
-    code: 'ED02',
-    name: 'นักวิชาการศึกษาปฏิบัติการ',
-    org: 'กรมส่งเสริมการปกครองท้องถิ่น',
-    price: 199,
-    status: 'Draft',
-    questions: 250,
-    sets: 1,
-    updatedAt: '2026-06-20',
+export default async function PackagesPage() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+      },
+    }
+  )
+
+  let packages: any[] = []
+  
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {
+    const { data } = await supabase.from('packages').select('*').order('created_at', { ascending: false })
+    if (data) packages = data
   }
-]
 
-export default function PackagesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -63,7 +59,7 @@ export default function PackagesPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
@@ -76,43 +72,49 @@ export default function PackagesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
-              {dummyPackages.map((pkg) => (
+              {packages.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                    No packages found. Click "Create Package" to begin.
+                  </td>
+                </tr>
+              ) : packages.map((pkg) => (
                 <tr key={pkg.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#0F0B07] border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-xs font-bold font-display">
-                        {pkg.code}
+                      <div className="w-10 h-10 rounded-lg bg-[#0F0B07] border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-xs font-bold font-display shrink-0">
+                        {pkg.package_code}
                       </div>
                       <div>
-                        <div className="text-[#F5E9D6] font-medium mb-0.5">{pkg.name}</div>
-                        <div className="text-[#A1866B] text-xs">{pkg.org}</div>
+                        <Link href={`/package/${pkg.slug}`} target="_blank" className="text-[#F5E9D6] font-medium mb-0.5 hover:text-[#D4AF37] transition-colors line-clamp-1">
+                          {pkg.name}
+                        </Link>
+                        <div className="text-[#A1866B] text-xs">{pkg.org_name}</div>
                       </div>
                     </div>
                   </td>
                   <td className="p-4">
-                    <div className="text-[#F5E9D6] text-sm">{pkg.questions.toLocaleString()} Qs</div>
-                    <div className="text-[#A1866B] text-xs">{pkg.sets} Sets</div>
+                    <div className="text-[#F5E9D6] text-sm whitespace-nowrap">{pkg.total_questions.toLocaleString()} Qs</div>
+                    <div className="text-[#A1866B] text-xs whitespace-nowrap">{pkg.total_exam_sets} Sets</div>
                   </td>
-                  <td className="p-4 text-[#F5E9D6] font-medium">
-                    ฿{pkg.price}
+                  <td className="p-4 text-[#F5E9D6] font-medium whitespace-nowrap">
+                    ฿{pkg.current_price}
                   </td>
                   <td className="p-4">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${
-                      pkg.status === 'Published' 
-                        ? 'bg-[#22C55E]/10 text-[#22C55E]' 
-                        : 'bg-[#A1866B]/10 text-[#A1866B]'
-                    }`}>
-                      {pkg.status}
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[#22C55E]/10 text-[#22C55E]">
+                      Published
                     </span>
                   </td>
-                  <td className="p-4 text-[#A1866B] text-sm">
-                    {pkg.updatedAt}
+                  <td className="p-4 text-[#A1866B] text-sm whitespace-nowrap">
+                    {new Date(pkg.updated_at).toLocaleDateString()}
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
-                        <Edit size={16} />
-                      </button>
+                      <Link href={`/admin/packages/${pkg.id}/edit`}>
+                        <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
+                          <Edit size={16} />
+                        </button>
+                      </Link>
                       <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Duplicate">
                         <Copy size={16} />
                       </button>

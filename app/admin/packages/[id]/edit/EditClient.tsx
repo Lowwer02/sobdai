@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { ArrowLeft, Save, Image as ImageIcon, Loader2 } from 'lucide-react'
-import { createPackageAction } from '../actions'
+import { updatePackageAction } from '../../actions'
 
 const availableFeatures = [
   'Detailed Explanations', 
@@ -13,10 +13,10 @@ const availableFeatures = [
   'Unlimited Updates'
 ]
 
-export default function CreatePackagePage() {
+export default function EditClient({ pkg }: { pkg: any }) {
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState('')
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(availableFeatures)
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(pkg.features || [])
 
   const toggleFeature = (feature: string) => {
     setSelectedFeatures(prev => 
@@ -33,7 +33,7 @@ export default function CreatePackagePage() {
     formData.append('features', JSON.stringify(selectedFeatures))
 
     startTransition(async () => {
-      const result = await createPackageAction(formData)
+      const result = await updatePackageAction(pkg.id, formData)
       if (result?.error) {
         setErrorMsg(result.error)
       }
@@ -49,21 +49,23 @@ export default function CreatePackagePage() {
           </button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Create Package</h1>
-          <p className="text-[#A1866B] mt-1">Add a new exam package to the platform.</p>
+          <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Edit Package</h1>
+          <p className="text-[#A1866B] mt-1">Update existing exam package details.</p>
         </div>
         
         <div className="ml-auto flex items-center gap-3">
-          <button type="button" className="px-4 py-2 rounded-xl text-[#A1866B] font-medium hover:text-[#F5E9D6] transition-colors">
-            Save Draft
-          </button>
+          <Link href={`/package/${pkg.slug}`} target="_blank">
+            <button type="button" className="px-4 py-2 rounded-xl text-[#A1866B] font-medium hover:text-[#F5E9D6] transition-colors">
+              View Public
+            </button>
+          </Link>
           <button 
             type="submit" 
             disabled={isPending}
             className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-6 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
           >
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            Publish Package
+            Save Changes
           </button>
         </div>
       </div>
@@ -86,27 +88,27 @@ export default function CreatePackagePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Package Code *</label>
-                <input required name="package_code" type="text" placeholder="e.g. PM01" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+                <input defaultValue={pkg.package_code} required name="package_code" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-[#F5E9D6] font-medium block">URL Slug <span className="text-[#A1866B] text-xs font-normal">(Auto-generates if empty)</span></label>
-                <input name="slug" type="text" placeholder="e.g. policy-analyst" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+                <label className="text-sm text-[#F5E9D6] font-medium block">URL Slug</label>
+                <input defaultValue={pkg.slug} name="slug" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
               </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Package Name *</label>
-              <input required name="name" type="text" placeholder="e.g. นักวิเคราะห์นโยบายและแผน" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input defaultValue={pkg.name} required name="name" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Organization Name *</label>
-              <input required name="org_name" type="text" placeholder="e.g. สำนักงานปลัดกระทรวง อว." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input defaultValue={pkg.org_name} required name="org_name" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Description</label>
-              <textarea name="description" rows={5} placeholder="Write a compelling description for this package..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-3 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
+              <textarea defaultValue={pkg.description} name="description" rows={5} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-3 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
             </div>
           </div>
 
@@ -117,12 +119,12 @@ export default function CreatePackagePage() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Organization Logo URL</label>
-                <input name="logo_url" type="text" placeholder="e.g. /logo.png or https://..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+                <input defaultValue={pkg.logo_url} name="logo_url" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
               </div>
 
               <div className="space-y-3">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Cover Image URL</label>
-                <input name="cover_image_url" type="text" placeholder="e.g. https://..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+                <input defaultValue={pkg.cover_image_url} name="cover_image_url" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
               </div>
             </div>
           </div>
@@ -138,12 +140,12 @@ export default function CreatePackagePage() {
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Current Price (THB) *</label>
-              <input required name="current_price" type="number" defaultValue="99" min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#D4AF37] font-bold text-lg rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input defaultValue={pkg.current_price} required name="current_price" type="number" min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#D4AF37] font-bold text-lg rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Original Price (THB) *</label>
-              <input required name="original_price" type="number" defaultValue="249" min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input defaultValue={pkg.original_price} required name="original_price" type="number" min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
           </div>
 
@@ -153,7 +155,7 @@ export default function CreatePackagePage() {
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Difficulty Level</label>
-              <select name="difficulty" defaultValue="Mixed" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors appearance-none">
+              <select defaultValue={pkg.difficulty} name="difficulty" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors appearance-none">
                 <option value="Mixed">Mixed (All levels)</option>
                 <option value="Easy">Easy</option>
                 <option value="Medium">Medium</option>
@@ -185,12 +187,12 @@ export default function CreatePackagePage() {
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">SEO Title</label>
-              <input name="seo_title" type="text" placeholder="Title for search engines..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input defaultValue={pkg.seo_title} name="seo_title" type="text" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">SEO Description</label>
-              <textarea name="seo_description" rows={3} placeholder="Meta description..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
+              <textarea defaultValue={pkg.seo_description} name="seo_description" rows={3} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
             </div>
           </div>
 
