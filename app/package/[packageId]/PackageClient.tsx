@@ -2,8 +2,8 @@
 
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import type { Package } from '@/lib/mock_data'
-import Navbar from '@/components/Navbar'
 import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck } from 'lucide-react'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
@@ -49,15 +49,12 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
 }
 
 export default function PackageClient({ pkg }: { pkg: Package }) {
-  const allTopicsCount = pkg.sections.reduce((acc, s) => acc + s.topics.length, 0)
-  const totalQuestions = pkg.sections.reduce((acc, s) => acc + s.topics.reduce((sum, t) => sum + t.question_count, 0), 0)
-  
   // Get up to 3 topics for the sample area
   const sampleTopics = pkg.sections.flatMap(s => s.topics).slice(0, 3)
 
   return (
     <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
-      <Navbar />
+      {/* Removed Duplicate Navbar here. RootLayout handles it. */}
       
       <main className="max-w-[1360px] mx-auto px-4 py-6 md:py-8">
         
@@ -79,13 +76,13 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
               {/* Top half */}
               <div className="flex flex-col sm:flex-row gap-6 relative z-10">
                 {/* Logo Area */}
-                <div className="w-36 h-48 bg-[#0F0B07] rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-[rgba(212,175,55,0.3)] shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-b from-[#D4AF37]/20 to-transparent mix-blend-overlay"></div>
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-2 relative z-10">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    <circle cx="12" cy="10" r="3" fill="#D4AF37"/>
-                  </svg>
-                  <span className="text-[#D4AF37] font-bold text-3xl font-display mt-2 relative z-10 tracking-widest drop-shadow-[0_0_10px_rgba(212,175,55,0.5)]">ปภ.</span>
+                <div className="w-36 h-48 bg-white rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-[rgba(212,175,55,0.3)] shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
+                  <Image 
+                    src="/logo.png" 
+                    alt="อว. Logo" 
+                    fill 
+                    className="object-contain p-4" 
+                  />
                 </div>
 
                 {/* Info Area */}
@@ -104,14 +101,14 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                   </h1>
 
                   <p className="text-[#A1866B] text-[14px] leading-[1.6] mb-6">
-                    เรียนรู้ความรู้เกี่ยวกับการวิเคราะห์นโยบาย การวางแผน และการปฏิบัติงานเชิงยุทธศาสตร์ เพื่อเตรียมความพร้อมสำหรับการสอบ {pkg.position} สังกัดกรมป้องกันและบรรเทาสาธารณภัย (ปภ.)
+                    เตรียมความพร้อมสำหรับการสอบตำแหน่งนักวิเคราะห์นโยบายและแผน สำนักงานปลัดกระทรวง อว. ครอบคลุมความรู้ด้านนโยบายสาธารณะ การวางแผนยุทธศาสตร์ การบริหารภาครัฐ กฎหมายที่เกี่ยวข้อง และความรู้เฉพาะตำแหน่ง พร้อมเฉลยละเอียดทุกข้อ
                   </p>
 
                   <div className="flex flex-wrap gap-2.5">
                     <GoldBadge icon={<Star size={12} fill="currentColor" />}>ใช้งานได้ 12 เดือน</GoldBadge>
                     <GoldBadge icon={<Sparkles size={12} fill="currentColor" />}>เฉลยอธิบายละเอียด</GoldBadge>
                     <GoldBadge icon={<Clock size={12} fill="currentColor" />}>จำลองสอบจับเวลา</GoldBadge>
-                    <GoldBadge icon={<Check size={12} />}>อัปเดตถึงปี 2567</GoldBadge>
+                    <GoldBadge icon={<Check size={12} />}>อัปเดตถึง พ.ศ. 2569</GoldBadge>
                   </div>
                 </div>
               </div>
@@ -121,14 +118,14 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                 <MiniStatCard 
                   icon={<BookOpen size={16} />}
                   title="ชุดข้อสอบทั้งหมด"
-                  value={<>{allTopicsCount} <span className="text-[15px] font-normal text-[#F5E9D6]">ชุด</span></>}
-                  subtitle="ครอบคลุมทุกหัวข้อที่ออกสอบ"
+                  value={<>23 <span className="text-[15px] font-normal text-[#F5E9D6]">ชุด</span></>}
+                  subtitle="หมวดหมู่: 2 หมวด"
                 />
                 <MiniStatCard 
-                  icon={<Clock size={16} />} // Using Clock as icon for number of questions as per mockup visual approximation
+                  icon={<Clock size={16} />} 
                   title="จำนวนข้อสอบ"
-                  value={<>{totalQuestions.toLocaleString()} <span className="text-[15px] font-normal text-[#F5E9D6]">ข้อ</span></>}
-                  subtitle="ข้อสอบคุณภาพ อัปเดตล่าสุด"
+                  value={<>2,135 <span className="text-[15px] font-normal text-[#F5E9D6]">ข้อ</span></>}
+                  subtitle="อัปเดตล่าสุด: พ.ศ. 2569"
                 />
                 <MiniStatCard 
                   icon={<CalendarDays size={16} />}
@@ -139,8 +136,8 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                 <MiniStatCard 
                   icon={<TrendingUp size={16} />}
                   title="ระดับความยาก"
-                  value={<span className="text-[20px]">ปานกลาง-ยาก</span>}
-                  subtitle="เหมาะสำหรับ ผู้เตรียมสอบ ปภ."
+                  value={<span className="text-[20px]">ปานกลาง - ยาก</span>}
+                  subtitle="เหมาะสำหรับผู้เตรียมสอบตำแหน่งนักวิเคราะห์นโยบายและแผน"
                 />
               </div>
             </div>
@@ -150,7 +147,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37] opacity-[0.03] rounded-bl-full pointer-events-none"></div>
                <FileText size={48} className="text-[#D4AF37]/80 mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" strokeWidth={1} />
                <div className="text-[42px] font-bold font-display text-[#D4AF37] leading-none mb-2 tracking-tight">
-                 {totalQuestions.toLocaleString()} <span className="text-[18px] text-[#F5E9D6] ml-1">ข้อ</span>
+                 2,135 <span className="text-[18px] text-[#F5E9D6] ml-1">ข้อ</span>
                </div>
                <div className="text-[#A1866B] text-[13px] leading-snug max-w-[120px]">
                  รวมทุกข้อสอบในแพ็กเกจ
@@ -169,9 +166,9 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
               </div>
               
               <div className="flex items-center gap-3 mb-8">
-                <span className="text-[#A1866B] text-[13px] line-through">ปกติ {(pkg.price * 1.5).toFixed(0)} บาท</span>
+                <span className="text-[#A1866B] text-[13px] line-through">ปกติ {(pkg.price + 150)} บาท</span>
                 <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-[11px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/30">
-                  ประหยัด {(pkg.price * 0.5).toFixed(0)} บาท
+                  ประหยัด 150 บาท
                 </span>
               </div>
 
@@ -226,7 +223,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                     <BookOpen size={14} />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ชุดข้อสอบทั้งหมด {allTopicsCount} ชุด ครอบคลุมทุกหัวข้อสำคัญ</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">ชุดข้อสอบทั้งหมด 23 ชุด</span>
                   </div>
                 </div>
 
@@ -235,7 +232,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                     <Clock size={14} />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">อัปเดตเนื้อหา 2566-2570 ตามแนวข้อสอบล่าสุด</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">ครอบคลุมเนื้อหา พ.ศ. 2566–2570</span>
                   </div>
                 </div>
 
@@ -244,7 +241,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                     <FileText size={14} />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">อ้างอิง พ.ร.บ. แผนด้านการอุดมศึกษา 2566-2570 และอื่นๆ 9 ชุด</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">อ้างอิงแผนด้านการอุดมศึกษา พ.ศ. 2566–2570</span>
                   </div>
                 </div>
 
@@ -253,7 +250,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                     <TrendingUp size={14} />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ระดับความยาก <span className="font-bold">ปานกลาง-ยาก</span></span>
+                    <span className="text-[#F5E9D6] text-[14px] block">ระดับความยาก ปานกลาง–ยาก</span>
                   </div>
                 </div>
 
@@ -262,7 +259,7 @@ export default function PackageClient({ pkg }: { pkg: Package }) {
                     <Star size={14} fill="currentColor" />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">เหมาะสำหรับ ผู้เตรียมสอบตำแหน่ง นักวิเคราะห์นโยบายและแผน ปภ.</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">เหมาะสำหรับผู้เตรียมสอบตำแหน่งนักวิเคราะห์นโยบายและแผน</span>
                   </div>
                 </div>
               </div>

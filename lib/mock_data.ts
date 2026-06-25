@@ -26,11 +26,11 @@ export const PACKAGES: Package[] = [
   {
     id: 'demo-1', // keeping the ID mapping simple for now
     department: 'สำนักงานปลัดกระทรวง อว.',
-    position: 'นักวิเคราะห์นโยบายและแผนปฏิบัติการ',
+    position: 'นักวิเคราะห์นโยบายและแผน',
     subject: 'เนื้อหาตามโครงสร้างหลักสูตร (อว.)',
     year: 2569,
-    total_questions: 1471,
-    price: 249,
+    total_questions: 2135,
+    price: 99,
     tag: 'ใหม่',
     sections: [
       {
