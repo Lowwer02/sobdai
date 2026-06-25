@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -20,19 +22,11 @@ function GoogleIcon() {
   )
 }
 
-function XIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  )
-}
-
 export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -47,10 +41,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
       setPassword('')
       setError(null)
       setSuccessMsg(null)
+      setShowPassword(false)
     }
   }, [isOpen, initialMode])
 
-  if (!isOpen) return null
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
+  // Prevent scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => { document.body.style.overflow = 'unset' }
+  }, [isOpen])
 
   const handleGoogleAuth = async () => {
     setLoading(true)
@@ -82,7 +94,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
         if (data.user && data.user.identities && data.user.identities.length === 0) {
           setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ')
         } else {
-          setSuccessMsg('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือถ้าไม่ต้องยืนยันให้ลองล็อกอินได้เลย')
+          setSuccessMsg('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือทดลองล็อกอินได้เลย')
           setEmail('')
           setPassword('')
         }
@@ -102,124 +114,169 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-[#0F0B07]/80 backdrop-blur-sm"
+            onClick={onClose}
+          />
 
-      {/* Modal Card */}
-      <div className="card-glass w-full max-w-md relative z-10 overflow-hidden shadow-2xl animate-fadeInUp">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1"
-        >
-          <XIcon />
-        </button>
-
-        <div className="p-8">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold font-display text-[var(--gold-light)] mb-1">
-              {mode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิกฟรี'}
-            </h2>
-            <p className="text-sm text-[var(--text-muted)]">
-              {mode === 'login' 
-                ? 'ยินดีต้อนรับกลับ! เข้าสู่ระบบเพื่อทำข้อสอบต่อ' 
-                : 'สร้างบัญชีเพื่อบันทึกผลและเข้าถึงข้อสอบทั้งหมด'}
-            </p>
-          </div>
-
-          {error && (
-            <div className="bg-[var(--wrong-bg)] border border-[rgba(224,92,92,0.25)] text-[var(--wrong)] text-[13.5px] p-3 rounded-xl mb-5 text-center">
-              {error}
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="bg-[var(--correct-bg)] border border-[rgba(76,175,125,0.25)] text-[var(--correct)] text-[13.5px] p-3 rounded-xl mb-5 text-center">
-              {successMsg}
-            </div>
-          )}
-
-          <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">อีเมล</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                className="input-field"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">รหัสผ่าน</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="input-field"
-                placeholder="อย่างน้อย 6 ตัวอักษร"
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="btn-primary w-full mt-2 flex justify-center"
-            >
-              {loading ? 'กำลังดำเนินการ...' : (mode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี')}
-            </button>
-          </form>
-
-          <div className="relative flex items-center justify-center my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[var(--border-card)]"></div>
-            </div>
-            <div className="relative bg-[#1a1208] px-4 text-xs text-[var(--text-muted)] uppercase tracking-wider">
-              หรือ
-            </div>
-          </div>
-
-          <button
-            onClick={handleGoogleAuth}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-[var(--bg-input)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-[15px] cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--gold-tint)] transition-all font-sans"
+          {/* Modal Card */}
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="relative z-10 w-full sm:max-w-[480px] bg-[#1A140E] border-t sm:border border-[rgba(212,175,55,0.15)] sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden"
           >
-            <GoogleIcon />
-            {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
-          </button>
-          
-          <div className="mt-8 text-center text-sm text-[var(--text-muted)]">
-            {mode === 'login' ? (
-              <>
-                ยังไม่มีบัญชี?{' '}
+            {/* Subtle Gold Radial Glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[300px] h-32 bg-[#D4AF37] opacity-[0.03] blur-[50px] pointer-events-none"></div>
+
+            <button 
+              onClick={onClose}
+              className="absolute top-5 right-5 text-[#A1866B] hover:text-[#F5E9D6] transition-colors p-1 rounded-full hover:bg-[rgba(255,255,255,0.05)]"
+            >
+              <X size={20} strokeWidth={2.5} />
+            </button>
+
+            <div className="p-8 sm:p-10">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701F] text-[#0F0B07] mb-4 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                  </svg>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold font-display text-[#F5E9D6] mb-2">
+                  {mode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิกฟรี'}
+                </h2>
+                <p className="text-sm text-[#A1866B]">
+                  {mode === 'login' 
+                    ? 'ยินดีต้อนรับกลับ! เข้าสู่ระบบเพื่อทำข้อสอบต่อ' 
+                    : 'สร้างบัญชีเพื่อบันทึกผลและเข้าถึงข้อสอบทั้งหมด'}
+                </p>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-[#2a1711] border border-[#ff4a4a]/20 text-[#ff7070] text-[13.5px] p-3 rounded-xl mb-5 text-center overflow-hidden"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+
+                {successMsg && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-[#112a1c] border border-[#22c55e]/20 text-[#22c55e] text-[13.5px] p-3 rounded-xl mb-5 text-center overflow-hidden"
+                  >
+                    {successMsg}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form onSubmit={handleEmailAuth} className="space-y-5 mb-8">
+                <div>
+                  <label className="block text-[13px] font-medium text-[#A1866B] mb-1.5 uppercase tracking-wide">อีเมล</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3.5 text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-[#A1866B] mb-1.5 uppercase tracking-wide">รหัสผ่าน</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl pl-4 pr-12 py-3.5 text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                      placeholder="อย่างน้อย 6 ตัวอักษร"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A1866B] hover:text-[#D4AF37] transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
                 <button 
-                  type="button"
-                  onClick={() => setMode('register')} 
-                  className="text-[var(--gold-light)] hover:underline font-medium"
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#0F0B07] font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-2"
                 >
-                  สมัครสมาชิก
+                  {loading && <Loader2 size={18} className="animate-spin" />}
+                  {mode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
                 </button>
-              </>
-            ) : (
-              <>
-                มีบัญชีอยู่แล้ว?{' '}
-                <button 
-                  type="button"
-                  onClick={() => setMode('login')} 
-                  className="text-[var(--gold-light)] hover:underline font-medium"
-                >
-                  เข้าสู่ระบบ
-                </button>
-              </>
-            )}
-          </div>
+              </form>
+
+              <div className="relative flex items-center justify-center my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[rgba(255,255,255,0.05)]"></div>
+                </div>
+                <div className="relative bg-[#1A140E] px-4 text-xs font-medium text-[#A1866B] uppercase tracking-wider">
+                  หรือ
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-xl text-[#F5E9D6] text-[15px] cursor-pointer hover:bg-[rgba(255,255,255,0.06)] hover:border-[rgba(212,175,55,0.3)] transition-all"
+              >
+                <GoogleIcon />
+                {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
+              </button>
+              
+              <div className="mt-8 text-center text-sm text-[#A1866B]">
+                {mode === 'login' ? (
+                  <>
+                    ยังไม่มีบัญชี?{' '}
+                    <button 
+                      type="button"
+                      onClick={() => { setMode('register'); setError(null); }} 
+                      className="text-[#D4AF37] hover:text-[#F1D17A] font-bold transition-colors"
+                    >
+                      สมัครสมาชิก
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    มีบัญชีอยู่แล้ว?{' '}
+                    <button 
+                      type="button"
+                      onClick={() => { setMode('login'); setError(null); }} 
+                      className="text-[#D4AF37] hover:text-[#F1D17A] font-bold transition-colors"
+                    >
+                      เข้าสู่ระบบ
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   )
 }
