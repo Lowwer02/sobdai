@@ -1,0 +1,85 @@
+'use server'
+
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
+import type { ParsedQuestion } from '@/lib/markdownParser'
+
+export async function importQuestionsAction(questions: ParsedQuestion[]) {
+  try {
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll() },
+          setAll() { /* ignore */ }
+        }
+      }
+    )
+
+    // Check auth
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    // Verify admin role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'admin') {
+      return { success: false, error: 'Forbidden: Admins only' }
+    }
+
+    if (questions.length === 0) {
+      return { success: false, error: 'No valid questions to import' }
+    }
+
+    // Prepare payload (status defaults to Draft based on DB schema)
+    const payload = questions.map(q => ({
+      content: q.content,
+      choice_a: q.choice_a,
+      choice_b: q.choice_b,
+      choice_c: q.choice_c,
+      choice_d: q.choice_d,
+      correct_answer: q.correct_answer,
+      hint: q.hint || null,
+      full_explanation: q.full_explanation || null,
+      why_a_wrong: q.why_a_wrong || null,
+      why_b_wrong: q.why_b_wrong || null,
+      why_c_wrong: q.why_c_wrong || null,
+      why_d_wrong: q.why_d_wrong || null,
+      reference: q.reference || null,
+      difficulty: q.difficulty,
+      category: q.category || null,
+      tags: q.tags,
+      status: 'Draft' // Initially import as Draft
+    }))
+
+    // Batch insert into Supabase
+    const { data, error } = await supabase
+      .from('questions')
+      .insert(payload)
+      .select('id')
+
+    if (error) {
+      console.error('Batch insert error:', error)
+      return { success: false, error: error.message }
+    }
+
+    // Note: Revalidating the questions path (placeholder for when we build it)
+    revalidatePath('/admin/questions')
+    
+    return { 
+      success: true, 
+      count: data?.length || 0 
+    }
+
+  } catch (error: any) {
+    console.error('Import Action error:', error)
+    return { success: false, error: error.message }
+  }
+}
