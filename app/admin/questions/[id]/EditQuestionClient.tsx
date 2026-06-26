@@ -178,8 +178,23 @@ export default function EditQuestionClient({ question }: { question: any }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm text-[#F5E9D6] font-medium block">Category</label>
+              <label className="text-sm text-[#F5E9D6] font-medium block">Category (Legacy)</label>
               <input defaultValue={question.category} name="category" type="text" placeholder="e.g. Mathematics" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Subject</label>
+              <input defaultValue={question.subject} name="subject" type="text" placeholder="e.g. ความรู้ทั่วไป" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Law (Optional)</label>
+              <input defaultValue={question.law} name="law" type="text" placeholder="e.g. พ.ร.บ.ระเบียบข้าราชการพลเรือน" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Topic</label>
+              <input defaultValue={question.topic} name="topic" type="text" placeholder="e.g. วินัยข้าราชการ" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
 
             <div className="space-y-2">

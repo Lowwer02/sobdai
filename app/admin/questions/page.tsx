@@ -14,6 +14,9 @@ export default async function QuestionsPage({
   const statusFilter = typeof params.status === 'string' ? params.status : ''
   const difficultyFilter = typeof params.difficulty === 'string' ? params.difficulty : ''
   const categoryFilter = typeof params.category === 'string' ? params.category : ''
+  const subjectFilter = typeof params.subject === 'string' ? params.subject : ''
+  const lawFilter = typeof params.law === 'string' ? params.law : ''
+  const topicFilter = typeof params.topic === 'string' ? params.topic : ''
 
   const limit = 15
   const from = (page - 1) * limit
@@ -47,6 +50,15 @@ export default async function QuestionsPage({
   if (categoryFilter && categoryFilter !== 'All') {
     query = query.eq('category', categoryFilter)
   }
+  if (subjectFilter && subjectFilter !== 'All') {
+    query = query.eq('subject', subjectFilter)
+  }
+  if (lawFilter && lawFilter !== 'All') {
+    query = query.eq('law', lawFilter)
+  }
+  if (topicFilter && topicFilter !== 'All') {
+    query = query.eq('topic', topicFilter)
+  }
 
   // Add pagination and ordering
   query = query
@@ -58,12 +70,14 @@ export default async function QuestionsPage({
   const totalPages = count ? Math.ceil(count / limit) : 0
 
   // Fetch unique categories for the filter dropdown
-  const { data: categoryData } = await supabase
+  const { data: filterData } = await supabase
     .from('questions')
-    .select('category')
-    .neq('category', null)
+    .select('category, subject, law, topic')
 
-  const uniqueCategories = Array.from(new Set(categoryData?.map(c => c.category).filter(Boolean))) as string[]
+  const uniqueCategories = Array.from(new Set(filterData?.map(c => c.category).filter(Boolean))) as string[]
+  const uniqueSubjects = Array.from(new Set(filterData?.map(c => c.subject).filter(Boolean))) as string[]
+  const uniqueLaws = Array.from(new Set(filterData?.map(c => c.law).filter(Boolean))) as string[]
+  const uniqueTopics = Array.from(new Set(filterData?.map(c => c.topic).filter(Boolean))) as string[]
 
   return (
     <QuestionsClient 
@@ -74,7 +88,13 @@ export default async function QuestionsPage({
       statusFilter={statusFilter}
       difficultyFilter={difficultyFilter}
       categoryFilter={categoryFilter}
+      subjectFilter={subjectFilter}
+      lawFilter={lawFilter}
+      topicFilter={topicFilter}
       uniqueCategories={uniqueCategories}
+      uniqueSubjects={uniqueSubjects}
+      uniqueLaws={uniqueLaws}
+      uniqueTopics={uniqueTopics}
     />
   )
 }

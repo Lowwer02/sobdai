@@ -55,6 +55,9 @@ export async function importQuestionsAction(questions: ParsedQuestion[]) {
       reference: q.reference || null,
       difficulty: q.difficulty,
       category: q.category || null,
+      subject: q.subject || null,
+      law: q.law || null,
+      topic: q.topic || null,
       tags: q.tags,
       status: 'Draft' // Initially import as Draft
     }))

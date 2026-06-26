@@ -64,6 +64,9 @@ export async function updateQuestionAction(id: string, formData: FormData) {
       reference: (formData.get('reference') as string) || null,
       difficulty: formData.get('difficulty') as string,
       category: (formData.get('category') as string) || null,
+      subject: (formData.get('subject') as string) || null,
+      law: (formData.get('law') as string) || null,
+      topic: (formData.get('topic') as string) || null,
       status: formData.get('status') as string,
       tags,
       updated_at: new Date().toISOString()

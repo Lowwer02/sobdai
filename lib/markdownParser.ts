@@ -14,6 +14,9 @@ export interface ParsedQuestion {
   reference: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   category: string;
+  subject: string;
+  law: string;
+  topic: string;
   tags: string[];
 }
 
@@ -56,7 +59,7 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     // We use a strategy where we match everything after a label until the next label or EOF
     const extractMultiline = (labelRegex: string) => {
       // Lookbehind for the label, match anything non-greedy until the next known label or end of string
-      const regex = new RegExp(`${labelRegex}\\s*([\\s\\S]*?)(?=\\n\\s*(?:A\\.|B\\.|C\\.|D\\.|\\*\\*Question:\\*\\*|\\*\\*Answer:\\*\\*|\\*\\*Hint:\\*\\*|\\*\\*Explanation:\\*\\*|\\*\\*Why A Wrong:\\*\\*|\\*\\*Why B Wrong:\\*\\*|\\*\\*Why C Wrong:\\*\\*|\\*\\*Why D Wrong:\\*\\*|\\*\\*Reference:\\*\\*|\\*\\*Difficulty:\\*\\*|\\*\\*Category:\\*\\*|\\*\\*Tags:\\*\\*)|$)`, 'i');
+      const regex = new RegExp(`${labelRegex}\\s*([\\s\\S]*?)(?=\\n\\s*(?:A\\.|B\\.|C\\.|D\\.|\\*\\*Question:\\*\\*|\\*\\*Answer:\\*\\*|\\*\\*Hint:\\*\\*|\\*\\*Explanation:\\*\\*|\\*\\*Why A Wrong:\\*\\*|\\*\\*Why B Wrong:\\*\\*|\\*\\*Why C Wrong:\\*\\*|\\*\\*Why D Wrong:\\*\\*|\\*\\*Reference:\\*\\*|\\*\\*Difficulty:\\*\\*|\\*\\*Category:\\*\\*|\\*\\*Subject:\\*\\*|\\*\\*Law:\\*\\*|\\*\\*Topic:\\*\\*|\\*\\*Tags:\\*\\*)|$)`, 'i');
       return extractField(chunk, regex);
     };
 
@@ -77,6 +80,9 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     
     const difficultyRaw = extractMultiline('\\*\\*Difficulty:\\*\\*');
     const category = extractMultiline('\\*\\*Category:\\*\\*');
+    const subject = extractMultiline('\\*\\*Subject:\\*\\*');
+    const law = extractMultiline('\\*\\*Law:\\*\\*');
+    const topic = extractMultiline('\\*\\*Topic:\\*\\*');
     const tagsRaw = extractMultiline('\\*\\*Tags:\\*\\*');
 
     // Default formatting and validation
@@ -118,6 +124,9 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
       reference,
       difficulty,
       category,
+      subject,
+      law,
+      topic,
       tags
     } : null;
 

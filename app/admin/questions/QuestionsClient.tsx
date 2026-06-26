@@ -14,7 +14,13 @@ interface QuestionsClientProps {
   statusFilter: string
   difficultyFilter: string
   categoryFilter: string
+  subjectFilter: string
+  lawFilter: string
+  topicFilter: string
   uniqueCategories: string[]
+  uniqueSubjects: string[]
+  uniqueLaws: string[]
+  uniqueTopics: string[]
 }
 
 export default function QuestionsClient({
@@ -25,7 +31,13 @@ export default function QuestionsClient({
   statusFilter,
   difficultyFilter,
   categoryFilter,
-  uniqueCategories
+  subjectFilter,
+  lawFilter,
+  topicFilter,
+  uniqueCategories,
+  uniqueSubjects,
+  uniqueLaws,
+  uniqueTopics
 }: QuestionsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -140,9 +152,42 @@ export default function QuestionsClient({
               onChange={(e) => updateParams({ category: e.target.value })}
               className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
             >
-              <option value="">All Categories</option>
+              <option value="">Legacy Category</option>
               {uniqueCategories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            
+            <select 
+              value={subjectFilter} 
+              onChange={(e) => updateParams({ subject: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Subjects</option>
+              {uniqueSubjects.map(sub => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+
+            <select 
+              value={lawFilter} 
+              onChange={(e) => updateParams({ law: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Laws</option>
+              {uniqueLaws.map(law => (
+                <option key={law} value={law}>{law}</option>
+              ))}
+            </select>
+
+            <select 
+              value={topicFilter} 
+              onChange={(e) => updateParams({ topic: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Topics</option>
+              {uniqueTopics.map(topic => (
+                <option key={topic} value={topic}>{topic}</option>
               ))}
             </select>
           </div>
@@ -161,7 +206,7 @@ export default function QuestionsClient({
             <thead>
               <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
                 <th className="p-4 font-medium w-[40%]">Question Preview</th>
-                <th className="p-4 font-medium">Category</th>
+                <th className="p-4 font-medium">Subject / Topic</th>
                 <th className="p-4 font-medium">Diff.</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 font-medium">Created</th>
@@ -181,9 +226,22 @@ export default function QuestionsClient({
                     <div className="text-[#F5E9D6] text-sm line-clamp-2">{q.content}</div>
                   </td>
                   <td className="p-4">
-                    <span className="text-[#A1866B] text-xs px-2 py-1 bg-[#0F0B07] rounded-lg border border-[rgba(255,255,255,0.05)] whitespace-nowrap">
-                      {q.category || 'Uncategorized'}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      {q.subject ? (
+                        <span className="text-[#F5E9D6] text-xs px-2 py-1 bg-[#D4AF37]/10 rounded-lg border border-[#D4AF37]/20 whitespace-nowrap w-max">
+                          {q.subject}
+                        </span>
+                      ) : q.category && (
+                        <span className="text-[#A1866B] text-xs px-2 py-1 bg-[#0F0B07] rounded-lg border border-[rgba(255,255,255,0.05)] whitespace-nowrap w-max">
+                          {q.category}
+                        </span>
+                      )}
+                      {q.topic && (
+                        <span className="text-[#A1866B] text-[10px] uppercase font-bold tracking-wider">
+                          {q.topic}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4">
                     <span className={`text-xs font-bold ${
