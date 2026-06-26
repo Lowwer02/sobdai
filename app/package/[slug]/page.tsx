@@ -49,7 +49,7 @@ export default async function PackagePage({ params }: PageProps) {
          { id: '3', name: 'ความรู้ทางด้านภาษาอังกฤษ', duration_minutes: 60, is_sample: false, sort_order: 3 },
        ]
      }
-     return <PackageClient supabasePkg={mockSupabasePkg as any} />
+     return <PackageClient pkg={mockSupabasePkg as any} examSets={mockSupabasePkg.exam_sets || []} summaries={[]} isPurchased={false} />
   }
 
   const { data: pkg, error } = await supabase
@@ -61,6 +61,16 @@ export default async function PackagePage({ params }: PageProps) {
   if (error || !pkg) {
     notFound()
   }
-  
-  return <PackageClient supabasePkg={pkg} />
+
+  // Fetch Summaries
+  const { data: summaries } = await supabase
+    .from('summaries')
+    .select('id, title, slug, subject, topic, read_time_minutes, updated_at')
+    .eq('package_id', pkg.id)
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true })
+
+  const isPurchased = false // NOTE: Replace with actual purchase check logic later
+
+  return <PackageClient pkg={pkg} examSets={pkg.exam_sets || []} summaries={summaries || []} isPurchased={isPurchased} />
 }

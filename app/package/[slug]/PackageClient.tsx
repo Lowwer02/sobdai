@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck } from 'lucide-react'
+import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft } from 'lucide-react'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -47,16 +47,14 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
   )
 }
 
-export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
-  // Sort exam sets by sort_order
-  const examSets = supabasePkg.exam_sets ? [...supabasePkg.exam_sets].sort((a, b) => a.sort_order - b.sort_order) : []
-  const sampleTopics = examSets.slice(0, 3)
+export default function PackageClient({ pkg, examSets, summaries, isPurchased }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean }) {
+  const sortedExamSets = examSets ? [...examSets].sort((a, b) => a.sort_order - b.sort_order) : []
+  const sampleTopics = sortedExamSets.slice(0, 3)
 
   return (
     <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       <main className="max-w-[1360px] mx-auto px-4 py-6 md:py-8">
         
-        {/* Breadcrumb */}
         <div className="mb-6">
           <Link href="/exams" className="text-[#A1866B] hover:text-[#F5E9D6] flex items-center gap-2 text-[14px] font-medium transition-colors w-fit">
             <ChevronLeft size={16} />
@@ -66,40 +64,31 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
 
         <div className="flex flex-col gap-6">
           
-          {/* ================= MAIN GRID (Row 1) 7 - 2 - 3 ================= */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
-            {/* 1. HERO CARD (col-span-7) */}
             <div className="lg:col-span-7 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 md:p-8 flex flex-col gap-8 relative overflow-hidden shadow-2xl">
-              {/* Top half */}
               <div className="flex flex-col sm:flex-row gap-6 relative z-10">
-                {/* Logo Area */}
                 <div className="w-36 h-48 bg-white rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-[rgba(212,175,55,0.3)] shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
                   <Image 
-                    src={supabasePkg.logo_url || "/logo.png"} 
-                    alt={`${supabasePkg.org_name} Logo`} 
+                    src={pkg.logo_url || "/logo.png"} 
+                    alt={`${pkg.org_name} Logo`} 
                     fill 
                     className="object-contain p-4" 
                   />
                 </div>
 
-                {/* Info Area */}
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-[#F5E9D6] text-[13px] mr-2">แพ็กเกจเรียนรู้</span>
-                    <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{supabasePkg.package_code}</span>
-                    <span className="bg-[#0F0B07] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-[#D4AF37]/30 flex items-center gap-1.5">
-                      <PlayCircle size={12} />
-                      ตัวอย่าง
-                    </span>
+                    <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{pkg.package_code}</span>
                   </div>
                   
                   <h1 className="text-3xl md:text-[36px] font-bold font-display text-[#F5E9D6] mb-5 leading-[1.25]">
-                    {supabasePkg.name}
+                    {pkg.name}
                   </h1>
 
                   <p className="text-[#A1866B] text-[14px] leading-[1.6] mb-6">
-                    {supabasePkg.description}
+                    {pkg.description}
                   </p>
 
                   <div className="flex flex-wrap gap-2.5">
@@ -111,18 +100,17 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                 </div>
               </div>
 
-              {/* Bottom half: 4 Mini-stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-auto">
                 <MiniStatCard 
                   icon={<BookOpen size={16} />}
                   title="ชุดข้อสอบทั้งหมด"
-                  value={<>{supabasePkg.total_exam_sets} <span className="text-[15px] font-normal text-[#F5E9D6]">ชุด</span></>}
-                  subtitle={`หมวดหมู่: ${supabasePkg.total_categories} หมวด`}
+                  value={<>{pkg.total_exam_sets} <span className="text-[15px] font-normal text-[#F5E9D6]">ชุด</span></>}
+                  subtitle={`หมวดหมู่: ${pkg.total_categories} หมวด`}
                 />
                 <MiniStatCard 
                   icon={<Clock size={16} />} 
                   title="จำนวนข้อสอบ"
-                  value={<>{supabasePkg.total_questions.toLocaleString()} <span className="text-[15px] font-normal text-[#F5E9D6]">ข้อ</span></>}
+                  value={<>{pkg.total_questions.toLocaleString()} <span className="text-[15px] font-normal text-[#F5E9D6]">ข้อ</span></>}
                   subtitle="อัปเดตล่าสุด: พ.ศ. 2569"
                 />
                 <MiniStatCard 
@@ -134,18 +122,17 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                 <MiniStatCard 
                   icon={<TrendingUp size={16} />}
                   title="ระดับความยาก"
-                  value={<span className="text-[20px]">{supabasePkg.difficulty}</span>}
-                  subtitle={`เหมาะสำหรับผู้เตรียมสอบตำแหน่ง${supabasePkg.name}`}
+                  value={<span className="text-[20px]">{pkg.difficulty}</span>}
+                  subtitle={`เหมาะสำหรับผู้เตรียมสอบตำแหน่ง${pkg.name}`}
                 />
               </div>
             </div>
 
-            {/* 2. STATS CENTER (col-span-2) */}
             <div className="lg:col-span-2 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group hover:border-[#D4AF37]/30 transition-colors">
                <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37] opacity-[0.03] rounded-bl-full pointer-events-none"></div>
                <FileText size={48} className="text-[#D4AF37]/80 mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" strokeWidth={1} />
                <div className="text-[42px] font-bold font-display text-[#D4AF37] leading-none mb-2 tracking-tight">
-                 {supabasePkg.total_questions.toLocaleString()} <span className="text-[18px] text-[#F5E9D6] ml-1">ข้อ</span>
+                 {pkg.total_questions.toLocaleString()} <span className="text-[18px] text-[#F5E9D6] ml-1">ข้อ</span>
                </div>
                <div className="text-[#A1866B] text-[13px] leading-snug max-w-[120px]">
                  รวมทุกข้อสอบในแพ็กเกจ
@@ -159,14 +146,14 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
               <div className="text-[#A1866B] text-[14px] mb-2">แพ็กเกจนี้</div>
 
               <div className="mb-4 flex items-baseline gap-2">
-                <span className="text-[56px] font-bold text-[#D4AF37] font-display leading-none tracking-tight">{supabasePkg.current_price}</span>
+                <span className="text-[56px] font-bold text-[#D4AF37] font-display leading-none tracking-tight">{pkg.current_price}</span>
                 <span className="text-[18px] text-[#F5E9D6] font-bold">บาท</span>
               </div>
               
               <div className="flex items-center gap-3 mb-8">
-                <span className="text-[#A1866B] text-[13px] line-through">ปกติ {supabasePkg.original_price} บาท</span>
+                <span className="text-[#A1866B] text-[13px] line-through">ปกติ {pkg.original_price} บาท</span>
                 <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-[11px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/30">
-                  ประหยัด {supabasePkg.original_price - supabasePkg.current_price} บาท
+                  ประหยัด {pkg.original_price - pkg.current_price} บาท
                 </span>
               </div>
 
@@ -193,7 +180,7 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                 </div>
               </div>
 
-              <Link href={`/checkout/${supabasePkg.id}`} className="block w-full">
+              <Link href={`/checkout/${pkg.id}`} className="block w-full">
                 <button className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display">
                   <Lock size={18} />
                   ซื้อแพ็กเกจนี้
@@ -221,7 +208,7 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                     <BookOpen size={14} />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ชุดข้อสอบทั้งหมด {supabasePkg.total_exam_sets} ชุด</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">ชุดข้อสอบทั้งหมด {pkg.total_exam_sets} ชุด</span>
                   </div>
                 </div>
 
@@ -248,7 +235,7 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                     <TrendingUp size={14} />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ระดับความยาก {supabasePkg.difficulty}</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">ระดับความยาก {pkg.difficulty}</span>
                   </div>
                 </div>
 
@@ -257,7 +244,7 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                     <Star size={14} fill="currentColor" />
                   </div>
                   <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">เหมาะสำหรับผู้เตรียมสอบตำแหน่ง{supabasePkg.name}</span>
+                    <span className="text-[#F5E9D6] text-[14px] block">เหมาะสำหรับผู้เตรียมสอบตำแหน่ง{pkg.name}</span>
                   </div>
                 </div>
               </div>
@@ -275,7 +262,7 @@ export default function PackageClient({ supabasePkg }: { supabasePkg: any }) {
                         {topic.is_sample && (
                           <span className="bg-[#22C55E]/10 text-[#22C55E] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ทดลองทำฟรี</span>
                         )}
-                        <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2 py-0.5 rounded uppercase">{supabasePkg.package_code}</span>
+                        <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2 py-0.5 rounded uppercase">{pkg.package_code}</span>
                       </div>
                       
                       <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-4 leading-snug group-hover:text-[#D4AF37] transition-colors line-clamp-3">
