@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, BookOpen, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'Packages', href: '/admin/packages', icon: Package },
-  { name: 'Exam Sets', href: '/admin/exam-sets', icon: BookOpen },
+  { name: 'Exam Sets', href: '/admin/exam-sets', icon: CheckSquare },
   { name: 'Questions', href: '/admin/questions', icon: FileQuestion },
   { name: 'Import Center', href: '/admin/import', icon: UploadCloud },
   { name: 'Users', href: '/admin/users', icon: Users },

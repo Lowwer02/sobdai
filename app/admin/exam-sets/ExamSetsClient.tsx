@@ -1,0 +1,272 @@
+'use client'
+
+import Link from 'next/link'
+import { useRouter, usePathname } from 'next/navigation'
+import { useState, useTransition, useCallback } from 'react'
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, AlertTriangle, Loader2, Copy } from 'lucide-react'
+import { deleteExamSetAction, createExamSetAction } from './actions'
+
+interface ExamSetsClientProps {
+  examSets: any[]
+  packages: any[]
+  totalPages: number
+  currentPage: number
+  search: string
+  packageFilter: string
+  typeFilter: string
+}
+
+export default function ExamSetsClient({
+  examSets,
+  packages,
+  totalPages,
+  currentPage,
+  search,
+  packageFilter,
+  typeFilter
+}: ExamSetsClientProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [isPending, startTransition] = useTransition()
+  
+  const [searchInput, setSearchInput] = useState(search)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [setToActOn, setSetToActOn] = useState<{id: string, name: string} | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+
+  // URL updating helper
+  const updateParams = useCallback((updates: Record<string, string>) => {
+    const params = new URLSearchParams(window.location.search)
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value)
+      } else {
+        params.delete(key)
+      }
+    })
+    
+    if (!updates.page) params.set('page', '1')
+
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`)
+    })
+  }, [pathname, router])
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    updateParams({ q: searchInput })
+  }
+
+  const handleDeleteClick = (id: string, name: string) => {
+    setSetToActOn({ id, name })
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!setToActOn) return
+    setIsDeleting(true)
+    const res = await deleteExamSetAction(setToActOn.id)
+    setIsDeleting(false)
+    if (res?.success) {
+      setDeleteModalOpen(false)
+      setSetToActOn(null)
+    } else {
+      alert('Failed to delete: ' + res?.error)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Exam Sets</h1>
+          <p className="text-[#A1866B] mt-1">Manage exam bundles and map questions to packages.</p>
+        </div>
+        
+        <Link href="/admin/exam-sets/create">
+          <button className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
+            <Plus size={18} />
+            Create Exam Set
+          </button>
+        </Link>
+      </div>
+
+      <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
+        
+        {/* Toolbar */}
+        <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex flex-wrap gap-4 items-center">
+          <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1866B]" size={18} />
+            <input 
+              type="text" 
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search exam sets..." 
+              className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors placeholder:text-[#A1866B]/50"
+            />
+          </form>
+          
+          <div className="flex items-center gap-3">
+            <select 
+              value={packageFilter} 
+              onChange={(e) => updateParams({ package: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[200px] truncate"
+            >
+              <option value="">All Packages</option>
+              {packages.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            <select 
+              value={typeFilter} 
+              onChange={(e) => updateParams({ type: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+            >
+              <option value="">All Types</option>
+              <option value="Full">Full Exam</option>
+              <option value="Sample">Sample Exam</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Loading Overlay */}
+        {isPending && (
+          <div className="absolute inset-0 bg-[#1A140E]/50 backdrop-blur-sm z-10 flex items-center justify-center">
+            <Loader2 className="animate-spin text-[#D4AF37]" size={32} />
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="overflow-x-auto min-h-[400px] relative">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
+                <th className="p-4 font-medium w-[30%]">Exam Name</th>
+                <th className="p-4 font-medium">Package</th>
+                <th className="p-4 font-medium text-center">Questions</th>
+                <th className="p-4 font-medium text-center">Duration</th>
+                <th className="p-4 font-medium">Type</th>
+                <th className="p-4 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
+              {examSets.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                    No exam sets found.
+                  </td>
+                </tr>
+              ) : examSets.map((set) => (
+                <tr key={set.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
+                  <td className="p-4">
+                    <div className="text-[#F5E9D6] font-medium">{set.name}</div>
+                    <div className="text-[#A1866B] text-xs mt-1 truncate max-w-[250px]">{set.description || 'No description'}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-[#A1866B] text-xs px-2 py-1 bg-[#0F0B07] rounded-lg border border-[rgba(255,255,255,0.05)] whitespace-nowrap">
+                      {set.package_name}
+                    </span>
+                  </td>
+                  <td className="p-4 text-center">
+                    <span className="text-[#F5E9D6] font-bold">{set.question_count}</span>
+                  </td>
+                  <td className="p-4 text-center text-[#A1866B] text-sm">
+                    {set.duration_minutes}m
+                  </td>
+                  <td className="p-4">
+                    {set.is_sample ? (
+                      <span className="text-xs font-bold text-[#EAB308] bg-[#EAB308]/10 px-2 py-1 rounded">Sample</span>
+                    ) : (
+                      <span className="text-xs font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded">Full</span>
+                    )}
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link href={`/admin/exam-sets/${set.id}/edit`}>
+                        <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
+                          <Edit size={16} />
+                        </button>
+                      </Link>
+                      <button 
+                        onClick={() => handleDeleteClick(set.id, set.name)}
+                        className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10" 
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-[rgba(255,255,255,0.05)] flex items-center justify-between">
+            <div className="text-sm text-[#A1866B]">
+              Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => updateParams({ page: String(currentPage - 1) })}
+                disabled={currentPage <= 1 || isPending}
+                className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button 
+                onClick={() => updateParams({ page: String(currentPage + 1) })}
+                disabled={currentPage >= totalPages || isPending}
+                className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Delete Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold font-display text-[#F5E9D6]">Delete Exam Set</h3>
+                <p className="text-[#A1866B] text-sm mt-1">Are you sure you want to delete this Exam Set? This action cannot be undone.</p>
+                <div className="mt-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg text-sm text-[#F5E9D6] font-medium">
+                  {setToActOn?.name}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6 justify-end">
+              <button 
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl text-[#F5E9D6] hover:bg-[#0F0B07] transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors text-sm font-bold flex items-center gap-2"
+              >
+                {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}

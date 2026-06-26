@@ -1,0 +1,160 @@
+'use server'
+
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
+
+// Helper to get authenticated admin supabase client
+async function getAdminSupabase() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+      },
+    }
+  )
+  
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { supabase, isAdmin: false }
+  
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+    
+  return { supabase, isAdmin: profile?.role === 'admin' }
+}
+
+export async function deleteExamSetAction(id: string) {
+  try {
+    const { supabase, isAdmin } = await getAdminSupabase()
+    if (!isAdmin) return { success: false, error: 'Unauthorized' }
+
+    const { error } = await supabase
+      .from('exam_sets')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+
+    revalidatePath('/admin/exam-sets')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function createExamSetAction(data: {
+  package_id: string
+  name: string
+  description?: string
+  duration_minutes: number
+  is_sample: boolean
+  sort_order: number
+  question_ids: string[]
+}) {
+  try {
+    const { supabase, isAdmin } = await getAdminSupabase()
+    if (!isAdmin) return { success: false, error: 'Unauthorized' }
+
+    // 1. Insert Exam Set
+    const { data: examSet, error: insertError } = await supabase
+      .from('exam_sets')
+      .insert({
+        package_id: data.package_id,
+        name: data.name,
+        description: data.description,
+        duration_minutes: data.duration_minutes,
+        is_sample: data.is_sample,
+        sort_order: data.sort_order
+      })
+      .select()
+      .single()
+
+    if (insertError) throw insertError
+
+    // 2. Insert Questions if any
+    if (data.question_ids && data.question_ids.length > 0) {
+      const junctionData = data.question_ids.map((qId, index) => ({
+        exam_set_id: examSet.id,
+        question_id: qId,
+        sort_order: index
+      }))
+
+      const { error: junctionError } = await supabase
+        .from('exam_set_questions')
+        .insert(junctionData)
+
+      if (junctionError) throw junctionError
+    }
+
+    revalidatePath('/admin/exam-sets')
+    revalidatePath('/admin/packages')
+    return { success: true, id: examSet.id }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function updateExamSetAction(id: string, data: {
+  package_id: string
+  name: string
+  description?: string
+  duration_minutes: number
+  is_sample: boolean
+  sort_order: number
+  question_ids: string[]
+}) {
+  try {
+    const { supabase, isAdmin } = await getAdminSupabase()
+    if (!isAdmin) return { success: false, error: 'Unauthorized' }
+
+    // 1. Update Exam Set
+    const { error: updateError } = await supabase
+      .from('exam_sets')
+      .update({
+        package_id: data.package_id,
+        name: data.name,
+        description: data.description,
+        duration_minutes: data.duration_minutes,
+        is_sample: data.is_sample,
+        sort_order: data.sort_order
+      })
+      .eq('id', id)
+
+    if (updateError) throw updateError
+
+    // 2. Delete existing questions mapping
+    const { error: deleteError } = await supabase
+      .from('exam_set_questions')
+      .delete()
+      .eq('exam_set_id', id)
+      
+    if (deleteError) throw deleteError
+
+    // 3. Insert new questions mapping
+    if (data.question_ids && data.question_ids.length > 0) {
+      const junctionData = data.question_ids.map((qId, index) => ({
+        exam_set_id: id,
+        question_id: qId,
+        sort_order: index
+      }))
+
+      const { error: junctionError } = await supabase
+        .from('exam_set_questions')
+        .insert(junctionData)
+
+      if (junctionError) throw junctionError
+    }
+
+    revalidatePath('/admin/exam-sets')
+    revalidatePath('/admin/packages')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
