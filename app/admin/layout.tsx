@@ -1,16 +1,16 @@
 import Link from 'next/link'
 import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare } from 'lucide-react'
 
-const navigation = [
-  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+const learningNav = [
   { name: 'Packages', href: '/admin/packages', icon: Package },
   { name: 'Exam Sets', href: '/admin/exam-sets', icon: CheckSquare },
   { name: 'Questions', href: '/admin/questions', icon: FileQuestion },
   { name: 'Import Center', href: '/admin/import', icon: UploadCloud },
+]
+
+const managementNav = [
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
-  { name: 'Analytics', href: '/admin/analytics', icon: BarChart },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
 export default function AdminLayout({
@@ -34,8 +34,41 @@ export default function AdminLayout({
         </div>
         
         <nav className="flex-1 overflow-y-auto py-4">
+          <div className="px-3 mb-2">
+            <Link
+              href="/admin"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
+            >
+              <LayoutDashboard size={18} />
+              <span className="text-sm font-medium">Dashboard</span>
+            </Link>
+          </div>
+          
+          <div className="mt-6 mb-2 px-6">
+            <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">Learning</h3>
+          </div>
           <ul className="space-y-1 px-3">
-            {navigation.map((item) => {
+            {learningNav.map((item) => {
+              const Icon = item.icon
+              return (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
+                  >
+                    <Icon size={18} />
+                    <span className="text-sm font-medium">{item.name}</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="mt-6 mb-2 px-6">
+            <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">Management</h3>
+          </div>
+          <ul className="space-y-1 px-3">
+            {managementNav.map((item) => {
               const Icon = item.icon
               return (
                 <li key={item.name}>
