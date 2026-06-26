@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
-import { Search, Loader2, ChevronLeft, ChevronRight, Plus, Eye, EyeOff, Edit, Trash2 } from 'lucide-react'
+import { Search, Loader2, ChevronLeft, ChevronRight, Plus, Eye, EyeOff, Edit, Trash2, UploadCloud } from 'lucide-react'
 import Link from 'next/link'
 import { toggleSummaryPublish, deleteSummary } from './actions'
 
@@ -70,13 +70,22 @@ export default function SummariesClient({
           <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Summary Bank</h1>
           <p className="text-[#A1866B] mt-1">Manage reading materials for learning packages.</p>
         </div>
-        <Link 
-          href="/admin/summaries/create"
-          className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
-        >
-          <Plus size={18} />
-          Create Summary
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link 
+            href="/admin/summaries/import"
+            className="bg-[#0F0B07] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#D4AF37] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
+          >
+            <UploadCloud size={18} />
+            Import Markdown
+          </Link>
+          <Link 
+            href="/admin/summaries/create"
+            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
+          >
+            <Plus size={18} />
+            Create Summary
+          </Link>
+        </div>
       </div>
 
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
