@@ -30,46 +30,63 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   }
 
-  const { exam_id, user_id } = charge.metadata ?? {}
-  if (!exam_id || !user_id) {
+  const { package_id, user_id } = charge.metadata ?? {}
+  if (!package_id || !user_id) {
     console.error('Missing metadata in charge:', charge.id)
     return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
   }
 
   const supabase = await createAdminClient()
 
-  // อัพเดต order status
-  await supabase
+  // อัพเดต order status (กรณีที่ก่อนหน้านี้ insert เป็น pending)
+  // แต่จริงๆ ใน create/route.ts เราไม่ได้เซฟ charge_id ไว้
+  // ดังนั้นให้เราถือโอกาส ตรวจสอบว่ามี order อยู่แล้วหรือยัง (ถ้าไม่มีก็สร้างเลย)
+  const { data: existingOrder } = await supabase
     .from('orders')
-    .update({ status: 'paid', paid_at: new Date().toISOString() })
-    .eq('omise_charge_id', charge.id)
-
-  // ตรวจสอบว่ามี access_token แล้วหรือยัง
-  const { data: existing } = await supabase
-    .from('access_tokens')
     .select('id')
     .eq('user_id', user_id)
-    .eq('exam_id', exam_id)
-    .single()
+    .eq('package_id', package_id)
+    .eq('status', 'completed')
+    .maybeSingle()
 
-  if (!existing) {
-    const expiresAt = new Date()
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1)
-
-    const { data: order } = await supabase
+  if (!existingOrder) {
+    // ถ้ายังไม่มี Order ที่ complete ให้ update หรือ insert ก็ได้
+    // สำหรับความเรียบง่ายเนื่องจาก schema order ปัจจุบันไม่เก็บ omise_charge_id (จาก 004_admin_completion.sql)
+    // เราเลยอัพเดตอันที่เป็น pending อันล่าสุดของ user นี้ + package นี้
+    const { data: pendingOrder } = await supabase
       .from('orders')
       .select('id')
-      .eq('omise_charge_id', charge.id)
-      .single()
+      .eq('user_id', user_id)
+      .eq('package_id', package_id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    await supabase.from('access_tokens').insert({
-      user_id,
-      exam_id,
-      order_id: order?.id,
-      expires_at: expiresAt.toISOString(),
-    })
+    if (pendingOrder) {
+      await supabase
+        .from('orders')
+        .update({ status: 'completed' })
+        .eq('id', pendingOrder.id)
+    } else {
+      // Fallback: create a new order just in case it wasn't saved
+      // But we don't have the amount, so we just query package
+      const { data: pkg } = await supabase
+         .from('packages')
+         .select('current_price')
+         .eq('id', package_id)
+         .single()
 
-    console.log(`Access granted: user=${user_id} exam=${exam_id} expires=${expiresAt.toISOString()}`)
+      await supabase.from('orders').insert({
+        user_id,
+        package_id,
+        amount: pkg?.current_price || 0,
+        payment_provider: 'omise',
+        status: 'completed'
+      })
+    }
+
+    console.log(`Access granted: user=${user_id} package=${package_id}`)
   }
 
   return NextResponse.json({ received: true })

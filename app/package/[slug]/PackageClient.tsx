@@ -49,7 +49,12 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
 
 export default function PackageClient({ pkg, examSets, summaries, isPurchased }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean }) {
   const sortedExamSets = examSets ? [...examSets].sort((a, b) => a.sort_order - b.sort_order) : []
-  const sampleTopics = sortedExamSets.slice(0, 3)
+  
+  const orgName = pkg.organizations?.name || 'Unknown Organization'
+  const posName = pkg.positions?.name || 'Unknown Position'
+  const logoUrl = pkg.organizations?.logo_url || null
+  const hasDiscount = pkg.original_price > pkg.current_price
+  const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
 
   return (
     <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
@@ -69,26 +74,32 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
             <div className="lg:col-span-7 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 md:p-8 flex flex-col gap-8 relative overflow-hidden shadow-2xl">
               <div className="flex flex-col sm:flex-row gap-6 relative z-10">
                 <div className="w-36 h-48 bg-white rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-[rgba(212,175,55,0.3)] shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
-                  <Image 
-                    src={pkg.logo_url || "/logo.png"} 
-                    alt={`${pkg.org_name} Logo`} 
-                    fill 
-                    className="object-contain p-4" 
-                  />
+                  {logoUrl ? (
+                    <img 
+                      src={logoUrl} 
+                      alt={`${orgName} Logo`} 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      className="p-4" 
+                    />
+                  ) : (
+                    <div className="text-[#D4AF37] font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
+                  )}
                 </div>
 
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <span className="text-[#F5E9D6] text-[13px] mr-2">แพ็กเกจเรียนรู้</span>
+                    <span className="text-[#F5E9D6] text-[13px] mr-2">{orgName}</span>
                     <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{pkg.package_code}</span>
+                    <span className="bg-[#D4AF37]/10 text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {pkg.exam_year}</span>
+                    <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full">v{pkg.version || '1'}</span>
                   </div>
                   
                   <h1 className="text-3xl md:text-[36px] font-bold font-display text-[#F5E9D6] mb-5 leading-[1.25]">
-                    {pkg.name}
+                    {posName}
                   </h1>
 
                   <p className="text-[#A1866B] text-[14px] leading-[1.6] mb-6">
-                    {pkg.description}
+                    {pkg.description || 'เตรียมความพร้อมสำหรับการสอบครอบคลุมเนื้อหาทั้งหมด พร้อมเฉลยละเอียดทุกข้อ'}
                   </p>
 
                   <div className="flex flex-wrap gap-2.5">
@@ -150,11 +161,15 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
                 <span className="text-[18px] text-[#F5E9D6] font-bold">บาท</span>
               </div>
               
-              <div className="flex items-center gap-3 mb-8">
-                <span className="text-[#A1866B] text-[13px] line-through">ปกติ {pkg.original_price} บาท</span>
-                <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-[11px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/30">
-                  ประหยัด {pkg.original_price - pkg.current_price} บาท
-                </span>
+              <div className="flex items-center gap-3 mb-8 h-6">
+                {hasDiscount && (
+                  <>
+                    <span className="text-[#A1866B] text-[13px] line-through">ปกติ {pkg.original_price} บาท</span>
+                    <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-[11px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/30">
+                      ประหยัด {discountAmount} บาท
+                    </span>
+                  </>
+                )}
               </div>
 
               <div className="space-y-4 mb-10">
@@ -180,12 +195,21 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
                 </div>
               </div>
 
-              <Link href={`/checkout/${pkg.id}`} className="block w-full">
-                <button className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display">
-                  <Lock size={18} />
-                  ซื้อแพ็กเกจนี้
-                </button>
-              </Link>
+              {isPurchased ? (
+                <Link href="#resources" className="block w-full">
+                  <button className="w-full bg-[#22C55E] hover:bg-[#1EA950] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(34,197,94,0.15)] font-display">
+                    <PlayCircle size={18} />
+                    เริ่มเรียน
+                  </button>
+                </Link>
+              ) : (
+                <Link href={`/checkout/${pkg.id}`} className="block w-full">
+                  <button className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display">
+                    <Lock size={18} />
+                    ซื้อแพ็กเกจนี้
+                  </button>
+                </Link>
+              )}
               
               <div className="text-center mt-4 text-[#D4AF37] text-[12px] flex items-center justify-center gap-1.5 opacity-80">
                 <Star size={12} fill="currentColor" />
@@ -195,100 +219,76 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
 
           </div>
 
-          {/* ================= SECOND GRID (Row 2) 5 - 7 ================= */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* ================= LEARNING RESOURCES ================= */}
+          <div id="resources" className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             
-            {/* 4. ABOUT (col-span-5) */}
-            <div className="lg:col-span-5 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-8 shadow-2xl flex flex-col">
-              <h3 className="text-[#D4AF37] text-[18px] font-bold font-display mb-8">เกี่ยวกับแพ็กเกจนี้</h3>
+            {/* 4. SUMMARY BANK */}
+            <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                  <BookOpen size={20} />
+                </div>
+                <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">สรุปเนื้อหา</h3>
+              </div>
               
-              <div className="space-y-6 flex-1 flex flex-col justify-center">
-                <div className="flex items-start gap-4">
-                  <div className="w-6 h-6 rounded border border-[#D4AF37] flex items-center justify-center text-[#D4AF37] shrink-0 mt-0.5">
-                    <BookOpen size={14} />
+              <div className="space-y-4 flex-1">
+                {summaries.length > 0 ? (
+                  summaries.map((s: any) => (
+                    <Link href={`/package/${pkg.slug}/summary/${s.slug}`} key={s.id} className="block">
+                      <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col">
+                        <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-2 leading-snug group-hover:text-[#D4AF37] transition-colors">{s.title}</h4>
+                        <div className="text-[#A1866B] text-[12px] mb-4">{s.subject} • {s.topic}</div>
+                        <div className="flex justify-between items-center text-[#A1866B] text-[12px] mt-auto pt-2 border-t border-[rgba(255,255,255,0.05)]">
+                          <div className="flex items-center gap-1.5"><Clock size={12}/> {s.read_time_minutes || 5} นาที</div>
+                          <span className="bg-[#22C55E]/10 text-[#22C55E] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">พร้อมเรียน</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="h-40 border border-dashed border-[rgba(255,255,255,0.1)] rounded-xl flex items-center justify-center text-[#A1866B] text-[13px]">
+                    กำลังจัดเตรียมสรุปเนื้อหา
                   </div>
-                  <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ชุดข้อสอบทั้งหมด {pkg.total_exam_sets} ชุด</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="w-6 h-6 rounded border border-[#D4AF37] flex items-center justify-center text-[#D4AF37] shrink-0 mt-0.5">
-                    <Clock size={14} />
-                  </div>
-                  <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ครอบคลุมเนื้อหา พ.ศ. 2566–2570</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="w-6 h-6 rounded border border-[#D4AF37] flex items-center justify-center text-[#D4AF37] shrink-0 mt-0.5">
-                    <FileText size={14} />
-                  </div>
-                  <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">อ้างอิงแผนด้านการอุดมศึกษา พ.ศ. 2566–2570</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="w-6 h-6 rounded border border-[#D4AF37] flex items-center justify-center text-[#D4AF37] shrink-0 mt-0.5">
-                    <TrendingUp size={14} />
-                  </div>
-                  <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">ระดับความยาก {pkg.difficulty}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="w-6 h-6 rounded border border-[#D4AF37] flex items-center justify-center text-[#D4AF37] shrink-0 mt-0.5">
-                    <Star size={14} fill="currentColor" />
-                  </div>
-                  <div>
-                    <span className="text-[#F5E9D6] text-[14px] block">เหมาะสำหรับผู้เตรียมสอบตำแหน่ง{pkg.name}</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* 5. SAMPLES (col-span-7) */}
-            <div className="lg:col-span-7 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-8 shadow-2xl flex flex-col">
-              <h3 className="text-[#D4AF37] text-[18px] font-bold font-display mb-8">ตัวอย่างชุดข้อสอบ</h3>
+            {/* 5. EXAM SETS */}
+            <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                  <Check size={20} />
+                </div>
+                <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">ชุดข้อสอบ</h3>
+              </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">
-                {sampleTopics.map((topic: any, i: number) => (
-                  <div key={i} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 flex flex-col justify-between hover:border-[rgba(212,175,55,0.3)] transition-colors group">
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        {topic.is_sample && (
-                          <span className="bg-[#22C55E]/10 text-[#22C55E] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ทดลองทำฟรี</span>
-                        )}
-                        <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2 py-0.5 rounded uppercase">{pkg.package_code}</span>
-                      </div>
-                      
-                      <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-4 leading-snug group-hover:text-[#D4AF37] transition-colors line-clamp-3">
-                        {topic.name} {topic.is_sample && '(Sample)'}
-                      </h4>
-                      
-                      <div className="flex items-center gap-4 text-[#A1866B] text-[12px] mb-6">
-                        <div className="flex items-center gap-1.5"><Clock size={12}/> {topic.duration_minutes} นาที</div>
-                      </div>
-                    </div>
-
-                    <Link href={`/quiz/${topic.id}`} className="block w-full mt-auto">
-                      <button className="w-full bg-transparent hover:bg-[#D4AF37]/5 border border-[#D4AF37]/50 text-[#D4AF37] font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors text-[13px]">
-                        <PlayCircle size={14} />
-                        {topic.is_sample ? 'เริ่มทดลองทำ' : 'เริ่มทำข้อสอบ'}
-                      </button>
-                    </Link>
+              <div className="space-y-4 flex-1">
+                {sortedExamSets.length > 0 ? (
+                  sortedExamSets.map((topic: any) => {
+                    const qCount = topic.exam_set_questions?.[0]?.count || 0
+                    return (
+                      <Link href={`/quiz/${topic.id}`} key={topic.id} className="block">
+                        <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col relative overflow-hidden">
+                          {topic.is_sample && (
+                            <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">
+                              Sample
+                            </div>
+                          )}
+                          <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-2 leading-snug group-hover:text-[#D4AF37] transition-colors pr-12">{topic.name}</h4>
+                          <p className="text-[#A1866B] text-[12px] mb-4 line-clamp-2">{topic.description || 'ชุดข้อสอบจำลองสนามจริง'}</p>
+                          <div className="flex gap-4 text-[#A1866B] text-[12px] mt-auto pt-2 border-t border-[rgba(255,255,255,0.05)]">
+                            <div className="flex items-center gap-1.5"><Clock size={12}/> {topic.duration_minutes} นาที</div>
+                            <div className="flex items-center gap-1.5"><FileText size={12}/> {qCount} ข้อ</div>
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })
+                ) : (
+                  <div className="h-40 border border-dashed border-[rgba(255,255,255,0.1)] rounded-xl flex items-center justify-center text-[#A1866B] text-[13px]">
+                    กำลังจัดเตรียมชุดข้อสอบ
                   </div>
-                ))}
-                
-                {/* Fallbacks if less than 3 topics to match the 3-column look in the mockup */}
-                {sampleTopics.length < 3 && Array.from({ length: 3 - sampleTopics.length }).map((_, i) => (
-                   <div key={`empty-${i}`} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.02)] rounded-2xl p-5 opacity-50 flex items-center justify-center text-[#A1866B] text-sm">
-                      Coming Soon
-                   </div>
-                ))}
+                )}
               </div>
             </div>
 

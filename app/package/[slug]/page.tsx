@@ -22,39 +22,18 @@ export default async function PackagePage({ params }: PageProps) {
       },
     }
   )
-  
-  // Skip calling Supabase if using dummy URL to prevent hanging
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://dummy.supabase.co') {
-     // Return a mocked supabase object if local db is not ready, to prevent crashing the UI preview
-     const mockSupabasePkg = {
-       id: 'dummy-id',
-       slug: slug,
-       package_code: 'PM01',
-       name: 'นักวิเคราะห์นโยบายและแผน',
-       org_name: 'สำนักงานปลัดกระทรวง อว.',
-       logo_url: '/logo.png',
-       cover_image_url: null,
-       current_price: 99,
-       original_price: 249,
-       discount_percent: 60,
-       total_questions: 2135,
-       total_exam_sets: 23,
-       total_categories: 2,
-       difficulty: 'Mixed',
-       features: ['Detailed Explanations', 'Mock Exam Mode', 'Progress Tracking', 'AI Analysis', 'Unlimited Updates'],
-       description: 'เตรียมความพร้อมสำหรับการสอบตำแหน่งนักวิเคราะห์นโยบายและแผน สำนักงานปลัดกระทรวง อว. ครอบคลุมความรู้ด้านนโยบายสาธารณะ การวางแผนยุทธศาสตร์ การบริหารภาครัฐ กฎหมายที่เกี่ยวข้อง และความรู้เฉพาะตำแหน่ง พร้อมเฉลยละเอียดทุกข้อ',
-       exam_sets: [
-         { id: '1', name: 'พ.ร.บ. แผนด้านการอุดมศึกษาฯ', duration_minutes: 60, is_sample: true, sort_order: 1 },
-         { id: '2', name: 'กรอบนโยบายและยุทธศาสตร์ อววน.', duration_minutes: 60, is_sample: true, sort_order: 2 },
-         { id: '3', name: 'ความรู้ทางด้านภาษาอังกฤษ', duration_minutes: 60, is_sample: false, sort_order: 3 },
-       ]
-     }
-     return <PackageClient pkg={mockSupabasePkg as any} examSets={mockSupabasePkg.exam_sets || []} summaries={[]} isPurchased={false} />
-  }
 
   const { data: pkg, error } = await supabase
     .from('packages')
-    .select('*, exam_sets(*)')
+    .select(`
+      *,
+      organizations(name, logo_url),
+      positions(name),
+      exam_sets(
+        *,
+        exam_set_questions(count)
+      )
+    `)
     .eq('slug', slug)
     .single()
   
@@ -65,12 +44,24 @@ export default async function PackagePage({ params }: PageProps) {
   // Fetch Summaries
   const { data: summaries } = await supabase
     .from('summaries')
-    .select('id, title, slug, subject, topic, read_time_minutes, updated_at')
+    .select('id, title, slug, subject, topic, read_time_minutes, updated_at, is_published')
     .eq('package_id', pkg.id)
     .eq('is_published', true)
     .order('sort_order', { ascending: true })
 
-  const isPurchased = false // NOTE: Replace with actual purchase check logic later
+  // Purchase check
+  let isPurchased = false
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: order } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('package_id', pkg.id)
+      .eq('status', 'completed')
+      .maybeSingle()
+    if (order) isPurchased = true
+  }
 
   return <PackageClient pkg={pkg} examSets={pkg.exam_sets || []} summaries={summaries || []} isPurchased={isPurchased} />
 }

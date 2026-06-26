@@ -10,40 +10,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบก่อน' }, { status: 401 })
     }
 
-    const { examId, token } = await request.json()
+    const { packageId, token } = await request.json()
 
-    if (!examId || !token) {
+    if (!packageId || !token) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
     }
 
-    // ดึงราคา exam จาก DB
-    const { data: exam, error: examError } = await supabase
-      .from('exams')
-      .select('id, title, price, is_active')
-      .eq('id', examId)
+    // ดึงราคา package จาก DB
+    const { data: pkg, error: pkgError } = await supabase
+      .from('packages')
+      .select('id, name, current_price, is_published')
+      .eq('id', packageId)
       .single()
 
-    if (examError || !exam || !exam.is_active) {
-      return NextResponse.json({ error: 'ไม่พบชุดข้อสอบ' }, { status: 404 })
+    if (pkgError || !pkg || !pkg.is_published) {
+      return NextResponse.json({ error: 'ไม่พบแพ็กเกจ หรือแพ็กเกจยังไม่เปิดขาย' }, { status: 404 })
     }
 
-    // ตรวจสอบว่าซื้อแล้วหรือยัง
-    const now = new Date().toISOString()
-    const { data: existingToken } = await supabase
-      .from('access_tokens')
-      .select('id, expires_at')
+    // ตรวจสอบว่าซื้อไปแล้วหรือยัง
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('id')
       .eq('user_id', user.id)
-      .eq('exam_id', examId)
-      .gt('expires_at', now)
-      .single()
+      .eq('package_id', packageId)
+      .eq('status', 'completed')
+      .maybeSingle()
 
-    if (existingToken) {
-      return NextResponse.json({ error: 'คุณมีสิทธิ์เข้าถึงชุดข้อสอบนี้แล้ว' }, { status: 409 })
+    if (existingOrder) {
+      return NextResponse.json({ error: 'คุณมีสิทธิ์เข้าถึงแพ็กเกจนี้แล้ว' }, { status: 409 })
     }
 
     // เรียก Omise API
     const omiseSecretKey = process.env.OMISE_SECRET_KEY!
-    const amountSatang = exam.price * 100 // Omise ใช้สตางค์
+    const amountSatang = pkg.current_price * 100 // Omise ใช้สตางค์
 
     const chargeRes = await fetch('https://api.omise.co/charges', {
       method: 'POST',
@@ -55,9 +54,9 @@ export async function POST(request: NextRequest) {
         amount: amountSatang,
         currency: 'thb',
         card: token,
-        description: `สอบได้ — ${exam.title}`,
+        description: `สอบได้ — ${pkg.name}`,
         metadata: {
-          exam_id: examId,
+          package_id: packageId,
           user_id: user.id,
           user_email: user.email,
         },
@@ -71,36 +70,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: msg }, { status: 400 })
     }
 
-    // บันทึก order
-    const { data: order } = await supabase
+    // บันทึก order ทันทีที่ API ชำระเงินสร้าง charge
+    // ถึงแม้สถานะอาจจะเป็น pending หรือ paid ก็บันทึก
+    const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         user_id: user.id,
-        exam_id: examId,
-        amount: exam.price,
-        status: charge.paid ? 'paid' : 'pending',
-        omise_charge_id: charge.id,
-        paid_at: charge.paid ? new Date().toISOString() : null,
+        package_id: packageId,
+        amount: pkg.current_price,
+        payment_provider: 'omise',
+        status: charge.paid ? 'completed' : 'pending',
       })
       .select()
       .single()
+      
+    if (orderError) {
+       console.error('Insert order error:', orderError)
+    }
 
-    // ถ้าชำระสำเร็จ สร้าง access_token ทันที
+    // ถ้าชำระสำเร็จ ก็ถือว่าจบกระบวนการ
     if (charge.paid && order) {
-      const expiresAt = new Date()
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1)
-
-      await supabase.from('access_tokens').insert({
-        user_id: user.id,
-        exam_id: examId,
-        order_id: order.id,
-        expires_at: expiresAt.toISOString(),
-      })
-
       return NextResponse.json({
         success: true,
         message: 'ชำระเงินสำเร็จ!',
-        redirect: `/quiz/${examId}`,
       })
     }
 

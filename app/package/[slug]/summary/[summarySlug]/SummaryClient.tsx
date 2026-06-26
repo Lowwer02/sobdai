@@ -12,10 +12,16 @@ interface SummaryClientProps {
   summary: any
   prevSummary: any | null
   nextSummary: any | null
+  allSummaries: any[]
+  hasExamSets: boolean
 }
 
-export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }: SummaryClientProps) {
+export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, allSummaries, hasExamSets }: SummaryClientProps) {
   const [headings, setHeadings] = useState<{ id: string, text: string, level: number }[]>([])
+  const [scrollProgress, setScrollProgress] = useState(0)
+  const [activeHeadingId, setActiveHeadingId] = useState<string>('')
+  const [showMobileTOC, setShowMobileTOC] = useState(false)
+  const relatedSummaries = allSummaries.filter(s => s.id !== summary.id).slice(0, 3)
 
   useEffect(() => {
     // Basic extraction of headings from markdown for TOC
@@ -33,13 +39,50 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }
     setHeadings(extracted)
   }, [summary.content_md])
 
+  // Scroll Progress
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalScroll = document.documentElement.scrollTop
+      const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight
+      const scroll = `${totalScroll / windowHeight}`
+      setScrollProgress(Number(scroll) * 100)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // Intersection Observer for Active TOC
+  useEffect(() => {
+    const observerCallback: IntersectionObserverCallback = (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveHeadingId(entry.target.id)
+        }
+      })
+    }
+    const observer = new IntersectionObserver(observerCallback, {
+      rootMargin: '-100px 0px -70% 0px',
+    })
+
+    headings.forEach((h) => {
+      const el = document.getElementById(h.id)
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [headings])
+
   return (
     <div className="min-h-screen pb-20 font-sans selection:bg-[#D4AF37]/30 selection:text-[#F5E9D6]" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       
       {/* Top Navigation */}
       <div className="sticky top-0 z-50 bg-[#0F0B07]/80 backdrop-blur-xl border-b border-[rgba(212,175,55,0.1)]">
+        {/* Progress Bar */}
+        <div className="absolute top-0 left-0 h-[2px] bg-[#D4AF37] transition-all duration-150 ease-out z-50" style={{ width: `${scrollProgress}%` }} />
+        
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
-          <Link href={`/package/${pkg.slug}`} className="flex items-center gap-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors text-sm font-medium">
+          <Link href={`/package/${pkg.slug}`} className="flex items-center gap-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded-lg px-2 py-1 -ml-2" aria-label={`กลับไปที่แพ็กเกจ ${pkg.name}`}>
             <ChevronLeft size={16} />
             กลับไปที่ {pkg.name}
           </Link>
@@ -155,25 +198,28 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }
           {/* Bottom Actions */}
           <div className="mt-16 pt-8 border-t border-[rgba(255,255,255,0.05)] flex flex-col gap-8">
             
-            {/* Take Quiz Button */}
-            <div className="bg-gradient-to-r from-[#D4AF37]/10 to-[#1A140E] rounded-2xl p-8 border border-[#D4AF37]/20 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
-              <div>
-                <h3 className="text-xl font-bold text-[#F5E9D6] mb-2">ทดสอบความเข้าใจของคุณ</h3>
-                <p className="text-[#A1866B] text-sm max-w-md">เมื่ออ่านสรุปจบแล้ว ลองทำข้อสอบเฉพาะหัวข้อนี้ เพื่อวัดระดับความเข้าใจและเตรียมความพร้อมสู่สนามสอบจริง</p>
+            {/* Continue to Exam Sets CTA */}
+            {hasExamSets && (
+              <div className="bg-gradient-to-r from-[#D4AF37]/10 to-[#1A140E] rounded-2xl p-8 border border-[#D4AF37]/20 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
+                <div>
+                  <h3 className="text-xl font-bold text-[#F5E9D6] mb-2">ทดสอบความเข้าใจของคุณ</h3>
+                  <p className="text-[#A1866B] text-sm max-w-md">เมื่ออ่านสรุปจบแล้ว ลองทำชุดข้อสอบเพื่อวัดระดับความเข้าใจและเตรียมความพร้อมสู่สนามสอบจริง</p>
+                </div>
+                <Link 
+                  href={`/package/${pkg.slug}#resources`}
+                  className="flex-shrink-0 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.3)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50"
+                  aria-label="ไปที่ชุดข้อสอบ"
+                >
+                  <PenTool size={18} />
+                  ไปที่ชุดข้อสอบ
+                </Link>
               </div>
-              <Link 
-                href={`/quiz/mini?topic=${encodeURIComponent(summary.topic || '')}&law=${encodeURIComponent(summary.law || '')}&subject=${encodeURIComponent(summary.subject || '')}`}
-                className="flex-shrink-0 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.3)]"
-              >
-                <PenTool size={18} />
-                ทำข้อสอบหัวข้อนี้
-              </Link>
-            </div>
+            )}
 
             {/* Pagination */}
-            <div className="flex flex-col sm:flex-row items-stretch gap-4">
+            <nav className="flex flex-col sm:flex-row items-stretch gap-4" aria-label="Summary Navigation">
               {prevSummary ? (
-                <Link href={`/package/${pkg.slug}/summary/${prevSummary.slug}`} className="flex-1 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] hover:border-[#D4AF37]/30 transition-colors group flex items-center gap-4">
+                <Link href={`/package/${pkg.slug}/summary/${prevSummary.slug}`} className="flex-1 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] hover:border-[#D4AF37]/30 transition-colors group flex items-center gap-4 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]">
                   <div className="w-8 h-8 rounded-full bg-[#0F0B07] flex items-center justify-center text-[#A1866B] group-hover:text-[#D4AF37] transition-colors">
                     <ChevronLeft size={16} />
                   </div>
@@ -185,7 +231,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }
               ) : <div className="flex-1" />}
               
               {nextSummary ? (
-                <Link href={`/package/${pkg.slug}/summary/${nextSummary.slug}`} className="flex-1 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] hover:border-[#D4AF37]/30 transition-colors group flex items-center justify-end gap-4 text-right">
+                <Link href={`/package/${pkg.slug}/summary/${nextSummary.slug}`} className="flex-1 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] hover:border-[#D4AF37]/30 transition-colors group flex items-center justify-end gap-4 text-right focus:outline-none focus:ring-2 focus:ring-[#D4AF37]">
                   <div>
                     <div className="text-[10px] uppercase font-bold text-[#A1866B] mb-1">บทถัดไป</div>
                     <div className="text-sm font-bold text-[#F5E9D6] group-hover:text-[#D4AF37] transition-colors line-clamp-1">{nextSummary.title}</div>
@@ -195,7 +241,21 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }
                   </div>
                 </Link>
               ) : <div className="flex-1" />}
-            </div>
+            </nav>
+
+            {/* Related Summaries */}
+            {relatedSummaries.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-[#F5E9D6] text-[18px] font-bold font-display mb-6 border-b border-[rgba(255,255,255,0.05)] pb-4">บทความที่เกี่ยวข้องในแพ็กเกจนี้</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {relatedSummaries.map((rel: any) => (
+                    <Link href={`/package/${pkg.slug}/summary/${rel.slug}`} key={rel.id} className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] p-4 rounded-xl hover:border-[#D4AF37]/30 transition-colors group focus:outline-none focus:ring-2 focus:ring-[#D4AF37]">
+                      <h4 className="text-[13px] font-bold text-[#F5E9D6] group-hover:text-[#D4AF37] transition-colors line-clamp-2 leading-snug">{rel.title}</h4>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
         </main>
@@ -211,7 +271,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }
                 <a 
                   key={i} 
                   href={`#${h.id}`}
-                  className={`block text-[13px] leading-snug py-1 text-[#A1866B] hover:text-[#D4AF37] transition-colors ${h.level === 3 ? 'pl-4 text-[12px] opacity-80' : ''}`}
+                  className={`block text-[13px] leading-snug py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-[#D4AF37] rounded px-1 -mx-1 ${h.id === activeHeadingId ? 'text-[#D4AF37] font-bold' : 'text-[#A1866B] hover:text-[#F5E9D6]'} ${h.level === 3 ? 'pl-5 text-[12px] opacity-80' : ''}`}
                 >
                   {h.text}
                 </a>
@@ -231,6 +291,50 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary }
         </aside>
 
       </div>
+
+      {/* Mobile TOC FAB */}
+      <button 
+        onClick={() => setShowMobileTOC(true)}
+        className="lg:hidden fixed bottom-6 right-6 z-40 bg-[#D4AF37] text-[#1A140E] w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(212,175,55,0.4)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50 active:scale-95 transition-transform"
+        aria-label="เปิดสารบัญ"
+      >
+        <LayoutList size={24} />
+      </button>
+
+      {/* Mobile TOC Bottom Sheet */}
+      {showMobileTOC && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end lg:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowMobileTOC(false)} aria-hidden="true" />
+          <div className="bg-[#1A140E] w-full rounded-t-3xl p-6 relative flex flex-col max-h-[80vh] border-t border-[rgba(212,175,55,0.2)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transform transition-transform duration-300 translate-y-0">
+            <div className="w-12 h-1.5 bg-[rgba(255,255,255,0.1)] rounded-full mx-auto mb-6" />
+            <h4 className="text-[14px] uppercase font-bold text-[#F5E9D6] tracking-wider mb-4 flex items-center gap-2 border-b border-[rgba(255,255,255,0.05)] pb-4">
+              <LayoutList size={16} className="text-[#D4AF37]" /> สารบัญเนื้อหา
+            </h4>
+            <div className="flex-1 overflow-y-auto custom-scrollbar mb-4">
+              <nav className="space-y-1">
+                {headings.length > 0 ? headings.map((h, i) => (
+                  <a 
+                    key={i} 
+                    href={`#${h.id}`}
+                    onClick={() => setShowMobileTOC(false)}
+                    className={`block leading-snug py-2.5 rounded-lg px-3 transition-colors ${h.id === activeHeadingId ? 'bg-[#D4AF37]/10 text-[#D4AF37] font-bold' : 'text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.02)]'} ${h.level === 3 ? 'pl-8 text-[13px]' : 'text-[14px]'}`}
+                  >
+                    {h.text}
+                  </a>
+                )) : (
+                  <div className="text-sm text-[#A1866B] italic px-3">ไม่มีหัวข้อย่อย</div>
+                )}
+              </nav>
+            </div>
+            <button 
+              onClick={() => setShowMobileTOC(false)}
+              className="w-full bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] text-[#F5E9D6] font-bold py-3.5 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+            >
+              ปิดสารบัญ
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

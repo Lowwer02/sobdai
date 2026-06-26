@@ -68,9 +68,26 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
     .eq('is_published', true)
     .order('sort_order', { ascending: true })
 
+  // Check if package has Exam Sets
+  const { count: examSetsCount } = await supabase
+    .from('exam_sets')
+    .select('id', { count: 'exact', head: true })
+    .eq('package_id', pkg.id)
+
+  const hasExamSets = (examSetsCount || 0) > 0
+
   const currentIndex = allSummaries?.findIndex((s: any) => s.id === summary.id) || 0
   const prevSummary = currentIndex > 0 ? allSummaries![currentIndex - 1] : null
   const nextSummary = allSummaries && currentIndex < allSummaries.length - 1 ? allSummaries[currentIndex + 1] : null
 
-  return <SummaryClient pkg={pkg} summary={summary} prevSummary={prevSummary} nextSummary={nextSummary} />
+  return (
+    <SummaryClient 
+      pkg={pkg} 
+      summary={summary} 
+      prevSummary={prevSummary} 
+      nextSummary={nextSummary} 
+      allSummaries={allSummaries || []}
+      hasExamSets={hasExamSets}
+    />
+  )
 }
