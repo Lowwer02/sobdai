@@ -6,7 +6,7 @@ export interface SummaryMetadata {
   subject?: string
   law?: string
   topic?: string
-  package?: string
+  package_slug?: string
   published?: boolean
   sort?: number
 }
@@ -39,11 +39,11 @@ export function parseMarkdownSummary(markdown: string): ParsedSummary {
 
   const title = data.title || ''
   const slug = data.slug || ''
-  const pkg = data.package || ''
+  const pkgSlug = data.package_slug || ''
   
   if (!title) errors.push('Missing "title" in metadata')
   if (!slug) errors.push('Missing "slug" in metadata')
-  if (!pkg) errors.push('Missing "package" in metadata')
+  if (!pkgSlug) errors.push('Missing "package_slug" in metadata')
   if (!content.trim()) errors.push('Markdown body is empty')
 
   const wordCount = content.trim().split(/\s+/).length
@@ -56,7 +56,7 @@ export function parseMarkdownSummary(markdown: string): ParsedSummary {
       subject: data.subject || '',
       law: data.law || '',
       topic: data.topic || '',
-      package: pkg,
+      package_slug: pkgSlug,
       published: data.published === true || data.published === 'true',
       sort: data.sort ? parseInt(data.sort, 10) : 0
     },

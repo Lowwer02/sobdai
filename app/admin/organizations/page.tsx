@@ -1,11 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import CreateClient from './CreateClient'
+import OrganizationsClient from './OrganizationsClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CreatePackagePage() {
+export default async function OrganizationsPage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,17 +28,10 @@ export default async function CreatePackagePage() {
 
   if (profile?.role !== 'admin') redirect('/admin')
 
-  // Fetch all orgs
-  const { data: orgs } = await supabase
+  const { data: organizations } = await supabase
     .from('organizations')
-    .select('id, name, code')
-    .order('name', { ascending: true })
+    .select('*')
+    .order('created_at', { ascending: false })
 
-  // Fetch all positions
-  const { data: positions } = await supabase
-    .from('positions')
-    .select('id, organization_id, code, name')
-    .order('name', { ascending: true })
-
-  return <CreateClient organizations={orgs || []} positions={positions || []} />
+  return <OrganizationsClient organizations={organizations || []} />
 }

@@ -19,15 +19,20 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
     }
   )
 
-  const { data: pkg, error } = await supabase
-    .from('packages')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const { data: pkg } = await supabase.from('packages').select('*').eq('id', id).single()
+  if (!pkg) notFound()
 
-  if (error || !pkg) {
-    notFound()
-  }
+  // Fetch all orgs
+  const { data: orgs } = await supabase
+    .from('organizations')
+    .select('id, name, code')
+    .order('name', { ascending: true })
 
-  return <EditClient pkg={pkg} />
+  // Fetch all positions
+  const { data: positions } = await supabase
+    .from('positions')
+    .select('id, organization_id, code, name')
+    .order('name', { ascending: true })
+
+  return <EditClient pkg={pkg} organizations={orgs || []} positions={positions || []} />
 }

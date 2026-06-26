@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library } from 'lucide-react'
 
 const learningNav = [
   { name: 'Packages', href: '/admin/packages', icon: Package },
@@ -10,6 +10,8 @@ const learningNav = [
 ]
 
 const managementNav = [
+  { name: 'Organizations', href: '/admin/organizations', icon: Building2 },
+  { name: 'Positions', href: '/admin/positions', icon: UserCircle2 },
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
 ]

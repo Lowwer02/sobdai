@@ -60,6 +60,19 @@ export async function createPackageAction(formData: FormData) {
   try {
     const supabase = await createAdminClient()
 
+    const orgId = formData.get('organization_id') as string
+    const posId = formData.get('position_id') as string
+    const examYear = formData.get('exam_year') as string
+    const version = formData.get('version') as string
+
+    // Fetch codes for auto-generation
+    const { data: org } = await supabase.from('organizations').select('code').eq('id', orgId).single()
+    const { data: pos } = await supabase.from('positions').select('code').eq('id', posId).single()
+
+    if (!org || !pos) throw new Error('Invalid organization or position')
+
+    const packageCode = `${org.code}-${pos.code}-${examYear}-V${version.replace(/\./g, '')}`
+
     let slug = formData.get('slug') as string
     const name = formData.get('name') as string
     
@@ -70,10 +83,13 @@ export async function createPackageAction(formData: FormData) {
     }
 
     const payload = {
-      package_code: formData.get('package_code') as string,
+      package_code: packageCode,
+      organization_id: orgId,
+      position_id: posId,
+      exam_year: examYear,
+      version: version,
       slug,
       name,
-      org_name: formData.get('org_name') as string,
       logo_url: (formData.get('logo_url') as string) || null,
       cover_image_url: (formData.get('cover_image_url') as string) || null,
       description: formData.get('description') as string,
@@ -105,6 +121,19 @@ export async function updatePackageAction(id: string, formData: FormData) {
   try {
     const supabase = await createAdminClient()
 
+    const orgId = formData.get('organization_id') as string
+    const posId = formData.get('position_id') as string
+    const examYear = formData.get('exam_year') as string
+    const version = formData.get('version') as string
+
+    // Fetch codes for auto-generation
+    const { data: org } = await supabase.from('organizations').select('code').eq('id', orgId).single()
+    const { data: pos } = await supabase.from('positions').select('code').eq('id', posId).single()
+
+    if (!org || !pos) throw new Error('Invalid organization or position')
+
+    const packageCode = `${org.code}-${pos.code}-${examYear}-V${version.replace(/\./g, '')}`
+
     let slug = formData.get('slug') as string
     const name = formData.get('name') as string
     
@@ -115,10 +144,13 @@ export async function updatePackageAction(id: string, formData: FormData) {
     }
 
     const payload = {
-      package_code: formData.get('package_code') as string,
+      package_code: packageCode,
+      organization_id: orgId,
+      position_id: posId,
+      exam_year: examYear,
+      version: version,
       slug,
       name,
-      org_name: formData.get('org_name') as string,
       logo_url: (formData.get('logo_url') as string) || null,
       cover_image_url: (formData.get('cover_image_url') as string) || null,
       description: formData.get('description') as string,

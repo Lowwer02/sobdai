@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useState, useTransition, useMemo } from 'react'
-import { ArrowLeft, Save, Loader2, Trash2 } from 'lucide-react'
-import { updatePackageAction } from '../../actions'
+import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { createPackageAction } from '../actions'
 
 const availableFeatures = [
   'Detailed Explanations', 
@@ -13,13 +13,13 @@ const availableFeatures = [
   'Unlimited Updates'
 ]
 
-export default function EditClient({ pkg, organizations, positions }: { pkg: any, organizations: any[], positions: any[] }) {
+export default function CreateClient({ organizations, positions }: { organizations: any[], positions: any[] }) {
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState('')
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(pkg.features || [])
-
-  const [selectedOrg, setSelectedOrg] = useState(pkg.organization_id || '')
-  const [selectedPos, setSelectedPos] = useState(pkg.position_id || '')
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(availableFeatures)
+  
+  const [selectedOrg, setSelectedOrg] = useState('')
+  const [selectedPos, setSelectedPos] = useState('')
 
   const filteredPositions = useMemo(() => {
     if (!selectedOrg) return []
@@ -41,7 +41,7 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
     formData.append('features', JSON.stringify(selectedFeatures))
 
     startTransition(async () => {
-      const result = await updatePackageAction(pkg.id, formData)
+      const result = await createPackageAction(formData)
       if (result?.error) {
         setErrorMsg(result.error)
       }
@@ -57,13 +57,13 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
           </button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Edit Package</h1>
-          <p className="text-[#A1866B] mt-1">Update details for {pkg.name}</p>
+          <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Create Package</h1>
+          <p className="text-[#A1866B] mt-1">Add a new exam package to the platform.</p>
         </div>
         
         <div className="ml-auto flex items-center gap-3">
-          <button type="button" className="p-2 rounded-xl text-[#A1866B] hover:text-red-400 hover:bg-red-400/10 transition-colors">
-            <Trash2 size={20} />
+          <button type="button" className="px-4 py-2 rounded-xl text-[#A1866B] font-medium hover:text-[#F5E9D6] transition-colors">
+            Save Draft
           </button>
           <button 
             type="submit" 
@@ -71,7 +71,7 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-6 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
           >
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            Save Changes
+            Publish Package
           </button>
         </div>
       </div>
@@ -128,11 +128,11 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Exam Year *</label>
-                <input required name="exam_year" type="number" defaultValue={pkg.exam_year} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+                <input required name="exam_year" type="number" defaultValue={new Date().getFullYear()} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Version *</label>
-                <input required name="version" type="text" defaultValue={pkg.version} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+                <input required name="version" type="text" defaultValue="1.0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
               </div>
             </div>
           </div>
@@ -141,25 +141,19 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 shadow-xl space-y-5">
             <h2 className="text-[#D4AF37] font-bold font-display text-lg mb-4">Package Details</h2>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm text-[#F5E9D6] font-medium block">Package Code *</label>
-                <input required name="package_code" type="text" defaultValue={pkg.package_code} readOnly className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2.5 focus:outline-none transition-colors opacity-70 cursor-not-allowed" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-[#F5E9D6] font-medium block">URL Slug</label>
-                <input name="slug" type="text" defaultValue={pkg.slug} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Package Name *</label>
+              <input required name="name" type="text" placeholder="e.g. ตะลุยโจทย์นักวิเคราะห์นโยบายและแผน" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm text-[#F5E9D6] font-medium block">Package Name *</label>
-              <input required name="name" type="text" defaultValue={pkg.name} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <label className="text-sm text-[#F5E9D6] font-medium block">URL Slug <span className="text-[#A1866B] text-xs font-normal">(Auto-generates if empty)</span></label>
+              <input name="slug" type="text" placeholder="e.g. policy-analyst-2026" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
-            
+
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Description</label>
-              <textarea name="description" rows={5} defaultValue={pkg.description} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-3 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
+              <textarea name="description" rows={5} placeholder="Write a compelling description for this package..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-3 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
             </div>
           </div>
 
@@ -170,12 +164,12 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Organization Logo URL</label>
-                <input name="logo_url" type="text" defaultValue={pkg.logo_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+                <input name="logo_url" type="text" placeholder="e.g. /logo.png or https://..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
               </div>
 
               <div className="space-y-3">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Cover Image URL</label>
-                <input name="cover_image_url" type="text" defaultValue={pkg.cover_image_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+                <input name="cover_image_url" type="text" placeholder="e.g. https://..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
               </div>
             </div>
           </div>
@@ -191,12 +185,12 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Current Price (THB) *</label>
-              <input required name="current_price" type="number" defaultValue={pkg.current_price} min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#D4AF37] font-bold text-lg rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input required name="current_price" type="number" defaultValue="99" min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#D4AF37] font-bold text-lg rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Original Price (THB) *</label>
-              <input required name="original_price" type="number" defaultValue={pkg.original_price} min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input required name="original_price" type="number" defaultValue="249" min="0" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
           </div>
 
@@ -206,7 +200,7 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Difficulty Level</label>
-              <select name="difficulty" defaultValue={pkg.difficulty} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors appearance-none">
+              <select name="difficulty" defaultValue="Mixed" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors appearance-none">
                 <option value="Mixed">Mixed (All levels)</option>
                 <option value="Easy">Easy</option>
                 <option value="Medium">Medium</option>
@@ -238,12 +232,12 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">SEO Title</label>
-              <input name="seo_title" type="text" defaultValue={pkg.seo_title} placeholder="Title for search engines..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <input name="seo_title" type="text" placeholder="Title for search engines..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
             
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">SEO Description</label>
-              <textarea name="seo_description" rows={3} defaultValue={pkg.seo_description} placeholder="Meta description..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
+              <textarea name="seo_description" rows={3} placeholder="Meta description..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors resize-none"></textarea>
             </div>
           </div>
 

@@ -215,7 +215,7 @@ export default function SummaryImportPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[#A1866B]">Package Ref</span>
-                        <span className="text-[#D4AF37] font-bold">{parsedData.metadata.package}</span>
+                        <span className="text-[#D4AF37] font-bold">{parsedData.metadata.package_slug}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[#A1866B]">Status</span>

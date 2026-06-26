@@ -37,11 +37,11 @@ export async function validateSummaryImport(metadata: any) {
     const { data: pkg, error: pkgError } = await supabase
       .from('packages')
       .select('id, name')
-      .or(`slug.eq.${metadata.package},package_code.eq.${metadata.package}`)
+      .eq('slug', metadata.package_slug)
       .single()
 
     if (pkgError || !pkg) {
-      return { success: false, error: `Package not found for identifier: ${metadata.package}` }
+      return { success: false, error: `Package not found for slug: ${metadata.package_slug}` }
     }
 
     // Check Slug conflict
