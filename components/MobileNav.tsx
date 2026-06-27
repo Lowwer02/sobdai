@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
 
 function BookOpenIcon() {
@@ -58,6 +59,11 @@ interface MobileNavProps {
 
 export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick, onSignOut }: MobileNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Mobile Menu Accessiblity
   useEffect(() => {
@@ -145,79 +151,85 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
         </button>
       </nav>
 
-      {/* Backdrop */}
-      <div 
-        className={`fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        onClick={() => setMenuOpen(false)}
-        aria-hidden="true"
-      />
-
-      {/* Bottom Sheet */}
-      <div 
-        className={`fixed bottom-0 left-0 w-full z-[55] bg-[#1A140E] border-t border-[rgba(212,175,55,0.15)] rounded-t-[32px] p-6 pb-12 transition-transform duration-300 ease-in-out flex flex-col gap-2 ${menuOpen ? 'translate-y-0 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]' : 'translate-y-full'}`}
-        role="dialog"
-        aria-label="เมนูนำทาง"
-      >
-        <div className="w-12 h-1.5 bg-[#F5E9D6]/10 rounded-full mx-auto mb-6" />
-
-        <Link
-          href="/"
-          onClick={() => setMenuOpen(false)}
-          className="p-3 text-[16px] text-[#F5E9D6] font-medium font-display rounded-xl hover:bg-[rgba(212,175,55,0.1)] transition-colors"
-        >
-          หน้าแรก
-        </Link>
-        {NAV_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
+      {/* Render Backdrop and Bottom Sheet at body level to escape navbar's backdrop-filter containing block */}
+      {mounted && createPortal(
+        <>
+          {/* Backdrop */}
+          <div 
+            className={`fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
             onClick={() => setMenuOpen(false)}
-            className="p-3 text-[16px] text-[#F5E9D6] font-medium font-display rounded-xl hover:bg-[rgba(212,175,55,0.1)] transition-colors"
-          >
-            {link.label}
-          </Link>
-        ))}
-        
-        <div className="divider my-2 opacity-50" />
+            aria-hidden="true"
+          />
 
-        {user ? (
-          <div className="flex flex-col gap-2 mt-2">
-            <div className="px-3 pb-2 text-[13px] text-[#A1866B] font-medium">
-              ลงชื่อเข้าใช้ในชื่อ: {user.email}
-            </div>
-            {isAdmin && (
-              <Link 
-                href="/admin" 
+          {/* Bottom Sheet */}
+          <div 
+            className={`fixed bottom-0 left-0 w-full z-[55] bg-[#1A140E] border-t border-[rgba(212,175,55,0.15)] rounded-t-[32px] p-6 pb-12 transition-transform duration-300 ease-in-out flex flex-col gap-2 ${menuOpen ? 'translate-y-0 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto' : 'translate-y-full pointer-events-none'}`}
+            role="dialog"
+            aria-label="เมนูนำทาง"
+          >
+            <div className="w-12 h-1.5 bg-[#F5E9D6]/10 rounded-full mx-auto mb-6" />
+
+            <Link
+              href="/"
+              onClick={() => setMenuOpen(false)}
+              className="p-3 text-[16px] text-[#F5E9D6] font-medium font-display rounded-xl hover:bg-[rgba(212,175,55,0.1)] transition-colors"
+            >
+              หน้าแรก
+            </Link>
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className="p-3 text-[16px] text-[#D4AF37] font-medium font-display rounded-xl bg-[rgba(212,175,55,0.05)] border border-[rgba(212,175,55,0.2)] hover:bg-[rgba(212,175,55,0.1)] transition-colors"
+                className="p-3 text-[16px] text-[#F5E9D6] font-medium font-display rounded-xl hover:bg-[rgba(212,175,55,0.1)] transition-colors"
               >
-                Admin Panel
+                {link.label}
               </Link>
+            ))}
+            
+            <div className="divider my-2 opacity-50" />
+
+            {user ? (
+              <div className="flex flex-col gap-2 mt-2">
+                <div className="px-3 pb-2 text-[13px] text-[#A1866B] font-medium">
+                  ลงชื่อเข้าใช้ในชื่อ: {user.email}
+                </div>
+                {isAdmin && (
+                  <Link 
+                    href="/admin" 
+                    onClick={() => setMenuOpen(false)}
+                    className="p-3 text-[16px] text-[#D4AF37] font-medium font-display rounded-xl bg-[rgba(212,175,55,0.05)] border border-[rgba(212,175,55,0.2)] hover:bg-[rgba(212,175,55,0.1)] transition-colors"
+                  >
+                    Admin Panel
+                  </Link>
+                )}
+                <button
+                  onClick={handleSignOutClick}
+                  className="p-3 text-[16px] text-[#e8786a] font-medium font-display rounded-xl text-left hover:bg-[rgba(192,57,43,0.1)] transition-colors flex items-center gap-2"
+                >
+                  <LogOutIcon /> ออกจากระบบ
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 mt-2 pb-safe">
+                <button
+                  onClick={() => { setMenuOpen(false); onLoginClick(); }}
+                  className="w-full btn-outline py-3 text-[16px] flex justify-center"
+                >
+                  เข้าสู่ระบบ
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); onRegisterClick(); }}
+                  className="w-full btn-primary py-3 text-[16px] flex justify-center text-[#1A140E]"
+                >
+                  สมัครสมาชิกฟรี
+                </button>
+              </div>
             )}
-            <button
-              onClick={handleSignOutClick}
-              className="p-3 text-[16px] text-[#e8786a] font-medium font-display rounded-xl text-left hover:bg-[rgba(192,57,43,0.1)] transition-colors flex items-center gap-2"
-            >
-              <LogOutIcon /> ออกจากระบบ
-            </button>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3 mt-2 pb-safe">
-            <button
-              onClick={() => { setMenuOpen(false); onLoginClick(); }}
-              className="w-full btn-outline py-3 text-[16px] flex justify-center"
-            >
-              เข้าสู่ระบบ
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); onRegisterClick(); }}
-              className="w-full btn-primary py-3 text-[16px] flex justify-center text-[#1A140E]"
-            >
-              สมัครสมาชิกฟรี
-            </button>
-          </div>
-        )}
-      </div>
+        </>,
+        document.body
+      )}
     </>
   )
 }
