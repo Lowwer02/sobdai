@@ -46,8 +46,8 @@ export async function proxy(request: NextRequest) {
         .eq('id', user.id)
         .single()
         
-      if (!profile || profile.role !== 'admin') {
-        return NextResponse.redirect(new URL('/', request.url)) // Redirect to home if not admin
+      if (!profile || profile.role === 'user') {
+        return NextResponse.redirect(new URL('/', request.url)) // Redirect to home if user
       }
     }
   }

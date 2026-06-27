@@ -23,7 +23,7 @@ export default function Navbar() {
       setUser(sessionUser)
       if (sessionUser) {
         const { data } = await supabase.from('profiles').select('role').eq('id', sessionUser.id).single()
-        setIsAdmin(data?.role === 'admin')
+        setIsAdmin(['admin', 'owner'].includes(data?.role))
       } else {
         setIsAdmin(false)
       }

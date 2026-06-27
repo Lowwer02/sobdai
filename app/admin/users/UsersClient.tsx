@@ -92,6 +92,9 @@ export default function UsersClient({
               <option value="">All Roles</option>
               <option value="user">User</option>
               <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
+              <option value="editor">Editor</option>
+              <option value="support">Support</option>
             </select>
 
             <select 
@@ -145,11 +148,11 @@ export default function UsersClient({
                   </td>
                   <td className="p-4">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${
-                      user.role === 'admin' 
+                      ['admin', 'owner', 'editor', 'support'].includes(user.role) 
                         ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30' 
                         : 'bg-[#0F0B07] text-[#A1866B] border-[rgba(255,255,255,0.1)]'
                     }`}>
-                      {user.role === 'admin' ? <Shield size={12} /> : <UserCircle size={12} />}
+                      {['admin', 'owner', 'editor', 'support'].includes(user.role) ? <Shield size={12} /> : <UserCircle size={12} />}
                       {user.role.toUpperCase()}
                     </span>
                   </td>
@@ -169,7 +172,7 @@ export default function UsersClient({
                         onClick={() => handleRoleToggle(user.id, user.role)}
                         disabled={actingOnId === user.id}
                         className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10 disabled:opacity-50"
-                        title={user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
+                        title={['admin', 'owner', 'editor', 'support'].includes(user.role) ? 'Demote to User' : 'Promote to Admin'}
                       >
                         {actingOnId === user.id ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
                       </button>

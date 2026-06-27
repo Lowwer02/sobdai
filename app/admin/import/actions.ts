@@ -9,20 +9,7 @@ export async function importQuestionsAction(questions: ParsedQuestion[]) {
   try {
     const { supabase } = await requirePermission('content.write')
 
-    // Check auth
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'Unauthorized' }
 
-    // Verify admin role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || profile.role !== 'admin') {
-      return { success: false, error: 'Forbidden: Admins only' }
-    }
 
     if (questions.length === 0) {
       return { success: false, error: 'No valid questions to import' }
