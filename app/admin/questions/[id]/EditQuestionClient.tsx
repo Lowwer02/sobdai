@@ -197,14 +197,14 @@ export default function EditQuestionClient({ question }: { question: any }) {
               <input defaultValue={question.topic} name="topic" type="text" placeholder="e.g. วินัยข้าราชการ" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-4">
               <label className="text-sm text-[#F5E9D6] font-medium block">Tags (Comma separated)</label>
-              <input defaultValue={(question.tags || []).join(', ')} name="tags" type="text" placeholder="e.g. algebra, basic, exam1" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors text-sm" />
+              <input defaultValue={(question.tags || []).join(', ')} name="tags" type="text" placeholder="e.g. algebra, basic, exam1" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors text-base sm:text-sm" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-4">
               <label className="text-sm text-[#F5E9D6] font-medium block">Reference Material</label>
-              <input defaultValue={question.reference} name="reference" type="text" placeholder="e.g. Book A, Page 12" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors text-sm" />
+              <input defaultValue={question.reference} name="reference" type="text" placeholder="e.g. Book A, Page 12" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#A1866B] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors text-base sm:text-sm" />
             </div>
           </div>
 

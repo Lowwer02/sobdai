@@ -73,6 +73,16 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
     return () => observer.disconnect()
   }, [headings])
 
+  // Lock body scroll when mobile TOC is open
+  useEffect(() => {
+    if (showMobileTOC) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [showMobileTOC])
+
   return (
     <div className="min-h-screen pb-20 font-sans selection:bg-[#D4AF37]/30 selection:text-[#F5E9D6]" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       
@@ -131,7 +141,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
             </div>
           </header>
 
-          <article className="prose prose-invert prose-yellow max-w-none prose-headings:font-display prose-headings:tracking-tight prose-a:text-[#D4AF37] prose-a:no-underline hover:prose-a:underline prose-img:rounded-2xl prose-img:border prose-img:border-[rgba(255,255,255,0.1)]">
+          <article className="prose prose-invert prose-yellow max-w-none w-full overflow-hidden sm:overflow-visible prose-headings:font-display prose-headings:tracking-tight prose-a:text-[#D4AF37] prose-a:no-underline hover:prose-a:underline prose-img:rounded-2xl prose-img:border prose-img:border-[rgba(255,255,255,0.1)]">
              <ReactMarkdown 
                remarkPlugins={[remarkGfm]} 
                rehypePlugins={[rehypeRaw]}

@@ -439,3 +439,11 @@ h1, h2, h3, .heading {
 }
 
 /* Sarabun font from Google Fonts (loaded in layout) */
+
+/* ===================== Safe Area Insets ===================== */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}

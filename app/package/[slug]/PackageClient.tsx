@@ -151,7 +151,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
             </div>
 
             {/* 3. PRICING STICKY (col-span-3) */}
-            <div className="lg:col-span-3 bg-[#1A140E] border border-[#D4AF37]/30 rounded-[24px] p-8 shadow-[0_0_40px_rgba(212,175,55,0.05)] sticky top-6">
+            <div className="lg:col-span-3 bg-[#1A140E] border border-[#D4AF37]/30 rounded-[24px] p-8 shadow-[0_0_40px_rgba(212,175,55,0.05)] sticky top-6 transition-all duration-300 ease-in-out">
               <h2 className="text-[#D4AF37] font-bold text-[16px] mb-6 font-display">เลือกแพ็กเกจเพื่อเริ่มเรียน</h2>
               
               <div className="text-[#A1866B] text-[14px] mb-2">แพ็กเกจนี้</div>

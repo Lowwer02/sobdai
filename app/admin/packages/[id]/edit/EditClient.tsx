@@ -170,12 +170,12 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Organization Logo URL</label>
-                <input name="logo_url" type="text" defaultValue={pkg.logo_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+                <input name="logo_url" type="text" defaultValue={pkg.logo_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-base sm:text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
               </div>
 
-              <div className="space-y-3">
-                <label className="text-sm text-[#F5E9D6] font-medium block">Cover Image URL</label>
-                <input name="cover_image_url" type="text" defaultValue={pkg.cover_image_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+              <div>
+                <label className="block text-[#A1866B] text-sm font-medium">Cover Image URL</label>
+                <input name="cover_image_url" type="text" defaultValue={pkg.cover_image_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-base sm:text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
               </div>
             </div>
           </div>
@@ -237,8 +237,8 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             <h2 className="text-[#D4AF37] font-bold font-display text-lg mb-4">SEO</h2>
             
             <div className="space-y-2">
-              <label className="text-sm text-[#F5E9D6] font-medium block">SEO Title</label>
-              <input name="seo_title" type="text" defaultValue={pkg.seo_title} placeholder="Title for search engines..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <label className="block text-[#A1866B] text-sm font-medium mb-2">SEO Title</label>
+              <input name="seo_title" type="text" defaultValue={pkg.seo_title} placeholder="Title for search engines..." className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-base sm:text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>
             
             <div className="space-y-2">

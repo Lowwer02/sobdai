@@ -331,7 +331,7 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
 
   // MAIN RUNTIME & REVIEW VIEW
   return (
-    <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
+    <div className="min-h-screen pb-32 lg:pb-24 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       
       {/* Header */}
       <div className="sticky top-0 z-50 bg-[#0F0B07]/80 backdrop-blur-xl border-b border-[rgba(212,175,55,0.1)]">
@@ -472,7 +472,7 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
                   <button 
                     key={question.id}
                     onClick={() => setCurrentIndex(i)}
-                    className={`relative p-1 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
+                    className={`relative p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
                     aria-label={`ไปข้อที่ ${i + 1}`}
                   >
                     <div className={dotClass} />
