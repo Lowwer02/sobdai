@@ -61,7 +61,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
       <main className="max-w-[1360px] mx-auto px-4 py-6 md:py-8">
         
         <div className="mb-6">
-          <Link href="/exams" className="text-[#A1866B] hover:text-[#F5E9D6] flex items-center gap-2 text-[14px] font-medium transition-colors w-fit">
+          <Link href="/#exams" className="text-[#A1866B] hover:text-[#F5E9D6] flex items-center gap-2 text-[14px] font-medium transition-colors w-fit">
             <ChevronLeft size={16} />
             แพ็กเกจทั้งหมด
           </Link>
@@ -267,7 +267,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
                   sortedExamSets.map((topic: any) => {
                     const qCount = topic.exam_set_questions?.[0]?.count || 0
                     return (
-                      <Link href={`/quiz/${topic.id}`} key={topic.id} className="block">
+                      <Link href={`/package/${pkg.slug}/exam/${topic.id}`} key={topic.id} className="block">
                         <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col relative overflow-hidden">
                           {topic.is_sample && (
                             <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">

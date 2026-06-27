@@ -19,6 +19,9 @@ interface PackageData {
     name: string
   } | null
 }
+
+export const dynamic = 'force-dynamic'
+
 const HOW_IT_WORKS = [
   {
     num: '01',
@@ -190,7 +193,7 @@ export default async function Home() {
                 ดูชุดข้อสอบ
               </button>
             </Link>
-            <Link href="/quiz/demo-1">
+            <Link href="#exams">
               <button className="btn-outline" style={{ padding: '13px 28px', fontSize: '15px' }}>
                 ทดลองทำฟรี
               </button>

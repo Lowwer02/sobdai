@@ -20,8 +20,12 @@ export const metadata: Metadata = {
     locale: 'th_TH',
     type: 'website',
   },
+}
+
+export const viewport = {
   themeColor: '#0f0b08',
-  viewport: 'width=device-width, initial-scale=1',
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({
