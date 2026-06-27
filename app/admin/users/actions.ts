@@ -1,13 +1,35 @@
 'use server'
 
 import { requirePermission } from '@/lib/auth/server-protect'
-
 import { revalidatePath } from 'next/cache'
+import { logAuditEvent } from '@/lib/audit/logger'
+import { Role } from '@/lib/auth/rbac'
 
-
-export async function updateUserRole(userId: string, newRole: 'admin' | 'user') {
+export async function updateUserRole(userId: string, newRole: Role) {
   try {
-    const { supabase } = await requirePermission('users.write')
+    const { supabase, profile } = await requirePermission('users.write')
+    
+    // Check if modifying an owner
+    const { data: targetUser, error: fetchError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+      
+    if (fetchError) throw fetchError
+
+    // If downgrading an owner, ensure there is at least one other owner
+    if (targetUser.role === 'owner' && newRole !== 'owner') {
+      const { count, error: countError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'owner')
+        
+      if (countError) throw countError
+      if (count === null || count <= 1) {
+        throw new Error('Cannot downgrade the last owner of the system.')
+      }
+    }
     
     const { error } = await supabase
       .from('profiles')
@@ -15,6 +37,16 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'user') 
       .eq('id', userId)
 
     if (error) throw error
+
+    await logAuditEvent({
+      action: 'UPDATE_ROLE',
+      entity: 'profiles',
+      entity_id: userId,
+      old_value: { role: targetUser.role },
+      new_value: { role: newRole },
+      user_id: profile?.id,
+      role: profile?.role
+    })
 
     revalidatePath('/admin/users')
     return { success: true }
@@ -25,7 +57,30 @@ export async function updateUserRole(userId: string, newRole: 'admin' | 'user') 
 
 export async function updateUserStatus(userId: string, newStatus: 'active' | 'banned') {
   try {
-    const { supabase } = await requirePermission('users.write')
+    const { supabase, profile } = await requirePermission('users.write')
+    
+    // Check if modifying an owner
+    const { data: targetUser, error: fetchError } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', userId)
+      .single()
+      
+    if (fetchError) throw fetchError
+
+    // If deactivating an owner, ensure there is at least one other owner
+    if (targetUser.role === 'owner' && newStatus !== 'active') {
+      const { count, error: countError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'owner')
+        .eq('status', 'active')
+        
+      if (countError) throw countError
+      if (count === null || count <= 1) {
+        throw new Error('Cannot deactivate the last active owner of the system.')
+      }
+    }
     
     const { error } = await supabase
       .from('profiles')
@@ -33,6 +88,16 @@ export async function updateUserStatus(userId: string, newStatus: 'active' | 'ba
       .eq('id', userId)
 
     if (error) throw error
+
+    await logAuditEvent({
+      action: 'UPDATE_STATUS',
+      entity: 'profiles',
+      entity_id: userId,
+      old_value: { status: targetUser.status },
+      new_value: { status: newStatus },
+      user_id: profile?.id,
+      role: profile?.role
+    })
 
     revalidatePath('/admin/users')
     return { success: true }
