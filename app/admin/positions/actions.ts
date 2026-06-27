@@ -1,44 +1,13 @@
 'use server'
 
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { requirePermission } from '@/lib/auth/server-protect'
+
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-async function getAdminSupabase() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {}
-        },
-      },
-    }
-  )
-  
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return { supabase, isAdmin: false }
-  
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single()
-    
-  return { supabase, isAdmin: profile?.role === 'admin' }
-}
 
 export async function createPositionAction(formData: FormData): Promise<void> {
-  const { supabase, isAdmin } = await getAdminSupabase()
-  if (!isAdmin) throw new Error('Unauthorized')
+  const { supabase } = await requirePermission('system.manage')
 
   const payload = {
     organization_id: formData.get('organization_id') as string,
@@ -55,8 +24,7 @@ export async function createPositionAction(formData: FormData): Promise<void> {
 }
 
 export async function updatePositionAction(id: string, formData: FormData): Promise<void> {
-  const { supabase, isAdmin } = await getAdminSupabase()
-  if (!isAdmin) throw new Error('Unauthorized')
+  const { supabase } = await requirePermission('system.manage')
 
   const payload = {
     organization_id: formData.get('organization_id') as string,
@@ -74,9 +42,8 @@ export async function updatePositionAction(id: string, formData: FormData): Prom
 
 export async function deletePosition(id: string) {
   try {
-    const { supabase, isAdmin } = await getAdminSupabase()
-    if (!isAdmin) return { success: false, error: 'Unauthorized' }
-
+    const { supabase } = await requirePermission('system.manage')
+    
     const { error } = await supabase.from('positions').delete().eq('id', id)
     if (error) throw error
 

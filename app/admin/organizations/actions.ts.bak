@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 
 export async function createOrganizationAction(formData: FormData): Promise<void> {
   const { supabase } = await requirePermission('system.manage')
+  if (!isAdmin) throw new Error('Unauthorized')
 
   const payload = {
     code: formData.get('code') as string,
@@ -26,6 +27,7 @@ export async function createOrganizationAction(formData: FormData): Promise<void
 
 export async function updateOrganizationAction(id: string, formData: FormData): Promise<void> {
   const { supabase } = await requirePermission('system.manage')
+  if (!isAdmin) throw new Error('Unauthorized')
 
   const payload = {
     code: formData.get('code') as string,

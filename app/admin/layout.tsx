@@ -1,26 +1,42 @@
 import Link from 'next/link'
 import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library } from 'lucide-react'
+import { getAdminSession } from '@/lib/auth/server-protect'
+import { hasPermission } from '@/lib/auth/rbac'
+import { redirect } from 'next/navigation'
 
 const learningNav = [
-  { name: 'Packages', href: '/admin/packages', icon: Package },
-  { name: 'Exam Sets', href: '/admin/exam-sets', icon: CheckSquare },
-  { name: 'Questions', href: '/admin/questions', icon: FileQuestion },
-  { name: 'Summary Bank', href: '/admin/summaries', icon: BookOpen },
-  { name: 'Import Center', href: '/admin/import', icon: UploadCloud },
+  { name: 'Packages', href: '/admin/packages', icon: Package, permission: 'content.read' },
+  { name: 'Exam Sets', href: '/admin/exam-sets', icon: CheckSquare, permission: 'content.read' },
+  { name: 'Questions', href: '/admin/questions', icon: FileQuestion, permission: 'content.read' },
+  { name: 'Summary Bank', href: '/admin/summaries', icon: BookOpen, permission: 'content.read' },
+  { name: 'Import Center', href: '/admin/import', icon: UploadCloud, permission: 'content.write' },
 ]
 
 const managementNav = [
-  { name: 'Organizations', href: '/admin/organizations', icon: Building2 },
-  { name: 'Positions', href: '/admin/positions', icon: UserCircle2 },
-  { name: 'Users', href: '/admin/users', icon: Users },
-  { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
+  { name: 'Organizations', href: '/admin/organizations', icon: Building2, permission: 'system.manage' },
+  { name: 'Positions', href: '/admin/positions', icon: UserCircle2, permission: 'system.manage' },
+  { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
+  { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
 ]
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  let profile = null
+  try {
+    const session = await getAdminSession()
+    profile = session.profile
+  } catch {
+    redirect('/admin')
+  }
+
+  const role = profile?.role || 'user'
+
+  const filteredLearningNav = learningNav.filter(item => hasPermission(role, item.permission as any))
+  const filteredManagementNav = managementNav.filter(item => hasPermission(role, item.permission as any))
+
   return (
     <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex flex-col md:flex-row font-sans">
       
@@ -47,45 +63,53 @@ export default function AdminLayout({
             </Link>
           </div>
           
-          <div className="mt-6 mb-2 px-6">
-            <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">Learning</h3>
-          </div>
-          <ul className="space-y-1 px-3">
-            {learningNav.map((item) => {
-              const Icon = item.icon
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
-                  >
-                    <Icon size={18} />
-                    <span className="text-sm font-medium">{item.name}</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+          {filteredLearningNav.length > 0 && (
+            <>
+              <div className="mt-6 mb-2 px-6">
+                <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">Learning</h3>
+              </div>
+              <ul className="space-y-1 px-3">
+                {filteredLearningNav.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <li key={item.name}>
+                      <Link
+                        href={item.href}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
+                      >
+                        <Icon size={18} />
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
 
-          <div className="mt-6 mb-2 px-6">
-            <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">Management</h3>
-          </div>
-          <ul className="space-y-1 px-3">
-            {managementNav.map((item) => {
-              const Icon = item.icon
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
-                  >
-                    <Icon size={18} />
-                    <span className="text-sm font-medium">{item.name}</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+          {filteredManagementNav.length > 0 && (
+            <>
+              <div className="mt-6 mb-2 px-6">
+                <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">Management</h3>
+              </div>
+              <ul className="space-y-1 px-3">
+                {filteredManagementNav.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <li key={item.name}>
+                      <Link
+                        href={item.href}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
+                      >
+                        <Icon size={18} />
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-[#D4AF37]/20">
@@ -105,3 +129,4 @@ export default function AdminLayout({
     </div>
   )
 }
+

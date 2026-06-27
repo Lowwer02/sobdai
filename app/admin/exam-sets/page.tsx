@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import ExamSetsClient from './ExamSetsClient'
 
 export default async function ExamSetsPage({
@@ -7,6 +6,8 @@ export default async function ExamSetsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  const { supabase, profile } = await requirePermission('content.read')
+
   const params = await searchParams
   
   const page = typeof params.page === 'string' ? parseInt(params.page) : 1
@@ -18,17 +19,7 @@ export default async function ExamSetsPage({
   const from = (page - 1) * limit
   const to = from + limit - 1
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-      },
-    }
-  )
-
+  
   // Fetch unique packages for filter
   const { data: packages } = await supabase
     .from('packages')

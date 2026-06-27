@@ -1,22 +1,11 @@
+import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import Link from 'next/link'
 import { Plus, Search, Filter, Edit, Copy, Archive } from 'lucide-react'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 
 export default async function PackagesPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-      },
-    }
-  )
+  const { supabase, profile } = await requirePermission('content.read')
 
+  
   let packages: any[] = []
   
   if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {

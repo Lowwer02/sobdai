@@ -1,22 +1,13 @@
+import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import { createPositionAction } from '../actions'
 import Link from 'next/link'
 import { ArrowLeft, Save } from 'lucide-react'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 export default async function CreatePositionPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() }
-      }
-    }
-  )
+  const { supabase, profile } = await requirePermission('system.manage')
 
+  
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) redirect('/admin')
 

@@ -1,8 +1,11 @@
+import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import { createOrganizationAction } from '../actions'
 import Link from 'next/link'
 import { ArrowLeft, Save } from 'lucide-react'
 
-export default function CreateOrganizationPage() {
+export default async function CreateOrganizationPage() {
+  const { supabase, profile } = await requirePermission('system.manage')
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
       <div className="flex items-center gap-4 mb-8">

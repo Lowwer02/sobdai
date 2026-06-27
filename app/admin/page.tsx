@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getAdminSession } from '@/lib/auth/server-protect'
 import { Users, Package, FileQuestion, ShoppingCart, CheckSquare } from 'lucide-react'
 
 export const metadata = {
@@ -26,17 +25,9 @@ function StatCard({ title, value, icon: Icon, trend }: { title: string, value: s
 }
 
 export default async function AdminDashboard() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-      },
-    }
-  )
+  const { supabase, profile } = await getAdminSession()
 
+  
   // Fetch true counts
   const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
   const { count: pkgsCount } = await supabase.from('packages').select('*', { count: 'exact', head: true })

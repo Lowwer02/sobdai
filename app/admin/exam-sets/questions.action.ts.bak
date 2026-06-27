@@ -1,7 +1,7 @@
 'use server'
 
-import { requirePermission } from "@/lib/auth/server-protect"
-
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 export async function fetchQuestionsForPicker(filters: {
   search?: string
