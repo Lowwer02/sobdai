@@ -100,14 +100,20 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
         }
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       if (error) {
         setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
-      } else {
-        onClose()
+      } else if (data?.user) {
+        const { data: profile } = await supabase.from('profiles').select('deleted_at').eq('id', data.user.id).single()
+        if (profile?.deleted_at) {
+          await supabase.auth.signOut()
+          setError('บัญชีนี้ถูกปิดการใช้งานแล้ว กรุณาติดต่อทีมงานหากต้องการเปิดใช้งานอีกครั้ง')
+        } else {
+          onClose()
+        }
       }
     }
     setLoading(false)

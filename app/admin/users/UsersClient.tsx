@@ -157,10 +157,12 @@ export default function UsersClient({
                     </span>
                   </td>
                   <td className="p-4">
-                    {user.status === 'banned' ? (
+                    {user.deleted_at ? (
+                      <span className="text-xs font-bold text-gray-400 bg-gray-500/10 px-2 py-1 rounded">ปิดการใช้งาน</span>
+                    ) : user.status === 'banned' ? (
                       <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded">Banned</span>
                     ) : (
-                      <span className="text-xs font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded">Active</span>
+                      <span className="text-xs font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded">ใช้งานอยู่</span>
                     )}
                   </td>
                   <td className="p-4 text-[#A1866B] text-sm">

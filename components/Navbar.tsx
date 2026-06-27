@@ -22,7 +22,17 @@ export default function Navbar() {
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
-        const { data } = await supabase.from('profiles').select('role').eq('id', sessionUser.id).single()
+        const { data } = await supabase.from('profiles').select('role, deleted_at').eq('id', sessionUser.id).single()
+        
+        if (data?.deleted_at) {
+          // Force logout for deactivated accounts
+          await supabase.auth.signOut()
+          setUser(null)
+          setIsAdmin(false)
+          window.location.reload()
+          return
+        }
+
         setIsAdmin(['admin', 'owner'].includes(data?.role))
       } else {
         setIsAdmin(false)

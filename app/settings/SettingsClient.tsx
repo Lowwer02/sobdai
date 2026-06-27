@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Camera, Shield, UserCircle, LogIn, AlertTriangle, Loader2 } from 'lucide-react'
-import { updateProfile } from './actions'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Camera, Shield, UserCircle, LogIn, AlertTriangle, Loader2, X } from 'lucide-react'
+import { updateProfile, deactivateAccount } from './actions'
 
 interface Profile {
   id: string
@@ -16,9 +18,13 @@ interface Profile {
 }
 
 export default function SettingsClient({ initialProfile }: { initialProfile: Profile }) {
+  const router = useRouter()
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [isPending, startTransition] = useTransition()
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false)
+  const [isDeactivating, setIsDeactivating] = useState(false)
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
@@ -51,6 +57,21 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
       return profile.display_name.charAt(0).toUpperCase()
     }
     return profile.email.charAt(0).toUpperCase()
+  }
+
+  const handleDeactivate = async () => {
+    setIsDeactivating(true)
+    const result = await deactivateAccount()
+    if (result.success) {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.push('/')
+      router.refresh()
+    } else {
+      setIsDeactivating(false)
+      setIsDeactivateModalOpen(false)
+      showToast('error', result.error || 'เกิดข้อผิดพลาดในการปิดการใช้งาน')
+    }
   }
 
   return (
@@ -223,16 +244,58 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
           <button 
             type="button"
             className="px-4 py-2 bg-red-900/20 text-red-400 border border-red-900/50 hover:bg-red-900/40 rounded-lg font-medium text-sm transition-colors whitespace-nowrap"
-            onClick={() => {
-              if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีของคุณ? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
-                alert('ระบบลบบัญชีถูกปิดการใช้งานชั่วคราว (เร็ว ๆ นี้)')
-              }
-            }}
+            onClick={() => setIsDeactivateModalOpen(true)}
           >
-            Delete My Account
+            ปิดการใช้งานบัญชี
           </button>
         </div>
       </div>
+
+      {/* Deactivate Account Modal */}
+      {isDeactivateModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !isDeactivating && setIsDeactivateModalOpen(false)} />
+          <div className="relative bg-[#1A140E] border border-red-900/50 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => !isDeactivating && setIsDeactivateModalOpen(false)}
+              className="absolute top-4 right-4 text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 text-red-400 mb-4">
+              <AlertTriangle size={24} />
+              <h2 className="text-xl font-bold font-display">ปิดการใช้งานบัญชี</h2>
+            </div>
+            
+            <p className="text-[#F5E9D6] mb-4">หากดำเนินการต่อ:</p>
+            <ul className="list-disc list-inside space-y-2 text-[#A1866B] text-sm mb-6">
+              <li>จะออกจากระบบทันที</li>
+              <li>จะไม่สามารถเข้าสู่ระบบได้</li>
+              <li>ข้อมูลยังไม่ถูกลบถาวร</li>
+              <li>สามารถให้ทีมงานกู้คืนได้</li>
+            </ul>
+            
+            <div className="flex gap-3 mt-8">
+              <button 
+                className="flex-1 px-4 py-3 bg-transparent border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-xl font-medium transition-colors"
+                onClick={() => setIsDeactivateModalOpen(false)}
+                disabled={isDeactivating}
+              >
+                ยกเลิก
+              </button>
+              <button 
+                className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleDeactivate}
+                disabled={isDeactivating}
+              >
+                {isDeactivating && <Loader2 size={18} className="animate-spin" />}
+                ปิดการใช้งานบัญชี
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
