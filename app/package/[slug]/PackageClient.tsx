@@ -50,8 +50,8 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
 export default function PackageClient({ pkg, examSets, summaries, isPurchased }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean }) {
   const sortedExamSets = examSets ? [...examSets].sort((a, b) => a.sort_order - b.sort_order) : []
   
-  const orgName = pkg.organizations?.name || 'Unknown Organization'
-  const posName = pkg.positions?.name || 'Unknown Position'
+  const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
+  const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.organizations?.logo_url || null
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
@@ -270,9 +270,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
                       <Link href={`/package/${pkg.slug}/exam/${topic.id}`} key={topic.id} className="block">
                         <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col relative overflow-hidden">
                           {topic.is_sample && (
-                            <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">
-                              Sample
-                            </div>
+                            <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">ตัวอย่าง</div>
                           )}
                           <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-2 leading-snug group-hover:text-[#D4AF37] transition-colors pr-12">{topic.name}</h4>
                           <p className="text-[#A1866B] text-[12px] mb-4 line-clamp-2">{topic.description || 'ชุดข้อสอบจำลองสนามจริง'}</p>

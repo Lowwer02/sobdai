@@ -429,8 +429,8 @@ export default async function Home() {
 
 // Exam Card Component (inline เพื่อความสะดวก)
 function ExamCard({ pkg, index }: { pkg: PackageData; index: number }) {
-  const orgName = pkg.organizations?.name || 'Unknown Org'
-  const posName = pkg.positions?.name || 'Unknown Position'
+  const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
+  const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.organizations?.logo_url
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountPercent = hasDiscount ? Math.round(((pkg.original_price - pkg.current_price) / pkg.original_price) * 100) : 0

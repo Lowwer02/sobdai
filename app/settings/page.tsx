@@ -64,7 +64,7 @@ export default async function SettingsPage() {
     <div className="min-h-screen bg-[#0A0705] pt-24 pb-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight mb-8">
-          Settings
+          การตั้งค่า
         </h1>
         <SettingsClient initialProfile={enhancedProfile} />
       </div>

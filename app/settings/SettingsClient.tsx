@@ -32,7 +32,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
     startTransition(async () => {
       const result = await updateProfile(formData)
       if (result.success) {
-        showToast('success', 'Saved successfully')
+        showToast('success', 'บันทึกข้อมูลเรียบร้อยแล้ว')
         setProfile(prev => ({
           ...prev,
           display_name: formData.get('display_name') as string,
@@ -40,7 +40,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
           phone: formData.get('phone') as string,
         }))
       } else {
-        showToast('error', result.error || 'Failed to save profile')
+        showToast('error', result.error || 'ไม่สามารถบันทึกข้อมูลส่วนตัวได้')
       }
     })
   }
@@ -83,7 +83,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
         
         <div className="text-center sm:text-left flex-1 space-y-2">
           <h2 className="text-2xl font-bold font-display text-[#F5E9D6]">
-            {profile.display_name || 'Anonymous User'}
+            {profile.display_name || 'ผู้ใช้งาน'}
           </h2>
           <p className="text-[#A1866B] text-sm">{profile.email}</p>
           
@@ -103,14 +103,14 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
       {/* Section 2: Account Details Form */}
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
         <div className="p-6 sm:p-8 border-b border-[rgba(255,255,255,0.05)]">
-          <h3 className="text-xl font-display text-[#F5E9D6]">Account Details</h3>
-          <p className="text-[#A1866B] text-sm mt-1">Update your personal information.</p>
+          <h3 className="text-xl font-display text-[#F5E9D6]">ข้อมูลบัญชี</h3>
+          <p className="text-[#A1866B] text-sm mt-1">อัปเดตข้อมูลส่วนตัวของคุณ</p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="display_name" className="block text-sm font-medium text-[#F5E9D6]">Display Name</label>
+              <label htmlFor="display_name" className="block text-sm font-medium text-[#F5E9D6]">ชื่อที่แสดง</label>
               <input 
                 id="display_name"
                 name="display_name"
@@ -123,7 +123,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
             </div>
             
             <div className="space-y-2">
-              <label htmlFor="occupation" className="block text-sm font-medium text-[#F5E9D6]">Occupation</label>
+              <label htmlFor="occupation" className="block text-sm font-medium text-[#F5E9D6]">อาชีพ</label>
               <input 
                 id="occupation"
                 name="occupation"
@@ -136,7 +136,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="phone" className="block text-sm font-medium text-[#F5E9D6]">Phone Number</label>
+              <label htmlFor="phone" className="block text-sm font-medium text-[#F5E9D6]">เบอร์โทรศัพท์</label>
               <input 
                 id="phone"
                 name="phone"
@@ -149,7 +149,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
             
             {/* Read-only fields to prevent user confusion */}
             <div className="space-y-2 opacity-60 pointer-events-none">
-              <label className="block text-sm font-medium text-[#F5E9D6]">Email Address</label>
+              <label className="block text-sm font-medium text-[#F5E9D6]">อีเมล</label>
               <input 
                 type="email" 
                 value={profile.email}
@@ -171,7 +171,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
                   Saving...
                 </>
               ) : (
-                'Save Changes'
+                'บันทึกข้อมูล'
               )}
             </button>
           </div>
@@ -180,8 +180,8 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
 
       {/* Section 3: Authentication & Security */}
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl p-6 sm:p-8">
-        <h3 className="text-xl font-display text-[#F5E9D6]">Security</h3>
-        <p className="text-[#A1866B] text-sm mt-1 mb-6">Manage how you log into Sobdai.</p>
+        <h3 className="text-xl font-display text-[#F5E9D6]">ความปลอดภัย</h3>
+        <p className="text-[#A1866B] text-sm mt-1 mb-6">จัดการวิธีเข้าสู่ระบบบัญชีของคุณ</p>
         
         <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -189,19 +189,19 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
               <LogIn size={20} />
             </div>
             <div>
-              <p className="text-[#F5E9D6] font-medium text-sm">Login Method</p>
+              <p className="text-[#F5E9D6] font-medium text-sm">วิธีเข้าสู่ระบบ</p>
               <p className="text-[#A1866B] text-xs mt-0.5 capitalize">{profile.provider}</p>
             </div>
           </div>
           
           <div>
             {profile.provider === 'google' ? (
-              <p className="text-sm text-[#A1866B] italic">This account is managed by Google.</p>
+              <p className="text-sm text-[#A1866B] italic">บัญชีนี้เข้าสู่ระบบด้วย Google<br/>อีเมลจะถูกจัดการโดย Google</p>
             ) : (
               <button 
                 type="button" 
                 className="px-4 py-2 border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm font-medium rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors"
-                onClick={() => alert('Change password functionality coming soon.')}
+                onClick={() => alert('ระบบเปลี่ยนรหัสผ่านกำลังอยู่ระหว่างการพัฒนา (เร็ว ๆ นี้)')}
               >
                 Change Password
               </button>
@@ -216,16 +216,16 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
           <AlertTriangle size={22} />
           Danger Zone
         </h3>
-        <p className="text-red-400/70 text-sm mt-1 mb-6">Irreversible and destructive actions.</p>
+        <p className="text-red-400/70 text-sm mt-1 mb-6">การตั้งค่าที่ส่งผลต่อบัญชีของคุณ</p>
         
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-[#A1866B] text-sm">Once you delete your account, there is no going back. Please be certain.</p>
+          <p className="text-[#A1866B] text-sm">การลบบัญชีเป็นสิ่งที่ไม่สามารถย้อนกลับได้ กรุณาตรวจสอบให้แน่ใจ</p>
           <button 
             type="button"
             className="px-4 py-2 bg-red-900/20 text-red-400 border border-red-900/50 hover:bg-red-900/40 rounded-lg font-medium text-sm transition-colors whitespace-nowrap"
             onClick={() => {
-              if (window.confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.')) {
-                alert('Account deletion is currently disabled. Coming soon in Session 8.')
+              if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีของคุณ? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+                alert('ระบบลบบัญชีถูกปิดการใช้งานชั่วคราว (เร็ว ๆ นี้)')
               }
             }}
           >

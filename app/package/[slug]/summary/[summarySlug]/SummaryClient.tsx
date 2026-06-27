@@ -98,9 +98,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
           </Link>
           <div className="hidden sm:flex items-center gap-4 text-xs font-bold text-[#A1866B]">
             <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A140E] border border-[rgba(255,255,255,0.05)]">
-              <BookOpen size={14} className="text-[#D4AF37]" />
-              Sobdai Knowledge Hub
-            </span>
+              <BookOpen size={14} className="text-[#D4AF37]" />คลังความรู้สอบได้</span>
           </div>
         </div>
       </div>
@@ -163,7 +161,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
                      return (
                        <div className={`p-4 rounded-xl border-l-4 my-6 ${isWarning ? 'bg-red-500/10 border-red-500 text-red-200' : isImportant ? 'bg-purple-500/10 border-purple-500 text-purple-200' : 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#F5E9D6]'}`}>
                          <div className="font-bold mb-2 flex items-center gap-2">
-                            {isWarning ? '⚠️ WARNING' : isImportant ? '✨ IMPORTANT' : '💡 NOTE'}
+                            {isWarning ? '⚠️ คำเตือน' : isImportant ? '✨ ข้อควรระวัง' : '💡 หมายเหตุ'}
                          </div>
                          <div className="text-sm opacity-90 leading-relaxed">
                            {props.children}
@@ -195,7 +193,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
                  },
                  pre: ({node, ...props}) => (
                    <div className="relative group my-6">
-                     <div className="absolute -top-3 left-4 px-2 bg-[#0F0B07] text-[#A1866B] text-[10px] font-bold uppercase tracking-wider">CODE</div>
+                     <div className="absolute -top-3 left-4 px-2 bg-[#0F0B07] text-[#A1866B] text-[10px] font-bold uppercase tracking-wider">โค้ด</div>
                      <pre className="bg-[#1A140E] p-4 rounded-xl border border-[rgba(255,255,255,0.05)] overflow-x-auto text-[13px] leading-relaxed text-[#F5E9D6]" {...props} />
                    </div>
                  )
