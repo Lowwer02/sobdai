@@ -155,18 +155,13 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
               </Link>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                style={{
-                  fontSize: '13px',
-                  color: 'var(--text-muted)',
-                  maxWidth: '120px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
+              <Link
+                href="/settings"
+                className="text-[13px] text-[#A1866B] hover:text-[#D4AF37] max-w-[120px] truncate transition-colors"
+                title="Account Settings"
               >
                 {user.email?.split('@')[0]}
-              </span>
+              </Link>
               <button
                 onClick={onSignOut}
                 className="btn-ghost"

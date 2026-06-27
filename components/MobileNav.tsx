@@ -191,9 +191,13 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
 
             {user ? (
               <div className="flex flex-col gap-2 mt-2">
-                <div className="px-3 pb-2 text-[13px] text-[#A1866B] font-medium">
+                <Link
+                  href="/settings"
+                  onClick={() => setMenuOpen(false)}
+                  className="px-3 pb-2 text-[13px] text-[#A1866B] hover:text-[#D4AF37] font-medium transition-colors block"
+                >
                   ลงชื่อเข้าใช้ในชื่อ: {user.email}
-                </div>
+                </Link>
                 {isAdmin && (
                   <Link 
                     href="/admin" 
