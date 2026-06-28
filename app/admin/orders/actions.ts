@@ -22,7 +22,7 @@ export async function grantPackageAccess(userId: string, packageId: string) {
       return { success: false, error: 'User already has access to this package.' }
     }
 
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('orders')
       .insert({
         user_id: userId,
@@ -31,8 +31,10 @@ export async function grantPackageAccess(userId: string, packageId: string) {
         status: 'completed',
         payment_provider: 'manual_grant'
       })
+      .select('id')
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Grant access failed. You may not have permission.')
 
     revalidatePath('/admin/orders')
     return { success: true }
@@ -45,12 +47,14 @@ export async function updateOrderStatus(orderId: string, newStatus: 'completed' 
   try {
     const { supabase } = await requirePermission('financial.manage')
     
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('orders')
       .update({ status: newStatus })
       .eq('id', orderId)
+      .select('id')
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission.')
 
     revalidatePath('/admin/orders')
     return { success: true }

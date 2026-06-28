@@ -40,6 +40,7 @@ export default async function EditOrganizationPage({ params }: { params: Promise
         </div>
       </div>
 
+      {/* @ts-expect-error: Next.js Server Action return type mismatch */}
       <form action={updateOrgWithId} className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 shadow-xl space-y-6">
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

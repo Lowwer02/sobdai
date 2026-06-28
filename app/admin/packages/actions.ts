@@ -61,12 +61,13 @@ export async function createPackageAction(formData: FormData) {
       features: JSON.parse((formData.get('features') as string) || '[]'),
     }
 
-    const { error } = await supabase.from('packages').insert(payload)
+    const { error, data } = await supabase.from('packages').insert(payload).select('id')
 
     if (error) {
       console.error('Error creating package:', error)
       return { success: false, error: error.message }
     }
+    if (!data || data.length === 0) throw new Error('Insert failed. You may not have permission.')
 
   } catch (error: any) {
     console.error('Action error:', error)
@@ -123,12 +124,13 @@ export async function updatePackageAction(id: string, formData: FormData) {
       updated_at: new Date().toISOString()
     }
 
-    const { error } = await supabase.from('packages').update(payload).eq('id', id)
+    const { error, data } = await supabase.from('packages').update(payload).eq('id', id).select('id')
 
     if (error) {
       console.error('Error updating package:', error)
       return { success: false, error: error.message }
     }
+    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission.')
 
   } catch (error: any) {
     console.error('Action error:', error)
@@ -142,15 +144,11 @@ export async function updatePackageAction(id: string, formData: FormData) {
 
 export async function deletePackageAction(id: string) {
   try {
-    const { supabase, profile } = await requirePermission('content.write')
+    const { supabase } = await requirePermission('content.delete')
     
-    // In a real system, you might want to soft delete. For now we will hard delete if owner.
-    if (profile?.role !== 'owner') {
-      return { success: false, error: 'Only Owner can delete packages' }
-    }
-
-    const { error } = await supabase.from('packages').delete().eq('id', id)
+    const { error, data } = await supabase.from('packages').delete().eq('id', id).select('id')
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Delete failed. You may not have permission.')
 
     revalidatePath('/admin/packages')
     return { success: true }

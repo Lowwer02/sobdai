@@ -34,10 +34,11 @@ export async function updateSummary(id: string, data: any) {
   try {
     const { supabase } = await requirePermission('content.write')
     
-    const { error } = await supabase
+    const { error, data: updateData } = await supabase
       .from('summaries')
       .update(data)
       .eq('id', id)
+      .select('id')
 
     if (error) {
       if (error.code === '23505') {
@@ -45,6 +46,7 @@ export async function updateSummary(id: string, data: any) {
       }
       throw error
     }
+    if (!updateData || updateData.length === 0) throw new Error('Update failed. You may not have permission.')
 
     revalidatePath('/admin/summaries')
     if (data.package_id) {
@@ -59,14 +61,16 @@ export async function updateSummary(id: string, data: any) {
 
 export async function deleteSummary(id: string) {
   try {
-    const { supabase } = await requirePermission('content.write')
+    const { supabase } = await requirePermission('content.delete')
     
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('summaries')
       .delete()
       .eq('id', id)
+      .select('id')
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Delete failed. You may not have permission.')
 
     revalidatePath('/admin/summaries')
     return { success: true }
@@ -77,14 +81,16 @@ export async function deleteSummary(id: string) {
 
 export async function toggleSummaryPublish(id: string, isPublished: boolean) {
   try {
-    const { supabase } = await requirePermission('content.write')
+    const { supabase } = await requirePermission('content.publish')
     
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('summaries')
       .update({ is_published: isPublished })
       .eq('id', id)
+      .select('id')
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Publish failed. You may not have permission.')
 
     revalidatePath('/admin/summaries')
     return { success: true }

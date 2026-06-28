@@ -7,14 +7,16 @@ import { revalidatePath } from 'next/cache'
 
 export async function deleteExamSetAction(id: string) {
   try {
-    const { supabase } = await requirePermission('content.write')
+    const { supabase } = await requirePermission('content.delete')
     
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('exam_sets')
       .delete()
       .eq('id', id)
+      .select('id')
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Delete failed. You may not have permission.')
 
     revalidatePath('/admin/exam-sets')
     return { success: true }
@@ -59,11 +61,15 @@ export async function createExamSetAction(data: {
         sort_order: index
       }))
 
-      const { error: junctionError } = await supabase
+      const { error: junctionError, data: junctionResult } = await supabase
         .from('exam_set_questions')
         .insert(junctionData)
+        .select('exam_set_id')
 
       if (junctionError) throw junctionError
+      if (!junctionResult || junctionResult.length !== junctionData.length) {
+        throw new Error('Some questions could not be linked. You may not have permission.')
+      }
     }
 
     revalidatePath('/admin/exam-sets')
@@ -87,7 +93,7 @@ export async function updateExamSetAction(id: string, data: {
     const { supabase } = await requirePermission('content.write')
     
     // 1. Update Exam Set
-    const { error: updateError } = await supabase
+    const { error: updateError, data: updateData } = await supabase
       .from('exam_sets')
       .update({
         package_id: data.package_id,
@@ -98,8 +104,10 @@ export async function updateExamSetAction(id: string, data: {
         sort_order: data.sort_order
       })
       .eq('id', id)
+      .select('id')
 
     if (updateError) throw updateError
+    if (!updateData || updateData.length === 0) throw new Error('Update failed. You may not have permission.')
 
     // 2. Delete existing questions mapping
     const { error: deleteError } = await supabase
@@ -117,11 +125,15 @@ export async function updateExamSetAction(id: string, data: {
         sort_order: index
       }))
 
-      const { error: junctionError } = await supabase
+      const { error: junctionError, data: junctionResult } = await supabase
         .from('exam_set_questions')
         .insert(junctionData)
+        .select('exam_set_id')
 
       if (junctionError) throw junctionError
+      if (!junctionResult || junctionResult.length !== junctionData.length) {
+        throw new Error('Some questions could not be linked. You may not have permission.')
+      }
     }
 
     revalidatePath('/admin/exam-sets')

@@ -41,15 +41,17 @@ export async function updateQuestionAction(id: string, formData: FormData) {
       updated_at: new Date().toISOString()
     }
 
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('questions')
       .update(payload)
       .eq('id', id)
+      .select('id')
 
     if (error) {
       console.error('Error updating question:', error)
       return { success: false, error: error.message }
     }
+    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission.')
 
   } catch (error: any) {
     console.error('Action error:', error)
@@ -62,17 +64,19 @@ export async function updateQuestionAction(id: string, formData: FormData) {
 
 export async function deleteQuestionAction(id: string) {
   try {
-    const { supabase } = await requirePermission('content.write')
+    const { supabase } = await requirePermission('content.delete')
 
-    const { error } = await supabase
+    const { error, data } = await supabase
       .from('questions')
       .delete()
       .eq('id', id)
+      .select('id')
 
     if (error) {
       console.error('Error deleting question:', error)
       return { success: false, error: error.message }
     }
+    if (!data || data.length === 0) throw new Error('Delete failed. You may not have permission.')
     
     revalidatePath('/admin/questions')
     return { success: true }

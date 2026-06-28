@@ -46,6 +46,7 @@ export default async function EditPositionPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
+      {/* @ts-expect-error: Next.js Server Action return type mismatch */}
       <form action={updatePositionWithId} className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 shadow-xl space-y-6">
         
         <div className="space-y-2">

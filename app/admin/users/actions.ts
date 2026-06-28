@@ -31,12 +31,14 @@ export async function updateUserRole(userId: string, newRole: Role) {
       }
     }
     
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .update({ role: newRole })
       .eq('id', userId)
+      .select('id') // Added select to force return of affected rows
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission to modify this profile.')
 
     await logAuditEvent({
       action: 'UPDATE_ROLE',
@@ -82,12 +84,14 @@ export async function updateUserStatus(userId: string, newStatus: 'active' | 'ba
       }
     }
     
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .update({ status: newStatus })
       .eq('id', userId)
+      .select('id') // Added select to force return of affected rows
 
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission to modify this profile.')
 
     await logAuditEvent({
       action: 'UPDATE_STATUS',
