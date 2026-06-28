@@ -4,6 +4,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, UserCircle, Shield, Ban, CheckCircle } from 'lucide-react'
 import { updateUserRole, updateUserStatus } from './actions'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import { toastEvent } from '@/hooks/useToast'
 
 interface UsersClientProps {
   users: any[]
@@ -12,6 +14,7 @@ interface UsersClientProps {
   search: string
   roleFilter: string
   statusFilter: string
+  currentUserRole: string
 }
 
 export default function UsersClient({
@@ -20,7 +23,8 @@ export default function UsersClient({
   currentPage,
   search,
   roleFilter,
-  statusFilter
+  statusFilter,
+  currentUserRole
 }: UsersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -28,6 +32,10 @@ export default function UsersClient({
   
   const [searchInput, setSearchInput] = useState(search)
   const [actingOnId, setActingOnId] = useState<string | null>(null)
+
+  // Dialog states
+  const [roleModal, setRoleModal] = useState<{ isOpen: boolean, user: any, newRole: 'user' | 'admin' | 'owner' | 'editor' | 'support' | '' }>({ isOpen: false, user: null, newRole: '' })
+  const [statusModal, setStatusModal] = useState<{ isOpen: boolean, user: any, newStatus: 'active' | 'banned' | '' }>({ isOpen: false, user: null, newStatus: '' })
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(window.location.search)
@@ -47,19 +55,37 @@ export default function UsersClient({
     updateParams({ q: searchInput })
   }
 
-  const handleRoleToggle = async (id: string, currentRole: string) => {
-    setActingOnId(id)
-    const newRole = currentRole === 'admin' ? 'user' : 'admin'
-    await updateUserRole(id, newRole)
+  const handleRoleChange = async () => {
+    if (!roleModal.user || !roleModal.newRole) return
+    setActingOnId(roleModal.user.id)
+    const newRole = roleModal.newRole as 'user' | 'admin' | 'owner' | 'editor' | 'support'
+    setRoleModal({ isOpen: false, user: null, newRole: '' })
+    await updateUserRole(roleModal.user.id, newRole)
+    toastEvent('เปลี่ยนสิทธิ์สำเร็จ')
     setActingOnId(null)
   }
 
-  const handleStatusToggle = async (id: string, currentStatus: string) => {
-    setActingOnId(id)
-    const newStatus = currentStatus === 'banned' ? 'active' : 'banned'
-    await updateUserStatus(id, newStatus)
+  const handleStatusChange = async () => {
+    if (!statusModal.user || !statusModal.newStatus) return
+    setActingOnId(statusModal.user.id)
+    const newStatus = statusModal.newStatus as 'active' | 'banned'
+    setStatusModal({ isOpen: false, user: null, newStatus: '' })
+    await updateUserStatus(statusModal.user.id, newStatus)
+    toastEvent(newStatus === 'banned' ? 'แบนผู้ใช้สำเร็จ' : 'ปลดแบนสำเร็จ')
     setActingOnId(null)
   }
+
+  const handleRoleSelect = (user: any, newRole: 'user' | 'admin' | 'owner' | 'editor' | 'support') => {
+    if (newRole === user.role) return
+    setRoleModal({ isOpen: true, user, newRole })
+  }
+
+  const handleStatusSelect = (user: any, newStatus: 'active' | 'banned') => {
+    if (newStatus === user.status) return
+    setStatusModal({ isOpen: true, user, newStatus })
+  }
+
+  const canManageRoles = ['owner', 'admin'].includes(currentUserRole)
 
   return (
     <div className="space-y-6">
@@ -147,14 +173,31 @@ export default function UsersClient({
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${
-                      ['admin', 'owner', 'editor', 'support'].includes(user.role) 
-                        ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30' 
-                        : 'bg-[#0F0B07] text-[#A1866B] border-[rgba(255,255,255,0.1)]'
-                    }`}>
-                      {['admin', 'owner', 'editor', 'support'].includes(user.role) ? <Shield size={12} /> : <UserCircle size={12} />}
-                      {user.role.toUpperCase()}
-                    </span>
+                    {canManageRoles && user.role !== 'owner' ? (
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleSelect(user, e.target.value as any)}
+                        disabled={user.role === 'owner' || actingOnId === user.id}
+                        className={`bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] rounded-md px-2 py-1 text-xs font-bold uppercase focus:outline-none focus:border-[#D4AF37]/50 ${
+                          ['admin', 'editor', 'support'].includes(user.role) ? 'text-[#D4AF37]' : 'text-[#A1866B]'
+                        }`}
+                      >
+                        <option value="user">USER</option>
+                        <option value="support">SUPPORT</option>
+                        <option value="editor">EDITOR</option>
+                        <option value="admin">ADMIN</option>
+                        {currentUserRole === 'owner' && <option value="owner">OWNER</option>}
+                      </select>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${
+                        ['admin', 'owner', 'editor', 'support'].includes(user.role) 
+                          ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30' 
+                          : 'bg-[#0F0B07] text-[#A1866B] border-[rgba(255,255,255,0.1)]'
+                      }`}>
+                        {['admin', 'owner', 'editor', 'support'].includes(user.role) ? <Shield size={12} /> : <UserCircle size={12} />}
+                        {user.role.toUpperCase()}
+                      </span>
+                    )}
                   </td>
                   <td className="p-4">
                     {user.deleted_at ? (
@@ -170,26 +213,20 @@ export default function UsersClient({
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => handleRoleToggle(user.id, user.role)}
-                        disabled={actingOnId === user.id}
-                        className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10 disabled:opacity-50"
-                        title={['admin', 'owner', 'editor', 'support'].includes(user.role) ? 'Demote to User' : 'Promote to Admin'}
-                      >
-                        {actingOnId === user.id ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
-                      </button>
-                      <button 
-                        onClick={() => handleStatusToggle(user.id, user.status || 'active')}
-                        disabled={actingOnId === user.id}
-                        className={`p-2 transition-colors rounded-lg disabled:opacity-50 ${
-                          user.status === 'banned' 
-                            ? 'text-green-500 hover:bg-green-500/10' 
-                            : 'text-[#A1866B] hover:text-red-400 hover:bg-red-400/10'
-                        }`} 
-                        title={user.status === 'banned' ? 'Unban User' : 'Ban User'}
-                      >
-                        {user.status === 'banned' ? <CheckCircle size={16} /> : <Ban size={16} />}
-                      </button>
+                      {canManageRoles && user.role !== 'owner' && (
+                        <button 
+                          onClick={() => setStatusModal({ isOpen: true, user, newStatus: user.status === 'banned' ? 'active' : 'banned' })}
+                          disabled={actingOnId === user.id}
+                          className={`p-2 transition-colors rounded-lg disabled:opacity-50 ${
+                            user.status === 'banned' 
+                              ? 'text-green-500 hover:bg-green-500/10' 
+                              : 'text-[#A1866B] hover:text-red-400 hover:bg-red-400/10'
+                          }`} 
+                          title={user.status === 'banned' ? 'Unban User' : 'Ban User'}
+                        >
+                          {actingOnId === user.id ? <Loader2 size={16} className="animate-spin" /> : user.status === 'banned' ? <CheckCircle size={16} /> : <Ban size={16} />}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -223,6 +260,39 @@ export default function UsersClient({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={roleModal.isOpen}
+        onClose={() => setRoleModal({ isOpen: false, user: null, newRole: '' })}
+        onConfirm={handleRoleChange}
+        title="เปลี่ยนสิทธิ์การใช้งาน"
+        description={
+          <div className="space-y-2 text-[#F5E9D6]">
+            <div>ผู้ใช้: <span className="text-[#D4AF37] font-medium">{roleModal.user?.email}</span></div>
+            <div>
+              จาก <span className="bg-[#0F0B07] px-2 py-0.5 rounded font-mono text-xs text-[#A1866B]">{roleModal.user?.role?.toUpperCase()}</span> เป็น <span className="bg-[#D4AF37]/20 px-2 py-0.5 rounded font-mono text-xs text-[#D4AF37]">{roleModal.newRole.toUpperCase()}</span>
+            </div>
+            <p className="text-[#A1866B] text-xs pt-2">การเปลี่ยนสิทธิ์จะมีผลทันที</p>
+          </div>
+        }
+        confirmText="ยืนยัน"
+        cancelText="ยกเลิก"
+      />
+
+      <ConfirmDialog
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal({ isOpen: false, user: null, newStatus: '' })}
+        onConfirm={handleStatusChange}
+        title={statusModal.newStatus === 'banned' ? 'ระงับบัญชี' : 'ปลดระงับบัญชี'}
+        description={
+          <div className="space-y-2 text-[#F5E9D6]">
+            <div>คุณต้องการ {statusModal.newStatus === 'banned' ? 'แบน' : 'ปลดแบน'}: <span className="text-[#D4AF37] font-medium">{statusModal.user?.email}</span> ใช่หรือไม่?</div>
+          </div>
+        }
+        confirmText="ยืนยัน"
+        cancelText="ยกเลิก"
+        isDestructive={statusModal.newStatus === 'banned'}
+      />
     </div>
   )
 }

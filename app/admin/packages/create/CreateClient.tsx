@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useTransition, useMemo } from 'react'
 import { ArrowLeft, Save, Loader2 } from 'lucide-react'
 import { createPackageAction } from '../actions'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 
 const availableFeatures = [
   'Detailed Explanations', 
@@ -20,6 +21,9 @@ export default function CreateClient({ organizations, positions }: { organizatio
   
   const [selectedOrg, setSelectedOrg] = useState('')
   const [selectedPos, setSelectedPos] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
+
+  useUnsavedChanges(isDirty)
 
   const filteredPositions = useMemo(() => {
     if (!selectedOrg) return []
@@ -44,12 +48,18 @@ export default function CreateClient({ organizations, positions }: { organizatio
       const result = await createPackageAction(formData)
       if (result?.error) {
         setErrorMsg(result.error)
+      } else {
+        setIsDirty(false) // clear dirty state on success
       }
     })
   }
 
+  const handleFormChange = () => {
+    setIsDirty(true)
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-20">
+    <form onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-6 max-w-5xl mx-auto pb-20">
       <div className="flex items-center gap-4">
         <Link href="/admin/packages">
           <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors">

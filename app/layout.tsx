@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Sarabun } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import ToastContainer from '@/components/admin/ToastContainer'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body className={sarabun.className}>
         <Navbar />
         <main>{children}</main>
+        <ToastContainer />
       </body>
     </html>
   )

@@ -1,16 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import AuthModal from './AuthModal'
 import DesktopNav from './DesktopNav'
 import MobileNav from './MobileNav'
+import ConfirmDialog from './admin/ConfirmDialog'
+import { toastEvent } from '@/hooks/useToast'
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const router = useRouter()
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
@@ -56,8 +61,18 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const handleSignOut = async () => {
+  const handleSignOutClick = () => {
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmSignOut = async () => {
     await supabase.auth.signOut()
+    setUser(null)
+    setIsAdmin(false)
+    setShowLogoutConfirm(false)
+    router.replace('/')
+    router.refresh()
+    toastEvent('ออกจากระบบเรียบร้อย')
   }
 
   const handleLoginClick = () => {
@@ -85,7 +100,7 @@ export default function Navbar() {
           isAdmin={isAdmin} 
           onLoginClick={handleLoginClick} 
           onRegisterClick={handleRegisterClick} 
-          onSignOut={handleSignOut} 
+          onSignOut={handleSignOutClick} 
         />
       </div>
 
@@ -96,7 +111,7 @@ export default function Navbar() {
           isAdmin={isAdmin} 
           onLoginClick={handleLoginClick} 
           onRegisterClick={handleRegisterClick} 
-          onSignOut={handleSignOut} 
+          onSignOut={handleSignOutClick} 
         />
       </div>
 
@@ -105,6 +120,17 @@ export default function Navbar() {
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
         initialMode={authMode} 
+      />
+
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={confirmSignOut}
+        title="ออกจากระบบ"
+        description="คุณต้องการออกจากระบบใช่หรือไม่"
+        confirmText="ออกจากระบบ"
+        cancelText="ยกเลิก"
+        isDestructive={true}
       />
     </header>
   )

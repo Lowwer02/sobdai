@@ -5,6 +5,8 @@ import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Plus, Eye, EyeOff, Edit, Trash2, UploadCloud } from 'lucide-react'
 import Link from 'next/link'
 import { toggleSummaryPublish, deleteSummary } from './actions'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import { toastEvent } from '@/hooks/useToast'
 
 interface SummariesClientProps {
   summaries: any[]
@@ -31,6 +33,7 @@ export default function SummariesClient({
   
   const [searchInput, setSearchInput] = useState(search)
   const [actingOnId, setActingOnId] = useState<string | null>(null)
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, summaryId: string | null }>({ isOpen: false, summaryId: null })
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(window.location.search)
@@ -56,10 +59,12 @@ export default function SummariesClient({
     setActingOnId(null)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this summary?')) return
-    setActingOnId(id)
-    await deleteSummary(id)
+  const handleDelete = async () => {
+    if (!deleteModal.summaryId) return
+    setActingOnId(deleteModal.summaryId)
+    setDeleteModal({ isOpen: false, summaryId: null })
+    await deleteSummary(deleteModal.summaryId)
+    toastEvent('ลบสรุปเรียบร้อยแล้ว')
     setActingOnId(null)
   }
 
@@ -192,7 +197,7 @@ export default function SummariesClient({
                         <Edit size={16} />
                       </Link>
                       <button 
-                        onClick={() => handleDelete(summary.id)}
+                        onClick={() => setDeleteModal({ isOpen: true, summaryId: summary.id })}
                         disabled={actingOnId === summary.id}
                         className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 disabled:opacity-50"
                         title="Delete"
@@ -232,6 +237,17 @@ export default function SummariesClient({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, summaryId: null })}
+        onConfirm={handleDelete}
+        title="ลบเนื้อหาสรุป"
+        description="คุณต้องการลบเนื้อหาสรุปนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        confirmText="ลบเนื้อหา"
+        cancelText="ยกเลิก"
+        isDestructive={true}
+      />
     </div>
   )
 }

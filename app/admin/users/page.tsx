@@ -48,6 +48,7 @@ export default async function UsersPage({
       search={search}
       roleFilter={roleFilter}
       statusFilter={statusFilter}
+      currentUserRole={profile?.role || 'user'}
     />
   )
 }

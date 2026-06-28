@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
-import { Plus, Search, Filter, Edit, Trash2, ChevronLeft, ChevronRight, AlertTriangle, Loader2 } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { deleteQuestionAction } from './actions'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import { toastEvent } from '@/hooks/useToast'
 
 interface QuestionsClientProps {
   questions: any[]
@@ -86,10 +88,11 @@ export default function QuestionsClient({
     const res = await deleteQuestionAction(questionToDelete.id)
     setIsDeleting(false)
     if (res?.success) {
+      toastEvent('ลบข้อสอบเรียบร้อยแล้ว')
       setDeleteModalOpen(false)
       setQuestionToDelete(null)
     } else {
-      alert('Failed to delete: ' + res?.error)
+      toastEvent(res?.error || 'ลบไม่สำเร็จ', 'error')
     }
   }
 
@@ -312,41 +315,24 @@ export default function QuestionsClient({
       </div>
 
       {/* Delete Modal */}
-      {deleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
-                <AlertTriangle size={20} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold font-display text-[#F5E9D6]">Delete Question</h3>
-                <p className="text-[#A1866B] text-sm mt-1">Are you sure you want to delete this question? This action cannot be undone.</p>
-                <div className="mt-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg text-sm text-[#F5E9D6] italic line-clamp-2">
-                  "{questionToDelete?.preview}"
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6 justify-end">
-              <button 
-                onClick={() => setDeleteModalOpen(false)}
-                disabled={isDeleting}
-                className="px-4 py-2 rounded-xl text-[#F5E9D6] hover:bg-[#0F0B07] transition-colors text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors text-sm font-bold flex items-center gap-2"
-              >
-                {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                Delete Question
-              </button>
+      <ConfirmDialog
+        isOpen={deleteModalOpen}
+        onClose={() => !isDeleting && setDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="ลบข้อสอบ"
+        description={
+          <div className="space-y-2 text-[#F5E9D6]">
+            <p className="text-[#A1866B] text-sm">การลบข้อสอบจะลบข้อมูลที่เกี่ยวข้องทั้งหมดแบบถาวร ไม่สามารถกู้คืนได้</p>
+            <div className="mt-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg text-sm text-[#F5E9D6] font-medium break-words whitespace-pre-wrap">
+              "{questionToDelete?.preview}"
             </div>
           </div>
-        </div>
-      )}
+        }
+        confirmText="ลบข้อสอบถาวร"
+        cancelText="ยกเลิก"
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
 
     </div>
   )

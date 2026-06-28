@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import Link from 'next/link'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 
 interface SummaryData {
   id?: string
@@ -43,6 +44,9 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
   const [isPreview, setIsPreview] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
+
+  useUnsavedChanges(isDirty)
 
   const generateSlug = (text: string) => {
     return text.toLowerCase().replace(/[^a-z0-9ก-๙]+/g, '-').replace(/(^-|-$)+/g, '')
@@ -55,12 +59,14 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
       title: newTitle,
       slug: !isEditing ? generateSlug(newTitle) : prev.slug
     }))
+    setIsDirty(true)
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     setFormData(prev => ({ ...prev, [name]: val }))
+    setIsDirty(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,6 +84,8 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
     setIsSaving(false)
     if (!res.success) {
       setError(res.error || 'Failed to save summary')
+    } else {
+      setIsDirty(false)
     }
   }
 

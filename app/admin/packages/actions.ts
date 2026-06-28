@@ -139,3 +139,23 @@ export async function updatePackageAction(id: string, formData: FormData) {
   revalidatePath(`/package/${formData.get('slug')}`) // revalidate public page too
   redirect('/admin/packages')
 }
+
+export async function deletePackageAction(id: string) {
+  try {
+    const { supabase, profile } = await requirePermission('content.write')
+    
+    // In a real system, you might want to soft delete. For now we will hard delete if owner.
+    if (profile?.role !== 'owner') {
+      return { success: false, error: 'Only Owner can delete packages' }
+    }
+
+    const { error } = await supabase.from('packages').delete().eq('id', id)
+    if (error) throw error
+
+    revalidatePath('/admin/packages')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Delete error:', error)
+    return { success: false, error: error.message }
+  }
+}

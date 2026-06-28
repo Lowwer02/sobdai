@@ -4,10 +4,14 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { ArrowLeft, Save, Loader2, BookOpen } from 'lucide-react'
 import { updateQuestionAction } from '../actions'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 
 export default function EditQuestionClient({ question }: { question: any }) {
   const [isPending, startTransition] = useTransition()
   const [errorMsg, setErrorMsg] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
+
+  useUnsavedChanges(isDirty)
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -18,12 +22,16 @@ export default function EditQuestionClient({ question }: { question: any }) {
       const result = await updateQuestionAction(question.id, formData)
       if (result?.error) {
         setErrorMsg(result.error)
+      } else {
+        setIsDirty(false)
       }
     })
   }
 
+  const handleFormChange = () => setIsDirty(true)
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-20">
+    <form onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-6 max-w-5xl mx-auto pb-20">
       <div className="flex items-center gap-4">
         <Link href="/admin/questions">
           <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, X, Loader2 } from 'lucide-react'
 import QuestionPicker from './QuestionPicker'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 
 interface ExamSetFormProps {
   initialData?: any
@@ -33,6 +34,9 @@ export default function ExamSetForm({
   const [sortOrder, setSortOrder] = useState(initialData?.sort_order || 0)
   
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>(selectedQuestionsData)
+  const [isDirty, setIsDirty] = useState(false)
+
+  useUnsavedChanges(isDirty)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,6 +59,7 @@ export default function ExamSetForm({
       })
 
       if (res.success) {
+        setIsDirty(false)
         router.push('/admin/exam-sets')
       } else {
         setError(res.error || 'Something went wrong')
@@ -62,8 +67,10 @@ export default function ExamSetForm({
     })
   }
 
+  const handleFormChange = () => setIsDirty(true)
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-5xl">
+    <form onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-8 max-w-5xl">
       {error && (
         <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-xl text-sm">
           {error}
@@ -153,7 +160,7 @@ export default function ExamSetForm({
         <div className="lg:col-span-2">
           <QuestionPicker 
             selectedQuestions={selectedQuestions} 
-            onChange={setSelectedQuestions} 
+            onChange={(v) => { setSelectedQuestions(v); setIsDirty(true); }} 
           />
         </div>
       </div>

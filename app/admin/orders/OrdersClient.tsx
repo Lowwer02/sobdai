@@ -4,6 +4,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
 import { grantPackageAccess, updateOrderStatus } from './actions'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import { toastEvent } from '@/hooks/useToast'
 
 interface OrdersClientProps {
   orders: any[]
@@ -35,6 +37,7 @@ export default function OrdersClient({
   const [selectedUser, setSelectedUser] = useState('')
   const [selectedPackage, setSelectedPackage] = useState('')
   const [error, setError] = useState('')
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: 'revoke' | 'restore' | null }>({ isOpen: false, orderId: null, action: null })
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(window.location.search)
@@ -54,16 +57,27 @@ export default function OrdersClient({
     updateParams({ q: searchInput })
   }
 
-  const handleRevoke = async (id: string) => {
-    setActingOnId(id)
-    await updateOrderStatus(id, 'revoked')
+  const handleRevoke = async () => {
+    if (!confirmModal.orderId) return
+    setActingOnId(confirmModal.orderId)
+    setConfirmModal({ isOpen: false, orderId: null, action: null })
+    await updateOrderStatus(confirmModal.orderId, 'revoked')
+    toastEvent('ยกเลิกสิทธิ์เข้าถึงสำเร็จ')
     setActingOnId(null)
   }
 
-  const handleRestore = async (id: string) => {
-    setActingOnId(id)
-    await updateOrderStatus(id, 'completed')
+  const handleRestore = async () => {
+    if (!confirmModal.orderId) return
+    setActingOnId(confirmModal.orderId)
+    setConfirmModal({ isOpen: false, orderId: null, action: null })
+    await updateOrderStatus(confirmModal.orderId, 'completed')
+    toastEvent('คืนสิทธิ์เข้าถึงสำเร็จ')
     setActingOnId(null)
+  }
+
+  const confirmAction = () => {
+    if (confirmModal.action === 'revoke') handleRevoke()
+    else if (confirmModal.action === 'restore') handleRestore()
   }
 
   const handleGrant = async (e: React.FormEvent) => {
@@ -187,7 +201,7 @@ export default function OrdersClient({
                     <div className="flex items-center justify-end gap-2">
                       {order.status === 'completed' ? (
                         <button 
-                          onClick={() => handleRevoke(order.id)}
+                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'revoke' })}
                           disabled={actingOnId === order.id}
                           className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 disabled:opacity-50"
                           title="Revoke Access"
@@ -196,7 +210,7 @@ export default function OrdersClient({
                         </button>
                       ) : order.status === 'revoked' ? (
                         <button 
-                          onClick={() => handleRestore(order.id)}
+                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'restore' })}
                           disabled={actingOnId === order.id}
                           className="p-2 text-[#A1866B] hover:text-green-500 transition-colors rounded-lg hover:bg-green-500/10 disabled:opacity-50"
                           title="Restore Access"
@@ -297,6 +311,20 @@ export default function OrdersClient({
         </div>
       )}
 
+      <ConfirmDialog
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, orderId: null, action: null })}
+        onConfirm={confirmAction}
+        title={confirmModal.action === 'revoke' ? 'ยกเลิกสิทธิ์เข้าถึง' : 'คืนสิทธิ์เข้าถึง'}
+        description={
+          confirmModal.action === 'revoke' 
+            ? 'คุณต้องการยกเลิกสิทธิ์เข้าถึงแพ็กเกจของผู้ใช้งานนี้ใช่หรือไม่?' 
+            : 'คุณต้องการคืนสิทธิ์เข้าถึงแพ็กเกจให้ผู้ใช้งานนี้ใช่หรือไม่?'
+        }
+        confirmText="ยืนยัน"
+        cancelText="ยกเลิก"
+        isDestructive={confirmModal.action === 'revoke'}
+      />
     </div>
   )
 }
