@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ORDER_STATUS } from '@/lib/orderUtils'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
   }
 
-  const supabase = await createAdminClient()
+  const supabase = createAdminClient()
 
   // อัพเดต order status (กรณีที่ก่อนหน้านี้ insert เป็น pending)
   // แต่จริงๆ ใน create/route.ts เราไม่ได้เซฟ charge_id ไว้
