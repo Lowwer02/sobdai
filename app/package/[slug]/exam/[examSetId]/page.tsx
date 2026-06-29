@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Lock } from 'lucide-react'
 import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 
@@ -62,24 +63,14 @@ export default async function ExamSetPage({ params }: { params: Promise<{ slug: 
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
-        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
-          <h2 className="text-xl font-bold text-[#F5E9D6] mb-3">เข้าสู่ระบบก่อนทำข้อสอบ</h2>
-          <p className="text-[#A1866B] mb-6 text-sm">กรุณาเข้าสู่ระบบเพื่อเริ่มทำข้อสอบและบันทึกผล</p>
-          <Link href={`/login?redirect=/package/${slug}/exam/${examSetId}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
-            เข้าสู่ระบบ
-          </Link>
-        </div>
-      </div>
-    )
+    redirect(`/login?redirect=/package/${slug}/exam/${examSetId}`)
   }
 
   // 4. Access Control (Check if user bought the package, unless it's a sample)
   if (!examSet.is_sample) {
     let hasAccess = false
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile && (profile.role === 'admin' || profile.role === 'owner')) {
+    if (profile && ['admin', 'owner', 'editor', 'support'].includes(profile.role)) {
       hasAccess = true
     } else {
       const { data: order } = await supabase
@@ -96,14 +87,19 @@ export default async function ExamSetPage({ params }: { params: Promise<{ slug: 
       return (
         <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
-            <h2 className="text-xl font-bold text-[#F5E9D6] mb-3">ยังไม่ได้ซื้อแพ็กเกจนี้</h2>
-            <p className="text-[#A1866B] mb-6 text-sm">ข้อสอบชุดนี้สงวนสิทธิ์สำหรับผู้ซื้อแพ็กเกจเท่านั้น</p>
-            <Link href={`/checkout/${pkg.id}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors mb-3">
-              สั่งซื้อแพ็กเกจ
-            </Link>
-            <Link href={`/package/${slug}`} className="block w-full bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors">
-              กลับไปดูรายละเอียด
-            </Link>
+            <div className="w-16 h-16 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto mb-6">
+              <Lock size={32} />
+            </div>
+            <h2 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">เนื้อหาสงวนสิทธิ์เฉพาะผู้ซื้อ</h2>
+            <p className="text-[#A1866B] mb-8 text-sm">แพ็กเกจ {pkg.name}</p>
+            <div className="space-y-3">
+              <Link href={`/checkout/${pkg.id}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+                สั่งซื้อแพ็กเกจ
+              </Link>
+              <Link href={`/package/${slug}`} className="block w-full bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors">
+                กลับไปดูรายละเอียด
+              </Link>
+            </div>
           </div>
         </div>
       )

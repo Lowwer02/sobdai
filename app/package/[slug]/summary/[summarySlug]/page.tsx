@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { Lock, LogIn } from 'lucide-react'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import SummaryClient from './SummaryClient'
 
@@ -67,7 +69,7 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
 
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile && (profile.role === 'admin' || profile.role === 'owner')) {
+    if (profile && ['admin', 'owner', 'editor', 'support'].includes(profile.role)) {
       hasAccess = true
     } else {
       const { data: order } = await supabase
@@ -81,8 +83,43 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
     }
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto mb-6">
+            <LogIn size={32} />
+          </div>
+          <h2 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">เข้าสู่ระบบเพื่ออ่านเนื้อหา</h2>
+          <p className="text-[#A1866B] mb-8 text-sm">กรุณาเข้าสู่ระบบก่อนเพื่อตรวจสอบสิทธิ์การเข้าถึงเนื้อหาสรุปนี้</p>
+          <Link href={`/login?redirect=/package/${slug}/summary/${summarySlug}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+            เข้าสู่ระบบ
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (!hasAccess) {
-    redirect(`/package/${slug}`)
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock size={32} />
+          </div>
+          <h2 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">เนื้อหาสงวนสิทธิ์เฉพาะผู้ซื้อ</h2>
+          <p className="text-[#A1866B] mb-8 text-sm">แพ็กเกจ {pkg.name}</p>
+          <div className="space-y-3">
+            <Link href={`/checkout/${pkg.id}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+              สั่งซื้อแพ็กเกจ
+            </Link>
+            <Link href={`/package/${slug}`} className="block w-full bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors">
+              กลับไปดูรายละเอียด
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Fetch previous and next summaries
