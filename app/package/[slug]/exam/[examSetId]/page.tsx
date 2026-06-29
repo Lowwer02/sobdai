@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ExamRuntime from './ExamRuntime'
+import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, examSetId: string }> }) {
   const { slug, examSetId } = await params
@@ -81,7 +82,7 @@ export default async function ExamSetPage({ params }: { params: Promise<{ slug: 
       .select('id')
       .eq('user_id', user.id)
       .eq('package_id', pkg.id)
-      .eq('status', 'completed')
+      .in('status', ORDER_COMPLETED_STATUSES)
       .maybeSingle()
 
     if (!order) {

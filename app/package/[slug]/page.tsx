@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import PackageClient from './PackageClient'
 import { notFound } from 'next/navigation'
 
@@ -58,7 +59,7 @@ export default async function PackagePage({ params }: PageProps) {
       .select('id')
       .eq('user_id', user.id)
       .eq('package_id', pkg.id)
-      .eq('status', 'completed')
+      .in('status', ORDER_COMPLETED_STATUSES)
       .maybeSingle()
     if (order) isPurchased = true
   }

@@ -1,7 +1,7 @@
 'use server'
 
 import { requirePermission } from '@/lib/auth/server-protect'
-
+import { ORDER_COMPLETED_STATUSES, OrderStatus, ORDER_STATUS } from '@/lib/orderUtils'
 import { revalidatePath } from 'next/cache'
 
 
@@ -15,7 +15,7 @@ export async function grantPackageAccess(userId: string, packageId: string) {
       .select('id')
       .eq('user_id', userId)
       .eq('package_id', packageId)
-      .eq('status', 'completed')
+      .in('status', ORDER_COMPLETED_STATUSES)
       .maybeSingle()
 
     if (existing) {
@@ -28,7 +28,7 @@ export async function grantPackageAccess(userId: string, packageId: string) {
         user_id: userId,
         package_id: packageId,
         amount: 0,
-        status: 'completed',
+        status: ORDER_STATUS.FREE,
         payment_provider: 'manual_grant'
       })
       .select('id')
@@ -43,7 +43,7 @@ export async function grantPackageAccess(userId: string, packageId: string) {
   }
 }
 
-export async function updateOrderStatus(orderId: string, newStatus: 'completed' | 'revoked' | 'refunded' | 'failed') {
+export async function updateOrderStatus(orderId: string, newStatus: OrderStatus) {
   try {
     const { supabase } = await requirePermission('financial.manage')
     

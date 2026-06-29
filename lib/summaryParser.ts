@@ -6,7 +6,8 @@ export interface SummaryMetadata {
   subject?: string
   law?: string
   topic?: string
-  package_slug?: string
+  package_ref?: string
+  package_ref_type?: 'slug' | 'code' | 'ambiguous'
   published?: boolean
   sort?: number
 }
@@ -39,11 +40,24 @@ export function parseMarkdownSummary(markdown: string): ParsedSummary {
 
   const title = data.title || ''
   const slug = data.slug || ''
-  const pkgSlug = data.package_slug || ''
+  
+  let package_ref = ''
+  let package_ref_type: 'slug' | 'code' | 'ambiguous' | undefined = undefined
+
+  if (data.package_slug) {
+    package_ref = data.package_slug
+    package_ref_type = 'slug'
+  } else if (data.package) {
+    package_ref = data.package
+    package_ref_type = 'ambiguous'
+  } else if (data.package_code) {
+    package_ref = data.package_code
+    package_ref_type = 'code'
+  }
   
   if (!title) errors.push('Missing "title" in metadata')
   if (!slug) errors.push('Missing "slug" in metadata')
-  if (!pkgSlug) errors.push('Missing "package_slug" in metadata')
+  if (!package_ref) errors.push('Missing package reference (expected package_slug, package, or package_code)')
   if (!content.trim()) errors.push('Markdown body is empty')
 
   const wordCount = content.trim().split(/\s+/).length
@@ -56,7 +70,8 @@ export function parseMarkdownSummary(markdown: string): ParsedSummary {
       subject: data.subject || '',
       law: data.law || '',
       topic: data.topic || '',
-      package_slug: pkgSlug,
+      package_ref,
+      package_ref_type,
       published: data.published === true || data.published === 'true',
       sort: data.sort ? parseInt(data.sort, 10) : 0
     },

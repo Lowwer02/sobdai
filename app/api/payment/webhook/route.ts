@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ORDER_STATUS } from '@/lib/orderUtils'
 import { createAdminClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 
@@ -46,7 +47,8 @@ export async function POST(request: NextRequest) {
     .select('id')
     .eq('user_id', user_id)
     .eq('package_id', package_id)
-    .eq('status', 'completed')
+    .neq('status', ORDER_STATUS.PAID)
+    .neq('status', ORDER_STATUS.FREE)
     .maybeSingle()
 
   if (!existingOrder) {
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (pendingOrder) {
       await supabase
         .from('orders')
-        .update({ status: 'completed' })
+        .update({ status: ORDER_STATUS.PAID })
         .eq('id', pendingOrder.id)
     } else {
       // Fallback: create a new order just in case it wasn't saved
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
         package_id,
         amount: pkg?.current_price || 0,
         payment_provider: 'omise',
-        status: 'completed'
+        status: ORDER_STATUS.PAID
       })
     }
 

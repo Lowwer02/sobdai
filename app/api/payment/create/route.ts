@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { ORDER_COMPLETED_STATUSES, ORDER_STATUS } from '@/lib/orderUtils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +13,8 @@ export async function POST(request: NextRequest) {
 
     const { packageId, token } = await request.json()
 
-    if (!packageId || !token) {
-      return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
+    if (!packageId) {
+      return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน (packageId)' }, { status: 400 })
     }
 
     // ดึงราคา package จาก DB
@@ -33,11 +34,40 @@ export async function POST(request: NextRequest) {
       .select('id')
       .eq('user_id', user.id)
       .eq('package_id', packageId)
-      .eq('status', 'completed')
+      .in('status', ORDER_COMPLETED_STATUSES)
       .maybeSingle()
 
     if (existingOrder) {
       return NextResponse.json({ error: 'คุณมีสิทธิ์เข้าถึงแพ็กเกจนี้แล้ว' }, { status: 409 })
+    }
+
+    // จัดการแพ็กเกจฟรี
+    if (pkg.current_price === 0) {
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          package_id: packageId,
+          amount: 0,
+          payment_provider: 'free',
+          status: ORDER_STATUS.FREE,
+        })
+        .select()
+        .single()
+        
+      if (orderError) {
+        console.error('Insert order error:', orderError)
+        return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่' }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'รับแพ็กเกจฟรีสำเร็จ!',
+      })
+    }
+
+    if (!token) {
+      return NextResponse.json({ error: 'ข้อมูลการชำระเงินไม่ครบถ้วน' }, { status: 400 })
     }
 
     // เรียก Omise API
@@ -79,7 +109,7 @@ export async function POST(request: NextRequest) {
         package_id: packageId,
         amount: pkg.current_price,
         payment_provider: 'omise',
-        status: charge.paid ? 'completed' : 'pending',
+        status: charge.paid ? ORDER_STATUS.PAID : ORDER_STATUS.PENDING,
       })
       .select()
       .single()

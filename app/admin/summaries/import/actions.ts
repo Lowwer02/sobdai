@@ -10,14 +10,37 @@ export async function validateSummaryImport(metadata: any) {
     const { supabase } = await requirePermission('content.write')
     
     // Find Package
-    const { data: pkg, error: pkgError } = await supabase
-      .from('packages')
-      .select('id, name')
-      .eq('slug', metadata.package_slug)
-      .single()
+    let pkg = null
+    let resolvedBy = ''
 
-    if (pkgError || !pkg) {
-      return { success: false, error: `Package not found for slug: ${metadata.package_slug}` }
+    if (metadata.package_ref_type === 'slug' || metadata.package_ref_type === 'ambiguous') {
+      const { data } = await supabase
+        .from('packages')
+        .select('id, name')
+        .eq('slug', metadata.package_ref)
+        .maybeSingle()
+      
+      if (data) {
+        pkg = data
+        resolvedBy = 'slug'
+      }
+    }
+
+    if (!pkg && (metadata.package_ref_type === 'code' || metadata.package_ref_type === 'ambiguous')) {
+      const { data } = await supabase
+        .from('packages')
+        .select('id, name')
+        .eq('package_code', metadata.package_ref)
+        .maybeSingle()
+        
+      if (data) {
+        pkg = data
+        resolvedBy = 'code'
+      }
+    }
+
+    if (!pkg) {
+      return { success: false, error: `Package not found: ${metadata.package_ref}` }
     }
 
     // Check Slug conflict
@@ -32,7 +55,8 @@ export async function validateSummaryImport(metadata: any) {
       success: true, 
       packageId: pkg.id,
       packageName: pkg.name,
-      isDuplicate: !!existingSummary 
+      isDuplicate: !!existingSummary,
+      resolvedBy
     }
   } catch (err: any) {
     return { success: false, error: err.message }

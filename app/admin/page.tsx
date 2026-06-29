@@ -1,4 +1,5 @@
 import { getAdminSession } from '@/lib/auth/server-protect'
+import { ORDER_STATUS } from '@/lib/orderUtils'
 import { Users, Package, FileQuestion, ShoppingCart, CheckSquare } from 'lucide-react'
 
 export const metadata = {
@@ -35,7 +36,7 @@ export default async function AdminDashboard() {
   const { count: esCount } = await supabase.from('exam_sets').select('*', { count: 'exact', head: true })
   const { count: ordersCount } = await supabase.from('orders').select('*', { count: 'exact', head: true })
   
-  const { data: revData } = await supabase.from('orders').select('amount').eq('status', 'completed')
+  const { data: revData } = await supabase.from('orders').select('amount').eq('status', ORDER_STATUS.PAID)
   const totalRevenue = revData?.reduce((sum, order) => sum + Number(order.amount), 0) || 0
 
   return (

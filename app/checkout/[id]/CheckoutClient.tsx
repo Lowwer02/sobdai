@@ -78,6 +78,28 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
     setError('ระบบ PromptPay อยู่ระหว่างการพัฒนา กรุณาใช้บัตรเครดิต/เดบิต')
   }
 
+  const handleFreeCheckout = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId: pkg.id, token: 'free_token' }), // Token can be anything for free
+      })
+      const data = await res.json()
+      if (data.success) {
+        router.push(`/package/${pkg.slug}?success=1`)
+      } else {
+        setError(data.error || 'เกิดข้อผิดพลาด')
+      }
+    } catch {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#0F0B07] font-sans pb-20">
       
@@ -135,68 +157,103 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
           </div>
         </div>
 
-        {/* Payment Methods */}
-        <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl p-6">
-          <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">ช่องทางชำระเงิน</h2>
-          
-          <div className="flex gap-3 mb-6">
+        {/* Free or Paid Condition */}
+        {pkg.current_price === 0 ? (
+          <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl p-6 text-center">
+            <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">รับสิทธิ์ใช้งาน</h2>
+            <p className="text-[#F5E9D6] mb-6">แพ็กเกจนี้เปิดให้ใช้งานฟรี กดปุ่มด้านล่างเพื่อรับสิทธิ์ใช้งานทันที</p>
+            
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
+                {error}
+              </div>
+            )}
+
             <button
-              onClick={() => setPayMethod('card')}
-              className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
-                payMethod === 'card' 
-                  ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' 
-                  : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] text-[#A1866B] hover:border-[#D4AF37]/50'
+              onClick={handleFreeCheckout}
+              disabled={loading}
+              className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
+                loading
+                  ? 'bg-[#A1866B] cursor-not-allowed opacity-70' 
+                  : 'bg-[#D4AF37] hover:bg-[#F1D17A] shadow-[0_0_20px_rgba(212,175,55,0.3)]'
               }`}
             >
-              <CreditCard size={24} />
-              <span className="text-sm font-bold">บัตรเครดิต/เดบิต</span>
-            </button>
-            <button
-              onClick={() => setPayMethod('promptpay')}
-              className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
-                payMethod === 'promptpay' 
-                  ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' 
-                  : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] text-[#A1866B] hover:border-[#D4AF37]/50'
-              }`}
-            >
-              <QrCode size={24} />
-              <span className="text-sm font-bold">พร้อมเพย์</span>
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-[#1A140E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  กำลังดำเนินการ...
+                </>
+              ) : (
+                'รับแพ็กเกจฟรี'
+              )}
             </button>
           </div>
-
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
-              {error}
+        ) : (
+          <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl p-6">
+            <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">ช่องทางชำระเงิน</h2>
+            
+            <div className="flex gap-3 mb-6">
+              <button
+                onClick={() => setPayMethod('card')}
+                className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
+                  payMethod === 'card' 
+                    ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' 
+                    : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] text-[#A1866B] hover:border-[#D4AF37]/50'
+                }`}
+              >
+                <CreditCard size={24} />
+                <span className="text-sm font-bold">บัตรเครดิต/เดบิต</span>
+              </button>
+              <button
+                onClick={() => setPayMethod('promptpay')}
+                className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
+                  payMethod === 'promptpay' 
+                    ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' 
+                    : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] text-[#A1866B] hover:border-[#D4AF37]/50'
+                }`}
+              >
+                <QrCode size={24} />
+                <span className="text-sm font-bold">พร้อมเพย์</span>
+              </button>
             </div>
-          )}
 
-          <button
-            onClick={payMethod === 'card' ? handleCardPayment : handlePromptPay}
-            disabled={loading || !omiseLoaded || pkg.current_price === 0}
-            className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
-              loading || !omiseLoaded 
-                ? 'bg-[#A1866B] cursor-not-allowed opacity-70' 
-                : 'bg-[#D4AF37] hover:bg-[#F1D17A] shadow-[0_0_20px_rgba(212,175,55,0.3)]'
-            }`}
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-[#1A140E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                กำลังดำเนินการ...
-              </>
-            ) : (
-              `ชำระเงิน ฿${pkg.current_price.toLocaleString()}`
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
+                {error}
+              </div>
             )}
-          </button>
 
-          <p className="text-center text-xs text-[#A1866B] mt-6 leading-relaxed">
-            ระบบชำระเงินมีความปลอดภัยระดับโลกด้วยมาตรฐาน PCI DSS Level 1 <br/>
-            ข้อมูลบัตรของคุณจะไม่ถูกจัดเก็บไว้บนเซิร์ฟเวอร์ของเรา
-          </p>
-        </div>
+            <button
+              onClick={payMethod === 'card' ? handleCardPayment : handlePromptPay}
+              disabled={loading || !omiseLoaded}
+              className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
+                loading || !omiseLoaded 
+                  ? 'bg-[#A1866B] cursor-not-allowed opacity-70' 
+                  : 'bg-[#D4AF37] hover:bg-[#F1D17A] shadow-[0_0_20px_rgba(212,175,55,0.3)]'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-[#1A140E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  กำลังดำเนินการ...
+                </>
+              ) : (
+                `ชำระเงิน ฿${pkg.current_price.toLocaleString()}`
+              )}
+            </button>
+
+            <p className="text-center text-xs text-[#A1866B] mt-6 leading-relaxed">
+              ระบบชำระเงินมีความปลอดภัยระดับโลกด้วยมาตรฐาน PCI DSS Level 1 <br/>
+              ข้อมูลบัตรของคุณจะไม่ถูกจัดเก็บไว้บนเซิร์ฟเวอร์ของเรา
+            </p>
+          </div>
+        )}
 
       </div>
     </div>

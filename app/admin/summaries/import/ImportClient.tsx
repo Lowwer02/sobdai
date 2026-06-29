@@ -19,7 +19,7 @@ export default function ImportClient() {
   const [isPending, startTransition] = useTransition()
   
   // Validation state
-  const [valResult, setValResult] = useState<{ success: boolean, error?: string, packageId?: string, packageName?: string, isDuplicate?: boolean } | null>(null)
+  const [valResult, setValResult] = useState<{ success: boolean, error?: string, packageId?: string, packageName?: string, isDuplicate?: boolean, resolvedBy?: string } | null>(null)
   const [conflictResolution, setConflictResolution] = useState<'replace' | 'new'>('replace')
 
   // Final result
@@ -216,7 +216,7 @@ export default function ImportClient() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[#A1866B]">Package Ref</span>
-                        <span className="text-[#D4AF37] font-bold">{parsedData.metadata.package_slug}</span>
+                        <span className="text-[#D4AF37] font-bold">{parsedData.metadata.package_ref}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[#A1866B]">Status</span>
@@ -296,7 +296,7 @@ export default function ImportClient() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-[#F5E9D6]">Validation Passed</h2>
-                  <p className="text-[#A1866B] text-sm mt-1">Package <strong className="text-[#D4AF37]">{valResult.packageName}</strong> was found.</p>
+                  <p className="text-[#A1866B] text-sm mt-1">Package <strong className="text-[#D4AF37]">{valResult.packageName}</strong> was found. (✓ Package resolved by {valResult.resolvedBy})</p>
                 </div>
               </div>
 

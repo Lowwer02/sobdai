@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
+import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import CheckoutClient from './CheckoutClient'
 import Link from 'next/link'
 
@@ -77,7 +78,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
     .select('id')
     .eq('user_id', user.id)
     .eq('package_id', id)
-    .eq('status', 'completed')
+    .in('status', ORDER_COMPLETED_STATUSES)
     .maybeSingle()
 
   if (existingOrder) {

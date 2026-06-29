@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
+import { ORDER_STATUS } from '@/lib/orderUtils'
 import { grantPackageAccess, updateOrderStatus } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
@@ -37,7 +38,7 @@ export default function OrdersClient({
   const [selectedUser, setSelectedUser] = useState('')
   const [selectedPackage, setSelectedPackage] = useState('')
   const [error, setError] = useState('')
-  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: 'revoke' | 'restore' | null }>({ isOpen: false, orderId: null, action: null })
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: 'revoke' | 'restore' | 'complete' | null }>({ isOpen: false, orderId: null, action: null })
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(window.location.search)
@@ -61,7 +62,7 @@ export default function OrdersClient({
     if (!confirmModal.orderId) return
     setActingOnId(confirmModal.orderId)
     setConfirmModal({ isOpen: false, orderId: null, action: null })
-    await updateOrderStatus(confirmModal.orderId, 'revoked')
+    await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.CANCELLED)
     toastEvent('ยกเลิกสิทธิ์เข้าถึงสำเร็จ')
     setActingOnId(null)
   }
@@ -70,14 +71,24 @@ export default function OrdersClient({
     if (!confirmModal.orderId) return
     setActingOnId(confirmModal.orderId)
     setConfirmModal({ isOpen: false, orderId: null, action: null })
-    await updateOrderStatus(confirmModal.orderId, 'completed')
+    await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.PAID)
     toastEvent('คืนสิทธิ์เข้าถึงสำเร็จ')
+    setActingOnId(null)
+  }
+
+  const handleComplete = async () => {
+    if (!confirmModal.orderId) return
+    setActingOnId(confirmModal.orderId)
+    setConfirmModal({ isOpen: false, orderId: null, action: null })
+    await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.PAID)
+    toastEvent('เปลี่ยนสถานะเป็นชำระเงินแล้วสำเร็จ')
     setActingOnId(null)
   }
 
   const confirmAction = () => {
     if (confirmModal.action === 'revoke') handleRevoke()
     else if (confirmModal.action === 'restore') handleRestore()
+    else if (confirmModal.action === 'complete') handleComplete()
   }
 
   const handleGrant = async (e: React.FormEvent) => {
@@ -136,10 +147,11 @@ export default function OrdersClient({
               onChange={(e) => updateParams({ status: e.target.value })}
               className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
             >
-              <option value="">All Statuses</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
+              <option value="all">ทุกสถานะ</option>
+              <option value={ORDER_STATUS.PAID}>Paid</option>
+              <option value={ORDER_STATUS.FREE}>Free</option>
+              <option value={ORDER_STATUS.PENDING}>Pending</option>
+              <option value={ORDER_STATUS.CANCELLED}>Cancelled</option>
               <option value="refunded">Refunded</option>
               <option value="revoked">Revoked</option>
             </select>
@@ -189,17 +201,28 @@ export default function OrdersClient({
                     <span className="text-[#D4AF37] font-bold">฿{Number(order.amount).toLocaleString()}</span>
                   </td>
                   <td className="p-4">
-                    <span className={`text-xs font-bold px-2 py-1 rounded ${
-                      order.status === 'completed' ? 'text-[#22C55E] bg-[#22C55E]/10' :
-                      order.status === 'revoked' || order.status === 'refunded' ? 'text-red-500 bg-red-500/10' :
-                      'text-[#EAB308] bg-[#EAB308]/10'
+                    <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${
+                      order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE ? 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20' :
+                      order.status === ORDER_STATUS.PENDING ? 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20' :
+                      order.status === ORDER_STATUS.FAILED ? 'text-red-400 bg-red-400/10 border-red-400/20' :
+                      order.status === ORDER_STATUS.REFUNDED ? 'text-purple-400 bg-purple-400/10 border-purple-400/20' :
+                      'text-red-400 bg-red-400/10 border-red-400/20'
                     }`}>
                       {order.status.toUpperCase()}
                     </span>
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {order.status === 'completed' ? (
+                      {order.status === ORDER_STATUS.PENDING && (
+                        <button 
+                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'complete' })}
+                          disabled={actingOnId === order.id}
+                          className="px-3 py-1.5 bg-[#22C55E]/10 text-[#22C55E] text-xs font-bold rounded hover:bg-[#22C55E]/20 transition-colors"
+                        >
+                          Mark Paid
+                        </button>
+                      )}
+                      {(order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
                         <button 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'revoke' })}
                           disabled={actingOnId === order.id}
