@@ -144,8 +144,8 @@ export async function POST(request: NextRequest) {
       status: charge.status,
       charge_id: charge.id,
     })
-  } catch (err) {
-    console.error('Payment error:', err)
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด กรุณาลองใหม่' }, { status: 500 })
+  } catch (err: any) {
+    console.error('Payment error caught in catch block:', err)
+    return NextResponse.json({ success: false, error: 'Backend Crash: ' + (err.message || err.toString()) }, { status: 500 })
   }
 }
