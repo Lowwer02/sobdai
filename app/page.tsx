@@ -103,18 +103,43 @@ export default async function Home() {
         current_price,
         original_price,
         difficulty,
-        total_questions,
-        total_exam_sets,
         description,
         organizations ( name, logo_url ),
-        positions ( name )
+        positions ( name ),
+        exam_sets (
+          id,
+          exam_set_questions (
+            questions ( status )
+          )
+        )
       `)
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(6)
       
     if (data && data.length > 0) {
-      livePackages = data as any
+      livePackages = data.map((pkg: any) => {
+        let actualQuestions = 0;
+        let actualSets = pkg.exam_sets ? pkg.exam_sets.length : 0;
+        
+        if (pkg.exam_sets) {
+          pkg.exam_sets.forEach((es: any) => {
+            if (es.exam_set_questions) {
+              es.exam_set_questions.forEach((esq: any) => {
+                if (esq.questions?.status === 'Published') {
+                  actualQuestions++;
+                }
+              })
+            }
+          })
+        }
+
+        return {
+          ...pkg,
+          total_questions: actualQuestions,
+          total_exam_sets: actualSets
+        }
+      })
     }
   } catch (error) {
     console.error('Failed to fetch packages:', error)

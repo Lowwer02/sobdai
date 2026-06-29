@@ -32,24 +32,29 @@ export async function proxy(request: NextRequest) {
     user = data.user
   }
 
-  // Protect admin routes
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url))
+  // Global user checks (banned status)
+  if (user && process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.status === 'banned' && request.nextUrl.pathname !== '/banned') {
+      return NextResponse.redirect(new URL('/banned', request.url))
     }
-    
-    // Check admin role from profiles table
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-        
+
+    // Protect admin routes
+    if (request.nextUrl.pathname.startsWith('/admin')) {
       if (!profile || profile.role === 'user') {
         return NextResponse.redirect(new URL('/', request.url)) // Redirect to home if user
       }
     }
+  } else if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Unauthenticated accessing protected route
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   return supabaseResponse

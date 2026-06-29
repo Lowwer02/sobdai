@@ -143,3 +143,43 @@ export async function updateExamSetAction(id: string, data: {
     return { success: false, error: err.message }
   }
 }
+
+export async function publishDraftQuestionsInExamSetAction(examSetId: string) {
+  try {
+    const { supabase } = await requirePermission('content.write')
+
+    // 1. Get all questions in the exam set
+    const { data: esq, error: fetchError } = await supabase
+      .from('exam_set_questions')
+      .select('question_id, questions!inner(id, status)')
+      .eq('exam_set_id', examSetId)
+
+    if (fetchError) throw fetchError
+
+    // 2. Filter for Draft questions
+    const draftIds = esq
+      .map((item: any) => item.questions)
+      .filter((q: any) => q && q.status === 'Draft')
+      .map((q: any) => q.id)
+
+    if (draftIds.length === 0) return { success: true, count: 0 }
+
+    // 3. Update status to Published
+    const { error: updateError, data: updateData } = await supabase
+      .from('questions')
+      .update({ status: 'Published', updated_at: new Date().toISOString() })
+      .in('id', draftIds)
+      .select('id')
+
+    if (updateError) throw updateError
+    if (!updateData || updateData.length === 0) throw new Error('Update failed. You may not have permission.')
+
+    revalidatePath('/admin/exam-sets')
+    revalidatePath('/admin/questions')
+    return { success: true, count: updateData.length }
+
+  } catch (err: any) {
+    console.error('Action error:', err)
+    return { success: false, error: err.message }
+  }
+}

@@ -60,6 +60,19 @@ export default async function QuestionsPage({
 
   const totalPages = count ? Math.ceil(count / limit) : 0
 
+  // 1. Fetch Aggregated Counts
+  const [
+    { count: totalCount },
+    { count: publishedCount },
+    { count: reviewCount },
+    { count: draftCount }
+  ] = await Promise.all([
+    supabase.from('questions').select('*', { count: 'exact', head: true }),
+    supabase.from('questions').select('*', { count: 'exact', head: true }).eq('status', 'Published'),
+    supabase.from('questions').select('*', { count: 'exact', head: true }).eq('status', 'Review'),
+    supabase.from('questions').select('*', { count: 'exact', head: true }).eq('status', 'Draft'),
+  ])
+
   // Fetch unique categories for the filter dropdown
   const { data: filterData } = await supabase
     .from('questions')
@@ -86,6 +99,10 @@ export default async function QuestionsPage({
       uniqueSubjects={uniqueSubjects}
       uniqueLaws={uniqueLaws}
       uniqueTopics={uniqueTopics}
+      totalCount={totalCount || 0}
+      publishedCount={publishedCount || 0}
+      reviewCount={reviewCount || 0}
+      draftCount={draftCount || 0}
     />
   )
 }

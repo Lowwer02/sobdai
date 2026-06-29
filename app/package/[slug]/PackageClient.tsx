@@ -265,7 +265,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
               <div className="space-y-4 flex-1">
                 {sortedExamSets.length > 0 ? (
                   sortedExamSets.map((topic: any) => {
-                    const qCount = topic.exam_set_questions?.[0]?.count || 0
+                    const qCount = topic.qCount || 0
                     return (
                       <Link href={`/package/${pkg.slug}/exam/${topic.id}`} key={topic.id} className="block">
                         <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col relative overflow-hidden">

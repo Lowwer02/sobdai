@@ -32,7 +32,9 @@ export default async function PackagePage({ params }: PageProps) {
       positions(name),
       exam_sets(
         *,
-        exam_set_questions(count)
+        exam_set_questions(
+          questions(status)
+        )
       )
     `)
     .eq('slug', slug)
@@ -41,6 +43,25 @@ export default async function PackagePage({ params }: PageProps) {
   if (error || !pkg) {
     notFound()
   }
+
+  // Calculate actual published question counts
+  let totalPublishedQuestions = 0
+  if (pkg.exam_sets) {
+    pkg.exam_sets.forEach((es: any) => {
+      let publishedCount = 0
+      if (es.exam_set_questions) {
+        es.exam_set_questions.forEach((esq: any) => {
+          if (esq.questions?.status === 'Published') {
+            publishedCount++
+          }
+        })
+      }
+      es.qCount = publishedCount
+      totalPublishedQuestions += publishedCount
+    })
+  }
+  pkg.total_questions = totalPublishedQuestions
+  pkg.total_exam_sets = pkg.exam_sets ? pkg.exam_sets.length : 0
 
   const { data: { user } } = await supabase.auth.getUser()
 

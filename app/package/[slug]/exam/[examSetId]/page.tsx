@@ -77,15 +77,22 @@ export default async function ExamSetPage({ params }: { params: Promise<{ slug: 
 
   // 4. Access Control (Check if user bought the package, unless it's a sample)
   if (!examSet.is_sample) {
-    const { data: order } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('package_id', pkg.id)
-      .in('status', ORDER_COMPLETED_STATUSES)
-      .maybeSingle()
+    let hasAccess = false
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile && (profile.role === 'admin' || profile.role === 'owner')) {
+      hasAccess = true
+    } else {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('package_id', pkg.id)
+        .in('status', ORDER_COMPLETED_STATUSES)
+        .maybeSingle()
+      if (order) hasAccess = true
+    }
 
-    if (!order) {
+    if (!hasAccess) {
       return (
         <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
@@ -146,8 +153,22 @@ export default async function ExamSetPage({ params }: { params: Promise<{ slug: 
     )
   }
 
-  // Map to flat array
-  const questions = esq.map((item: any) => item.questions)
+  // Map to flat array and filter out nulls (hidden by RLS)
+  const questions = esq.map((item: any) => item.questions).filter(Boolean)
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
+          <h2 className="text-xl font-bold text-[#F5E9D6] mb-3">ไม่มีข้อสอบที่เปิดให้ทำในขณะนี้</h2>
+          <p className="text-[#A1866B] mb-6 text-sm">ยังไม่มีข้อสอบที่ถูกเผยแพร่ในชุดข้อสอบนี้ หรือข้อสอบทั้งหมดอาจอยู่ระหว่างการปรับปรุง</p>
+          <Link href={`/package/${slug}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+            กลับไปหน้ารายละเอียด
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <ExamRuntime 

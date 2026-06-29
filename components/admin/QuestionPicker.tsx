@@ -80,6 +80,18 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
     onChange(selectedQuestions.filter(q => q.id !== id))
   }
 
+  const handleSelectAll = () => {
+    const newSelected = [...selectedQuestions]
+    let added = false
+    questions.forEach(q => {
+      if (!newSelected.find(sq => sq.id === q.id)) {
+        newSelected.push(q)
+        added = true
+      }
+    })
+    if (added) onChange(newSelected)
+  }
+
   const moveUp = (index: number) => {
     if (index === 0) return
     const newItems = [...selectedQuestions]
@@ -161,7 +173,17 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
             
             {/* Modal Header */}
             <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex justify-between items-center bg-[#0F0B07] rounded-t-2xl shrink-0">
-              <h2 className="text-xl font-bold font-display text-[#F5E9D6]">Question Bank Picker</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold font-display text-[#F5E9D6]">Question Bank Picker</h2>
+                {questions.length > 0 && (
+                  <button
+                    onClick={handleSelectAll}
+                    className="text-sm bg-[#1A140E] border border-[rgba(212,175,55,0.3)] text-[#D4AF37] px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
+                  >
+                    Select All (Current Page)
+                  </button>
+                )}
+              </div>
               <button onClick={() => setIsOpen(false)} className="p-2 text-[#A1866B] hover:text-white transition-colors">
                 <X size={20} />
               </button>

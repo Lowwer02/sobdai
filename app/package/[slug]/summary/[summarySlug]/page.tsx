@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import SummaryClient from './SummaryClient'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, summarySlug: string }> }) {
@@ -59,6 +60,30 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
     .single()
 
   if (!summary || !summary.is_published) return notFound()
+
+  // Purchase Access Control
+  const { data: { user } } = await supabase.auth.getUser()
+  let hasAccess = false
+
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile && (profile.role === 'admin' || profile.role === 'owner')) {
+      hasAccess = true
+    } else {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('package_id', pkg.id)
+        .in('status', ORDER_COMPLETED_STATUSES)
+        .maybeSingle()
+      if (order) hasAccess = true
+    }
+  }
+
+  if (!hasAccess) {
+    redirect(`/package/${slug}`)
+  }
 
   // Fetch previous and next summaries
   const { data: allSummaries } = await supabase

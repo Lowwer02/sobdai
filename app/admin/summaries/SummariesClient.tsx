@@ -179,7 +179,7 @@ export default function SummariesClient({
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border transition-colors disabled:opacity-50 ${
                         summary.is_published 
                           ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/30 hover:bg-[#22C55E]/20' 
-                          : 'bg-[#0F0B07] text-[#A1866B] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)]'
+                          : 'bg-[rgba(255,255,255,0.05)] text-[#A1866B] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)]'
                       }`}
                     >
                       {actingOnId === summary.id ? <Loader2 size={12} className="animate-spin" /> : 

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
 import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
-import { deleteQuestionAction } from './actions'
+import { deleteQuestionAction, bulkUpdateQuestionStatusAction } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
 
@@ -23,6 +23,10 @@ interface QuestionsClientProps {
   uniqueSubjects: string[]
   uniqueLaws: string[]
   uniqueTopics: string[]
+  totalCount: number
+  publishedCount: number
+  reviewCount: number
+  draftCount: number
 }
 
 export default function QuestionsClient({
@@ -39,7 +43,11 @@ export default function QuestionsClient({
   uniqueCategories,
   uniqueSubjects,
   uniqueLaws,
-  uniqueTopics
+  uniqueTopics,
+  totalCount,
+  publishedCount,
+  reviewCount,
+  draftCount
 }: QuestionsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -49,6 +57,47 @@ export default function QuestionsClient({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [questionToDelete, setQuestionToDelete] = useState<{id: string, preview: string} | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Bulk Selection State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkActionOpen, setBulkActionOpen] = useState(false)
+  const [bulkStatusTarget, setBulkStatusTarget] = useState<'Published' | 'Draft' | 'Review'>('Draft')
+  const [isBulking, setIsBulking] = useState(false)
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      const allIds = new Set(questions.map(q => q.id))
+      setSelectedIds(allIds)
+    } else {
+      setSelectedIds(new Set())
+    }
+  }
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const next = new Set(selectedIds)
+    if (checked) next.add(id)
+    else next.delete(id)
+    setSelectedIds(next)
+  }
+
+  const handleBulkAction = (status: 'Published' | 'Draft' | 'Review') => {
+    setBulkStatusTarget(status)
+    setBulkActionOpen(true)
+  }
+
+  const confirmBulkAction = async () => {
+    setIsBulking(true)
+    const res = await bulkUpdateQuestionStatusAction(Array.from(selectedIds), bulkStatusTarget)
+    setIsBulking(false)
+    if (res?.success) {
+      toastEvent(`ปรับสถานะเป็น ${bulkStatusTarget} แล้ว ${res.count} ข้อ`)
+      setSelectedIds(new Set())
+      setBulkActionOpen(false)
+    } else {
+      toastEvent(res?.error || 'เกิดข้อผิดพลาด', 'error')
+    }
+  }
+
 
   // URL updating helper
   const updateParams = useCallback((updates: Record<string, string>) => {
@@ -112,6 +161,93 @@ export default function QuestionsClient({
         </Link>
       </div>
 
+      {/* Dashboard Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in slide-in-from-bottom-2">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-4 shadow-xl flex flex-col items-center justify-center text-center">
+          <div className="text-3xl font-bold text-[#F5E9D6]">{totalCount}</div>
+          <div className="text-xs text-[#A1866B] uppercase font-bold tracking-wider mt-1">Total Questions</div>
+        </div>
+        <div className="bg-[#22C55E]/10 border border-[#22C55E]/20 rounded-2xl p-4 shadow-xl flex flex-col items-center justify-center text-center">
+          <div className="text-3xl font-bold text-[#22C55E]">{publishedCount}</div>
+          <div className="text-xs text-[#22C55E]/70 uppercase font-bold tracking-wider mt-1">Published</div>
+        </div>
+        <div className="bg-[#EAB308]/10 border border-[#EAB308]/20 rounded-2xl p-4 shadow-xl flex flex-col items-center justify-center text-center">
+          <div className="text-3xl font-bold text-[#EAB308]">{reviewCount}</div>
+          <div className="text-xs text-[#EAB308]/70 uppercase font-bold tracking-wider mt-1">Review</div>
+        </div>
+        <div className="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-2xl p-4 shadow-xl flex flex-col items-center justify-center text-center">
+          <div className="text-3xl font-bold text-[#A1866B]">{draftCount}</div>
+          <div className="text-xs text-[#A1866B]/70 uppercase font-bold tracking-wider mt-1">Draft</div>
+        </div>
+      </div>
+
+      {/* Quick Filter Chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button 
+          onClick={() => updateParams({ status: '' })}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${!statusFilter ? 'bg-[rgba(212,175,55,0.15)] border-[#D4AF37] text-[#D4AF37]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
+        >
+          All
+        </button>
+        <button 
+          onClick={() => updateParams({ status: 'Published' })}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${statusFilter === 'Published' ? 'bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
+        >
+          Published
+        </button>
+        <button 
+          onClick={() => updateParams({ status: 'Review' })}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${statusFilter === 'Review' ? 'bg-[#EAB308]/20 border-[#EAB308] text-[#EAB308]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
+        >
+          Review
+        </button>
+        <button 
+          onClick={() => updateParams({ status: 'Draft' })}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${statusFilter === 'Draft' ? 'bg-[rgba(255,255,255,0.15)] border-[rgba(255,255,255,0.3)] text-[#F5E9D6]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
+        >
+          Draft
+        </button>
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-4">
+            <div className="font-bold text-[#F5E9D6]">
+              Selected: {selectedIds.size} Questions
+            </div>
+            <button 
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
+            >
+              Clear Selection
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => handleBulkAction('Published')}
+              disabled={isBulking}
+              className="bg-[#22C55E]/10 hover:bg-[#22C55E]/20 text-[#22C55E] px-3 py-1.5 rounded-lg text-sm font-bold border border-[#22C55E]/20 transition-colors"
+            >
+              Publish Selected
+            </button>
+            <button 
+              onClick={() => handleBulkAction('Review')}
+              disabled={isBulking}
+              className="bg-[#EAB308]/10 hover:bg-[#EAB308]/20 text-[#EAB308] px-3 py-1.5 rounded-lg text-sm font-bold border border-[#EAB308]/20 transition-colors"
+            >
+              Move to Review
+            </button>
+            <button 
+              onClick={() => handleBulkAction('Draft')}
+              disabled={isBulking}
+              className="bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.15)] text-[#A1866B] px-3 py-1.5 rounded-lg text-sm font-bold border border-[rgba(255,255,255,0.05)] transition-colors"
+            >
+              Move to Draft
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
         
         {/* Toolbar */}
@@ -133,10 +269,10 @@ export default function QuestionsClient({
               onChange={(e) => updateParams({ status: e.target.value })}
               className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
             >
-              <option value="">All Statuses</option>
-              <option value="Draft">Draft</option>
-              <option value="Review">Review</option>
-              <option value="Published">Published</option>
+              <option value="">All ({totalCount})</option>
+              <option value="Published">Published ({publishedCount})</option>
+              <option value="Review">Review ({reviewCount})</option>
+              <option value="Draft">Draft ({draftCount})</option>
             </select>
 
             <select 
@@ -208,6 +344,14 @@ export default function QuestionsClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
+                <th className="p-4 w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    checked={questions.length > 0 && selectedIds.size === questions.length}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] checked:bg-[#D4AF37] checked:border-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-[#0F0B07] transition-colors cursor-pointer"
+                  />
+                </th>
                 <th className="p-4 font-medium w-[40%]">Question Preview</th>
                 <th className="p-4 font-medium">Subject / Topic</th>
                 <th className="p-4 font-medium">Diff.</th>
@@ -219,12 +363,20 @@ export default function QuestionsClient({
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
               {questions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                  <td colSpan={7} className="p-12 text-center text-[#A1866B]">
                     No questions found matching your criteria.
                   </td>
                 </tr>
               ) : questions.map((q) => (
                 <tr key={q.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
+                  <td className="p-4 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedIds.has(q.id)}
+                      onChange={(e) => handleSelectOne(q.id, e.target.checked)}
+                      className="w-4 h-4 rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] checked:bg-[#D4AF37] checked:border-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-[#0F0B07] transition-colors cursor-pointer"
+                    />
+                  </td>
                   <td className="p-4">
                     <div className="text-[#F5E9D6] text-sm line-clamp-2">{q.content}</div>
                   </td>
@@ -255,10 +407,10 @@ export default function QuestionsClient({
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${
-                      q.status === 'Published' ? 'bg-[#22C55E]/10 text-[#22C55E]' : 
-                      q.status === 'Review' ? 'bg-[#EAB308]/10 text-[#EAB308]' : 
-                      'bg-[rgba(255,255,255,0.1)] text-[#A1866B]'
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold border ${
+                      q.status === 'Published' ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/20' : 
+                      q.status === 'Review' ? 'bg-[#EAB308]/10 text-[#EAB308] border-[#EAB308]/20' : 
+                      'bg-[rgba(255,255,255,0.05)] text-[#A1866B] border-[rgba(255,255,255,0.1)]'
                     }`}>
                       {q.status}
                     </span>
@@ -332,6 +484,25 @@ export default function QuestionsClient({
         cancelText="ยกเลิก"
         isDestructive={true}
         isLoading={isDeleting}
+      />
+
+      {/* Bulk Action Modal */}
+      <ConfirmDialog
+        isOpen={bulkActionOpen}
+        onClose={() => !isBulking && setBulkActionOpen(false)}
+        onConfirm={confirmBulkAction}
+        title={`ยืนยันการอัพเดทสถานะ`}
+        description={
+          <div className="space-y-2 text-[#F5E9D6]">
+            <p className="text-[#A1866B] text-sm">
+              คุณต้องการเปลี่ยนสถานะข้อสอบจำนวน {selectedIds.size} ข้อ เป็น <span className="font-bold text-[#D4AF37]">{bulkStatusTarget}</span> ใช่หรือไม่?
+            </p>
+          </div>
+        }
+        confirmText="ยืนยัน"
+        cancelText="ยกเลิก"
+        isDestructive={false}
+        isLoading={isBulking}
       />
 
     </div>

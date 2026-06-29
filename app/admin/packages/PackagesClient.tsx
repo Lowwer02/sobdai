@@ -105,11 +105,11 @@ export default function PackagesClient({ packages, currentUserRole }: { packages
                   </td>
                   <td className="p-4">
                     {pkg.is_published ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[#22C55E]/10 text-[#22C55E]">
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20">
                         Published
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[rgba(255,255,255,0.1)] text-[#A1866B]">
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[rgba(255,255,255,0.05)] text-[#A1866B] border border-[rgba(255,255,255,0.1)]">
                         Draft
                       </span>
                     )}

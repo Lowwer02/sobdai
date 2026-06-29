@@ -9,6 +9,7 @@ interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
   initialMode?: 'login' | 'register'
+  redirectUrl?: string
 }
 
 function GoogleIcon() {
@@ -22,7 +23,7 @@ function GoogleIcon() {
   )
 }
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', redirectUrl }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -67,10 +68,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
   const handleGoogleAuth = async () => {
     setLoading(true)
     setError(null)
+    const redirectTo = redirectUrl 
+      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
+      : `${window.location.origin}/auth/callback`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo,
       },
     })
     if (error) setError(error.message)

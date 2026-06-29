@@ -86,3 +86,28 @@ export async function deleteQuestionAction(id: string) {
     return { success: false, error: error.message }
   }
 }
+export async function bulkUpdateQuestionStatusAction(ids: string[], status: 'Published' | 'Draft' | 'Review') {
+  try {
+    const { supabase } = await requirePermission('content.write')
+
+    if (!ids || ids.length === 0) return { success: false, error: 'No questions selected' }
+
+    const { error, data } = await supabase
+      .from('questions')
+      .update({ status, updated_at: new Date().toISOString() })
+      .in('id', ids)
+      .select('id')
+
+    if (error) {
+      console.error('Error bulk updating questions:', error)
+      return { success: false, error: error.message }
+    }
+    
+    revalidatePath('/admin/questions')
+    return { success: true, count: data?.length || 0 }
+    
+  } catch (error: any) {
+    console.error('Action error:', error)
+    return { success: false, error: error.message }
+  }
+}
