@@ -64,6 +64,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
       slug,
       current_price,
       original_price,
+      is_published,
       positions(name),
       organizations(name, logo_url)
     `)
@@ -71,6 +72,20 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
     .single()
 
   if (error || !pkg) return notFound()
+
+  if (!pkg.is_published) {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
+          <h2 className="text-xl font-bold text-[#F5E9D6] mb-3">แพ็กเกจยังไม่เปิดขาย</h2>
+          <p className="text-[#A1866B] mb-6 text-sm">แพ็กเกจนี้กำลังอยู่ในระหว่างการจัดทำ หรือปิดการขายชั่วคราว กรุณากลับมาตรวจสอบอีกครั้งในภายหลัง</p>
+          <Link href="/" className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+            กลับหน้าหลัก
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   // Prevent duplicate purchase
   const { data: existingOrder } = await supabase

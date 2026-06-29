@@ -104,9 +104,15 @@ export default function PackagesClient({ packages, currentUserRole }: { packages
                     ฿{pkg.current_price}
                   </td>
                   <td className="p-4">
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[#22C55E]/10 text-[#22C55E]">
-                      Published
-                    </span>
+                    {pkg.is_published ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[#22C55E]/10 text-[#22C55E]">
+                        Published
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-[rgba(255,255,255,0.1)] text-[#A1866B]">
+                        Draft
+                      </span>
+                    )}
                   </td>
                   <td className="p-4 text-[#A1866B] text-sm whitespace-nowrap">
                     {new Date(pkg.updated_at).toLocaleDateString()}

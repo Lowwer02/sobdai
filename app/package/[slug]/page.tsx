@@ -42,6 +42,21 @@ export default async function PackagePage({ params }: PageProps) {
     notFound()
   }
 
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!pkg.is_published) {
+    let canViewDraft = false
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (profile && (profile.role === 'admin' || profile.role === 'owner')) {
+        canViewDraft = true
+      }
+    }
+    if (!canViewDraft) {
+      notFound()
+    }
+  }
+
   // Fetch Summaries
   const { data: summaries } = await supabase
     .from('summaries')
@@ -52,7 +67,6 @@ export default async function PackagePage({ params }: PageProps) {
 
   // Purchase check
   let isPurchased = false
-  const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const { data: order } = await supabase
       .from('orders')

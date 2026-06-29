@@ -59,6 +59,7 @@ export async function createPackageAction(formData: FormData) {
       seo_title: formData.get('seo_title') as string,
       seo_description: formData.get('seo_description') as string,
       features: JSON.parse((formData.get('features') as string) || '[]'),
+      is_published: formData.get('is_published') === 'on',
     }
 
     const { error, data } = await supabase.from('packages').insert(payload).select('id')
@@ -121,6 +122,7 @@ export async function updatePackageAction(id: string, formData: FormData) {
       seo_title: formData.get('seo_title') as string,
       seo_description: formData.get('seo_description') as string,
       features: JSON.parse((formData.get('features') as string) || '[]'),
+      is_published: formData.get('is_published') === 'on',
       updated_at: new Date().toISOString()
     }
 

@@ -215,6 +215,22 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             <h2 className="text-[#D4AF37] font-bold font-display text-lg mb-4">Configuration</h2>
             
             <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Publication Status</label>
+              <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#0F0B07] group hover:border-[rgba(212,175,55,0.3)] transition-colors">
+                <input 
+                  type="checkbox" 
+                  name="is_published"
+                  defaultChecked={pkg.is_published}
+                  className="w-5 h-5 rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] text-[#22C55E] focus:ring-[#22C55E]/50" 
+                />
+                <div>
+                  <span className="text-sm text-[#F5E9D6] font-medium block">Published</span>
+                  <span className="text-xs text-[#A1866B]">If checked, package is visible to users</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="space-y-2 pt-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Difficulty Level</label>
               <select name="difficulty" defaultValue={pkg.difficulty} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#D4AF37]/50 transition-colors appearance-none">
                 <option value="Mixed">Mixed (All levels)</option>

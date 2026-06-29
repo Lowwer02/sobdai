@@ -109,6 +109,7 @@ export default async function Home() {
         organizations ( name, logo_url ),
         positions ( name )
       `)
+      .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(6)
       
