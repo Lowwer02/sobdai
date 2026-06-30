@@ -9,7 +9,7 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2">
+    <div className="fixed top-[env(safe-area-inset-top,0px)] mt-[88px] left-4 right-4 md:left-auto z-[9999] flex flex-col gap-2 pointer-events-none items-end">
       {toasts.map(toast => {
         let Icon = CheckCircle2
         let iconColor = 'text-green-500'
@@ -29,7 +29,7 @@ export default function ToastContainer() {
         return (
           <div 
             key={toast.id}
-            className={`flex items-center gap-3 p-4 rounded-xl border shadow-xl animate-in slide-in-from-right-4 fade-in duration-300 ${bgColor} ${borderColor}`}
+            className={`pointer-events-auto flex items-center gap-3 p-4 rounded-xl border shadow-xl animate-in slide-in-from-top-4 fade-in duration-300 ${bgColor} ${borderColor} max-w-sm w-full`}
             role="alert"
           >
             <Icon className={`shrink-0 ${iconColor}`} size={20} />

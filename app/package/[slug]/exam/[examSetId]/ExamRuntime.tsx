@@ -32,9 +32,10 @@ interface ExamRuntimeProps {
   pkg: any
   examSet: any
   questions: Question[]
+  mode?: string
 }
 
-export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProps) {
+export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRuntimeProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, ChoiceLetter>>({})
   const [flagged, setFlagged] = useState<Record<string, boolean>>({})
@@ -182,7 +183,7 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
         <button 
           onClick={() => handleSelect(letter)}
           disabled={isReview}
-          className={btnClass}
+          className={`${btnClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]`}
         >
           <div className={`w-8 h-8 rounded-full border flex items-center justify-center flex-shrink-0 font-bold ${
             isReview 
@@ -200,11 +201,41 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
         
         {/* Explanation specifically for this wrong choice */}
         {isReview && isSelected && !isCorrectChoice && whyWrongText && (
-          <div className="mt-2 ml-12 p-3 bg-red-500/5 border border-red-500/20 rounded-lg text-sm text-red-200/90 leading-relaxed">
+          <div className="mt-2 ml-12 p-3 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-200/90 leading-relaxed shadow-sm">
             <span className="font-bold text-red-400 block mb-1">ทำไมข้อนี้ถึงผิด:</span>
             {whyWrongText}
           </div>
         )}
+      </div>
+    )
+  }
+
+  // Placeholder for Practice Mode Immediate Feedback
+  const renderPracticeFeedback = () => {
+    if (mode !== 'practice') return null
+    const isAnswered = !!answers[q.id]
+    if (!isAnswered) return null
+    const isCorrect = answers[q.id] === q.correct_answer
+
+    return (
+      <div className={`mt-6 p-5 rounded-2xl border animate-in slide-in-from-top-2 duration-300 ${isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+        <div className="flex items-start gap-3">
+          {isCorrect ? (
+            <CheckCircle className="text-green-500 shrink-0 mt-0.5" size={20} />
+          ) : (
+            <XCircle className="text-red-500 shrink-0 mt-0.5" size={20} />
+          )}
+          <div>
+            <h4 className={`font-bold mb-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+              {isCorrect ? 'ตอบถูกต้อง!' : 'ตอบผิด'}
+            </h4>
+            {q.full_explanation && (
+              <div className="text-sm text-[#F5E9D6] leading-relaxed opacity-90 whitespace-pre-line">
+                {q.full_explanation}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
@@ -215,37 +246,41 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
     const flaggedCount = Object.values(flagged).filter(Boolean).length
     return (
       <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
-        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
-          <h2 className="text-2xl font-bold text-[#F5E9D6] mb-2 text-center">ยืนยันการส่งข้อสอบ?</h2>
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-3xl max-w-md w-full animate-in zoom-in-95 duration-200 shadow-2xl">
+          <div className="w-16 h-16 bg-yellow-500/10 text-yellow-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <AlertCircle size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-[#F5E9D6] font-display mb-2 text-center">ยืนยันการส่งข้อสอบ?</h2>
+          <p className="text-center text-[#A1866B] text-sm mb-6">คุณจะไม่สามารถกลับมาแก้ไขคำตอบได้อีก</p>
           
-          <div className="bg-[#0F0B07] rounded-xl p-6 my-6 border border-[rgba(255,255,255,0.05)] space-y-4">
+          <div className="bg-[#0F0B07] rounded-2xl p-6 my-6 border border-[rgba(255,255,255,0.05)] space-y-4 shadow-inner">
             <div className="flex justify-between items-center text-sm">
               <span className="text-[#A1866B]">ทำไปแล้ว</span>
-              <span className="text-[#F5E9D6] font-bold">{answeredCount} / {questions.length} ข้อ</span>
+              <span className="text-[#F5E9D6] font-bold text-base px-3 py-1 bg-[rgba(255,255,255,0.03)] rounded-lg">{answeredCount} / {questions.length} ข้อ</span>
             </div>
             {unAnswered > 0 && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-red-400">ยังไม่ได้ทำ</span>
-                <span className="text-red-400 font-bold">{unAnswered} ข้อ</span>
+                <span className="text-red-400 font-bold text-base px-3 py-1 bg-red-500/10 rounded-lg">{unAnswered} ข้อ</span>
               </div>
             )}
             {flaggedCount > 0 && (
               <div className="flex justify-between items-center text-sm">
-                <span className="text-yellow-400">ปักหมุดไว้ทบทวน</span>
-                <span className="text-yellow-400 font-bold">{flaggedCount} ข้อ</span>
+                <span className="text-yellow-400">ปักหมุดไว้</span>
+                <span className="text-yellow-400 font-bold text-base px-3 py-1 bg-yellow-500/10 rounded-lg">{flaggedCount} ข้อ</span>
               </div>
             )}
             <div className="flex justify-between items-center text-sm pt-4 border-t border-[rgba(255,255,255,0.05)]">
               <span className="text-[#A1866B]">เวลาที่เหลือ</span>
-              <span className="text-[#D4AF37] font-bold">{formatTime(timeRemaining)}</span>
+              <span className="text-[#D4AF37] font-bold text-base px-3 py-1 bg-[#D4AF37]/10 rounded-lg">{formatTime(timeRemaining)}</span>
             </div>
           </div>
 
           <div className="flex gap-3">
-            <button onClick={handleCancelSubmit} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors">
-              กลับไปทำต่อ
+            <button onClick={handleCancelSubmit} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]">
+              ทำต่อ
             </button>
-            <button onClick={handleForceSubmit} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+            <button onClick={handleForceSubmit} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               ส่งข้อสอบ
             </button>
           </div>
@@ -274,10 +309,25 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
             <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-sm bg-gradient-to-b ${accuracy >= 60 ? 'from-green-500/10' : 'from-red-500/10'} to-transparent opacity-50 blur-2xl pointer-events-none`} />
             
             <div className="relative z-10 flex flex-col items-center">
-              <div className="text-6xl font-display font-bold mb-2" style={{ color: accuracy >= 60 ? '#22c55e' : '#ef4444' }}>
-                {accuracy}%
+              
+              {/* Circular Progress Placeholder */}
+              <div className="relative w-40 h-40 mb-6 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                  <circle className="text-[#0F0B07] stroke-current" strokeWidth="8" cx="50" cy="50" r="40" fill="transparent" />
+                  <circle 
+                    className={`${accuracy >= 60 ? 'text-green-500' : 'text-red-500'} stroke-current transition-all duration-1000 ease-out`} 
+                    strokeWidth="8" strokeLinecap="round" cx="50" cy="50" r="40" fill="transparent" 
+                    strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * accuracy) / 100}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="text-4xl font-display font-bold" style={{ color: accuracy >= 60 ? '#22c55e' : '#ef4444' }}>
+                    {accuracy}%
+                  </div>
+                </div>
               </div>
-              <div className="text-[#F5E9D6] font-bold text-lg mb-8">
+
+              <div className="text-[#F5E9D6] font-bold text-lg mb-8 text-center px-4">
                 {accuracy >= 80 ? 'ยอดเยี่ยม! คุณพร้อมสำหรับการสอบแล้ว' : accuracy >= 60 ? 'ทำได้ดี! ทบทวนอีกนิดรับรองผ่านฉลุย' : 'ฝึกต่อไป! คุณทำได้แน่นอน'}
               </div>
 
@@ -315,12 +365,12 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
             </div>
           )}
 
-          <div className="flex gap-4">
-            <button onClick={() => setCurrentIndex(0)} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button onClick={() => setCurrentIndex(0)} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <BookOpen size={18} />
               ดูเฉลยอย่างละเอียด
             </button>
-            <Link href={`/package/${pkg.slug}`} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <Link href={`/package/${pkg.slug}`} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]">
               กลับหน้าหลัก
             </Link>
           </div>
@@ -354,19 +404,22 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
           
           <div className="flex items-center gap-3">
             {status === 'IN_PROGRESS' ? (
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono text-sm font-bold transition-colors ${timeRemaining < 300 ? 'border-red-500/30 text-red-400 bg-red-500/10' : 'border-[rgba(255,255,255,0.05)] bg-[#1A140E] text-[#D4AF37]'}`}>
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono text-sm font-bold transition-all ${timeRemaining < 300 ? 'border-red-500/30 text-red-400 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse' : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#D4AF37]'}`}>
                 <Clock size={14} className={timeRemaining < 300 ? "animate-pulse" : ""} />
-                {formatTime(timeRemaining)}
+                {mode === 'practice' ? 'ไม่จำกัดเวลา' : formatTime(timeRemaining)}
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)] bg-[#1A140E] text-[#A1866B] text-sm font-bold">
-                <CheckCircle size={14} className={answers[q.id] === q.correct_answer ? "text-green-500" : "text-[#A1866B]"} />
-                {answers[q.id] === q.correct_answer ? 'ตอบถูก' : 'ตอบผิด'}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#A1866B] text-sm font-bold">
+                <CheckCircle size={14} className={answers[q.id] === q.correct_answer ? "text-green-500" : "text-red-500"} />
+                <span className="hidden sm:inline">{answers[q.id] === q.correct_answer ? 'ตอบถูก' : 'ตอบผิด'}</span>
               </div>
             )}
             
             {status === 'IN_PROGRESS' && (
-              <button onClick={handleRequestSubmit} className="hidden sm:flex bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/20 px-4 py-1.5 rounded-lg text-sm font-bold transition-colors">
+              <button 
+                onClick={handleRequestSubmit} 
+                className="hidden sm:flex bg-transparent hover:bg-[rgba(255,255,255,0.05)] text-[#D4AF37] border border-[rgba(212,175,55,0.3)] px-4 py-1.5 rounded-lg text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              >
                 ส่งข้อสอบ
               </button>
             )}
@@ -405,6 +458,9 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
           {renderChoice('C', q.choice_c)}
           {renderChoice('D', q.choice_d)}
         </div>
+
+        {/* Practice Mode Placeholder */}
+        {renderPracticeFeedback()}
 
         {/* Post-Question Explanations (Review Mode) */}
         {status === 'REVIEW' && (
@@ -489,7 +545,7 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
               <button 
                 onClick={handleRequestSubmit} 
-                className="flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] transition-colors shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+                className="flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 ส่งข้อสอบ
               </button>
@@ -497,9 +553,9 @@ export default function ExamRuntime({ pkg, examSet, questions }: ExamRuntimeProp
               <button 
                 onClick={goNext} 
                 disabled={currentIndex === questions.length - 1}
-                className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl transition-colors ${currentIndex === questions.length - 1 ? 'text-[#A1866B] opacity-50 cursor-not-allowed' : 'bg-[#1A140E] text-[#F5E9D6] hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] border border-[rgba(255,255,255,0.05)]'}`}
+                className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${currentIndex === questions.length - 1 ? 'text-[#A1866B] opacity-50 cursor-not-allowed' : 'bg-transparent text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)]'}`}
               >
-                <span className="hidden sm:inline">ข้อถัดไป</span>
+                <span className="hidden sm:inline">ถัดไป</span>
                 <ChevronRight size={18} />
               </button>
             )}

@@ -308,6 +308,7 @@ export default async function ExamSetPage({
       pkg={pkg} 
       examSet={examSet} 
       questions={questions} 
+      mode={mode}
     />
   )
 }
