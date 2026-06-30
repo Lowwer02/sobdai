@@ -3,6 +3,7 @@ import { Sarabun } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import ToastContainer from '@/components/admin/ToastContainer'
+import Footer from '@/components/Footer'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
@@ -36,9 +37,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="th" className={sarabun.variable}>
-      <body className={sarabun.className}>
+      <body className={`${sarabun.className} min-h-screen flex flex-col`}>
         <Navbar />
-        <main>{children}</main>
+        <main className="flex-grow">{children}</main>
+        <Footer />
         <ToastContainer />
       </body>
     </html>

@@ -31,6 +31,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [consentGiven, setConsentGiven] = useState(false)
   
   const supabase = createClient()
 
@@ -43,6 +44,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
       setError(null)
       setSuccessMsg(null)
       setShowPassword(false)
+      setConsentGiven(false)
     }
   }, [isOpen, initialMode])
 
@@ -230,10 +232,25 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                     </button>
                   </div>
                 </div>
+
+                {mode === 'register' && (
+                  <label className="flex items-start gap-3 pt-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={consentGiven}
+                      onChange={e => setConsentGiven(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-[rgba(255,255,255,0.2)] text-[#D4AF37] focus:ring-[#D4AF37] bg-transparent accent-[#D4AF37] cursor-pointer"
+                    />
+                    <span className="text-[13px] text-[#A1866B] leading-relaxed">
+                      ฉันได้อ่านและยอมรับ <a href="/terms" target="_blank" className="text-[#D4AF37] hover:underline">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="text-[#D4AF37] hover:underline">นโยบายความเป็นส่วนตัว</a>
+                    </span>
+                  </label>
+                )}
+
                 <button 
                   type="submit" 
-                  disabled={loading}
-                  className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#0F0B07] font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-2"
+                  disabled={loading || (mode === 'register' && !consentGiven)}
+                  className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#0F0B07] font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-2"
                 >
                   {loading && <Loader2 size={18} className="animate-spin" />}
                   {mode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
@@ -258,6 +275,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                 <GoogleIcon />
                 {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
               </button>
+              
+              {mode === 'register' && (
+                <p className="mt-4 text-[11.5px] text-center text-[#A1866B]/80 leading-relaxed">
+                  การสมัครสมาชิกด้วย Google ถือว่าท่านยอมรับ<br/>
+                  <a href="/terms" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">นโยบายความเป็นส่วนตัว</a> ของเรา
+                </p>
+              )}
               
               <div className="mt-8 text-center text-sm text-[#A1866B]">
                 {mode === 'login' ? (

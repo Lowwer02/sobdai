@@ -169,6 +169,11 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
               </div>
             )}
 
+            <div className="mb-6 text-[12px] text-[#A1866B] bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] p-3.5 rounded-xl flex gap-2.5 text-left leading-relaxed">
+              <ShieldCheck size={16} className="text-[#A1866B] flex-shrink-0 mt-0.5" />
+              <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
+            </div>
+
             <button
               onClick={handleFreeCheckout}
               disabled={loading}
@@ -225,6 +230,11 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
                 {error}
               </div>
             )}
+
+            <div className="mb-6 text-[12px] text-[#A1866B] bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] p-3.5 rounded-xl flex gap-2.5 text-left leading-relaxed">
+              <ShieldCheck size={16} className="text-[#A1866B] flex-shrink-0 mt-0.5" />
+              <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
+            </div>
 
             <button
               onClick={payMethod === 'card' ? handleCardPayment : handlePromptPay}
