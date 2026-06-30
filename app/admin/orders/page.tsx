@@ -26,7 +26,7 @@ export default async function OrdersPage({
   if (search) {
     query = query.ilike('profiles.email', `%${search}%`)
   }
-  if (statusFilter && statusFilter !== 'All') {
+  if (statusFilter && statusFilter.toLowerCase() !== 'all') {
     query = query.eq('status', statusFilter.toLowerCase())
   }
 
