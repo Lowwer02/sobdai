@@ -48,7 +48,7 @@ export default async function EditExamSetPage({ params }: { params: Promise<{ id
         initialData={examSet}
         packages={packages || []} 
         selectedQuestionsData={selectedQuestionsData}
-        onSubmit={async (data) => updateExamSetAction(id, data)} 
+        onSubmit={updateExamSetAction.bind(null, id)} 
         isEdit={true}
       />
     </div>

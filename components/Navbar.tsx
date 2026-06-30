@@ -38,7 +38,7 @@ export default function Navbar() {
           return
         }
 
-        setIsAdmin(['admin', 'owner'].includes(data?.role))
+        setIsAdmin(['admin', 'owner', 'editor', 'support'].includes(data?.role))
       } else {
         setIsAdmin(false)
       }
