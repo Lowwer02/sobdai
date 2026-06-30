@@ -87,11 +87,11 @@ export default function Navbar() {
 
   return (
     <header
-      className="navbar"
-      style={{
-        background: scrolled ? 'rgba(15, 11, 8, 0.97)' : 'rgba(15, 11, 8, 0.85)',
-        transition: 'background 0.3s',
-      }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
+        scrolled 
+          ? 'bg-[#0F0B07]/95 backdrop-blur-md border-[rgba(255,255,255,0.05)] shadow-lg' 
+          : 'bg-[#0F0B07]/80 backdrop-blur-sm border-transparent'
+      }`}
     >
       {/* Desktop view */}
       <div className="hidden lg:block w-full">

@@ -4,49 +4,14 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
-
-function BookOpenIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-    </svg>
-  )
-}
-
-function MenuIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  )
-}
-
-function XIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-  )
-}
-
-function LogOutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-      <polyline points="16 17 21 12 16 7"/>
-      <line x1="21" y1="12" x2="9" y2="12"/>
-    </svg>
-  )
-}
+import { usePathname } from 'next/navigation'
 
 const NAV_LINKS = [
-  { href: '/quiz', label: 'ทำข้อสอบ' },
-  { href: '/exams', label: 'ชุดข้อสอบ' },
-  { href: '/about', label: 'เกี่ยวกับ' },
+  { href: '/', label: 'หน้าแรก' },
+  { href: '/packages', label: 'แพ็กเกจ' },
+  { href: '/exams', label: 'ข้อสอบ' },
+  { href: '/summaries', label: 'สรุปเนื้อหา' },
+  { href: '/downloads', label: 'ดาวน์โหลด' },
 ]
 
 interface MobileNavProps {
@@ -60,6 +25,7 @@ interface MobileNavProps {
 export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick, onSignOut }: MobileNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     setMounted(true)
@@ -90,146 +56,155 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
 
   return (
     <>
-      <nav
-        style={{
-          width: '100%',
-          padding: '0 20px',
-          height: '60px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
+      <nav className="w-full px-5 h-[72px] flex items-center justify-between">
         {/* Logo */}
         <Link
           href="/"
           onClick={() => setMenuOpen(false)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            textDecoration: 'none',
-            flexShrink: 0,
-          }}
+          className="flex items-center gap-3 shrink-0 group"
         >
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-muted) 100%)',
-              color: '#1a1208',
-            }}
-          >
-            <BookOpenIcon />
-          </span>
-          <span
-            className="font-display"
-            style={{
-              fontSize: '20px',
-              color: 'var(--text-primary)',
-              fontWeight: 'normal',
-              letterSpacing: '0.04em',
-            }}
-          >
-            สอบได้
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B38F24] text-[#0F0B07] font-bold text-base shadow-sm">
+            S
+          </div>
+          <span className="font-display text-xl text-[#F5E9D6] tracking-wide">
+            Sobdai
           </span>
         </Link>
 
         {/* Hamburger */}
         <button
-          className="btn-ghost relative z-[60]"
-          style={{ padding: '6px' }}
+          className="relative z-[60] p-2 text-[#F5E9D6] hover:text-[#D4AF37] transition-colors focus:outline-none"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label={menuOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
           aria-expanded={menuOpen}
         >
-          {menuOpen ? <XIcon /> : <MenuIcon />}
+          <div className="w-6 h-5 flex flex-col justify-between items-end">
+            <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-6 rotate-45 translate-y-2.5' : 'w-6'}`} />
+            <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-0 opacity-0' : 'w-4'}`} />
+            <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-6 -rotate-45 -translate-y-2' : 'w-5'}`} />
+          </div>
         </button>
       </nav>
 
-      {/* Render Backdrop and Bottom Sheet at body level to escape navbar's backdrop-filter containing block */}
+      {/* Render Backdrop and Menu at body level */}
       {mounted && createPortal(
         <>
           {/* Backdrop */}
           <div 
-            className={`fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            className={`fixed inset-0 z-[55] bg-[#0F0B07]/80 backdrop-blur-md transition-opacity duration-300 ${menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
             onClick={() => setMenuOpen(false)}
             aria-hidden="true"
           />
 
-          {/* Bottom Sheet */}
+          {/* Full Screen Menu */}
           <div 
-            className={`fixed bottom-0 left-0 w-full z-[55] bg-[#1A140E] border-t border-[rgba(212,175,55,0.15)] rounded-t-[32px] p-6 pb-12 transition-transform duration-300 ease-in-out flex flex-col gap-2 ${menuOpen ? 'translate-y-0 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto' : 'translate-y-full pointer-events-none'}`}
+            className={`fixed inset-y-0 right-0 w-[85vw] max-w-sm z-[55] bg-[#140F0A] border-l border-[rgba(255,255,255,0.05)] shadow-2xl p-6 transition-transform duration-300 ease-in-out flex flex-col ${menuOpen ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'}`}
             role="dialog"
             aria-label="เมนูนำทาง"
           >
-            <div className="w-12 h-1.5 bg-[#F5E9D6]/10 rounded-full mx-auto mb-6" />
+            <div className="flex-1 overflow-y-auto pt-16 pb-6 flex flex-col gap-6">
+              
+              {/* User Profile Summary */}
+              {user && (
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.05)]">
+                  <div className="w-12 h-12 rounded-full bg-[#1A140E] flex items-center justify-center border border-[#D4AF37]/30 text-[#D4AF37] text-lg font-bold shrink-0">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex flex-col overflow-hidden">
+                    <span className="text-sm text-[#A1866B]">ยินดีต้อนรับ</span>
+                    <span className="text-base font-medium text-[#F5E9D6] truncate">{user.email}</span>
+                  </div>
+                </div>
+              )}
 
-            <Link
-              href="/"
-              onClick={() => setMenuOpen(false)}
-              className="p-3 text-[16px] text-[#F5E9D6] font-medium font-display rounded-xl hover:bg-[rgba(212,175,55,0.1)] transition-colors"
-            >
-              หน้าแรก
-            </Link>
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMenuOpen(false)}
-                className="p-3 text-[16px] text-[#F5E9D6] font-medium font-display rounded-xl hover:bg-[rgba(212,175,55,0.1)] transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-            
-            <div className="divider my-2 opacity-50" />
+              {/* Main Links */}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-bold tracking-wider text-[#A1866B] uppercase mb-2 px-2">เมนูหลัก</span>
+                {NAV_LINKS.map((link) => {
+                  const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href))
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={`px-4 py-3 text-base font-medium rounded-lg transition-colors ${
+                        isActive 
+                          ? 'text-[#D4AF37] bg-[rgba(212,175,55,0.08)]' 
+                          : 'text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)]'
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  )
+                })}
+              </div>
 
-            {user ? (
-              <div className="flex flex-col gap-2 mt-2">
-                <Link
-                  href="/settings"
-                  onClick={() => setMenuOpen(false)}
-                  className="px-3 pb-2 text-[13px] text-[#A1866B] hover:text-[#D4AF37] font-medium transition-colors block"
-                >
-                  ลงชื่อเข้าใช้ในชื่อ: {user.email}
-                </Link>
-                {isAdmin && (
-                  <Link 
-                    href="/admin" 
+              {/* Account Links */}
+              {user && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-bold tracking-wider text-[#A1866B] uppercase mb-2 px-2">บัญชีของฉัน</span>
+                  <Link
+                    href="/settings"
                     onClick={() => setMenuOpen(false)}
-                    className="p-3 text-[16px] text-[#D4AF37] font-medium font-display rounded-xl bg-[rgba(212,175,55,0.05)] border border-[rgba(212,175,55,0.2)] hover:bg-[rgba(212,175,55,0.1)] transition-colors"
+                    className="px-4 py-3 text-base font-medium text-[#F5E9D6] rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors"
                   >
-                    Admin Panel
+                    โปรไฟล์
                   </Link>
-                )}
+                  <Link
+                    href="/orders"
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-3 text-base font-medium text-[#F5E9D6] rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+                  >
+                    คำสั่งซื้อ
+                  </Link>
+                  <Link
+                    href="/history"
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-3 text-base font-medium text-[#F5E9D6] rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+                  >
+                    ประวัติ
+                  </Link>
+                  
+                  {isAdmin && (
+                    <Link 
+                      href="/admin" 
+                      onClick={() => setMenuOpen(false)}
+                      className="px-4 py-3 mt-2 text-base font-medium text-[#D4AF37] rounded-lg bg-[rgba(212,175,55,0.05)] border border-[rgba(212,175,55,0.2)] hover:bg-[rgba(212,175,55,0.1)] transition-colors"
+                    >
+                      Admin Panel
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Bottom Actions */}
+            <div className="pt-6 border-t border-[rgba(255,255,255,0.05)] pb-safe">
+              {user ? (
                 <button
                   onClick={handleSignOutClick}
-                  className="p-3 text-[16px] text-[#e8786a] font-medium font-display rounded-xl text-left hover:bg-[rgba(192,57,43,0.1)] transition-colors flex items-center gap-2"
+                  className="w-full py-3 px-4 text-left text-base font-medium text-red-400 rounded-lg hover:bg-red-400/10 transition-colors"
                 >
-                  <LogOutIcon /> ออกจากระบบ
+                  ออกจากระบบ
                 </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 mt-2 pb-safe">
-                <button
-                  onClick={() => { setMenuOpen(false); onLoginClick(); }}
-                  className="w-full btn-outline py-3 text-[16px] flex justify-center"
-                >
-                  เข้าสู่ระบบ
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); onRegisterClick(); }}
-                  className="w-full btn-primary py-3 text-[16px] flex justify-center text-[#1A140E]"
-                >
-                  สมัครสมาชิกฟรี
-                </button>
-              </div>
-            )}
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => { setMenuOpen(false); onLoginClick(); }}
+                    className="w-full py-3 px-4 text-base font-medium text-[#F5E9D6] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] rounded-lg hover:bg-[rgba(255,255,255,0.06)] transition-all"
+                  >
+                    เข้าสู่ระบบ
+                  </button>
+                  <button
+                    onClick={() => { setMenuOpen(false); onRegisterClick(); }}
+                    className="w-full py-3 px-4 text-base font-bold text-[#0F0B07] bg-gradient-to-r from-[#D4AF37] to-[#B38F24] rounded-lg shadow-lg shadow-[#D4AF37]/20 transition-all"
+                  >
+                    สมัครสมาชิกฟรี
+                  </button>
+                </div>
+              )}
+            </div>
+
           </div>
         </>,
         document.body
