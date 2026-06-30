@@ -10,7 +10,7 @@ export default function ToastContainer() {
 
   return (
     <div 
-      className="fixed top-[env(safe-area-inset-top,0px)] mt-[88px] left-4 right-4 md:left-auto md:right-4 z-[9999] flex flex-col items-center md:items-end gap-3 pointer-events-none"
+      className="fixed top-[calc(env(safe-area-inset-top,0px)+104px)] left-4 right-4 md:left-auto md:right-4 z-[9999] flex flex-col items-center md:items-end gap-3 pointer-events-none"
       aria-live="assertive"
       role="region"
       aria-label="Notifications"
@@ -43,9 +43,9 @@ export default function ToastContainer() {
             <motion.div 
               key={toast.id}
               layout
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               className={`pointer-events-auto flex items-start sm:items-center gap-3 p-4 rounded-xl border shadow-[0_10px_40px_rgba(0,0,0,0.5)] ${bgColor} ${borderColor} max-w-sm w-full backdrop-blur-md`}
               role="alert"
