@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
@@ -61,11 +62,15 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
         <Link
           href="/"
           onClick={() => setMenuOpen(false)}
-          className="flex items-center gap-3 shrink-0 group"
+          className="flex items-center gap-3 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg p-1 -ml-1"
         >
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B38F24] text-[#0F0B07] font-bold text-base shadow-sm">
-            S
-          </div>
+          <Image 
+            src="/logo.png" 
+            alt="Sobdai Logo" 
+            width={32} 
+            height={32} 
+            className="rounded-lg shadow-sm group-hover:shadow-[0_2px_8px_rgba(212,175,55,0.3)] transition-all"
+          />
           <span className="font-display text-xl text-[#F5E9D6] tracking-wide">
             Sobdai
           </span>

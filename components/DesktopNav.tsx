@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 
@@ -41,10 +42,14 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
     <nav className="max-w-[1200px] mx-auto px-6 h-[72px] flex items-center justify-between gap-8">
       
       {/* Left: Logo */}
-      <Link href="/" className="flex items-center gap-3 shrink-0 group">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#B38F24] text-[#0F0B07] font-bold text-lg shadow-[0_2px_10px_rgba(212,175,55,0.2)] group-hover:shadow-[0_4px_15px_rgba(212,175,55,0.4)] transition-all">
-          S
-        </div>
+      <Link href="/" className="flex items-center gap-3 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg p-1">
+        <Image 
+          src="/logo.png" 
+          alt="Sobdai Logo" 
+          width={36} 
+          height={36} 
+          className="rounded-lg shadow-[0_2px_10px_rgba(212,175,55,0.2)] group-hover:shadow-[0_4px_15px_rgba(212,175,55,0.4)] transition-all"
+        />
         <span className="font-display text-xl text-[#F5E9D6] tracking-wide group-hover:text-[#D4AF37] transition-colors">
           Sobdai
         </span>

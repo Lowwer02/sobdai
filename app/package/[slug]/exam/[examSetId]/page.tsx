@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Lock } from 'lucide-react'
+import { Lock, Clock, FileText, ChevronRight, Activity, Zap } from 'lucide-react'
 import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 
@@ -30,8 +30,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-export default async function ExamSetPage({ params }: { params: Promise<{ slug: string, examSetId: string }> }) {
+export default async function ExamSetPage({ 
+  params, 
+  searchParams 
+}: { 
+  params: Promise<{ slug: string, examSetId: string }>,
+  searchParams: Promise<{ mode?: string }>
+}) {
   const { slug, examSetId } = await params
+  const { mode } = await searchParams
   
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -166,6 +173,136 @@ export default async function ExamSetPage({ params }: { params: Promise<{ slug: 
     )
   }
 
+  // If no mode is selected, render the Landing UI
+  if (!mode) {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] pt-24 pb-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Breadcrumb / Back */}
+          <Link href={`/package/${slug}`} className="inline-flex items-center text-sm font-medium text-[#A1866B] hover:text-[#D4AF37] transition-colors mb-8">
+            <ChevronRight className="w-4 h-4 rotate-180 mr-1" />
+            กลับไปที่ {pkg.name}
+          </Link>
+
+          {/* Header */}
+          <div className="mb-12">
+            <h1 className="text-3xl md:text-5xl font-display font-bold text-[#F5E9D6] mb-4 leading-tight">
+              {examSet.title}
+            </h1>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-[#A1866B]">
+              <div className="flex items-center bg-[rgba(255,255,255,0.03)] px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)]">
+                <FileText className="w-4 h-4 mr-2 text-[#D4AF37]" />
+                {questions.length} ข้อ
+              </div>
+              {examSet.duration_minutes && (
+                <div className="flex items-center bg-[rgba(255,255,255,0.03)] px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)]">
+                  <Clock className="w-4 h-4 mr-2 text-[#D4AF37]" />
+                  {examSet.duration_minutes} นาที
+                </div>
+              )}
+              {examSet.difficulty && (
+                <div className="flex items-center bg-[rgba(255,255,255,0.03)] px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)]">
+                  <Activity className="w-4 h-4 mr-2 text-[#D4AF37]" />
+                  ระดับความยาก: {examSet.difficulty}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mode Selection Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Practice Mode */}
+            <Link href={`?mode=practice`} className="group relative block bg-[#1A140E] border border-[rgba(255,255,255,0.08)] hover:border-orange-500/50 rounded-3xl p-8 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(249,115,22,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-colors" />
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-500">
+                    <Zap className="w-7 h-7" />
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-[#F5E9D6]">{questions.length} ข้อ</div>
+                    <div className="text-xs text-[#A1866B]">⏱ ประมาณ {examSet.duration_minutes || questions.length} นาที</div>
+                    <div className="text-xs text-orange-400 mt-1">ระดับ : {examSet.difficulty || 'ปานกลาง'}</div>
+                  </div>
+                </div>
+                
+                <h3 className="text-2xl font-bold font-display text-[#F5E9D6] mb-4 group-hover:text-orange-400 transition-colors">
+                  Practice Mode
+                </h3>
+                
+                <ul className="space-y-3 mb-8 text-[#A1866B] text-sm">
+                  <li className="flex items-start">
+                    <span className="text-orange-500 mr-2">•</span>
+                    เรียนทีละข้อ
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-orange-500 mr-2">•</span>
+                    เหมาะสำหรับการทบทวน
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-orange-500 mr-2">•</span>
+                    เฉลยทันทีหลังตอบ
+                  </li>
+                </ul>
+
+                <button className="w-full py-3 px-6 bg-orange-500/10 text-orange-500 font-bold rounded-xl group-hover:bg-orange-500 group-hover:text-[#1A140E] transition-all">
+                  เริ่มฝึกทำ
+                </button>
+              </div>
+            </Link>
+
+            {/* Mock Exam */}
+            <Link href={`?mode=mock`} className="group relative block bg-[#1A140E] border border-[rgba(255,255,255,0.08)] hover:border-blue-500/50 rounded-3xl p-8 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(59,130,246,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-colors" />
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
+                    <Clock className="w-7 h-7" />
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-[#F5E9D6]">{questions.length} ข้อ</div>
+                    <div className="text-xs text-[#A1866B]">⏱ จำกัดเวลา {examSet.duration_minutes || questions.length} นาที</div>
+                    <div className="text-xs text-blue-400 mt-1">ระดับ : {examSet.difficulty || 'ปานกลาง'}</div>
+                  </div>
+                </div>
+                
+                <h3 className="text-2xl font-bold font-display text-[#F5E9D6] mb-4 group-hover:text-blue-400 transition-colors">
+                  Mock Exam
+                </h3>
+                
+                <ul className="space-y-3 mb-8 text-[#A1866B] text-sm">
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    จำลองสนามสอบจริง
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    จับเวลา
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-500 mr-2">•</span>
+                    เฉลยหลังส่งข้อสอบ
+                  </li>
+                </ul>
+
+                <button className="w-full py-3 px-6 bg-blue-500/10 text-blue-500 font-bold rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
+                  เริ่มสอบ
+                </button>
+              </div>
+            </Link>
+
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If mode is selected, render Runtime (Current logic)
   return (
     <ExamRuntime 
       pkg={pkg} 
