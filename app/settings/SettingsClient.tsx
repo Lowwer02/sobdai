@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Camera, Shield, UserCircle, LogIn, AlertTriangle, Loader2, X } from 'lucide-react'
 import { updateProfile, deactivateAccount } from './actions'
+import { toastEvent } from '@/hooks/useToast'
 
 interface Profile {
   id: string
@@ -21,15 +22,8 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
   const router = useRouter()
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [isPending, startTransition] = useTransition()
-  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
-
-  const showToast = (type: 'success' | 'error', text: string) => {
-    setToastMessage({ type, text })
-    setTimeout(() => setToastMessage(null), 3000)
-  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -38,7 +32,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
     startTransition(async () => {
       const result = await updateProfile(formData)
       if (result.success) {
-        showToast('success', 'บันทึกข้อมูลเรียบร้อยแล้ว')
+        toastEvent('บันทึกข้อมูลเรียบร้อยแล้ว', 'success')
         setProfile(prev => ({
           ...prev,
           display_name: formData.get('display_name') as string,
@@ -46,7 +40,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
           phone: formData.get('phone') as string,
         }))
       } else {
-        showToast('error', result.error || 'ไม่สามารถบันทึกข้อมูลส่วนตัวได้')
+        toastEvent(result.error || 'ไม่สามารถบันทึกข้อมูลส่วนตัวได้', 'error')
       }
     })
   }
@@ -70,23 +64,13 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
     } else {
       setIsDeactivating(false)
       setIsDeactivateModalOpen(false)
-      showToast('error', result.error || 'เกิดข้อผิดพลาดในการปิดการใช้งาน')
+      toastEvent(result.error || 'เกิดข้อผิดพลาดในการปิดการใช้งาน', 'error')
     }
   }
 
   return (
     <div className="space-y-8 relative">
       
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-xl border flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 ${
-          toastMessage.type === 'success' ? 'bg-[#1A140E] border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-[#2A0808] border-red-900/50 text-red-400'
-        }`}>
-          {toastMessage.type === 'success' ? <Shield size={18} /> : <AlertTriangle size={18} />}
-          <p className="text-sm font-medium">{toastMessage.text}</p>
-        </div>
-      )}
-
       {/* Section 1: Profile Overview */}
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6">
         <div className="relative group">

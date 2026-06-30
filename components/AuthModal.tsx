@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
+import { toastEvent } from '@/hooks/useToast'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -29,8 +30,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [consentGiven, setConsentGiven] = useState(false)
   
   const supabase = createClient()
@@ -41,8 +40,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
       setMode(initialMode)
       setEmail('')
       setPassword('')
-      setError(null)
-      setSuccessMsg(null)
       setShowPassword(false)
       setConsentGiven(false)
     }
@@ -69,7 +66,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
 
   const handleGoogleAuth = async () => {
     setLoading(true)
-    setError(null)
     const redirectTo = redirectUrl 
       ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
       : `${window.location.origin}/auth/callback`;
@@ -80,15 +76,17 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
         redirectTo,
       },
     })
-    if (error) setError(error.message)
+    if (error) {
+      toastEvent(error.message, 'error')
+    } else {
+      onClose()
+    }
     setLoading(false)
   }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
-    setSuccessMsg(null)
 
     if (mode === 'register') {
       const { error, data } = await supabase.auth.signUp({
@@ -96,14 +94,15 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
         password,
       })
       if (error) {
-        setError(error.message)
+        toastEvent(error.message, 'error')
       } else {
         if (data.user && data.user.identities && data.user.identities.length === 0) {
-          setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ')
+          toastEvent('อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ', 'error')
         } else {
-          setSuccessMsg('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือทดลองล็อกอินได้เลย')
+          toastEvent('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือทดลองล็อกอินได้เลย', 'success')
           setEmail('')
           setPassword('')
+          onClose()
         }
       }
     } else {
@@ -112,13 +111,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
         password,
       })
       if (error) {
-        setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
+        toastEvent('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error')
       } else if (data?.user) {
         const { data: profile } = await supabase.from('profiles').select('deleted_at').eq('id', data.user.id).single()
         if (profile?.deleted_at) {
           await supabase.auth.signOut()
-          setError('บัญชีนี้ถูกปิดการใช้งานแล้ว กรุณาติดต่อทีมงานหากต้องการเปิดใช้งานอีกครั้ง')
+          toastEvent('บัญชีนี้ถูกปิดการใช้งานแล้ว กรุณาติดต่อทีมงานหากต้องการเปิดใช้งานอีกครั้ง', 'error')
         } else {
+          toastEvent('เข้าสู่ระบบสำเร็จ', 'success')
           onClose()
         }
       }
@@ -176,27 +176,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
               </div>
 
               <AnimatePresence mode="wait">
-                {error && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-[#2a1711] border border-[#ff4a4a]/20 text-[#ff7070] text-[13.5px] p-3 rounded-xl mb-5 text-center overflow-hidden"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-
-                {successMsg && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-[#112a1c] border border-[#22c55e]/20 text-[#22c55e] text-[13.5px] p-3 rounded-xl mb-5 text-center overflow-hidden"
-                  >
-                    {successMsg}
-                  </motion.div>
-                )}
+                {/* Modal inline success/error UI removed in favor of global toastEvent */}
               </AnimatePresence>
 
               <form onSubmit={handleEmailAuth} className="space-y-5 mb-8">
@@ -289,7 +269,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                     ยังไม่มีบัญชี?{' '}
                     <button 
                       type="button"
-                      onClick={() => { setMode('register'); setError(null); }} 
+                      onClick={() => { setMode('register'); }} 
                       className="text-[#D4AF37] hover:text-[#F1D17A] font-bold transition-colors"
                     >
                       สมัครสมาชิก
@@ -300,7 +280,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                     มีบัญชีอยู่แล้ว?{' '}
                     <button 
                       type="button"
-                      onClick={() => { setMode('login'); setError(null); }} 
+                      onClick={() => { setMode('login'); }} 
                       className="text-[#D4AF37] hover:text-[#F1D17A] font-bold transition-colors"
                     >
                       เข้าสู่ระบบ

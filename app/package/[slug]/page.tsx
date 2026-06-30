@@ -4,6 +4,7 @@ import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import PackageClient from './PackageClient'
 import { notFound } from 'next/navigation'
 import { getPackagePublicCounts } from '@/lib/publicData'
+import { Suspense } from 'react'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -91,5 +92,9 @@ export default async function PackagePage({ params }: PageProps) {
     if (order) isPurchased = true
   }
 
-  return <PackageClient pkg={pkg} examSets={pkg.exam_sets || []} summaries={summaries || []} isPurchased={isPurchased} />
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PackageClient pkg={pkg} examSets={pkg.exam_sets || []} summaries={summaries || []} isPurchased={isPurchased} />
+    </Suspense>
+  )
 }

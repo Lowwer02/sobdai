@@ -2,8 +2,10 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft } from 'lucide-react'
+import { toastEvent } from '@/hooks/useToast'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -55,6 +57,17 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
   const logoUrl = pkg.organizations?.logo_url || null
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+
+  React.useEffect(() => {
+    if (searchParams.get('success') === '1') {
+      toastEvent('ชำระเงินสำเร็จ', 'success')
+      router.replace(pathname, { scroll: false })
+    }
+  }, [searchParams, pathname, router])
 
   return (
     <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
