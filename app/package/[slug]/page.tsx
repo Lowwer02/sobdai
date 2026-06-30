@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import PackageClient from './PackageClient'
 import { notFound } from 'next/navigation'
+import { getPackagePublicCounts } from '@/lib/publicData'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -31,10 +32,7 @@ export default async function PackagePage({ params }: PageProps) {
       organizations(name, logo_url),
       positions(name),
       exam_sets(
-        *,
-        exam_set_questions(
-          questions(status)
-        )
+        *
       )
     `)
     .eq('slug', slug)
@@ -44,24 +42,18 @@ export default async function PackagePage({ params }: PageProps) {
     notFound()
   }
 
-  // Calculate actual published question counts
-  let totalPublishedQuestions = 0
+  // Calculate actual published question counts using public helper (bypassing RLS)
+  const countsMap = await getPackagePublicCounts([pkg.id])
+  const pkgCounts = countsMap[pkg.id]
+
+  pkg.total_questions = pkgCounts?.total_questions || 0
+  pkg.total_exam_sets = pkgCounts?.total_exam_sets || 0
+
   if (pkg.exam_sets) {
     pkg.exam_sets.forEach((es: any) => {
-      let publishedCount = 0
-      if (es.exam_set_questions) {
-        es.exam_set_questions.forEach((esq: any) => {
-          if (esq.questions?.status === 'Published') {
-            publishedCount++
-          }
-        })
-      }
-      es.qCount = publishedCount
-      totalPublishedQuestions += publishedCount
+      es.qCount = pkgCounts?.exam_set_counts?.[es.id] || 0
     })
   }
-  pkg.total_questions = totalPublishedQuestions
-  pkg.total_exam_sets = pkg.exam_sets ? pkg.exam_sets.length : 0
 
   const { data: { user } } = await supabase.auth.getUser()
 

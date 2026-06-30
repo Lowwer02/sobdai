@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getPackagePublicCounts } from '@/lib/publicData'
 
 interface PackageData {
   id: string
@@ -105,39 +106,19 @@ export default async function Home() {
         difficulty,
         description,
         organizations ( name, logo_url ),
-        positions ( name ),
-        exam_sets (
-          id,
-          exam_set_questions (
-            questions ( status )
-          )
-        )
+        positions ( name )
       `)
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(6)
       
     if (data && data.length > 0) {
+      const counts = await getPackagePublicCounts(data.map((p: any) => p.id))
       livePackages = data.map((pkg: any) => {
-        let actualQuestions = 0;
-        let actualSets = pkg.exam_sets ? pkg.exam_sets.length : 0;
-        
-        if (pkg.exam_sets) {
-          pkg.exam_sets.forEach((es: any) => {
-            if (es.exam_set_questions) {
-              es.exam_set_questions.forEach((esq: any) => {
-                if (esq.questions?.status === 'Published') {
-                  actualQuestions++;
-                }
-              })
-            }
-          })
-        }
-
         return {
           ...pkg,
-          total_questions: actualQuestions,
-          total_exam_sets: actualSets
+          total_questions: counts[pkg.id]?.total_questions || 0,
+          total_exam_sets: counts[pkg.id]?.total_exam_sets || 0
         }
       })
     }
