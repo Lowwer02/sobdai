@@ -158,6 +158,40 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     return () => window.removeEventListener('keydown', handler)
   }, [currentIndex, status, q])
 
+  // Helper for rendering Question Indicators
+  const renderIndicators = () => (
+    questions.map((question, i) => {
+      let dotClass = "w-2.5 h-2.5 rounded-full transition-all "
+      if (status === 'REVIEW') {
+        const isAnsCorrect = answers[question.id] === question.correct_answer
+        if (answers[question.id]) {
+          dotClass += isAnsCorrect ? "bg-green-500 " : "bg-red-500 "
+        } else {
+          dotClass += "bg-[rgba(255,255,255,0.1)] "
+        }
+      } else {
+        if (answers[question.id]) dotClass += "bg-[#D4AF37] "
+        else dotClass += "bg-[rgba(255,255,255,0.2)] "
+      }
+
+      const isCurrent = i === currentIndex
+
+      return (
+        <button 
+          key={question.id}
+          onClick={() => setCurrentIndex(i)}
+          className={`relative p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
+          aria-label={`ไปข้อที่ ${i + 1}`}
+        >
+          <div className={dotClass} />
+          {status === 'IN_PROGRESS' && flagged[question.id] && (
+            <div className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-yellow-500 border border-[#0F0B07]" />
+          )}
+        </button>
+      )
+    })
+  )
+
   // Choice rendering helper
   const renderChoice = (letter: ChoiceLetter, text: string) => {
     const isSelected = answers[q.id] === letter
@@ -437,7 +471,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             </Link>
             <div>
               <div className="text-[10px] uppercase tracking-wider font-bold text-[#A1866B] mb-0.5">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.title}</div>
-              <div className="text-sm font-bold text-[#F5E9D6]">ข้อ {currentIndex + 1} จาก {questions.length}</div>
+              <div className="text-sm font-bold text-[#F5E9D6] lg:hidden">ข้อ {currentIndex + 1} จาก {questions.length}</div>
             </div>
           </div>
           
@@ -538,8 +572,8 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
       </div>
 
-      {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 w-full bg-[#0F0B07]/90 backdrop-blur-xl border-t border-[rgba(255,255,255,0.05)] pb-safe">
+      {/* Mobile & Tablet Navigation Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 w-full bg-[#0F0B07]/90 backdrop-blur-xl border-t border-[rgba(255,255,255,0.05)] pb-safe z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           
           <button 
@@ -554,36 +588,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
           {/* Quick Pagination Dots */}
           <div className="flex-1 flex justify-center px-4 overflow-x-auto custom-scrollbar no-scrollbar py-2">
             <div className="flex items-center gap-1.5">
-              {questions.map((question, i) => {
-                let dotClass = "w-2.5 h-2.5 rounded-full transition-all "
-                if (status === 'REVIEW') {
-                  const isAnsCorrect = answers[question.id] === question.correct_answer
-                  if (answers[question.id]) {
-                    dotClass += isAnsCorrect ? "bg-green-500 " : "bg-red-500 "
-                  } else {
-                    dotClass += "bg-[rgba(255,255,255,0.1)] "
-                  }
-                } else {
-                  if (answers[question.id]) dotClass += "bg-[#D4AF37] "
-                  else dotClass += "bg-[rgba(255,255,255,0.2)] "
-                }
-
-                const isCurrent = i === currentIndex
-
-                return (
-                  <button 
-                    key={question.id}
-                    onClick={() => setCurrentIndex(i)}
-                    className={`relative p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
-                    aria-label={`ไปข้อที่ ${i + 1}`}
-                  >
-                    <div className={dotClass} />
-                    {status === 'IN_PROGRESS' && flagged[question.id] && (
-                      <div className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-yellow-500 border border-[#0F0B07]" />
-                    )}
-                  </button>
-                )
-              })}
+              {renderIndicators()}
             </div>
           </div>
 
@@ -594,7 +599,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
                 className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${mode === 'practice' && !answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
                 disabled={mode === 'practice' && !answers[q.id]}
               >
-                {mode === 'practice' ? '✅ ดูผลคะแนน' : 'ส่งข้อสอบ'}
+                {mode === 'practice' ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}
               </button>
             ) : status === 'IN_PROGRESS' && mode === 'practice' ? (
               <button 
@@ -602,7 +607,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
                 disabled={!answers[q.id]}
                 className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${!answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)]' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] shadow-[0_4px_15px_rgba(212,175,55,0.3)]'}`}
               >
-                <span className="hidden sm:inline">➡️ ข้อถัดไป</span>
+                <span className="hidden sm:inline">ข้อถัดไป</span>
                 <ChevronRight size={18} className="sm:hidden" />
               </button>
             ) : (
@@ -617,6 +622,56 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             )}
           </div>
           
+        </div>
+      </div>
+
+      {/* Desktop Navigation Bar (Redesigned) */}
+      <div className="hidden lg:flex fixed bottom-0 left-0 w-full bg-[#0F0B07]/90 backdrop-blur-xl border-t border-[rgba(255,255,255,0.05)] pb-safe z-40 flex-col items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <div className="w-full max-w-5xl mx-auto px-8 py-5 flex flex-col gap-5">
+          
+          {/* Top Row: Prev | Counter | Next */}
+          <div className="flex items-center justify-between w-full">
+            <button 
+              onClick={goPrev} 
+              disabled={currentIndex === 0}
+              className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${currentIndex === 0 ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+            >
+              <ChevronLeft size={18} className={currentIndex === 0 ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+              <span>ก่อนหน้า</span>
+            </button>
+
+            <div className="text-center flex items-center gap-3 text-sm font-medium text-[#A1866B]">
+              ข้อ <span className="text-xl font-bold text-[#D4AF37]">{currentIndex + 1}</span> / {questions.length}
+            </div>
+
+            {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
+              <button 
+                onClick={handleRequestSubmit} 
+                disabled={mode === 'practice' && !answers[q.id]}
+                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${mode === 'practice' && !answers[q.id] ? 'border-[rgba(255,255,255,0.1)] text-[#A1866B] opacity-50 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+              >
+                <span>{mode === 'practice' ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}</span>
+                <CheckCircle size={18} className={mode === 'practice' && !answers[q.id] ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+              </button>
+            ) : (
+              <button 
+                onClick={goNext} 
+                disabled={mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1}
+                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1) ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+              >
+                <span>ข้อถัดไป</span>
+                <ChevronRight size={18} className={(mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1) ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Row: Indicators (Centered) */}
+          <div className="w-full flex justify-center overflow-x-auto custom-scrollbar no-scrollbar pb-2">
+            <div className="flex items-center gap-2 px-4">
+              {renderIndicators()}
+            </div>
+          </div>
+
         </div>
       </div>
 
