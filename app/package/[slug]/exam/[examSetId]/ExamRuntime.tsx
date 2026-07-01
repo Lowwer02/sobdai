@@ -26,6 +26,7 @@ interface Question {
   subject: string | null
   law: string | null
   topic: string | null
+  is_common?: boolean
 }
 
 interface ExamRuntimeProps {
@@ -40,6 +41,12 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   const [answers, setAnswers] = useState<Record<string, ChoiceLetter>>({})
   const [flagged, setFlagged] = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<'IN_PROGRESS' | 'CONFIRM_SUBMIT' | 'REVIEW'>('IN_PROGRESS')
+  const [isExplanationExpanded, setIsExplanationExpanded] = useState(false)
+
+  // Reset expanded state when question changes
+  useEffect(() => {
+    setIsExplanationExpanded(false)
+  }, [currentIndex])
   
   // Timer State
   const initialTime = (examSet.time_limit_minutes || 60) * 60
@@ -85,8 +92,8 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   const handleSelect = (letter: ChoiceLetter) => {
     if (status !== 'IN_PROGRESS') return
     setAnswers(prev => ({ ...prev, [q.id]: letter }))
-    // Auto next on answer (optional, but good UX, wait small delay)
-    if (currentIndex < questions.length - 1) {
+    // Auto next on answer (only for non-practice modes)
+    if (mode !== 'practice' && currentIndex < questions.length - 1) {
       setTimeout(() => goNext(), 300)
     }
   }
@@ -154,7 +161,8 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // Choice rendering helper
   const renderChoice = (letter: ChoiceLetter, text: string) => {
     const isSelected = answers[q.id] === letter
-    const isReview = status === 'REVIEW'
+    const isAnsweredInPractice = mode === 'practice' && !!answers[q.id]
+    const isReview = status === 'REVIEW' || isAnsweredInPractice
     const isCorrectChoice = q.correct_answer === letter
     
     let btnClass = "w-full text-left p-4 rounded-xl border flex gap-4 transition-all "
@@ -178,11 +186,13 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     const whyWrongProp = `why_${letter.toLowerCase()}_wrong` as keyof Question
     const whyWrongText = q[whyWrongProp] as string | null
 
+    const showExplanation = isReview && whyWrongText
+
     return (
       <div key={letter} className="mb-3">
         <button 
           onClick={() => handleSelect(letter)}
-          disabled={isReview}
+          disabled={status === 'REVIEW' || isAnsweredInPractice}
           className={`${btnClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]`}
         >
           <div className={`w-8 h-8 rounded-full border flex items-center justify-center flex-shrink-0 font-bold ${
@@ -199,10 +209,10 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
           {isReview && isSelected && !isCorrectChoice && <XCircle className="text-red-500 mt-1" size={20} />}
         </button>
         
-        {/* Explanation specifically for this wrong choice */}
-        {isReview && isSelected && !isCorrectChoice && whyWrongText && (
-          <div className="mt-2 ml-12 p-3 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-200/90 leading-relaxed shadow-sm">
-            <span className="font-bold text-red-400 block mb-1">ทำไมข้อนี้ถึงผิด:</span>
+        {/* Explanation specifically for this choice */}
+        {showExplanation && (
+          <div className="mt-2 ml-12 p-3 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-200/90 leading-relaxed shadow-sm animate-in fade-in slide-in-from-top-2">
+            <span className="font-bold text-red-400 block mb-1">เหตุผล:</span>
             {whyWrongText}
           </div>
         )}
@@ -210,7 +220,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     )
   }
 
-  // Placeholder for Practice Mode Immediate Feedback
+  // Practice Mode Immediate Feedback
   const renderPracticeFeedback = () => {
     if (mode !== 'practice') return null
     const isAnswered = !!answers[q.id]
@@ -218,20 +228,49 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     const isCorrect = answers[q.id] === q.correct_answer
 
     return (
-      <div className={`mt-6 p-5 rounded-2xl border animate-in slide-in-from-top-2 duration-300 ${isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-        <div className="flex items-start gap-3">
+      <div className={`mt-8 p-5 rounded-2xl border animate-in fade-in slide-in-from-top-4 duration-500 bg-[#2A1F0D] border-[#D4AF37]/30 shadow-lg`}>
+        <div className="flex items-start gap-4">
           {isCorrect ? (
-            <CheckCircle className="text-green-500 shrink-0 mt-0.5" size={20} />
+            <div className="bg-green-500/20 p-2 rounded-full mt-0.5">
+              <CheckCircle className="text-green-500 shrink-0" size={24} />
+            </div>
           ) : (
-            <XCircle className="text-red-500 shrink-0 mt-0.5" size={20} />
+            <div className="bg-red-500/20 p-2 rounded-full mt-0.5">
+              <XCircle className="text-red-500 shrink-0" size={24} />
+            </div>
           )}
-          <div>
-            <h4 className={`font-bold mb-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-              {isCorrect ? 'ตอบถูกต้อง!' : 'ตอบผิด'}
+          <div className="flex-1">
+            <h4 className={`font-bold text-lg mb-1 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+              {isCorrect ? 'ตอบถูกต้อง! 🎉' : 'ตอบผิด 😅'}
             </h4>
+            <div className="text-sm font-medium text-[#A1866B] mb-3">
+              คุณตอบ: <span className="text-[#F5E9D6] mr-4">{answers[q.id]}</span>
+              คำตอบที่ถูก: <span className="text-green-400">{q.correct_answer}</span>
+            </div>
+            
             {q.full_explanation && (
-              <div className="text-sm text-[#F5E9D6] leading-relaxed opacity-90 whitespace-pre-line">
-                {q.full_explanation}
+              <div className="mt-4 pt-4 border-t border-[#D4AF37]/20">
+                <span className="font-bold text-[#D4AF37] block mb-2">เหตุผลของคำตอบ:</span>
+                <div 
+                  className={`text-sm text-[#F5E9D6] leading-relaxed opacity-90 whitespace-pre-line transition-all duration-300 overflow-hidden ${
+                    !isExplanationExpanded ? 'line-clamp-3' : ''
+                  }`}
+                >
+                  {q.full_explanation}
+                </div>
+                
+                {q.full_explanation.length > 150 && (
+                  <button 
+                    onClick={() => setIsExplanationExpanded(!isExplanationExpanded)}
+                    className="mt-3 text-[#D4AF37] text-sm font-bold flex items-center gap-1 hover:text-[#F1D17A] transition-colors focus-visible:outline-none"
+                  >
+                    {isExplanationExpanded ? (
+                      <>▲ ซ่อนเฉลย</>
+                    ) : (
+                      <>▼ ดูเฉลยทั้งหมด</>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -432,9 +471,16 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
         {/* Question Area */}
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 mb-6">
-            <span className="inline-block px-3 py-1 rounded-md bg-[#1A140E] text-[#A1866B] text-xs font-bold border border-[rgba(255,255,255,0.05)]">
-              ข้อที่ {currentIndex + 1}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-block px-3 py-1 rounded-md bg-[#1A140E] text-[#A1866B] text-xs font-bold border border-[rgba(255,255,255,0.05)]">
+                ข้อที่ {currentIndex + 1}
+              </span>
+              {q.is_common !== undefined && (
+                <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold border ${q.is_common ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                  {q.is_common ? '🔥 ออกสอบบ่อย' : '📘 พื้นฐาน'}
+                </span>
+              )}
+            </div>
             {status === 'IN_PROGRESS' && (
               <button 
                 onClick={toggleFlag}
@@ -545,9 +591,19 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
               <button 
                 onClick={handleRequestSubmit} 
-                className="flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${mode === 'practice' && !answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
+                disabled={mode === 'practice' && !answers[q.id]}
               >
-                ส่งข้อสอบ
+                {mode === 'practice' ? '✅ ดูผลคะแนน' : 'ส่งข้อสอบ'}
+              </button>
+            ) : status === 'IN_PROGRESS' && mode === 'practice' ? (
+              <button 
+                onClick={goNext} 
+                disabled={!answers[q.id]}
+                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${!answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)]' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] shadow-[0_4px_15px_rgba(212,175,55,0.3)]'}`}
+              >
+                <span className="hidden sm:inline">➡️ ข้อถัดไป</span>
+                <ChevronRight size={18} className="sm:hidden" />
               </button>
             ) : (
               <button 
