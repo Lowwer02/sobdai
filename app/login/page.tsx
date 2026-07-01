@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import AuthModal from '@/components/AuthModal'
 
 export default function LoginPage() {
@@ -20,11 +21,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex flex-col items-center justify-center p-6 font-sans">
       <div className="max-w-md w-full text-center mb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-[#D4AF37] font-display font-bold text-2xl mb-8 drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] hover:scale-105 transition-transform">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <circle cx="12" cy="10" r="3" fill="currentColor"/>
-          </svg>
+        <Link href="/" className="inline-flex items-center gap-3 text-[#D4AF37] font-display font-bold text-2xl mb-8 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg p-1 transition-all hover:scale-105">
+          <Image 
+            src="/logo.png" 
+            alt="Sobdai Logo" 
+            width={48} 
+            height={48} 
+            className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl shadow-[0_2px_10px_rgba(212,175,55,0.2)] group-hover:shadow-[0_4px_15px_rgba(212,175,55,0.4)] transition-all"
+          />
           Sobdai
         </Link>
         <h1 className="text-2xl font-bold text-[#F5E9D6] mb-2">กรุณาเข้าสู่ระบบ</h1>

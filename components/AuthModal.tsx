@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 
@@ -176,10 +177,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
 
             <div className="p-8 sm:p-10">
               <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701F] text-[#0F0B07] mb-4 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                  </svg>
+                <div className="flex justify-center mb-6">
+                  <Image 
+                    src="/logo.png" 
+                    alt="Sobdai Logo" 
+                    width={56} 
+                    height={56} 
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl shadow-[0_4px_20px_rgba(212,175,55,0.3)]"
+                  />
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold font-display text-[#F5E9D6] mb-2">
                   {mode === 'login' ? 'เข้าสู่ระบบ' : mode === 'register' ? 'สมัครสมาชิกฟรี' : 'ลืมรหัสผ่าน'}

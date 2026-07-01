@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { toastEvent } from '@/hooks/useToast'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -41,10 +42,14 @@ export default function ResetPasswordPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[300px] h-32 bg-[#D4AF37] opacity-[0.03] blur-[50px] pointer-events-none"></div>
 
         <div className="text-center mb-8 relative z-10">
-          <Link href="/" className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8C701F] text-[#0F0B07] mb-6 shadow-[0_0_20px_rgba(212,175,55,0.2)] hover:scale-105 transition-transform">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-            </svg>
+          <Link href="/" className="inline-flex items-center justify-center mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-xl hover:scale-105 transition-transform">
+            <Image 
+              src="/logo.png" 
+              alt="Sobdai Logo" 
+              width={56} 
+              height={56} 
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl shadow-[0_4px_20px_rgba(212,175,55,0.3)]"
+            />
           </Link>
           <h2 className="text-2xl font-bold font-display text-[#F5E9D6] mb-2">
             ตั้งรหัสผ่านใหม่
