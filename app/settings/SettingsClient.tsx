@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Camera, Shield, UserCircle, LogIn, AlertTriangle, Loader2, X } from 'lucide-react'
 import { updateProfile, deactivateAccount } from './actions'
+
 import { toastEvent } from '@/hooks/useToast'
+import AvatarCropper from '@/components/AvatarCropper'
 
 interface Profile {
   id: string
@@ -24,6 +26,71 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
   const [isPending, startTransition] = useTransition()
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
+  
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [isCropperOpen, setIsCropperOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+      if (file.size > 4 * 1024 * 1024) {
+        toastEvent('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 4 MB', 'error')
+        e.target.value = ''
+        return
+      }
+      
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => {
+        setSelectedImage(reader.result as string)
+        setIsCropperOpen(true)
+      }
+    }
+  }
+
+  const handleAvatarSave = async (croppedBlob: Blob) => {
+    try {
+      setIsUploading(true)
+      const supabase = createClient()
+      
+      const fileName = `${profile.id}/avatar.webp`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, croppedBlob, {
+          contentType: 'image/webp',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      // Append timestamp to bust cache
+      const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: cacheBustedUrl })
+        .eq('id', profile.id)
+
+      if (updateError) throw updateError
+
+      setProfile(prev => ({ ...prev, avatar_url: cacheBustedUrl }))
+      toastEvent('อัปเดตรูปโปรไฟล์สำเร็จ', 'success')
+      router.refresh()
+    } catch (err: any) {
+      toastEvent(err.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปโปรไฟล์', 'error')
+    } finally {
+      setIsUploading(false)
+      setSelectedImage(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -81,9 +148,21 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
               <span className="text-3xl font-display text-[#D4AF37] font-bold">{getInitials()}</span>
             )}
           </div>
-          <button className="absolute bottom-0 right-0 p-2 bg-[#D4AF37] text-[#1A140E] rounded-full hover:brightness-110 transition-all cursor-not-allowed opacity-50" title="Avatar upload coming soon">
-            <Camera size={14} />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="absolute bottom-0 right-0 p-2 bg-[#D4AF37] text-[#1A140E] rounded-full hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed" 
+            title="อัปโหลดรูปโปรไฟล์"
+          >
+            {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
           </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept="image/*" 
+            className="hidden" 
+          />
         </div>
         
         <div className="text-center sm:text-left flex-1 space-y-2">
@@ -292,6 +371,17 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
         </div>
       )}
 
+      {/* Avatar Cropper Modal */}
+      <AvatarCropper 
+        isOpen={isCropperOpen}
+        imageSrc={selectedImage}
+        onClose={() => {
+          setIsCropperOpen(false)
+          setSelectedImage(null)
+          if (fileInputRef.current) fileInputRef.current.value = ''
+        }}
+        onSave={handleAvatarSave}
+      />
     </div>
   )
 }
