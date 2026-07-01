@@ -206,7 +206,18 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
               <button 
                 type="button" 
                 className="px-4 py-2 border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-sm font-medium rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors"
-                onClick={() => alert('ระบบเปลี่ยนรหัสผ่านกำลังอยู่ระหว่างการพัฒนา (เร็ว ๆ นี้)')}
+                onClick={async () => {
+                  try {
+                    const supabaseClient = createClient()
+                    const { error } = await supabaseClient.auth.resetPasswordForEmail(profile.email, {
+                      redirectTo: `${window.location.origin}/reset-password`,
+                    })
+                    if (error) throw error
+                    toastEvent('ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว', 'success')
+                  } catch (err: any) {
+                    toastEvent(err.message, 'error')
+                  }
+                }}
               >
                 Change Password
               </button>

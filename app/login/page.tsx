@@ -31,12 +31,27 @@ export default function LoginPage() {
         <p className="text-[#A1866B]">เพื่อเข้าใช้งานฟีเจอร์ต่างๆ ของระบบ</p>
       </div>
 
-      <AuthModal isOpen={true} onClose={() => {
-        // Since we don't have an explicit onSuccess in AuthModal, 
-        // we'll assume onClose means either success or intentional close.
-        // If there's a redirect, we can go there. Or go to home.
-        window.location.href = redirect || '/'
-      }} initialMode="login" redirectUrl={redirect || undefined} />
+      <AuthModal 
+        isOpen={true} 
+        onClose={() => {
+          // Intentional close (Guest cancelled)
+          // Try to extract package slug from redirect url to return them gracefully
+          if (redirect?.startsWith('/package/')) {
+            const match = redirect.match(/^\/package\/([^\/]+)/)
+            if (match) {
+              window.location.href = `/package/${match[1]}`
+              return
+            }
+          }
+          window.location.href = '/'
+        }} 
+        onSuccess={() => {
+          // Login successful, proceed to the requested protected page
+          window.location.href = redirect || '/'
+        }}
+        initialMode="login" 
+        redirectUrl={redirect || undefined} 
+      />
     </div>
   )
 }

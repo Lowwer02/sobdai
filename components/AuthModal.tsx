@@ -9,7 +9,8 @@ import { toastEvent } from '@/hooks/useToast'
 interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
-  initialMode?: 'login' | 'register'
+  onSuccess?: () => void
+  initialMode?: 'login' | 'register' | 'forgot_password'
   redirectUrl?: string
 }
 
@@ -24,8 +25,8 @@ function GoogleIcon() {
   )
 }
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login', redirectUrl }: AuthModalProps) {
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode)
+export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login', redirectUrl }: AuthModalProps) {
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot_password'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -88,10 +89,23 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
     e.preventDefault()
     setLoading(true)
 
-    if (mode === 'register') {
+    if (mode === 'forgot_password') {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) {
+        toastEvent(error.message, 'error')
+      } else {
+        toastEvent('ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณแล้ว', 'success')
+        onClose()
+      }
+    } else if (mode === 'register') {
       const { error, data } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
       })
       if (error) {
         toastEvent(error.message, 'error')
@@ -102,7 +116,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
           toastEvent('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือทดลองล็อกอินได้เลย', 'success')
           setEmail('')
           setPassword('')
-          onClose()
+          if (onSuccess) onSuccess()
+          else onClose()
         }
       }
     } else {
@@ -119,7 +134,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
           toastEvent('บัญชีนี้ถูกปิดการใช้งานแล้ว กรุณาติดต่อทีมงานหากต้องการเปิดใช้งานอีกครั้ง', 'error')
         } else {
           toastEvent('เข้าสู่ระบบสำเร็จ', 'success')
-          onClose()
+          if (onSuccess) onSuccess()
+          else onClose()
         }
       }
     }
@@ -166,12 +182,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                   </svg>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold font-display text-[#F5E9D6] mb-2">
-                  {mode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิกฟรี'}
+                  {mode === 'login' ? 'เข้าสู่ระบบ' : mode === 'register' ? 'สมัครสมาชิกฟรี' : 'ลืมรหัสผ่าน'}
                 </h2>
                 <p className="text-sm text-[#A1866B]">
                   {mode === 'login' 
                     ? 'ยินดีต้อนรับกลับ! เข้าสู่ระบบเพื่อทำข้อสอบต่อ' 
-                    : 'สร้างบัญชีเพื่อบันทึกผลและเข้าถึงข้อสอบทั้งหมด'}
+                    : mode === 'register' 
+                      ? 'สร้างบัญชีเพื่อบันทึกผลและเข้าถึงข้อสอบทั้งหมด'
+                      : 'กรอกอีเมลของคุณเพื่อรับลิงก์รีเซ็ตรหัสผ่าน'}
                 </p>
               </div>
 
@@ -191,27 +209,40 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                     placeholder="you@example.com"
                   />
                 </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-[#A1866B] mb-1.5 uppercase tracking-wide">รหัสผ่าน</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl pl-4 pr-12 py-3.5 text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
-                      placeholder="อย่างน้อย 6 ตัวอักษร"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A1866B] hover:text-[#D4AF37] transition-colors"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
+                {mode !== 'forgot_password' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[13px] font-medium text-[#A1866B] uppercase tracking-wide">รหัสผ่าน</label>
+                      {mode === 'login' && (
+                        <button 
+                          type="button"
+                          onClick={() => setMode('forgot_password')}
+                          className="text-[13px] font-medium text-[#D4AF37] hover:underline focus-visible:outline-none"
+                        >
+                          ลืมรหัสผ่าน?
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl pl-4 pr-12 py-3.5 text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                        placeholder="อย่างน้อย 6 ตัวอักษร"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A1866B] hover:text-[#D4AF37] transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {mode === 'register' && (
                   <label className="flex items-start gap-3 pt-2 cursor-pointer">
@@ -233,59 +264,55 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', redi
                   className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#0F0B07] font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-2"
                 >
                   {loading && <Loader2 size={18} className="animate-spin" />}
-                  {mode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
+                  {mode === 'login' ? 'เข้าสู่ระบบ' : mode === 'register' ? 'สร้างบัญชี' : 'ส่งลิงก์'}
                 </button>
               </form>
 
-              <div className="relative flex items-center justify-center my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[rgba(255,255,255,0.05)]"></div>
-                </div>
-                <div className="relative bg-[#1A140E] px-4 text-xs font-medium text-[#A1866B] uppercase tracking-wider">
-                  หรือ
-                </div>
-              </div>
+              {mode !== 'forgot_password' && (
+                <>
+                  <div className="relative flex items-center justify-center my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[rgba(255,255,255,0.05)]"></div>
+                    </div>
+                    <div className="relative bg-[#1A140E] px-4 text-xs font-medium text-[#A1866B] uppercase tracking-wider">
+                      หรือ
+                    </div>
+                  </div>
 
-              <button
-                type="button"
-                onClick={handleGoogleAuth}
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-xl text-[#F5E9D6] text-[15px] cursor-pointer hover:bg-[rgba(255,255,255,0.06)] hover:border-[rgba(212,175,55,0.3)] transition-all"
-              >
-                <GoogleIcon />
-                {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
-              </button>
-              
-              {mode === 'register' && (
-                <p className="mt-4 text-[11.5px] text-center text-[#A1866B]/80 leading-relaxed">
-                  การสมัครสมาชิกด้วย Google ถือว่าท่านยอมรับ<br/>
-                  <a href="/terms" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">นโยบายความเป็นส่วนตัว</a> ของเรา
-                </p>
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-xl text-[#F5E9D6] text-[15px] cursor-pointer hover:bg-[rgba(255,255,255,0.06)] hover:border-[rgba(212,175,55,0.3)] transition-all"
+                  >
+                    <GoogleIcon />
+                    {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
+                  </button>
+                  
+                  {mode === 'register' && (
+                    <p className="mt-4 text-[11.5px] text-center text-[#A1866B]/80 leading-relaxed">
+                      การสมัครสมาชิกด้วย Google ถือว่าท่านยอมรับ<br/>
+                      <a href="/terms" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">นโยบายความเป็นส่วนตัว</a> ของเรา
+                    </p>
+                  )}
+                </>
               )}
               
               <div className="mt-8 text-center text-sm text-[#A1866B]">
                 {mode === 'login' ? (
-                  <>
-                    ยังไม่มีบัญชี?{' '}
-                    <button 
-                      type="button"
-                      onClick={() => { setMode('register'); }} 
-                      className="text-[#D4AF37] hover:text-[#F1D17A] font-bold transition-colors"
-                    >
-                      สมัครสมาชิก
+                  <p className="text-[#A1866B] text-[13px]">
+                    ยังไม่มีบัญชีใช่ไหม?{' '}
+                    <button onClick={() => setMode('register')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
+                      สมัครสมาชิกฟรี
                     </button>
-                  </>
+                  </p>
                 ) : (
-                  <>
+                  <p className="text-[#A1866B] text-[13px]">
                     มีบัญชีอยู่แล้ว?{' '}
-                    <button 
-                      type="button"
-                      onClick={() => { setMode('login'); }} 
-                      className="text-[#D4AF37] hover:text-[#F1D17A] font-bold transition-colors"
-                    >
+                    <button onClick={() => setMode('login')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
                       เข้าสู่ระบบ
                     </button>
-                  </>
+                  </p>
                 )}
               </div>
             </div>
