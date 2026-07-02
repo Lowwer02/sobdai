@@ -28,7 +28,7 @@ export default function Navbar() {
       setUser(sessionUser)
       if (sessionUser) {
         const { data } = await supabase.from('profiles').select('role, deleted_at').eq('id', sessionUser.id).single()
-        
+
         if (data?.deleted_at) {
           // Force logout for deactivated accounts
           await supabase.auth.signOut()
@@ -44,7 +44,11 @@ export default function Navbar() {
       }
     }
 
-    supabase.auth.getUser().then(({ data }) => fetchUserAndRole(data.user))
+    // Use getSession() on mount: it reads the local session synchronously
+    // (no network round-trip), unlike getUser() which always hits the network.
+    // The profiles query below is the only network call needed; authoritative
+    // auth/role checks still happen server-side (proxy + server components).
+    supabase.auth.getSession().then(({ data }) => fetchUserAndRole(data.session?.user ?? null))
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       fetchUserAndRole(session?.user ?? null)
@@ -88,12 +92,12 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={`sticky top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
-        scrolled 
-          ? 'bg-[#0F0B07]/95 backdrop-blur-md border-[rgba(255,255,255,0.05)] shadow-lg' 
-          : 'bg-[#0F0B07]/80 backdrop-blur-sm border-transparent'
+        className={`sticky top-0 left-0 right-0 z-50 transition-colors duration-200 border-b ${
+        scrolled
+          ? 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] shadow-lg'
+          : 'bg-[#0F0B07] border-transparent'
       }`}
-    >
+      >
       {/* Desktop view */}
       <div className="hidden lg:block w-full">
         <DesktopNav 

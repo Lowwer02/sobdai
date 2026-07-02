@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Camera, Shield, UserCircle, LogIn, AlertTriangle, Loader2, X } from 'lucide-react'
 import { updateProfile, deactivateAccount } from './actions'
@@ -143,7 +144,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
         <div className="relative group">
           <div className="w-24 h-24 rounded-full bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] overflow-hidden flex items-center justify-center">
             {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              <Image src={profile.avatar_url} alt="Avatar" width={96} height={96} className="w-full h-full object-cover" />
             ) : (
               <span className="text-3xl font-display text-[#D4AF37] font-bold">{getInitials()}</span>
             )}
