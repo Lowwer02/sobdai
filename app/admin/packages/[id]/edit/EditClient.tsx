@@ -1,10 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useTransition, useMemo } from 'react'
-import { ArrowLeft, Save, Loader2, Trash2 } from 'lucide-react'
+import { useState, useTransition, useMemo, useRef } from 'react'
+import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
+import { ArrowLeft, Save, Loader2, Trash2, Camera, Image as ImageIcon } from 'lucide-react'
 import { updatePackageAction } from '../../actions'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { toastEvent } from '@/hooks/useToast'
+import AvatarCropper from '@/components/AvatarCropper'
 
 const availableFeatures = [
   'Detailed Explanations', 
@@ -23,7 +27,64 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
   const [selectedPos, setSelectedPos] = useState(pkg.position_id || '')
   const [isDirty, setIsDirty] = useState(false)
 
+  // Package Upload State
+  const [logoUrl, setLogoUrl] = useState(pkg.logo_url || '')
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [isCropperOpen, setIsCropperOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   useUnsavedChanges(isDirty)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+      if (file.size > 4 * 1024 * 1024) {
+        toastEvent('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 4 MB', 'error')
+        e.target.value = ''
+        return
+      }
+      
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => {
+        setSelectedImage(reader.result as string)
+        setIsCropperOpen(true)
+      }
+    }
+  }
+
+  const handleLogoSave = async (croppedBlob: Blob) => {
+    try {
+      setIsUploading(true)
+      const supabase = createClient()
+      const fileName = `packages/${pkg.id}/logo.webp`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('package-assets')
+        .upload(fileName, croppedBlob, {
+          contentType: 'image/webp',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('package-assets')
+        .getPublicUrl(fileName)
+
+      const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`
+      setLogoUrl(cacheBustedUrl)
+      setIsDirty(true)
+      toastEvent('อัปโหลดโลโก้สำเร็จ', 'success')
+    } catch (err: any) {
+      toastEvent(err.message || 'เกิดข้อผิดพลาดในการอัปโหลด', 'error')
+    } finally {
+      setIsUploading(false)
+      setSelectedImage(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const filteredPositions = useMemo(() => {
     if (!selectedOrg) return []
@@ -59,7 +120,9 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} onChange={handleFormChange} className="space-y-6 max-w-5xl mx-auto pb-20">
+      <input type="hidden" name="logo_url" value={logoUrl} />
       <div className="flex items-center gap-4">
         <Link href="/admin/packages">
           <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors">
@@ -179,8 +242,34 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
             
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
-                <label className="text-sm text-[#F5E9D6] font-medium block">Organization Logo URL</label>
-                <input name="logo_url" type="text" defaultValue={pkg.logo_url} className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] text-base sm:text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4AF37]/50 mt-2" />
+                <label className="text-sm text-[#F5E9D6] font-medium block">Upload Organization Logo</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] overflow-hidden flex items-center justify-center shrink-0">
+                    {logoUrl ? (
+                      <Image src={logoUrl} alt="Logo" width={80} height={80} className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={24} className="text-[#A1866B]" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <button type="button" 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="px-4 py-2 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm font-medium text-[#F5E9D6] transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                      {logoUrl ? 'เปลี่ยนรูปภาพ' : 'อัปโหลดรูปภาพ (สูงสุด 4 MB)'}
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleFileChange} 
+                      accept="image/jpeg,image/png,image/webp,image/heic" 
+                      className="hidden" 
+                    />
+                    <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG, WEBP หรือ HEIC ขนาด 1:1</p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -276,5 +365,17 @@ export default function EditClient({ pkg, organizations, positions }: { pkg: any
         </div>
       </div>
     </form>
+    
+    <AvatarCropper 
+      isOpen={isCropperOpen}
+      imageSrc={selectedImage}
+      onClose={() => {
+        setIsCropperOpen(false)
+        setSelectedImage(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }}
+      onSave={handleLogoSave}
+    />
+    </>
   )
 }

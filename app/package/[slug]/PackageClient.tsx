@@ -54,7 +54,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
   
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
-  const logoUrl = pkg.organizations?.logo_url || null
+  const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
 

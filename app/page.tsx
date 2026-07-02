@@ -13,6 +13,7 @@ interface PackageData {
   total_questions: number
   total_exam_sets: number
   description: string | null
+  logo_url: string | null
   organizations: {
     name: string
     logo_url: string | null
@@ -109,6 +110,7 @@ export default async function Home() {
         original_price,
         difficulty,
         description,
+        logo_url,
         organizations ( name, logo_url ),
         positions ( name )
       `)
@@ -442,7 +444,7 @@ export default async function Home() {
 function ExamCard({ pkg, index }: { pkg: PackageData; index: number }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
-  const logoUrl = pkg.organizations?.logo_url
+  const logoUrl = pkg.logo_url || pkg.organizations?.logo_url
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountPercent = hasDiscount ? Math.round(((pkg.original_price - pkg.current_price) / pkg.original_price) * 100) : 0
 

@@ -42,7 +42,9 @@ export async function createPackageAction(formData: FormData) {
       slug = generateSlug(slug)
     }
 
-    const payload = {
+    const id = formData.get('id') as string
+
+    const payload: any = {
       package_code: packageCode,
       organization_id: orgId,
       position_id: posId,
@@ -60,6 +62,9 @@ export async function createPackageAction(formData: FormData) {
       seo_description: formData.get('seo_description') as string,
       features: JSON.parse((formData.get('features') as string) || '[]'),
       is_published: formData.get('is_published') === 'on',
+    }
+    if (id) {
+      payload.id = id
     }
 
     const { error, data } = await supabase.from('packages').insert(payload).select('id')

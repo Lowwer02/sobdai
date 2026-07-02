@@ -122,8 +122,8 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
           
           <div className="flex gap-4 items-start mb-6">
             <div className="w-12 h-12 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] flex items-center justify-center p-2 flex-shrink-0">
-              {pkg.organizations?.logo_url ? (
-                <Image src={pkg.organizations.logo_url} alt="logo" width={48} height={48} className="w-full h-full object-contain" />
+              {pkg.logo_url || pkg.organizations?.logo_url ? (
+                <Image src={pkg.logo_url || pkg.organizations?.logo_url} alt="logo" width={48} height={48} className="w-full h-full object-contain" />
               ) : (
                 <span className="text-xl font-display font-bold text-[#D4AF37]">{pkg.organizations?.name?.charAt(0) || 'O'}</span>
               )}
