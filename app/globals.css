@@ -3,7 +3,7 @@
 /* ===================== Fonts ===================== */
 @font-face {
   font-family: 'Supermarket';
-  src: url('/fonts/supermarket.ttf') format('truetype');
+  src: url('/fonts/supermarket.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -120,9 +120,11 @@ h1, h2, h3, .heading {
 }
 
 .card-glass {
-  background: rgba(26, 18, 8, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* Opaque background instead of backdrop-filter blur. Blur is expensive on
+     the GPU compositor (especially when many glass cards are visible and the
+     user scrolls), and was a primary cause of scroll jank on mobile. The
+     near-solid background looks visually equivalent here. */
+  background: rgba(26, 18, 8, 0.94);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
 }
@@ -142,7 +144,7 @@ h1, h2, h3, .heading {
   border-radius: var(--radius-md);
   padding: 12px 28px;
   font-size: 15px;
-  transition: all 0.2s;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
   cursor: pointer;
   border: none;
   font-family: 'Supermarket', 'Sarabun', sans-serif;
@@ -166,7 +168,7 @@ h1, h2, h3, .heading {
   border-radius: var(--radius-md);
   padding: 10px 24px;
   font-size: 15px;
-  transition: all 0.2s;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
   cursor: pointer;
   font-family: 'Supermarket', 'Sarabun', sans-serif;
   letter-spacing: 0.02em;
@@ -184,7 +186,7 @@ h1, h2, h3, .heading {
   color: var(--text-muted);
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
   cursor: pointer;
 }
 
@@ -200,7 +202,7 @@ h1, h2, h3, .heading {
   border-radius: var(--radius-xl);
   padding: 32px;
   box-shadow: var(--shadow-lg);
-  transition: all 0.3s;
+  transition: box-shadow 0.3s, border-color 0.3s, transform 0.3s;
 }
 
 .choice-btn {
@@ -214,7 +216,7 @@ h1, h2, h3, .heading {
   font-size: 14.5px;
   font-family: 'Sarabun', sans-serif;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -297,9 +299,10 @@ h1, h2, h3, .heading {
 
 /* ===================== Navigation ===================== */
 .navbar {
-  background: rgba(15, 11, 8, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* Solid background instead of backdrop-filter: the sticky navbar re-paints
+     blur on every scroll frame, which is a top cause of scroll jank. An
+     opaque background is visually near-identical here and far cheaper. */
+  background: rgb(15, 11, 8);
   border-bottom: 1px solid var(--border-card);
   position: sticky;
   top: 0;
