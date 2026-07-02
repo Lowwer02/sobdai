@@ -457,7 +457,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     <div className="min-h-screen pb-32 lg:pb-24 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0F0B07]/80 backdrop-blur-xl border-b border-[rgba(212,175,55,0.1)]">
+      <div className="sticky top-0 z-50 bg-[#0F0B07] border-b border-[rgba(212,175,55,0.1)]">
         {/* Progress bar */}
         <div 
           className={`absolute top-0 left-0 h-[2px] transition-all duration-300 z-50 ${status === 'REVIEW' ? 'bg-[#D4AF37]' : 'bg-[#D4AF37]'}`} 
@@ -573,7 +573,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
       </div>
 
       {/* Mobile & Tablet Navigation Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 w-full bg-[#0F0B07]/90 backdrop-blur-xl border-t border-[rgba(255,255,255,0.05)] pb-safe z-40">
+      <div className="lg:hidden fixed bottom-0 left-0 w-full bg-[#0F0B07] border-t border-[rgba(255,255,255,0.05)] pb-safe z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           
           <button 
@@ -626,7 +626,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
       </div>
 
       {/* Desktop Navigation Bar (Redesigned) */}
-      <div className="hidden lg:flex fixed bottom-0 left-0 w-full bg-[#0F0B07]/90 backdrop-blur-xl border-t border-[rgba(255,255,255,0.05)] pb-safe z-40 flex-col items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+      <div className="hidden lg:flex fixed bottom-0 left-0 w-full bg-[#0F0B07] border-t border-[rgba(255,255,255,0.05)] pb-safe z-40 flex-col items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <div className="w-full max-w-5xl mx-auto px-8 py-5 flex flex-col gap-5">
           
           {/* Top Row: Prev | Counter | Next */}
