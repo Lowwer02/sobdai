@@ -169,6 +169,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[300px] h-32 bg-[#D4AF37] opacity-[0.03] blur-[50px] pointer-events-none"></div>
 
             <button 
+              type="button"
               onClick={onClose}
               className="absolute top-5 right-5 text-[#A1866B] hover:text-[#F5E9D6] transition-colors p-1 rounded-full hover:bg-[rgba(255,255,255,0.05)]"
             >
@@ -307,14 +308,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                 {mode === 'login' ? (
                   <p className="text-[#A1866B] text-[13px]">
                     ยังไม่มีบัญชีใช่ไหม?{' '}
-                    <button onClick={() => setMode('register')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
+                    <button type="button" onClick={() => setMode('register')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
                       สมัครสมาชิกฟรี
                     </button>
                   </p>
                 ) : (
                   <p className="text-[#A1866B] text-[13px]">
                     มีบัญชีอยู่แล้ว?{' '}
-                    <button onClick={() => setMode('login')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
+                    <button type="button" onClick={() => setMode('login')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
                       เข้าสู่ระบบ
                     </button>
                   </p>

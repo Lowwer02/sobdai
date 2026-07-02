@@ -250,7 +250,7 @@ export default async function ExamSetPage({
                   </li>
                 </ul>
 
-                <button className="w-full py-3 px-6 bg-orange-500/10 text-orange-500 font-bold rounded-xl group-hover:bg-orange-500 group-hover:text-[#1A140E] transition-all">
+                <button type="button" className="w-full py-3 px-6 bg-orange-500/10 text-orange-500 font-bold rounded-xl group-hover:bg-orange-500 group-hover:text-[#1A140E] transition-all">
                   เริ่มฝึกทำ
                 </button>
               </div>
@@ -292,7 +292,7 @@ export default async function ExamSetPage({
                   </li>
                 </ul>
 
-                <button className="w-full py-3 px-6 bg-blue-500/10 text-blue-500 font-bold rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
+                <button type="button" className="w-full py-3 px-6 bg-blue-500/10 text-blue-500 font-bold rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
                   เริ่มสอบ
                 </button>
               </div>

@@ -149,7 +149,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
               <span className="text-3xl font-display text-[#D4AF37] font-bold">{getInitials()}</span>
             )}
           </div>
-          <button 
+          <button type="button" 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             className="absolute bottom-0 right-0 p-2 bg-[#D4AF37] text-[#1A140E] rounded-full hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed" 
@@ -331,7 +331,7 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !isDeactivating && setIsDeactivateModalOpen(false)} />
           <div className="relative bg-[#1A140E] border border-red-900/50 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <button 
+            <button type="button" 
               onClick={() => !isDeactivating && setIsDeactivateModalOpen(false)}
               className="absolute top-4 right-4 text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
             >
@@ -352,14 +352,14 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
             </ul>
             
             <div className="flex gap-3 mt-8">
-              <button 
+              <button type="button" 
                 className="flex-1 px-4 py-3 bg-transparent border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-xl font-medium transition-colors"
                 onClick={() => setIsDeactivateModalOpen(false)}
                 disabled={isDeactivating}
               >
                 ยกเลิก
               </button>
-              <button 
+              <button type="button" 
                 className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleDeactivate}
                 disabled={isDeactivating}

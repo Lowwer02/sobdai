@@ -177,6 +177,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                 <h2 className="text-xl font-bold font-display text-[#F5E9D6]">Question Bank Picker</h2>
                 {questions.length > 0 && (
                   <button
+                    type="button"
                     onClick={handleSelectAll}
                     className="text-sm bg-[#1A140E] border border-[rgba(212,175,55,0.3)] text-[#D4AF37] px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
                   >
@@ -184,7 +185,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                   </button>
                 )}
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-2 text-[#A1866B] hover:text-white transition-colors">
+              <button type="button" onClick={() => setIsOpen(false)} className="p-2 text-[#A1866B] hover:text-white transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -274,6 +275,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
               </div>
               <div className="flex items-center gap-2">
                 <button 
+                  type="button"
                   onClick={() => setPage(p => p - 1)}
                   disabled={page <= 1 || loading}
                   className="px-3 py-1.5 rounded-lg bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50"
@@ -281,6 +283,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                   Prev
                 </button>
                 <button 
+                  type="button"
                   onClick={() => setPage(p => p + 1)}
                   disabled={page * 10 >= totalCount || loading}
                   className="px-3 py-1.5 rounded-lg bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50"

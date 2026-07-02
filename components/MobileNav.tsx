@@ -77,7 +77,7 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
         </Link>
 
         {/* Hamburger */}
-        <button
+        <button type="button"
           className="relative z-[60] p-2 text-[#F5E9D6] hover:text-[#D4AF37] transition-colors focus:outline-none"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label={menuOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
@@ -186,7 +186,7 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
             {/* Bottom Actions */}
             <div className="pt-6 border-t border-[rgba(255,255,255,0.05)] pb-safe">
               {user ? (
-                <button
+                <button type="button"
                   onClick={handleSignOutClick}
                   className="w-full py-3 px-4 text-left text-base font-medium text-red-400 rounded-lg hover:bg-red-400/10 transition-colors"
                 >
@@ -194,13 +194,13 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
                 </button>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <button
+                  <button type="submit"
                     onClick={() => { setMenuOpen(false); onLoginClick(); }}
                     className="w-full py-3 px-4 text-base font-medium text-[#F5E9D6] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.1)] rounded-lg hover:bg-[rgba(255,255,255,0.06)] transition-all"
                   >
                     เข้าสู่ระบบ
                   </button>
-                  <button
+                  <button type="submit"
                     onClick={() => { setMenuOpen(false); onRegisterClick(); }}
                     className="w-full py-3 px-4 text-base font-bold text-[#0F0B07] bg-gradient-to-r from-[#D4AF37] to-[#B38F24] rounded-lg shadow-lg shadow-[#D4AF37]/20 transition-all"
                   >

@@ -38,7 +38,7 @@ export default function GlobalError({
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
+            <button type="button"
               onClick={() => reset()}
               className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3.5 px-6 rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-[1.02] shadow-[0_0_20px_rgba(212,175,55,0.2)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/30"
             >

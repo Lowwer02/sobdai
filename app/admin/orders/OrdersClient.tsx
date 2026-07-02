@@ -117,7 +117,7 @@ export default function OrdersClient({
           <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Orders</h1>
           <p className="text-[#A1866B] mt-1">Manage purchases and package access.</p>
         </div>
-        <button 
+        <button type="button" 
           onClick={() => setIsModalOpen(true)}
           className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
         >
@@ -214,7 +214,7 @@ export default function OrdersClient({
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {order.status === ORDER_STATUS.PENDING && (
-                        <button 
+                        <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'complete' })}
                           disabled={actingOnId === order.id}
                           className="px-3 py-1.5 bg-[#22C55E]/10 text-[#22C55E] text-xs font-bold rounded hover:bg-[#22C55E]/20 transition-colors"
@@ -223,7 +223,7 @@ export default function OrdersClient({
                         </button>
                       )}
                       {(order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
-                        <button 
+                        <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'revoke' })}
                           disabled={actingOnId === order.id}
                           className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 disabled:opacity-50"
@@ -232,7 +232,7 @@ export default function OrdersClient({
                           {actingOnId === order.id ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
                         </button>
                       ) : order.status === 'revoked' ? (
-                        <button 
+                        <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'restore' })}
                           disabled={actingOnId === order.id}
                           className="p-2 text-[#A1866B] hover:text-green-500 transition-colors rounded-lg hover:bg-green-500/10 disabled:opacity-50"
@@ -258,14 +258,14 @@ export default function OrdersClient({
               Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
                 disabled={currentPage <= 1 || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
               >
                 <ChevronLeft size={16} />
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
                 disabled={currentPage >= totalPages || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
@@ -283,7 +283,7 @@ export default function OrdersClient({
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex justify-between items-center">
               <h3 className="text-lg font-bold font-display text-[#F5E9D6]">Grant Package Access</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-[#A1866B] hover:text-[#F5E9D6] transition-colors"><X size={20} /></button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-[#A1866B] hover:text-[#F5E9D6] transition-colors"><X size={20} /></button>
             </div>
             <form onSubmit={handleGrant} className="p-6 space-y-4">
               {error && <div className="p-3 bg-red-500/10 text-red-500 text-sm rounded-lg">{error}</div>}

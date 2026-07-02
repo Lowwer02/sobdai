@@ -12,7 +12,7 @@ export default function Forbidden() {
         ขออภัย คุณไม่มีสิทธิ์เข้าถึงหน้านี้ หรือบทบาทของคุณไม่เพียงพอสำหรับการใช้งานส่วนนี้
       </p>
       <Link href="/admin">
-        <button className="btn-primary flex items-center gap-2">
+        <button type="button" className="btn-primary flex items-center gap-2">
           กลับสู่แดชบอร์ด
         </button>
       </Link>

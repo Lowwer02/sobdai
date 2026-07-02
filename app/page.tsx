@@ -200,12 +200,12 @@ export default async function Home() {
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="#exams">
-              <button className="btn-primary" style={{ padding: '14px 32px', fontSize: '16px' }}>
+              <button type="button" className="btn-primary" style={{ padding: '14px 32px', fontSize: '16px' }}>
                 ดูชุดข้อสอบ
               </button>
             </Link>
             <Link href="#exams">
-              <button className="btn-outline" style={{ padding: '13px 28px', fontSize: '15px' }}>
+              <button type="button" className="btn-outline" style={{ padding: '13px 28px', fontSize: '15px' }}>
                 ทดลองทำฟรี
               </button>
             </Link>
@@ -271,7 +271,7 @@ export default async function Home() {
             </div>
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
               <Link href="#exams">
-                <button className="btn-outline" style={{ padding: '12px 28px' }}>
+                <button type="button" className="btn-outline" style={{ padding: '12px 28px' }}>
                   ดูชุดข้อสอบทั้งหมด
                 </button>
               </Link>
@@ -425,7 +425,7 @@ export default async function Home() {
             ซื้อชุดข้อสอบที่ต้องการ แล้วเริ่มทำได้ทันที ไม่ต้องรอ
           </p>
           <Link href="#exams">
-            <button
+            <button type="button"
               className="btn-primary animate-pulse-gold"
               style={{ padding: '14px 36px', fontSize: '16px' }}
             >

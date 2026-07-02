@@ -175,7 +175,7 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
               <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
             </div>
 
-            <button
+            <button type="button"
               onClick={handleFreeCheckout}
               disabled={loading}
               className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
@@ -202,7 +202,7 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
             <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">ช่องทางชำระเงิน</h2>
             
             <div className="flex gap-3 mb-6">
-              <button
+              <button type="button"
                 onClick={() => setPayMethod('card')}
                 className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
                   payMethod === 'card' 
@@ -213,7 +213,7 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
                 <CreditCard size={24} />
                 <span className="text-sm font-bold">บัตรเครดิต/เดบิต</span>
               </button>
-              <button
+              <button type="button"
                 onClick={() => setPayMethod('promptpay')}
                 className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
                   payMethod === 'promptpay' 
@@ -237,7 +237,7 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
               <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
             </div>
 
-            <button
+            <button type="button"
               onClick={payMethod === 'card' ? handleCardPayment : handlePromptPay}
               disabled={loading || !omiseLoaded}
               className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${

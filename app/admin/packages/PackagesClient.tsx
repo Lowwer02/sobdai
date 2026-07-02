@@ -38,7 +38,7 @@ export default function PackagesClient({ packages, currentUserRole }: { packages
         </div>
         
         <Link href="/admin/packages/create">
-          <button className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
+          <button type="submit" className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
             <Plus size={18} />
             Create Package
           </button>
@@ -56,7 +56,7 @@ export default function PackagesClient({ packages, currentUserRole }: { packages
             />
           </div>
           
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] rounded-xl text-[#A1866B] hover:text-[#F5E9D6] transition-colors">
+          <button type="button" className="flex items-center gap-2 px-4 py-2 bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] rounded-xl text-[#A1866B] hover:text-[#F5E9D6] transition-colors">
             <Filter size={18} />
             <span className="text-sm font-medium">Filter</span>
           </button>
@@ -120,12 +120,12 @@ export default function PackagesClient({ packages, currentUserRole }: { packages
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/admin/packages/${pkg.id}/edit`}>
-                        <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
+                        <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
                           <Edit size={16} />
                         </button>
                       </Link>
                       {currentUserRole === 'owner' && (
-                        <button 
+                        <button type="button" 
                           onClick={() => setDeleteModal({ isOpen: true, pkg })}
                           className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10" title="Delete">
                           <Archive size={16} />

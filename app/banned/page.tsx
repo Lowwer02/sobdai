@@ -26,7 +26,7 @@ export default function BannedPage() {
 
         <div className="space-y-3 relative z-10">
           <Link href="mailto:support@sobdai.com">
-            <button className="w-full py-3 px-4 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold rounded-xl transition-colors">
+            <button type="button" className="w-full py-3 px-4 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold rounded-xl transition-colors">
               ติดต่อทีมงาน
             </button>
           </Link>

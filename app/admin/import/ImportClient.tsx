@@ -125,7 +125,7 @@ export default function ImportClient() {
             ref={fileInputRef} 
             onChange={handleFileChange} 
           />
-          <button 
+          <button type="button" 
             onClick={() => fileInputRef.current?.click()}
             className="bg-[#0F0B07] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#D4AF37] px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors cursor-pointer"
           >
@@ -138,7 +138,7 @@ export default function ImportClient() {
       {step === 2 && (
         <div className="space-y-6">
           <div className="flex items-center gap-4">
-            <button onClick={resetPipeline} className="p-2 text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors">
+            <button type="button" onClick={resetPipeline} className="p-2 text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors">
               <ArrowLeft size={20} />
             </button>
             <h2 className="text-xl font-bold text-[#F5E9D6]">Parsing Results</h2>
@@ -166,7 +166,7 @@ export default function ImportClient() {
                 <FileText size={16} className="text-[#D4AF37]" />
                 {fileName}
               </div>
-              <button 
+              <button type="button" 
                 onClick={handleCommit}
                 disabled={isPending || validCount === 0}
                 className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm disabled:opacity-50"
@@ -234,7 +234,7 @@ export default function ImportClient() {
             </>
           )}
           
-          <button 
+          <button type="button" 
             onClick={resetPipeline}
             className="bg-[#0F0B07] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#D4AF37] px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors cursor-pointer"
           >

@@ -88,7 +88,7 @@ export default function ExamSetsClient({
         </div>
         
         <Link href="/admin/exam-sets/create">
-          <button className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
+          <button type="submit" className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
             <Plus size={18} />
             Create Exam Set
           </button>
@@ -188,11 +188,11 @@ export default function ExamSetsClient({
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/admin/exam-sets/${set.id}/edit`}>
-                        <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
+                        <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
                           <Edit size={16} />
                         </button>
                       </Link>
-                      <button 
+                      <button type="button" 
                         onClick={() => handleDeleteClick(set.id, set.name)}
                         className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10" 
                         title="Delete"
@@ -214,14 +214,14 @@ export default function ExamSetsClient({
               Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
                 disabled={currentPage <= 1 || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[rgba(255,255,255,0.05)] transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
                 disabled={currentPage >= totalPages || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[rgba(255,255,255,0.05)] transition-colors"

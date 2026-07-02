@@ -288,7 +288,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
               )}
             </nav>
             <div className="mt-6 pt-4 border-t border-[rgba(255,255,255,0.05)]">
-               <button 
+               <button type="button" 
                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                  className="text-xs font-bold text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
                >
@@ -301,7 +301,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
       </div>
 
       {/* Mobile TOC FAB */}
-      <button 
+      <button type="button" 
         onClick={() => setShowMobileTOC(true)}
         className="lg:hidden fixed bottom-6 right-6 z-40 bg-[#D4AF37] text-[#1A140E] w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(212,175,55,0.4)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50 active:scale-95 transition-transform"
         aria-label="เปิดสารบัญ"
@@ -334,7 +334,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
                 )}
               </nav>
             </div>
-            <button 
+            <button type="button" 
               onClick={() => setShowMobileTOC(false)}
               className="w-full bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] text-[#F5E9D6] font-bold py-3.5 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
             >

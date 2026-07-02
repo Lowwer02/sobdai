@@ -84,7 +84,7 @@ export default function OrganizationsClient({ organizations }: { organizations: 
                         >
                           <Edit size={18} />
                         </Link>
-                        <button 
+                        <button type="button" 
                           onClick={() => handleDelete(org.id, org.name)}
                           disabled={deletingId === org.id || isPending}
                           className="p-2 text-[#A1866B] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors disabled:opacity-50"
