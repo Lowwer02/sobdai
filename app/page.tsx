@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import Image from 'next/image'
+import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 
 interface PackageData {
@@ -21,7 +22,10 @@ interface PackageData {
   } | null
 }
 
-export const dynamic = 'force-dynamic'
+// Homepage shows public package data that changes infrequently.
+// Cache server-side (ISR) and revalidate every 5 minutes instead of
+// re-running the full Supabase query tree on every request.
+export const revalidate = 300
 
 const HOW_IT_WORKS = [
   {
@@ -94,7 +98,7 @@ export default async function Home() {
   let livePackages: PackageData[] = []
   
   try {
-    const supabase = await createClient()
+    const supabase = createAnonServerClient()
     const { data } = await supabase
       .from('packages')
       .select(`
@@ -471,8 +475,8 @@ function ExamCard({ pkg, index }: { pkg: PackageData; index: number }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {logoUrl ? (
-              <div style={{ width: 32, height: 32, borderRadius: '6px', overflow: 'hidden', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img src={logoUrl} alt={orgName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <div style={{ width: 32, height: 32, borderRadius: '6px', overflow: 'hidden', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                <Image src={logoUrl} alt={orgName} width={32} height={32} style={{ objectFit: 'contain' }} unoptimized />
               </div>
             ) : (
               <div style={{ width: 32, height: 32, borderRadius: '6px', backgroundColor: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1A140E', fontWeight: 'bold', fontSize: '14px' }}>
