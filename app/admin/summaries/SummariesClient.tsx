@@ -173,7 +173,7 @@ export default function SummariesClient({
                     <div className="text-[#F5E9D6] text-sm truncate max-w-[150px]">{summary.topic || summary.subject || '-'}</div>
                   </td>
                   <td className="p-4">
-                    <button 
+                    <button type="submit" 
                       onClick={() => handleTogglePublish(summary.id, summary.is_published)}
                       disabled={actingOnId === summary.id}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border transition-colors disabled:opacity-50 ${
@@ -196,7 +196,7 @@ export default function SummariesClient({
                       >
                         <Edit size={16} />
                       </Link>
-                      <button 
+                      <button type="button" 
                         onClick={() => setDeleteModal({ isOpen: true, summaryId: summary.id })}
                         disabled={actingOnId === summary.id}
                         className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 disabled:opacity-50"
@@ -219,14 +219,14 @@ export default function SummariesClient({
               Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
                 disabled={currentPage <= 1 || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
               >
                 <ChevronLeft size={16} />
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
                 disabled={currentPage >= totalPages || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"

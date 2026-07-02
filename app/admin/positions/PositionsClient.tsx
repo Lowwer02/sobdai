@@ -85,7 +85,7 @@ export default function PositionsClient({ positions }: { positions: any[] }) {
                         >
                           <Edit size={18} />
                         </Link>
-                        <button 
+                        <button type="button" 
                           onClick={() => handleDelete(pos.id, pos.name)}
                           disabled={deletingId === pos.id || isPending}
                           className="p-2 text-[#A1866B] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors disabled:opacity-50"

@@ -132,7 +132,7 @@ export default function ConfirmDialog({
           </div>
         </div>
         
-        <button 
+        <button type="button" 
           onClick={onClose}
           className="absolute top-4 right-4 text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
           aria-label="Close"

@@ -214,7 +214,7 @@ export default function UsersClient({
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {canManageRoles && user.role !== 'owner' && (
-                        <button 
+                        <button type="button" 
                           onClick={() => setStatusModal({ isOpen: true, user, newStatus: user.status === 'banned' ? 'active' : 'banned' })}
                           disabled={actingOnId === user.id}
                           className={`p-2 transition-colors rounded-lg disabled:opacity-50 ${
@@ -242,14 +242,14 @@ export default function UsersClient({
               Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
                 disabled={currentPage <= 1 || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
               >
                 <ChevronLeft size={16} />
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
                 disabled={currentPage >= totalPages || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"

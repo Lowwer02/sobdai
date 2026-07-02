@@ -88,7 +88,7 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
             
             {/* Profile Dropdown */}
             <div className="relative" ref={profileRef}>
-              <button 
+              <button type="button" 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.05)] transition-all focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
               >
@@ -123,7 +123,7 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
                   </div>
                   
                   <div className="py-2 border-t border-[rgba(255,255,255,0.05)]">
-                    <button
+                    <button type="button"
                       onClick={() => {
                         setIsProfileOpen(false)
                         onSignOut()
@@ -139,13 +139,13 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <button
+            <button type="submit"
               onClick={onLoginClick}
               className="px-4 py-2 text-sm font-medium text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
             >
               เข้าสู่ระบบ
             </button>
-            <button
+            <button type="button"
               onClick={onRegisterClick}
               className="px-5 py-2 text-sm font-bold text-[#0F0B07] bg-gradient-to-r from-[#D4AF37] to-[#B38F24] rounded-lg shadow-lg shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 hover:-translate-y-0.5 transition-all duration-200"
             >

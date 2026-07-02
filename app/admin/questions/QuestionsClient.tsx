@@ -154,7 +154,7 @@ export default function QuestionsClient({
         </div>
         
         <Link href="/admin/import">
-          <button className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
+          <button type="button" className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors">
             <Plus size={18} />
             Import Questions
           </button>
@@ -183,25 +183,25 @@ export default function QuestionsClient({
 
       {/* Quick Filter Chips */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button 
+        <button type="button" 
           onClick={() => updateParams({ status: '' })}
           className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${!statusFilter ? 'bg-[rgba(212,175,55,0.15)] border-[#D4AF37] text-[#D4AF37]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
         >
           All
         </button>
-        <button 
+        <button type="submit" 
           onClick={() => updateParams({ status: 'Published' })}
           className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${statusFilter === 'Published' ? 'bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
         >
           Published
         </button>
-        <button 
+        <button type="button" 
           onClick={() => updateParams({ status: 'Review' })}
           className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${statusFilter === 'Review' ? 'bg-[#EAB308]/20 border-[#EAB308] text-[#EAB308]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
         >
           Review
         </button>
-        <button 
+        <button type="button" 
           onClick={() => updateParams({ status: 'Draft' })}
           className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${statusFilter === 'Draft' ? 'bg-[rgba(255,255,255,0.15)] border-[rgba(255,255,255,0.3)] text-[#F5E9D6]' : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
         >
@@ -215,7 +215,7 @@ export default function QuestionsClient({
             <div className="font-bold text-[#F5E9D6]">
               Selected: {selectedIds.size} Questions
             </div>
-            <button 
+            <button type="button" 
               onClick={() => setSelectedIds(new Set())}
               className="text-sm text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
             >
@@ -223,21 +223,21 @@ export default function QuestionsClient({
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <button 
+            <button type="submit" 
               onClick={() => handleBulkAction('Published')}
               disabled={isBulking}
               className="bg-[#22C55E]/10 hover:bg-[#22C55E]/20 text-[#22C55E] px-3 py-1.5 rounded-lg text-sm font-bold border border-[#22C55E]/20 transition-colors"
             >
               Publish Selected
             </button>
-            <button 
+            <button type="button" 
               onClick={() => handleBulkAction('Review')}
               disabled={isBulking}
               className="bg-[#EAB308]/10 hover:bg-[#EAB308]/20 text-[#EAB308] px-3 py-1.5 rounded-lg text-sm font-bold border border-[#EAB308]/20 transition-colors"
             >
               Move to Review
             </button>
-            <button 
+            <button type="button" 
               onClick={() => handleBulkAction('Draft')}
               disabled={isBulking}
               className="bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.15)] text-[#A1866B] px-3 py-1.5 rounded-lg text-sm font-bold border border-[rgba(255,255,255,0.05)] transition-colors"
@@ -421,11 +421,12 @@ export default function QuestionsClient({
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/admin/questions/${q.id}`}>
-                        <button className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
+                        <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
                           <Edit size={16} />
                         </button>
                       </Link>
                       <button 
+                        type="button"
                         onClick={() => handleDeleteClick(q.id, q.content)}
                         className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10" 
                         title="Delete"
@@ -448,6 +449,7 @@ export default function QuestionsClient({
             </div>
             <div className="flex items-center gap-2">
               <button 
+                type="button"
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
                 disabled={currentPage <= 1 || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[rgba(255,255,255,0.05)] transition-colors"
@@ -455,6 +457,7 @@ export default function QuestionsClient({
                 <ChevronLeft size={16} />
               </button>
               <button 
+                type="button"
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
                 disabled={currentPage >= totalPages || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[rgba(255,255,255,0.05)] transition-colors"

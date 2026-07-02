@@ -54,7 +54,7 @@ export default function ToastContainer() {
               <div className="flex-1 text-[#F5E9D6] text-[14px] font-medium pr-2 leading-snug">
                 {toast.message}
               </div>
-              <button 
+              <button type="button" 
                 onClick={() => removeToast(toast.id)}
                 className="p-1 shrink-0 -mr-1 -mt-1 sm:mt-0 text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
                 aria-label="ปิดการแจ้งเตือน"

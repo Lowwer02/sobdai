@@ -177,7 +177,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
       const isCurrent = i === currentIndex
 
       return (
-        <button 
+        <button type="button" 
           key={question.id}
           onClick={() => setCurrentIndex(i)}
           className={`relative p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
@@ -224,7 +224,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
     return (
       <div key={letter} className="mb-3">
-        <button 
+        <button type="button" 
           onClick={() => handleSelect(letter)}
           disabled={status === 'REVIEW' || isAnsweredInPractice}
           className={`${btnClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]`}
@@ -294,7 +294,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
                 </div>
                 
                 {q.full_explanation.length > 150 && (
-                  <button 
+                  <button type="button" 
                     onClick={() => setIsExplanationExpanded(!isExplanationExpanded)}
                     className="mt-3 text-[#D4AF37] text-sm font-bold flex items-center gap-1 hover:text-[#F1D17A] transition-colors focus-visible:outline-none"
                   >
@@ -350,10 +350,10 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
           </div>
 
           <div className="flex gap-3">
-            <button onClick={handleCancelSubmit} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]">
+            <button type="submit" onClick={handleCancelSubmit} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]">
               ทำต่อ
             </button>
-            <button onClick={handleForceSubmit} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            <button type="button" onClick={handleForceSubmit} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               ส่งข้อสอบ
             </button>
           </div>
@@ -439,7 +439,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
           )}
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <button onClick={() => setCurrentIndex(0)} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            <button type="button" onClick={() => setCurrentIndex(0)} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <BookOpen size={18} />
               ดูเฉลยอย่างละเอียด
             </button>
@@ -489,7 +489,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             )}
             
             {status === 'IN_PROGRESS' && (
-              <button 
+              <button type="button" 
                 onClick={handleRequestSubmit} 
                 className="hidden sm:flex bg-transparent hover:bg-[rgba(255,255,255,0.05)] text-[#D4AF37] border border-[rgba(212,175,55,0.3)] px-4 py-1.5 rounded-lg text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
               >
@@ -516,7 +516,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
               )}
             </div>
             {status === 'IN_PROGRESS' && (
-              <button 
+              <button type="button" 
                 onClick={toggleFlag}
                 className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-md border transition-colors ${flagged[q.id] ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-transparent border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
               >
@@ -576,7 +576,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
       <div className="lg:hidden fixed bottom-0 left-0 w-full bg-[#0F0B07] border-t border-[rgba(255,255,255,0.05)] pb-safe z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           
-          <button 
+          <button type="button" 
             onClick={goPrev} 
             disabled={currentIndex === 0}
             className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl transition-colors ${currentIndex === 0 ? 'text-[#A1866B] opacity-50 cursor-not-allowed' : 'text-[#F5E9D6] hover:bg-[#1A140E]'}`}
@@ -594,7 +594,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
           <div className="flex items-center gap-2">
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
-              <button 
+              <button type="button" 
                 onClick={handleRequestSubmit} 
                 className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${mode === 'practice' && !answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
                 disabled={mode === 'practice' && !answers[q.id]}
@@ -602,7 +602,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
                 {mode === 'practice' ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}
               </button>
             ) : status === 'IN_PROGRESS' && mode === 'practice' ? (
-              <button 
+              <button type="button" 
                 onClick={goNext} 
                 disabled={!answers[q.id]}
                 className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${!answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)]' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] shadow-[0_4px_15px_rgba(212,175,55,0.3)]'}`}
@@ -611,7 +611,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
                 <ChevronRight size={18} className="sm:hidden" />
               </button>
             ) : (
-              <button 
+              <button type="button" 
                 onClick={goNext} 
                 disabled={currentIndex === questions.length - 1}
                 className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${currentIndex === questions.length - 1 ? 'text-[#A1866B] opacity-50 cursor-not-allowed' : 'bg-transparent text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)]'}`}
@@ -631,7 +631,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
           
           {/* Top Row: Prev | Counter | Next */}
           <div className="flex items-center justify-between w-full">
-            <button 
+            <button type="button" 
               onClick={goPrev} 
               disabled={currentIndex === 0}
               className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${currentIndex === 0 ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
@@ -645,7 +645,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             </div>
 
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
-              <button 
+              <button type="button" 
                 onClick={handleRequestSubmit} 
                 disabled={mode === 'practice' && !answers[q.id]}
                 className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${mode === 'practice' && !answers[q.id] ? 'border-[rgba(255,255,255,0.1)] text-[#A1866B] opacity-50 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
@@ -654,7 +654,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
                 <CheckCircle size={18} className={mode === 'practice' && !answers[q.id] ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
               </button>
             ) : (
-              <button 
+              <button type="button" 
                 onClick={goNext} 
                 disabled={mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1}
                 className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1) ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}

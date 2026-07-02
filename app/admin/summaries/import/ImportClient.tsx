@@ -160,7 +160,7 @@ export default function ImportClient() {
             ref={fileInputRef} 
             onChange={handleFileChange} 
           />
-          <button 
+          <button type="button" 
             onClick={() => fileInputRef.current?.click()}
             className="bg-[#0F0B07] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#D4AF37] px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors cursor-pointer"
           >
@@ -177,7 +177,7 @@ export default function ImportClient() {
                 <FileText size={16} className="text-[#D4AF37]" />
                 {fileName}
               </div>
-              <button 
+              <button type="button" 
                 onClick={handleValidate}
                 disabled={isPending || !parsedData.isValid}
                 className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm disabled:opacity-50"
@@ -196,7 +196,7 @@ export default function ImportClient() {
                   <ul className="list-disc list-inside text-red-400 space-y-1 text-sm">
                     {parsedData.errors.map((e, i) => <li key={i}>{e}</li>)}
                   </ul>
-                  <button onClick={resetPipeline} className="mt-6 text-sm underline text-red-400">Try another file</button>
+                  <button type="button" onClick={resetPipeline} className="mt-6 text-sm underline text-red-400">Try another file</button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -286,7 +286,7 @@ export default function ImportClient() {
                </div>
                <h2 className="text-xl font-bold text-[#F5E9D6] mb-2">Validation Failed</h2>
                <p className="text-[#A1866B] mb-6">{valResult.error}</p>
-               <button onClick={resetPipeline} className="px-6 py-2 bg-[#0F0B07] text-[#A1866B] rounded-lg border border-[rgba(255,255,255,0.1)] hover:text-[#F5E9D6]">Start Over</button>
+               <button type="button" onClick={resetPipeline} className="px-6 py-2 bg-[#0F0B07] text-[#A1866B] rounded-lg border border-[rgba(255,255,255,0.1)] hover:text-[#F5E9D6]">Start Over</button>
             </div>
           ) : (
             <div>
@@ -325,8 +325,8 @@ export default function ImportClient() {
               )}
 
               <div className="flex justify-end gap-3">
-                <button onClick={resetPipeline} className="px-5 py-2 text-[#A1866B] hover:text-[#F5E9D6] transition-colors">Cancel</button>
-                <button 
+                <button type="button" onClick={resetPipeline} className="px-5 py-2 text-[#A1866B] hover:text-[#F5E9D6] transition-colors">Cancel</button>
+                <button type="button" 
                   onClick={handleCommit}
                   disabled={isPending}
                   className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
@@ -355,7 +355,7 @@ export default function ImportClient() {
               </div>
               
               <div className="flex gap-4">
-                <button 
+                <button type="button" 
                   onClick={resetPipeline}
                   className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] px-6 py-2.5 rounded-xl font-bold transition-colors"
                 >
@@ -378,7 +378,7 @@ export default function ImportClient() {
               <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-sm font-medium w-full max-w-md text-left mb-8">
                 {importSummary.error}
               </div>
-              <button onClick={resetPipeline} className="bg-[#0F0B07] text-[#A1866B] px-6 py-2 rounded-xl">Try Again</button>
+              <button type="button" onClick={resetPipeline} className="bg-[#0F0B07] text-[#A1866B] px-6 py-2 rounded-xl">Try Again</button>
             </>
           )}
         </div>

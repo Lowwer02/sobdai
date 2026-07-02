@@ -212,14 +212,14 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
 
               {isPurchased ? (
                 <Link href="#resources" className="block w-full">
-                  <button className="w-full bg-[#22C55E] hover:bg-[#1EA950] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(34,197,94,0.15)] font-display">
+                  <button type="button" className="w-full bg-[#22C55E] hover:bg-[#1EA950] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(34,197,94,0.15)] font-display">
                     <PlayCircle size={18} />
                     เริ่มเรียน
                   </button>
                 </Link>
               ) : (
                 <Link href={`/checkout/${pkg.id}`} className="block w-full">
-                  <button className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display">
+                  <button type="button" className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display">
                     <Lock size={18} />
                     ซื้อแพ็กเกจนี้
                   </button>
