@@ -1,7 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Proxy (Next.js 16 name for middleware) — runs before a request completes.
+ *
+ * Per Next.js guidance, proxy is for OPTIMISTIC checks only and should NOT be
+ * used for slow data fetching or full authorization. We therefore:
+ *   - Only match `/admin/*` (public pages are not proxied at all → no auth
+ *     round-trip on the homepage or any public route).
+ *   - Do a cheap, cookie-based session presence check (no network call). The
+ *     authoritative auth + role check still happens server-side in
+ *     `app/admin/layout.tsx` via `getAdminSession()`.
+ *
+ * This keeps TTFB on public pages fast while still redirecting unauthenticated
+ * users away from `/admin` before the page starts rendering.
+ */
 export async function proxy(request: NextRequest) {
+  // Short-circuit when Supabase isn't configured (e.g. local placeholder env).
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://dummy.supabase.co') {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,39 +44,21 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  let user = null;
-  // Skip calling Supabase if using dummy URL to prevent hanging
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
-  }
+  // Optimistic check only: refresh the session cookies if needed, but do NOT
+  // await getUser() (a network round-trip) on every request. getSession() reads
+  // the local JWT from cookies and is sufficient for an optimistic redirect.
+  const { data: { session } } = await supabase.auth.getSession()
 
-  // Protect admin routes
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (!user) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', request.nextUrl.pathname)
-      return NextResponse.redirect(loginUrl)
-    }
-
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dummy.supabase.co') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile || profile.role === 'user') {
-        return NextResponse.redirect(new URL('/', request.url)) // Redirect to home if user
-      }
-    }
+  if (!session) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
   return supabaseResponse
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  // Only run proxy on admin routes. Public pages bypass proxy entirely.
+  matcher: ['/admin/:path*'],
 }

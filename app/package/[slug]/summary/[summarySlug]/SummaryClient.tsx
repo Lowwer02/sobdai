@@ -87,7 +87,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
     <div className="min-h-screen pb-20 font-sans selection:bg-[#D4AF37]/30 selection:text-[#F5E9D6]" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       
       {/* Top Navigation */}
-      <div className="sticky top-0 z-50 bg-[#0F0B07]/80 backdrop-blur-xl border-b border-[rgba(212,175,55,0.1)]">
+      <div className="sticky top-0 z-50 bg-[#0F0B07] border-b border-[rgba(212,175,55,0.1)]">
         {/* Progress Bar */}
         <div className="absolute top-0 left-0 h-[2px] bg-[#D4AF37] transition-all duration-150 ease-out z-50" style={{ width: `${scrollProgress}%` }} />
         

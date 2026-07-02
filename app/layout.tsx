@@ -7,7 +7,11 @@ import Footer from '@/components/Footer'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  // Only ship the weights actually used in the UI. Audited usage:
+  // font-normal(400), font-medium(500), font-semibold(600), font-bold(700).
+  // '300' (font-light) was loaded but never referenced — dropped to cut
+  // the Thai-subset font payload (~20% smaller).
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sarabun',
   display: 'swap',
 })
@@ -37,6 +41,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="th" className={sarabun.variable}>
+      <head>
+        {/* Preload the Supermarket display font (used on headings/hero) so it
+            doesn't block first meaningful paint. next/font handles Sarabun
+            automatically, but Supermarket is loaded via @font-face in CSS. */}
+        <link rel="preload" href="/fonts/supermarket.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body className={`${sarabun.className} min-h-screen flex flex-col`}>
         <Navbar />
         <main className="flex-grow">{children}</main>

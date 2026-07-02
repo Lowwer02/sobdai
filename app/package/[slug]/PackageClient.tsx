@@ -88,11 +88,13 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
               <div className="flex flex-col sm:flex-row gap-6 relative z-10">
                 <div className="w-36 h-48 bg-white rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-[rgba(212,175,55,0.3)] shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
                   {logoUrl ? (
-                    <img 
-                      src={logoUrl} 
-                      alt={`${orgName} Logo`} 
+                    <Image
+                      src={logoUrl}
+                      alt={`${orgName} Logo`}
+                      width={144}
+                      height={192}
                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      className="p-4" 
+                      className="p-4"
                     />
                   ) : (
                     <div className="text-[#D4AF37] font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>

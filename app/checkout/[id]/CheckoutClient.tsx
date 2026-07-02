@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft, ShieldCheck, CreditCard, QrCode } from 'lucide-react'
 
 interface CheckoutClientProps {
@@ -104,7 +105,7 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
     <div className="min-h-screen bg-[#0F0B07] font-sans pb-20">
       
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0F0B07]/80 backdrop-blur-xl border-b border-[rgba(212,175,55,0.1)] h-16 flex items-center px-4">
+      <div className="sticky top-0 z-50 bg-[#0F0B07] border-b border-[rgba(212,175,55,0.1)] h-16 flex items-center px-4">
         <div className="max-w-2xl mx-auto w-full flex items-center gap-4">
           <Link href={`/package/${pkg.slug}`} className="text-[#A1866B] hover:text-[#D4AF37] transition-colors p-2 -ml-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
             <ChevronLeft size={20} />
@@ -122,7 +123,7 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
           <div className="flex gap-4 items-start mb-6">
             <div className="w-12 h-12 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] flex items-center justify-center p-2 flex-shrink-0">
               {pkg.organizations?.logo_url ? (
-                <img src={pkg.organizations.logo_url} alt="logo" className="w-full h-full object-contain" />
+                <Image src={pkg.organizations.logo_url} alt="logo" width={48} height={48} className="w-full h-full object-contain" />
               ) : (
                 <span className="text-xl font-display font-bold text-[#D4AF37]">{pkg.organizations?.name?.charAt(0) || 'O'}</span>
               )}

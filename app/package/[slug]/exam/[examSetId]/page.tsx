@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, Clock, FileText, ChevronRight, Activity, Zap } from 'lucide-react'
@@ -7,14 +6,9 @@ import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, examSetId: string }> }) {
-  const { slug, examSetId } = await params
-  
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return cookieStore.getAll() } } }
-  )
+  const { examSetId } = await params
+
+  const supabase = await createClient()
 
   const { data: examSet } = await supabase
     .from('exam_sets')
@@ -30,33 +24,32 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-export default async function ExamSetPage({ 
-  params, 
-  searchParams 
-}: { 
+export default async function ExamSetPage({
+  params,
+  searchParams
+}: {
   params: Promise<{ slug: string, examSetId: string }>,
   searchParams: Promise<{ mode?: string }>
 }) {
   const { slug, examSetId } = await params
   const { mode } = await searchParams
-  
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return cookieStore.getAll() } } }
-  )
 
-  // 1. Fetch Package
-  const { data: pkg } = await supabase
-    .from('packages')
-    .select('id, name, slug, positions(name), organizations(name)')
-    .eq('slug', slug)
-    .single()
+  const supabase = await createClient()
 
+  // 1. Fetch package + current user in parallel (independent of each other).
+  const [pkgResult, userResult] = await Promise.all([
+    supabase
+      .from('packages')
+      .select('id, name, slug, positions(name), organizations(name)')
+      .eq('slug', slug)
+      .single(),
+    supabase.auth.getUser(),
+  ])
+
+  const pkg = pkgResult.data
   if (!pkg) return notFound()
 
-  // 2. Fetch Exam Set
+  // 2. Fetch exam set (depends on pkg.id).
   const { data: examSet } = await supabase
     .from('exam_sets')
     .select('*')
@@ -66,31 +59,65 @@ export default async function ExamSetPage({
 
   if (!examSet) return notFound()
 
-  // 3. Auth Check
-  const { data: { user } } = await supabase.auth.getUser()
-
+  // 3. Auth check
+  const user = userResult.data.user
   if (!user) {
     redirect(`/login?redirect=/package/${slug}/exam/${examSetId}`)
   }
 
-  // 4. Access Control (Check if user bought the package, unless it's a sample)
-  if (!examSet.is_sample) {
-    let hasAccess = false
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile && ['admin', 'owner', 'editor', 'support'].includes(profile.role)) {
-      hasAccess = true
-    } else {
-      const { data: order } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('package_id', pkg.id)
-        .in('status', ORDER_COMPLETED_STATUSES)
-        .maybeSingle()
-      if (order) hasAccess = true
-    }
+  // 4. Access control + question fetch, in parallel.
+  //    - profile and order together determine access (for non-sample sets).
+  //    - questions are needed regardless of mode, so start them now.
+  //    Running these three at once collapses 2-3 sequential round-trips into one.
+  const needsAccessCheck = !examSet.is_sample
+  const [profileResult, orderResult, questionsResult] = await Promise.all([
+    needsAccessCheck
+      ? supabase.from('profiles').select('role').eq('id', user.id).single()
+      : Promise.resolve({ data: null }),
+    // order only matters when not staff; fetch anyway to keep it parallel
+    needsAccessCheck
+      ? supabase
+          .from('orders')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('package_id', pkg.id)
+          .in('status', ORDER_COMPLETED_STATUSES)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from('exam_set_questions')
+      .select(`
+        sort_order,
+        questions (
+          id,
+          content,
+          choice_a,
+          choice_b,
+          choice_c,
+          choice_d,
+          correct_answer,
+          hint,
+          full_explanation,
+          why_a_wrong,
+          why_b_wrong,
+          why_c_wrong,
+          why_d_wrong,
+          reference,
+          subject,
+          law,
+          topic
+        )
+      `)
+      .eq('exam_set_id', examSetId)
+      .order('sort_order', { ascending: true }),
+  ])
 
-    if (!hasAccess) {
+  if (needsAccessCheck) {
+    const profile = profileResult.data
+    const staffRoles = ['admin', 'owner', 'editor', 'support']
+    const isStaff = profile && staffRoles.includes(profile.role)
+    const hasOrder = Boolean(orderResult.data)
+    if (!isStaff && !hasOrder) {
       return (
         <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
@@ -113,34 +140,9 @@ export default async function ExamSetPage({
     }
   }
 
-  // 5. Fetch Questions
-  // using inner join on exam_set_questions
-  const { data: esq, error: qError } = await supabase
-    .from('exam_set_questions')
-    .select(`
-      sort_order,
-      questions (
-        id,
-        content,
-        choice_a,
-        choice_b,
-        choice_c,
-        choice_d,
-        correct_answer,
-        hint,
-        full_explanation,
-        why_a_wrong,
-        why_b_wrong,
-        why_c_wrong,
-        why_d_wrong,
-        reference,
-        subject,
-        law,
-        topic
-      )
-    `)
-    .eq('exam_set_id', examSetId)
-    .order('sort_order', { ascending: true })
+  // 5. Questions (fetched in parallel above).
+  const esq = questionsResult.data
+  const qError = questionsResult.error
 
   if (qError || !esq || esq.length === 0) {
     return (
