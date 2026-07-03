@@ -162,13 +162,6 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
                   >
                     คำสั่งซื้อ
                   </Link>
-                  <Link
-                    href="/history"
-                    onClick={() => setMenuOpen(false)}
-                    className="px-4 py-3 text-base font-medium text-[#F5E9D6] rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors"
-                  >
-                    ประวัติ
-                  </Link>
                   
                   {isAdmin && (
                     <Link 

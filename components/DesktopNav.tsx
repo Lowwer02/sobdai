@@ -82,9 +82,6 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
             <Link href="/orders" className="text-sm font-medium text-[#A1866B] hover:text-[#D4AF37] transition-colors hidden lg:block">
               คำสั่งซื้อ
             </Link>
-            <Link href="/history" className="text-sm font-medium text-[#A1866B] hover:text-[#D4AF37] transition-colors hidden lg:block">
-              ประวัติ
-            </Link>
             
             {/* Profile Dropdown */}
             <div className="relative" ref={profileRef}>
@@ -110,9 +107,6 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
                     </Link>
                     <Link href="/orders" onClick={() => setIsProfileOpen(false)} className="block lg:hidden px-4 py-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
                       คำสั่งซื้อ
-                    </Link>
-                    <Link href="/history" onClick={() => setIsProfileOpen(false)} className="block lg:hidden px-4 py-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
-                      ประวัติ
                     </Link>
                     
                     {isAdmin && (
