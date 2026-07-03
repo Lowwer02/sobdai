@@ -1,11 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Clock, Calendar, BookOpen, PenTool, LayoutList } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
+import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 
 interface SummaryClientProps {
   pkg: any
@@ -24,11 +22,13 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
   const relatedSummaries = allSummaries.filter(s => s.id !== summary.id).slice(0, 3)
 
   useEffect(() => {
-    // Basic extraction of headings from markdown for TOC
+    // Extract H2/H3/H4 headings from markdown for the table of contents.
+    // The id here must match slugifyChildren() in SummaryMarkdown so TOC
+    // anchors resolve to the rendered heading.
     const lines = summary.content_md.split('\n')
     const extracted = []
     for (const line of lines) {
-      const match = line.match(/^(#{2,3})\s+(.+)$/)
+      const match = line.match(/^(#{2,4})\s+(.+)$/)
       if (match) {
          const level = match[1].length
          const text = match[2].replace(/\[|\]|\*|_/g, '').trim()
@@ -38,6 +38,19 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
     }
     setHeadings(extracted)
   }, [summary.content_md])
+
+  // Smooth-scroll to a heading with an offset so the sticky navbar does not
+  // cover the heading. Uses scrollIntoView for smoothness + a manual offset
+  // correction since CSS scroll-mt only applies to native anchor jumps.
+  const handleTocClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault()
+    const el = document.getElementById(id)
+    if (!el) return
+    const top = el.getBoundingClientRect().top + window.scrollY - 90 // navbar height + breathing room
+    window.scrollTo({ top, behavior: 'smooth' })
+    // Update hash without jumping, for shareability + back-button support.
+    history.replaceState(null, '', `#${id}`)
+  }, [])
 
   // Scroll Progress
   useEffect(() => {
@@ -104,9 +117,9 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 flex flex-col lg:flex-row gap-12 items-start">
-        
+
         {/* Main Content */}
-        <main className="flex-1 w-full max-w-3xl mx-auto lg:mx-0">
+        <main className="flex-1 w-full max-w-[680px] mx-auto lg:mx-0">
           
           <header className="mb-12 text-center lg:text-left">
             {/* Meta tags */}
@@ -139,68 +152,8 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
             </div>
           </header>
 
-          <article className="prose prose-invert prose-yellow max-w-none w-full overflow-hidden sm:overflow-visible prose-headings:font-display prose-headings:tracking-tight prose-a:text-[#D4AF37] prose-a:no-underline hover:prose-a:underline prose-img:rounded-2xl prose-img:border prose-img:border-[rgba(255,255,255,0.1)]">
-             <ReactMarkdown 
-               remarkPlugins={[remarkGfm]} 
-               rehypePlugins={[rehypeRaw]}
-               components={{
-                 h2: ({node, ...props}) => {
-                   const id = String(props.children).toLowerCase().replace(/[^a-z0-9ก-๙]+/g, '-').replace(/(^-|-$)+/g, '')
-                   return <h2 id={id} className="scroll-mt-24 text-2xl font-bold mt-12 mb-6 text-[#F5E9D6] border-b border-[rgba(255,255,255,0.05)] pb-4" {...props} />
-                 },
-                 h3: ({node, ...props}) => {
-                   const id = String(props.children).toLowerCase().replace(/[^a-z0-9ก-๙]+/g, '-').replace(/(^-|-$)+/g, '')
-                   return <h3 id={id} className="scroll-mt-24 text-xl font-bold mt-8 mb-4 text-[#F5E9D6]" {...props} />
-                 },
-                 blockquote: ({node, ...props}) => {
-                   // Custom Callouts (if text starts with [!NOTE] etc)
-                   const text = String(props.children)
-                   if (text.includes('[!NOTE]') || text.includes('[!TIP]') || text.includes('[!IMPORTANT]') || text.includes('[!WARNING]')) {
-                     const isWarning = text.includes('[!WARNING]')
-                     const isImportant = text.includes('[!IMPORTANT]')
-                     return (
-                       <div className={`p-4 rounded-xl border-l-4 my-6 ${isWarning ? 'bg-red-500/10 border-red-500 text-red-200' : isImportant ? 'bg-purple-500/10 border-purple-500 text-purple-200' : 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#F5E9D6]'}`}>
-                         <div className="font-bold mb-2 flex items-center gap-2">
-                            {isWarning ? '⚠️ คำเตือน' : isImportant ? '✨ ข้อควรระวัง' : '💡 หมายเหตุ'}
-                         </div>
-                         <div className="text-sm opacity-90 leading-relaxed">
-                           {props.children}
-                         </div>
-                       </div>
-                     )
-                   }
-                   return <blockquote className="border-l-4 border-[#A1866B] pl-4 italic text-[#A1866B] my-6" {...props} />
-                 },
-                 table: ({node, ...props}) => (
-                   <div className="overflow-x-auto my-8 rounded-xl border border-[rgba(255,255,255,0.05)]">
-                     <table className="w-full text-left text-sm" {...props} />
-                   </div>
-                 ),
-                 th: ({node, ...props}) => <th className="bg-[#1A140E] p-4 text-[#F5E9D6] font-bold border-b border-[rgba(255,255,255,0.05)]" {...props} />,
-                 td: ({node, ...props}) => <td className="p-4 border-b border-[rgba(255,255,255,0.05)] bg-[#0F0B07] text-[#A1866B]" {...props} />,
-                 code: ({node, className, children, ...props}) => {
-                   const match = /language-(\w+)/.exec(className || '')
-                   const isInline = !match && !String(children).includes('\n')
-                   return isInline ? (
-                     <code className="bg-[#1A140E] text-[#D4AF37] px-1.5 py-0.5 rounded-md text-[0.9em] border border-[rgba(212,175,55,0.2)]" {...props}>
-                       {children}
-                     </code>
-                   ) : (
-                     <code className={className} {...props}>
-                       {children}
-                     </code>
-                   )
-                 },
-                 pre: ({node, ...props}) => (
-                   <div className="relative group my-6">
-                     <div className="absolute -top-3 left-4 px-2 bg-[#0F0B07] text-[#A1866B] text-[10px] font-bold uppercase tracking-wider">โค้ด</div>
-                     <pre className="bg-[#1A140E] p-4 rounded-xl border border-[rgba(255,255,255,0.05)] overflow-x-auto text-[13px] leading-relaxed text-[#F5E9D6]" {...props} />
-                   </div>
-                 )
-               }}
-             >
-               {summary.content_md}
-             </ReactMarkdown>
+          <article className="max-w-none w-full">
+             <SummaryMarkdown content={summary.content_md} />
           </article>
 
           {/* Bottom Actions */}
@@ -276,10 +229,12 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
             </h4>
             <nav className="space-y-1.5 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
               {headings.length > 0 ? headings.map((h, i) => (
-                <a 
-                  key={i} 
+                <a
+                  key={i}
                   href={`#${h.id}`}
-                  className={`block text-[13px] leading-snug py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-[#D4AF37] rounded px-1 -mx-1 ${h.id === activeHeadingId ? 'text-[#D4AF37] font-bold' : 'text-[#A1866B] hover:text-[#F5E9D6]'} ${h.level === 3 ? 'pl-5 text-[12px] opacity-80' : ''}`}
+                  onClick={(e) => handleTocClick(e, h.id)}
+                  aria-label={`ไปที่หัวข้อ ${h.text}`}
+                  className={`block text-[13px] leading-snug py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-[#D4AF37] rounded px-1 -mx-1 ${h.id === activeHeadingId ? 'text-[#D4AF37] font-bold' : 'text-[#A1866B] hover:text-[#F5E9D6]'} ${h.level === 4 ? 'pl-7 text-[12px] opacity-70' : h.level === 3 ? 'pl-5 text-[12px] opacity-80' : ''}`}
                 >
                   {h.text}
                 </a>
@@ -321,11 +276,12 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
             <div className="flex-1 overflow-y-auto custom-scrollbar mb-4">
               <nav className="space-y-1">
                 {headings.length > 0 ? headings.map((h, i) => (
-                  <a 
-                    key={i} 
+                  <a
+                    key={i}
                     href={`#${h.id}`}
-                    onClick={() => setShowMobileTOC(false)}
-                    className={`block leading-snug py-2.5 rounded-lg px-3 transition-colors ${h.id === activeHeadingId ? 'bg-[#D4AF37]/10 text-[#D4AF37] font-bold' : 'text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.02)]'} ${h.level === 3 ? 'pl-8 text-[13px]' : 'text-[14px]'}`}
+                    onClick={(e) => { handleTocClick(e, h.id); setShowMobileTOC(false) }}
+                    aria-label={`ไปที่หัวข้อ ${h.text}`}
+                    className={`block leading-snug py-2.5 rounded-lg px-3 transition-colors ${h.id === activeHeadingId ? 'bg-[#D4AF37]/10 text-[#D4AF37] font-bold' : 'text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.02)]'} ${h.level === 4 ? 'pl-10 text-[12px]' : h.level === 3 ? 'pl-8 text-[13px]' : 'text-[14px]'}`}
                   >
                     {h.text}
                   </a>

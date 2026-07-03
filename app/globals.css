@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* GitHub alert base (blockquote structure + icon mask only; colors overridden
+   below in the Sobdai palette). */
+@import "remark-github-alerts/styles/github-base.css";
 
 /* ===================== Fonts ===================== */
 @font-face {
@@ -450,3 +453,77 @@ h1, h2, h3, .heading {
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
+
+/* ===================== Summary / Markdown Content ===================== */
+/* GitHub-style alerts produced by remark-github-alerts, themed to the Sobdai
+   palette. Two color groups: NOTE/TIP/IMPORTANT = gold, WARNING/CAUTION = red.
+   The plugin emits <blockquote class="markdown-alert markdown-alert-{type}">
+   with a .markdown-alert-title child carrying the icon (via CSS mask). */
+
+.summary-content .markdown-alert {
+  padding: 0.75rem 1.25rem;
+  margin: 1.5rem 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  border-left-width: 0.25rem;
+  border-left-style: solid;
+}
+
+/* Gold group: NOTE, TIP, IMPORTANT */
+.summary-content .markdown-alert-note,
+.summary-content .markdown-alert-tip,
+.summary-content .markdown-alert-important {
+  border-left-color: var(--gold);
+  background: rgba(212, 175, 55, 0.06);
+}
+.summary-content .markdown-alert-note .markdown-alert-title,
+.summary-content .markdown-alert-tip .markdown-alert-title,
+.summary-content .markdown-alert-important .markdown-alert-title {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* Red group: WARNING, CAUTION */
+.summary-content .markdown-alert-warning,
+.summary-content .markdown-alert-caution {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+}
+.summary-content .markdown-alert-warning .markdown-alert-title,
+.summary-content .markdown-alert-caution .markdown-alert-title {
+  color: #f87171;
+  font-weight: 700;
+}
+
+/* Body text inside alerts stays readable but slightly de-emphasized */
+.summary-content .markdown-alert p {
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+.summary-content .markdown-alert > :last-child {
+  margin-bottom: 0;
+}
+
+/* Thai label overlay for the alert title — the plugin's title comes through as
+   the English word (e.g. "Note"). We keep the plugin icon but restyle the
+   title text to match the card. The icon mask inherits currentColor. */
+.summary-content .markdown-alert .markdown-alert-title .octicon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* Custom scrollbar for TOC + code blocks (kept light) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.2);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.4);
+}
+
