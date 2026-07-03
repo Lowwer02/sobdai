@@ -111,7 +111,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     setTimeUsed(initialTime - Math.max(0, timeRemaining))
     calculateResults()
     setStatus('REVIEW')
-    setCurrentIndex(0)
+    setCurrentIndex(-1)
   }
 
   const calculateResults = () => {
