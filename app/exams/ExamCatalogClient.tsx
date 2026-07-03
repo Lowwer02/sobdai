@@ -12,11 +12,11 @@ const FILTER_OPTIONS = [
   { value: 'latest', label: 'ล่าสุด' },
 ]
 
-interface PackageCatalogClientProps {
+interface ExamCatalogClientProps {
   packages: PackageCardData[]
 }
 
-export default function PackageCatalogClient({ packages }: PackageCatalogClientProps) {
+export default function ExamCatalogClient({ packages }: ExamCatalogClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
 
@@ -62,10 +62,10 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
               backgroundClip: 'text',
             }}
           >
-            แพ็กเกจข้อสอบทั้งหมด
+            ชุดข้อสอบทั้งหมด
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '480px', margin: '0 auto' }}>
-            เลือกชุดข้อสอบตามกรมและตำแหน่งที่ต้องการ
+            ค้นหาชุดข้อสอบและเริ่มฝึกทำข้อสอบได้จากที่นี่
           </p>
         </header>
 
@@ -76,7 +76,7 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
             <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder="ค้นหาแพ็กเกจ, กรม, หรือตำแหน่ง..."
+              placeholder="ค้นหาชุดข้อสอบ, กรม, หรือตำแหน่ง..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full"
@@ -93,12 +93,12 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
                 outline: 'none',
                 transition: 'border-color 0.2s',
               }}
-              aria-label="ค้นหาแพ็กเกจ"
+              aria-label="ค้นหาชุดข้อสอบ"
             />
           </div>
 
           {/* Filter Pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }} role="radiogroup" aria-label="กรองแพ็กเกจ">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }} role="radiogroup" aria-label="กรองชุดข้อสอบ">
             {FILTER_OPTIONS.map(option => (
               <button
                 key={option.value}
@@ -135,10 +135,10 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
 
         {/* Results Count */}
         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', fontWeight: '600' }}>
-          แสดง {filteredPackages.length} จาก {packages.length} แพ็กเกจ
+          แสดง {filteredPackages.length} จาก {packages.length} ชุดข้อสอบ
         </div>
 
-        {/* Package Grid */}
+        {/* Exam Grid */}
         {filteredPackages.length > 0 ? (
           <div
             style={{
@@ -161,7 +161,7 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
               </svg>
             </div>
             <h3 className="font-display" style={{ fontSize: '20px', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              {searchQuery || activeFilter !== 'all' ? 'ไม่พบแพ็กเกจที่ตรงกับเงื่อนไข' : 'ยังไม่มีแพ็กเกจ'}
+              {searchQuery || activeFilter !== 'all' ? 'ไม่พบชุดข้อสอบที่ตรงกับเงื่อนไข' : 'ยังไม่มีชุดข้อสอบ'}
             </h3>
             <p style={{ color: 'var(--text-muted)', maxWidth: '400px' }}>
               {searchQuery || activeFilter !== 'all'
