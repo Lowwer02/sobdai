@@ -6,6 +6,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
+import SummaryNavigation from '@/components/SummaryNavigation'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -246,26 +247,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
                 <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">สรุปเนื้อหา</h3>
               </div>
               
-              <div className="space-y-4 flex-1">
-                {summaries.length > 0 ? (
-                  summaries.map((s: any) => (
-                    <Link href={`/package/${pkg.slug}/summary/${s.slug}`} key={s.id} className="block">
-                      <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col">
-                        <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-2 leading-snug group-hover:text-[#D4AF37] transition-colors">{s.title}</h4>
-                        <div className="text-[#A1866B] text-[12px] mb-4">{s.subject} • {s.topic}</div>
-                        <div className="flex justify-between items-center text-[#A1866B] text-[12px] mt-auto pt-2 border-t border-[rgba(255,255,255,0.05)]">
-                          <div className="flex items-center gap-1.5"><Clock size={12}/> {s.read_time_minutes || 5} นาที</div>
-                          <span className="bg-[#22C55E]/10 text-[#22C55E] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">พร้อมเรียน</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="h-40 border border-dashed border-[rgba(255,255,255,0.1)] rounded-xl flex items-center justify-center text-[#A1866B] text-[13px]">
-                    กำลังจัดเตรียมสรุปเนื้อหา
-                  </div>
-                )}
-              </div>
+              <SummaryNavigation summaries={summaries} packageSlug={pkg.slug} />
             </div>
 
             {/* 5. EXAM SETS */}
