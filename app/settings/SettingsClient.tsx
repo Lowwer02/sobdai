@@ -14,6 +14,7 @@ interface Profile {
   id: string
   email: string
   role: string
+  status?: string
   display_name?: string
   occupation?: string
   phone?: string
@@ -172,14 +173,21 @@ export default function SettingsClient({ initialProfile }: { initialProfile: Pro
           </h2>
           <p className="text-[#A1866B] text-sm">{profile.email}</p>
           
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
               ['owner', 'admin', 'editor', 'support'].includes(profile.role)
-                ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30' 
+                ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30'
                 : 'bg-[#0F0B07] text-[#A1866B] border-[rgba(255,255,255,0.1)]'
             }`}>
               {['owner', 'admin', 'editor', 'support'].includes(profile.role) ? <Shield size={14} /> : <UserCircle size={14} />}
               {profile.role.toUpperCase()}
+            </span>
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
+              profile.status === 'banned'
+                ? 'bg-red-500/10 text-red-300 border-red-500/30'
+                : 'bg-green-500/10 text-green-400 border-green-500/30'
+            }`}>
+              สถานะบัญชี: {profile.status === 'banned' ? 'ถูกระงับ' : 'ปกติ'}
             </span>
           </div>
         </div>

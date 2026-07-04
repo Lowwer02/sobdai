@@ -129,10 +129,16 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
       if (error) {
         toastEvent('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error')
       } else if (data?.user) {
-        const { data: profile } = await supabase.from('profiles').select('deleted_at').eq('id', data.user.id).single()
+        const { data: profile } = await supabase.from('profiles').select('deleted_at, status').eq('id', data.user.id).single()
         if (profile?.deleted_at) {
           await supabase.auth.signOut()
           toastEvent('บัญชีนี้ถูกปิดการใช้งานแล้ว กรุณาติดต่อทีมงานหากต้องการเปิดใช้งานอีกครั้ง', 'error')
+        } else if (profile?.status === 'banned') {
+          // Banned users cannot sign in. Sign them out immediately and send
+          // them to /login with a ?banned=1 query so the login page can show
+          // the explanation message.
+          await supabase.auth.signOut()
+          window.location.href = '/login?banned=1'
         } else {
           toastEvent('เข้าสู่ระบบสำเร็จ', 'success')
           if (onSuccess) onSuccess()

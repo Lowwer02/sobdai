@@ -28,7 +28,7 @@ export default function Navbar() {
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
-        const { data } = await supabase.from('profiles').select('role, deleted_at, avatar_url').eq('id', sessionUser.id).single()
+        const { data } = await supabase.from('profiles').select('role, deleted_at, avatar_url, status').eq('id', sessionUser.id).single()
 
         if (data?.deleted_at) {
           // Force logout for deactivated accounts
@@ -37,6 +37,18 @@ export default function Navbar() {
           setIsAdmin(false)
           setAvatarUrl(null)
           window.location.reload()
+          return
+        }
+
+        if (data?.status === 'banned') {
+          // Safety net for existing sessions: if an admin bans a user while
+          // they are online, this runs on the next auth state change / mount
+          // and forces them out to /login with the banned message.
+          await supabase.auth.signOut()
+          setUser(null)
+          setIsAdmin(false)
+          setAvatarUrl(null)
+          window.location.href = '/login?banned=1'
           return
         }
 

@@ -10,6 +10,20 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // After a successful OAuth sign-in, check the user's ban status. A
+      // banned user must not be allowed to complete login via OAuth either.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('status')
+          .eq('id', user.id)
+          .single()
+        if (profile?.status === 'banned') {
+          await supabase.auth.signOut()
+          return NextResponse.redirect(`${origin}/login?banned=1`)
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

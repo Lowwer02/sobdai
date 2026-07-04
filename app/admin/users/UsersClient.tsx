@@ -283,13 +283,20 @@ export default function UsersClient({
         isOpen={statusModal.isOpen}
         onClose={() => setStatusModal({ isOpen: false, user: null, newStatus: '' })}
         onConfirm={handleStatusChange}
-        title={statusModal.newStatus === 'banned' ? 'ระงับบัญชี' : 'ปลดระงับบัญชี'}
+        title={statusModal.newStatus === 'banned' ? 'ยืนยันการระงับผู้ใช้งาน' : 'ปลดระงับบัญชี'}
         description={
           <div className="space-y-2 text-[#F5E9D6]">
-            <div>คุณต้องการ {statusModal.newStatus === 'banned' ? 'แบน' : 'ปลดแบน'}: <span className="text-[#D4AF37] font-medium">{statusModal.user?.email}</span> ใช่หรือไม่?</div>
+            {statusModal.newStatus === 'banned' ? (
+              <>
+                <div>ผู้ใช้งานจะไม่สามารถเข้าสู่ระบบได้จนกว่าจะยกเลิกการระงับ</div>
+                <div>ผู้ใช้: <span className="text-[#D4AF37] font-medium">{statusModal.user?.email}</span></div>
+              </>
+            ) : (
+              <div>คุณต้องการปลดระงับ: <span className="text-[#D4AF37] font-medium">{statusModal.user?.email}</span> ใช่หรือไม่?</div>
+            )}
           </div>
         }
-        confirmText="ยืนยัน"
+        confirmText={statusModal.newStatus === 'banned' ? 'ระงับผู้ใช้' : 'ปลดระงับ'}
         cancelText="ยกเลิก"
         isDestructive={statusModal.newStatus === 'banned'}
       />
