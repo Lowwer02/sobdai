@@ -16,12 +16,13 @@ const NAV_LINKS = [
 interface DesktopNavProps {
   user: User | null
   isAdmin: boolean
+  avatarUrl?: string | null
   onLoginClick: () => void
   onRegisterClick: () => void
   onSignOut: () => void
 }
 
-export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClick, onSignOut }: DesktopNavProps) {
+export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onRegisterClick, onSignOut }: DesktopNavProps) {
   const pathname = usePathname()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -84,10 +85,21 @@ export default function DesktopNav({ user, isAdmin, onLoginClick, onRegisterClic
               <button type="button" 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.05)] transition-all focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
+                aria-label="เปิดเมนูโปรไฟล์"
               >
-                <div className="w-7 h-7 rounded-full bg-[#1A140E] flex items-center justify-center border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold">
-                  {user.email?.charAt(0).toUpperCase()}
-                </div>
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt="รูปโปรไฟล์"
+                    width={28}
+                    height={28}
+                    className="w-7 h-7 rounded-full object-cover border border-[#D4AF37]/30"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#1A140E] flex items-center justify-center border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </button>
 
               {/* Dropdown Menu */}
