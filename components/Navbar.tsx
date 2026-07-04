@@ -13,6 +13,7 @@ import { toastEvent } from '@/hooks/useToast'
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -27,20 +28,23 @@ export default function Navbar() {
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
-        const { data } = await supabase.from('profiles').select('role, deleted_at').eq('id', sessionUser.id).single()
+        const { data } = await supabase.from('profiles').select('role, deleted_at, avatar_url').eq('id', sessionUser.id).single()
 
         if (data?.deleted_at) {
           // Force logout for deactivated accounts
           await supabase.auth.signOut()
           setUser(null)
           setIsAdmin(false)
+          setAvatarUrl(null)
           window.location.reload()
           return
         }
 
         setIsAdmin(['admin', 'owner', 'editor', 'support'].includes(data?.role))
+        setAvatarUrl(data?.avatar_url ?? null)
       } else {
         setIsAdmin(false)
+        setAvatarUrl(null)
       }
     }
 
@@ -73,6 +77,7 @@ export default function Navbar() {
     await supabase.auth.signOut()
     setUser(null)
     setIsAdmin(false)
+    setAvatarUrl(null)
     setShowLogoutConfirm(false)
     router.replace('/')
     router.refresh()
@@ -100,23 +105,25 @@ export default function Navbar() {
       >
       {/* Desktop view */}
       <div className="hidden lg:block w-full">
-        <DesktopNav 
-          user={user} 
-          isAdmin={isAdmin} 
-          onLoginClick={handleLoginClick} 
-          onRegisterClick={handleRegisterClick} 
-          onSignOut={handleSignOutClick} 
+        <DesktopNav
+          user={user}
+          isAdmin={isAdmin}
+          avatarUrl={avatarUrl}
+          onLoginClick={handleLoginClick}
+          onRegisterClick={handleRegisterClick}
+          onSignOut={handleSignOutClick}
         />
       </div>
 
       {/* Mobile view */}
       <div className="block lg:hidden w-full">
-        <MobileNav 
-          user={user} 
-          isAdmin={isAdmin} 
-          onLoginClick={handleLoginClick} 
-          onRegisterClick={handleRegisterClick} 
-          onSignOut={handleSignOutClick} 
+        <MobileNav
+          user={user}
+          isAdmin={isAdmin}
+          avatarUrl={avatarUrl}
+          onLoginClick={handleLoginClick}
+          onRegisterClick={handleRegisterClick}
+          onSignOut={handleSignOutClick}
         />
         </div>
       </header>

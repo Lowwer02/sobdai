@@ -17,12 +17,13 @@ const NAV_LINKS = [
 interface MobileNavProps {
   user: User | null
   isAdmin: boolean
+  avatarUrl?: string | null
   onLoginClick: () => void
   onRegisterClick: () => void
   onSignOut: () => void
 }
 
-export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick, onSignOut }: MobileNavProps) {
+export default function MobileNav({ user, isAdmin, avatarUrl, onLoginClick, onRegisterClick, onSignOut }: MobileNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
@@ -111,9 +112,19 @@ export default function MobileNav({ user, isAdmin, onLoginClick, onRegisterClick
               {/* User Profile Summary */}
               {user && (
                 <div className="flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.05)]">
-                  <div className="w-12 h-12 rounded-full bg-[#1A140E] flex items-center justify-center border border-[#D4AF37]/30 text-[#D4AF37] text-lg font-bold shrink-0">
-                    {user.email?.charAt(0).toUpperCase()}
-                  </div>
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt="รูปโปรไฟล์"
+                      width={48}
+                      height={48}
+                      className="w-12 h-12 rounded-full object-cover border border-[#D4AF37]/30 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-[#1A140E] flex items-center justify-center border border-[#D4AF37]/30 text-[#D4AF37] text-lg font-bold shrink-0">
+                      {user.email?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex flex-col overflow-hidden">
                     <span className="text-sm text-[#A1866B]">ยินดีต้อนรับ</span>
                     <span className="text-base font-medium text-[#F5E9D6] truncate">{user.email}</span>

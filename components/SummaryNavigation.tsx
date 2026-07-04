@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Clock, ChevronDown } from 'lucide-react'
 
@@ -29,6 +29,19 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
+  // Responsive behavior: mobile (<768px) uses accordion (one category at a
+  // time), tablet/desktop (>=768px) shows all categories expanded with no
+  // accordion. Tracked via matchMedia to avoid layout shift and to keep the
+  // toggle button keyboard-accessible only on mobile.
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)')
+    const update = () => setIsDesktop(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [])
 
   // Group summaries by subject
   const categories = useMemo(() => {
@@ -84,11 +97,16 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
   }, [filteredCategories])
 
   const toggleCategory = (category: string) => {
+    // On desktop, all categories are always expanded — toggle is a no-op.
+    if (isDesktop) return
     setExpandedCategory(prev => prev === category ? null : category)
   }
 
-  // Auto-expand first category if none is expanded and we have results
+  // Auto-expand first category if none is expanded and we have results.
+  // On desktop this is irrelevant — every category is expanded regardless.
   const effectiveExpanded = expandedCategory ?? (filteredCategories.size > 0 ? filteredCategories.keys().next().value ?? null : null)
+
+  const isCategoryExpanded = (category: string) => isDesktop || effectiveExpanded === category
 
   if (summaries.length === 0) {
     return (
@@ -179,7 +197,7 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
       {filteredCategories.size > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Array.from(filteredCategories.entries()).map(([category, items]) => {
-            const isExpanded = effectiveExpanded === category
+            const isExpanded = isCategoryExpanded(category)
             return (
               <div
                 key={category}
@@ -192,12 +210,14 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                   transition: 'border-color 0.2s',
                 }}
               >
-                {/* Category Header */}
+                {/* Category Header — behaves as a toggle on mobile, as a static
+                    heading on desktop (where all categories are expanded). */}
                 <button
                   type="button"
                   onClick={() => toggleCategory(category)}
                   aria-expanded={isExpanded}
                   aria-controls={`summary-cat-${category}`}
+                  disabled={isDesktop}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -206,7 +226,7 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                     padding: '14px 16px',
                     background: 'none',
                     border: 'none',
-                    cursor: 'pointer',
+                    cursor: isDesktop ? 'default' : 'pointer',
                     color: isExpanded ? '#D4AF37' : '#F5E9D6',
                     transition: 'color 0.2s',
                   }}
@@ -228,28 +248,34 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                       {items.length}
                     </span>
                   </div>
-                  <ChevronDown
-                    size={16}
-                    style={{
-                      color: '#A1866B',
-                      transition: 'transform 0.25s ease',
-                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                    }}
-                  />
+                  {/* Chevron only meaningful on mobile (desktop = always open) */}
+                  {!isDesktop && (
+                    <ChevronDown
+                      size={16}
+                      style={{
+                        color: '#A1866B',
+                        transition: 'transform 0.25s ease',
+                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    />
+                  )}
                 </button>
 
-                {/* Summary List (collapsible) */}
+                {/* Summary List — collapsible on mobile, always shown on desktop */}
                 <div
                   id={`summary-cat-${category}`}
                   role="region"
                   aria-labelledby={`summary-cat-${category}`}
-                  style={{
-                    maxHeight: isExpanded ? `${items.length * 100 + 20}px` : '0',
-                    opacity: isExpanded ? 1 : 0,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease, opacity 0.25s ease',
-                    padding: isExpanded ? '0 12px 12px' : '0 12px',
-                  }}
+                  style={isDesktop
+                    ? { padding: '0 12px 12px' }
+                    : {
+                        maxHeight: isExpanded ? `${items.length * 100 + 20}px` : '0',
+                        opacity: isExpanded ? 1 : 0,
+                        overflow: 'hidden',
+                        transition: 'max-height 0.3s ease, opacity 0.25s ease',
+                        padding: isExpanded ? '0 12px 12px' : '0 12px',
+                      }
+                  }
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {items.map((s) => (
