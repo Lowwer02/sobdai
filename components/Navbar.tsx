@@ -28,7 +28,13 @@ export default function Navbar() {
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
-        const { data } = await supabase.from('profiles').select('role, deleted_at, avatar_url, status').eq('id', sessionUser.id).single()
+        // Use select('*') instead of explicit columns so that if migrations (like adding avatar_url or status) 
+        // are not yet applied to production, the query won't throw a 400 Bad Request error.
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).single()
+
+        if (error) {
+          console.error("Error fetching profile in Navbar:", error)
+        }
 
         if (data?.deleted_at) {
           // Force logout for deactivated accounts
