@@ -9,9 +9,8 @@ import type { User } from '@supabase/supabase-js'
 const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
   { href: '/packages', label: 'แพ็กเกจ' },
-  { href: '/exams', label: 'ข้อสอบ' },
-  { href: '/summaries', label: 'สรุปเนื้อหา' },
-  { href: '/downloads', label: 'ดาวน์โหลด' },
+  { href: '/exams', label: 'แดชบอร์ด' },
+  { href: '/downloads', label: 'คลังเนื้อหา' },
 ]
 
 interface DesktopNavProps {
