@@ -28,25 +28,51 @@ export default function Navbar() {
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
-        // Explicit columns only — the Navbar needs nothing else from the row.
-        // Columns origin: role (001), status (004), avatar_url (007), deleted_at (008).
-        const { data, error } = await supabase
+        // Primary: explicit columns only — the Navbar needs nothing else.
+        // Columns origin: role (001), status (004), avatar_url (007),
+        // deleted_at (008).
+        const primary = await supabase
           .from('profiles')
           .select('role, status, deleted_at, avatar_url')
           .eq('id', sessionUser.id)
           .single()
 
-        if (error) {
-          // Graceful degradation: the Navbar is client-side and is only a UX
-          // hint (show/hide the Admin button). Authoritative access control is
-          // enforced server-side in lib/auth/server-protect.ts + RBAC, so a
-          // failed profile read here must NOT break the rest of the auth flow.
+        let data = primary.data
+        const primaryError = primary.error
+
+        if (primaryError) {
+          // The Navbar is client-side and only a UX hint (show/hide the
+          // Admin button). Authoritative access control is enforced
+          // server-side in lib/auth/server-protect.ts + RBAC, so we must NOT
+          // let a failed profile read hide the button.
           //
-          // If this fires in production it almost always means a migration
-          // has not been applied (PostgREST returns 400 "column does not
-          // exist"). The fix is to apply the missing migration, NOT to widen
-          // the query to select('*').
-          console.error('Navbar: profiles query failed — check migration status:', error.message)
+          // Most likely cause: a stale PostgREST schema cache on production
+          // (migration 007 that adds avatar_url explicitly calls
+          // `NOTIFY pgrst, 'reload schema'`, indicating the team has hit
+          // this before). The PostgREST 400 message names the offending
+          // column, so we surface it loudly here.
+          console.error(
+            'Navbar: explicit profiles query failed — falling back to select(*).',
+            'Offending column / reason:',
+            primaryError.message
+          )
+
+          // Defensive fallback: select('*') cannot 400 on a missing column,
+          // so it restores the Admin button on partially-migrated or
+          // schema-cache-stale databases. This is intentionally a RECOVERY
+          // path, not the default — the happy path stays explicit and
+          // minimal. To remove this fallback, fix the root cause surfaced
+          // by the error log above (apply migration / reload schema cache).
+          const fallback = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', sessionUser.id)
+            .single()
+
+          if (fallback.error) {
+            console.error('Navbar: fallback select(*) also failed:', fallback.error.message)
+          }
+          data = fallback.data
         }
 
         if (data?.deleted_at) {
