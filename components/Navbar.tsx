@@ -28,12 +28,25 @@ export default function Navbar() {
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
-        // Use select('*') instead of explicit columns so that if migrations (like adding avatar_url or status) 
-        // are not yet applied to production, the query won't throw a 400 Bad Request error.
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', sessionUser.id).single()
+        // Explicit columns only — the Navbar needs nothing else from the row.
+        // Columns origin: role (001), status (004), avatar_url (007), deleted_at (008).
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role, status, deleted_at, avatar_url')
+          .eq('id', sessionUser.id)
+          .single()
 
         if (error) {
-          console.error("Error fetching profile in Navbar:", error)
+          // Graceful degradation: the Navbar is client-side and is only a UX
+          // hint (show/hide the Admin button). Authoritative access control is
+          // enforced server-side in lib/auth/server-protect.ts + RBAC, so a
+          // failed profile read here must NOT break the rest of the auth flow.
+          //
+          // If this fires in production it almost always means a migration
+          // has not been applied (PostgREST returns 400 "column does not
+          // exist"). The fix is to apply the missing migration, NOT to widen
+          // the query to select('*').
+          console.error('Navbar: profiles query failed — check migration status:', error.message)
         }
 
         if (data?.deleted_at) {
