@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Search, Loader2, Plus, Check, Trash2, GripVertical, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { fetchQuestionsForPicker, fetchUniqueFilters } from '../../app/admin/exam-sets/questions.action'
 
@@ -20,6 +20,12 @@ interface QuestionPickerProps {
   onChange: (questions: Question[]) => void
 }
 
+// Client-side "Question Status" filter for the picker.
+// 'all' keeps the existing server-paginated flow unchanged; the other two
+// values slice the rendered set client-side (no extra API calls).
+type QuestionStatusFilter = 'all' | 'selected' | 'unselected'
+const PAGE_SIZE = 10
+
 export default function QuestionPicker({ selectedQuestions, onChange }: QuestionPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   
@@ -35,6 +41,10 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
   const [difficulty, setDifficulty] = useState('')
   const [isCommon, setIsCommon] = useState<boolean | undefined>(undefined)
   const [page, setPage] = useState(1)
+
+  // Question Status filter (client-side). Lives alongside the server-side
+  // filters above; it never triggers a refetch.
+  const [statusFilter, setStatusFilter] = useState<QuestionStatusFilter>('all')
 
   // Filter Options
   const [subjects, setSubjects] = useState<string[]>([])
@@ -55,7 +65,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
     setLoading(true)
 
     fetchQuestionsForPicker({
-      search, subject, law, topic, difficulty, is_common: isCommon, page, limit: 10
+      search, subject, law, topic, difficulty, is_common: isCommon, page, limit: PAGE_SIZE
     }).then(res => {
       if (isMounted) {
         setQuestions(res.data as Question[])
@@ -69,6 +79,38 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
 
     return () => { isMounted = false }
   }, [isOpen, search, subject, law, topic, difficulty, isCommon, page])
+
+  // --- Client-side Question Status filter (no API calls) ---
+  // Reuses the existing `selectedQuestions` prop as the source of truth — no
+  // duplicated selection state. Note: `statusFilter` is intentionally NOT in
+  // the fetch effect's dependency array, so changing it never refetches.
+  const selectedIdSet = useMemo(
+    () => new Set(selectedQuestions.map(q => q.id)),
+    [selectedQuestions]
+  )
+
+  // The full filtered set for the current status (before pagination).
+  // - 'all'        → server-paginated `questions` (unchanged behaviour)
+  // - 'selected'   → every selected question, cross-page (per spec example)
+  // - 'unselected' → currently-loaded `questions` minus selected ones
+  const displayQuestions = useMemo<Question[]>(() => {
+    if (statusFilter === 'selected') return selectedQuestions
+    if (statusFilter === 'unselected') return questions.filter(q => !selectedIdSet.has(q.id))
+    return questions
+  }, [statusFilter, selectedQuestions, questions, selectedIdSet])
+
+  // In 'all' mode the server is authoritative for the total (it knows about
+  // questions beyond the loaded page). In the other two modes the visible set
+  // is fully client-side, so its length is the total.
+  const effectiveTotal = statusFilter === 'all' ? totalCount : displayQuestions.length
+
+  // Client-side pagination slice for the filtered modes. In 'all' mode the
+  // server already returns only the current page, so we render it as-is.
+  const pagedQuestions = useMemo(() => {
+    if (statusFilter === 'all') return questions
+    const from = (page - 1) * PAGE_SIZE
+    return displayQuestions.slice(from, from + PAGE_SIZE)
+  }, [statusFilter, questions, displayQuestions, page])
 
   const handleAdd = (q: Question) => {
     if (!selectedQuestions.find(sq => sq.id === q.id)) {
@@ -175,6 +217,11 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
             <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex justify-between items-center bg-[#0F0B07] rounded-t-2xl shrink-0">
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-bold font-display text-[#F5E9D6]">Question Bank Picker</h2>
+                {/* Live selected counter — updates instantly because `onChange`
+                    lifts to parent state, which re-renders this prop. */}
+                <span className="text-xs font-semibold text-[#D4AF37] bg-[#D4AF37]/10 border border-[rgba(212,175,55,0.3)] px-2.5 py-1 rounded-lg">
+                  เลือกแล้ว {selectedQuestions.length} ข้อ
+                </span>
                 {questions.length > 0 && (
                   <button
                     type="button"
@@ -221,6 +268,12 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                 <option value="true">Common Only</option>
                 <option value="false">Organization Specific</option>
               </select>
+              {/* Question Status — client-side only, never triggers a refetch. */}
+              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value as QuestionStatusFilter); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
+                <option value="all">ทั้งหมด</option>
+                <option value="selected">เลือกแล้ว</option>
+                <option value="unselected">ยังไม่ได้เลือก</option>
+              </select>
             </div>
 
             {/* Question List */}
@@ -231,8 +284,8 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                 </div>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {questions.map(q => {
-                  const isSelected = selectedQuestions.some(sq => sq.id === q.id)
+                {pagedQuestions.map(q => {
+                  const isSelected = selectedIdSet.has(q.id)
                   return (
                     <div 
                       key={q.id} 
@@ -263,7 +316,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                   )
                 })}
               </div>
-              {questions.length === 0 && !loading && (
+              {pagedQuestions.length === 0 && !loading && (
                 <div className="text-center p-12 text-[#A1866B]">No questions found.</div>
               )}
             </div>
@@ -271,10 +324,10 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
             {/* Pagination Footer */}
             <div className="p-4 border-t border-[rgba(255,255,255,0.05)] bg-[#0F0B07] rounded-b-2xl shrink-0 flex items-center justify-between">
               <div className="text-sm text-[#A1866B]">
-                Showing {Math.min((page - 1) * 10 + 1, totalCount)} to {Math.min(page * 10, totalCount)} of {totalCount} questions
+                Showing {effectiveTotal === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + 1, effectiveTotal)} to {Math.min(page * PAGE_SIZE, effectiveTotal)} of {effectiveTotal} questions
               </div>
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   type="button"
                   onClick={() => setPage(p => p - 1)}
                   disabled={page <= 1 || loading}
@@ -282,10 +335,10 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                 >
                   Prev
                 </button>
-                <button 
+                <button
                   type="button"
                   onClick={() => setPage(p => p + 1)}
-                  disabled={page * 10 >= totalCount || loading}
+                  disabled={page * PAGE_SIZE >= effectiveTotal || loading}
                   className="px-3 py-1.5 rounded-lg bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50"
                 >
                   Next
