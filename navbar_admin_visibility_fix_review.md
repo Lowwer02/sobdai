@@ -298,3 +298,103 @@ documented graceful-degradation error handler**. No business logic, auth flow,
 permissions, or performance optimisations were touched. The fix is safe on error,
 smaller on the wire, and — unlike `select('*')` — surfaces migration drift as a
 clear console warning instead of hiding it.
+
+---
+
+# Follow-up — Session 6.12.6.1 (same day)
+
+## What happened after deploy
+
+Commit `d144a29` was deployed to `https://sobdai.vercel.app`. The Admin Panel
+button disappeared again for Owner / Admin / Editor / Support. Direct access to
+`/admin` still worked (server-side RBAC unaffected).
+
+## Honest post-mortem: the 6.12.6 design regressed
+
+The 6.12.6 fix used **graceful degradation** = "on query failure, hide the
+button". On a perfectly migrated database the explicit query would have worked.
+On the production database it failed — and our degradation path did exactly
+what we designed it to do: hid the button. We over-optimised for "don't hide
+bugs" and under-optimised for "users must see the button". That was the wrong
+tradeoff for a UX-only client component.
+
+### Evidence the original "missing migration" diagnosis was wrong
+
+- `components/AuthModal.tsx:132` runs `select('deleted_at, status')` and login
+  works in production → those columns exist.
+- `lib/auth/server-protect.ts` reads `profile.role` via `select('*')` and
+  `/admin` access works → `role` exists.
+- Therefore all four Navbar columns exist; the 400 is **not** a missing column.
+- The most probable real cause is a **stale PostgREST schema cache** — note
+  that migration `007_add_profile_settings.sql` (the one that adds
+  `avatar_url`) ends with `NOTIFY pgrst, 'reload schema';`, a defence the team
+  has clearly needed before.
+
+## The correct long-term fix (now applied)
+
+Keep explicit columns as the **primary** path (fast, minimal payload, the
+common case) but add a **`select('*')` recovery fallback** that runs *only*
+when the primary query fails. This gives us both properties at once:
+
+1. **Happy path:** explicit, minimal, performant.
+2. **Degraded DB (stale cache / unmigrated):** button still renders — no
+   silent UX regression for end users.
+3. **Diagnosable:** the primary failure is logged loudly, naming the offending
+   column / reason, so an operator sees exactly what is wrong without the bug
+   being user-visible.
+
+```ts
+const primary = await supabase.from('profiles')
+  .select('role, status, deleted_at, avatar_url')
+  .eq('id', sessionUser.id).single()
+
+let data = primary.data
+if (primary.error) {
+  console.error('Navbar: explicit profiles query failed — falling back to select(*).',
+    'Offending column / reason:', primary.error.message)
+  const fallback = await supabase.from('profiles')
+    .select('*').eq('id', sessionUser.id).single()
+  if (fallback.error) console.error('Navbar: fallback select(*) also failed:', fallback.error.message)
+  data = fallback.data
+}
+// …rest of the auth/role/avatar logic unchanged, reads `data`
+```
+
+## Why this is not "select('*') forever" again
+
+- The default, hot, every-page-load path is the explicit query.
+- `select('*')` only runs in the error branch — zero extra cost on a healthy DB.
+- The fallback exists to protect the UX, while the loud `console.error`
+  protects observability. Both concerns are honoured.
+- Once the root cause (apply migration / reload PostgREST schema cache via
+  `NOTIFY pgrst, 'reload schema';` or the Supabase dashboard) is resolved on
+  production, the fallback simply never executes.
+
+## Verification
+
+| Step             | Result |
+|------------------|--------|
+| `npx tsc --noEmit` | ✅ exit 0 |
+| `npm run build`    | ✅ exit 0, 33/33 pages |
+| ISR `/`, `/packages` | ✅ 5m revalidate intact |
+| `ƒ Proxy (Middleware)` | ✅ still registered |
+
+## Operational follow-up (not code)
+
+To make the fallback stop firing on production, do one of:
+1. Apply any not-yet-run migration from `supabase/migrations/`, **or**
+2. Reload the PostgREST schema cache: run `NOTIFY pgrst, 'reload schema';`
+   against the production database (Supabase Dashboard → SQL Editor), **or**
+3. Use Supabase Dashboard → Database → "Reload schema cache".
+
+After that, the explicit query will succeed and the fallback branch will be
+dead code — confirmed by the absence of the `Navbar: explicit profiles query
+failed…` log line in the browser console.
+
+## Files modified (follow-up)
+
+| File | Change |
+|------|--------|
+| `components/Navbar.tsx` | Wrapped explicit query in primary/fallback pattern; `data` now sourced from primary on success, `select('*')` on primary failure. Downstream auth/role/banned/avatar logic unchanged. |
+
+**Diff size (follow-up):** +39 / −13 lines, single file.
