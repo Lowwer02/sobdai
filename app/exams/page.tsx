@@ -7,7 +7,7 @@ import type { Metadata } from 'next'
 import { BookOpen, Award, CheckCircle, ChevronLeft } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'แพ็กเกจของฉัน | Sobdai',
+  title: 'แดชบอร์ด | Sobdai',
   description: 'แดชบอร์ดการเรียนของคุณ — แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้',
 }
 
@@ -144,10 +144,10 @@ export default async function LearningDashboardPage() {
               backgroundClip: 'text',
             }}
           >
-            แพ็กเกจของฉัน
+            แดชบอร์ด
           </h1>
           <p className="text-[#A1866B] text-sm md:text-base max-w-lg mx-auto">
-            แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้
+            พื้นที่การเรียนของคุณ
           </p>
         </header>
 

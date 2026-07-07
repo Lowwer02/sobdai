@@ -114,7 +114,7 @@ export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onR
                       โปรไฟล์
                     </Link>
                     <Link href="/exams" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
-                      แพ็กเกจของฉัน
+                      แดชบอร์ด
                     </Link>
                     <Link href="/orders" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
                       คำสั่งซื้อ
