@@ -1,34 +1,37 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
-import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
-import PackageCard from '@/components/PackageCard'
-import type { PackageCardData } from '@/components/PackageCard'
 import type { Metadata } from 'next'
+import { BookOpen, Award, CheckCircle, ChevronLeft } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'ข้อสอบของฉัน | Sobdai',
-  description: 'แดชบอร์ดข้อสอบของคุณ — กลับไปทำชุดข้อสอบที่ซื้อไว้ได้อย่างรวดเร็ว',
+  title: 'แพ็กเกจของฉัน | Sobdai',
+  description: 'แดชบอร์ดการเรียนของคุณ — แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้',
 }
 
-/**
- * My Exam Dashboard (Phase 0).
- *
- * Replaces the previous catalog duplicate with a personal dashboard scoped to
- * the logged-in user's purchased packages. Three render states:
- *   1. Guest (not logged in)       -> empty state with login / explore CTAs
- *   2. Logged in, owns nothing     -> empty state with "browse packages" CTA
- *   3. Logged in, owns packages    -> Continue Learning + My Packages grid
- *
- * Sections that require future schema (exam_attempts / bookmarks / etc.) are
- * rendered as explicit "เร็ว ๆ นี้" placeholders — no fake data, per spec.
- *
- * Pure Server Component: no client JS added. Reuses PackageCard, the orders
- * query pattern from /orders, and the getPackagePublicCounts RPC.
- */
-export default async function ExamDashboardPage() {
+interface LearningCardData {
+  id: string
+  slug: string
+  name: string
+  exam_year: string
+  difficulty: string
+  description: string | null
+  logo_url: string | null
+  organizations: {
+    name: string
+    logo_url: string | null
+  } | null
+  positions: {
+    name: string
+  } | null
+  total_questions: number
+  total_exam_sets: number
+  total_summaries: number
+}
+
+export default async function LearningDashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -38,25 +41,31 @@ export default async function ExamDashboardPage() {
   }
 
   // --- Logged in: resolve purchased packages --------------------------------
-  // Reuse the /orders query pattern. We only need completed (paid/free) orders
-  // and the package fields required by PackageCard.
   const { data: orders } = await supabase
     .from('orders')
     .select(`
       package_id,
       packages (
-        id, slug, exam_year, current_price, original_price, difficulty,
-        description, logo_url, is_published,
+        id,
+        slug,
+        name,
+        exam_year,
+        current_price,
+        original_price,
+        difficulty,
+        description,
+        logo_url,
+        is_published,
         organizations ( name, logo_url ),
-        positions ( name )
+        positions ( name ),
+        summaries ( id, is_published )
       )
     `)
     .eq('user_id', user.id)
     .in('status', ORDER_COMPLETED_STATUSES)
     .order('created_at', { ascending: false })
 
-  // De-duplicate by package id (a user may have multiple orders for one pkg)
-  // and drop unpublished packages (e.g. retired after purchase).
+  // De-duplicate by package id
   const seen = new Set<string>()
   const ownedPackages: any[] = []
   for (const o of orders ?? []) {
@@ -72,132 +81,81 @@ export default async function ExamDashboardPage() {
   }
 
   // --- Logged in, owns packages --------------------------------------------
-  // Enrich with public counts (total_questions / total_exam_sets) via the
-  // existing RPC — same pattern as the homepage.
-  let enriched: PackageCardData[] = []
+  let enriched: LearningCardData[] = []
   try {
     const counts = await getPackagePublicCounts(ownedPackages.map((p) => p.id))
-    enriched = ownedPackages.map((pkg) => ({
-      id: pkg.id,
-      slug: pkg.slug,
-      exam_year: pkg.exam_year,
-      current_price: pkg.current_price,
-      original_price: pkg.original_price,
-      difficulty: pkg.difficulty,
-      description: pkg.description,
-      logo_url: pkg.logo_url,
-      organizations: pkg.organizations,
-      positions: pkg.positions,
-      total_questions: counts[pkg.id]?.total_questions || 0,
-      total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
-    }))
+    enriched = ownedPackages.map((pkg) => {
+      const total_summaries = pkg.summaries?.filter((s: any) => s.is_published).length || 0
+      return {
+        id: pkg.id,
+        slug: pkg.slug,
+        name: pkg.name || 'ไม่ระบุชื่อแพ็กเกจ',
+        exam_year: pkg.exam_year,
+        difficulty: pkg.difficulty,
+        description: pkg.description,
+        logo_url: pkg.logo_url,
+        organizations: pkg.organizations,
+        positions: pkg.positions,
+        total_questions: counts[pkg.id]?.total_questions || 0,
+        total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
+        total_summaries,
+      }
+    })
   } catch {
-    // Counts are non-critical; fall back to zeros rather than crashing.
-    enriched = ownedPackages.map((pkg) => ({
-      id: pkg.id,
-      slug: pkg.slug,
-      exam_year: pkg.exam_year,
-      current_price: pkg.current_price,
-      original_price: pkg.original_price,
-      difficulty: pkg.difficulty,
-      description: pkg.description,
-      logo_url: pkg.logo_url,
-      organizations: pkg.organizations,
-      positions: pkg.positions,
-      total_questions: 0,
-      total_exam_sets: 0,
-    }))
+    enriched = ownedPackages.map((pkg) => {
+      const total_summaries = pkg.summaries?.filter((s: any) => s.is_published).length || 0
+      return {
+        id: pkg.id,
+        slug: pkg.slug,
+        name: pkg.name || 'ไม่ระบุชื่อแพ็กเกจ',
+        exam_year: pkg.exam_year,
+        difficulty: pkg.difficulty,
+        description: pkg.description,
+        logo_url: pkg.logo_url,
+        organizations: pkg.organizations,
+        positions: pkg.positions,
+        total_questions: 0,
+        total_exam_sets: 0,
+        total_summaries,
+      }
+    })
   }
 
-  // Continue Learning = first few owned packages (no progress data in Phase 0,
-  // so we surface entries into purchased packages).
-  const continueLearning = enriched.slice(0, 3)
-  const allPackages = enriched
-
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 20px 80px' }}>
+    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] font-sans pb-24">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Back Link */}
+        <Link 
+          href="/" 
+          className="inline-flex items-center gap-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors text-sm font-medium mb-8 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg px-2 py-1 -ml-2"
+        >
+          <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+          หน้าแรก
+        </Link>
 
-        {/* ---------- Hero ---------- */}
-        <header style={{ textAlign: 'center', marginBottom: '40px' }}>
+        {/* Header */}
+        <header className="text-center mb-12">
           <h1
-            className="font-display"
+            className="text-3xl md:text-5xl font-bold font-display tracking-tight mb-3"
             style={{
-              fontSize: 'clamp(28px, 5vw, 42px)',
-              marginBottom: '10px',
-              background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
+              background: 'linear-gradient(135deg, #f5ede0 30%, #e8c46e 70%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
             }}
           >
-            ข้อสอบของฉัน
+            แพ็กเกจของฉัน
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '520px', margin: '0 auto' }}>
-            ติดตามการเรียนของคุณและกลับไปทำข้อสอบที่ซื้อไว้ได้อย่างรวดเร็ว
+          <p className="text-[#A1866B] text-sm md:text-base max-w-lg mx-auto">
+            แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้
           </p>
         </header>
 
-        {/* ---------- Continue Learning ---------- */}
-        <section style={{ marginBottom: '48px' }}>
-          <SectionTitle>ทำต่อ</SectionTitle>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '16px',
-            }}
-          >
-            {continueLearning.map((pkg, i) => (
-              <PackageCard key={pkg.id} pkg={pkg} index={i} />
-            ))}
-          </div>
-        </section>
-
-        {/* ---------- My Packages (full list) ---------- */}
-        {allPackages.length > continueLearning.length && (
-          <section style={{ marginBottom: '48px' }}>
-            <SectionTitle>แพ็กเกจของฉัน</SectionTitle>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '16px',
-              }}
-            >
-              {allPackages.map((pkg, i) => (
-                <PackageCard key={pkg.id} pkg={pkg} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ---------- Placeholder sections (future phases) ---------- */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          <PlaceholderCard title="ผลสอบล่าสุด">
-            เมื่อระบบบันทึกผลสอบถูกพัฒนา
-            คุณจะสามารถดูผลสอบย้อนหลังได้ที่นี่
-          </PlaceholderCard>
-          <PlaceholderCard title="สถิติการเรียน">
-            ค่าเฉลี่ย คะแนนสูงสุด และจำนวนครั้งที่ทำ
-            จะแสดงที่นี่ในอนาคต
-          </PlaceholderCard>
-          <PlaceholderCard title="หัวข้อที่ควรทบทวน">
-            ระบบจะวิเคราะห์หัวข้อที่คุณทำได้น้อย
-            เพื่อแนะนำการทบทวน
-          </PlaceholderCard>
-          <PlaceholderCard title="ข้อสอบที่บันทึกไว้">
-            ข้อสอบที่คุณคั่นไว้จะปรากฏที่นี่
-          </PlaceholderCard>
-          <PlaceholderCard title="ไทม์ไลน์กิจกรรม">
-            ประวัติการเรียนและการทำข้อสอบล่าสุด
-          </PlaceholderCard>
+        {/* Learning Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {enriched.map((pkg) => (
+            <LearningCard key={pkg.id} pkg={pkg} />
+          ))}
         </div>
       </div>
     </div>
@@ -205,133 +163,138 @@ export default async function ExamDashboardPage() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Sub-components (kept local — Phase-0 only, not worth a shared file yet)    */
+/* Sub-components                                                             */
 /* -------------------------------------------------------------------------- */
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2
-      className="font-display"
-      style={{
-        fontSize: '20px',
-        color: 'var(--text-primary)',
-        marginBottom: '16px',
-        fontWeight: 700,
-      }}
-    >
-      {children}
-    </h2>
-  )
+interface LearningCardProps {
+  pkg: LearningCardData
 }
 
-function PlaceholderCard({ title, children }: { title: string; children: React.ReactNode }) {
+function LearningCard({ pkg }: LearningCardProps) {
+  const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
+  const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
+  const logoUrl = pkg.logo_url || pkg.organizations?.logo_url
+
   return (
-    <div
-      className="card"
-      style={{
-        padding: '24px',
-        opacity: 0.85,
-      }}
+    <article
+      className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl p-6 hover:border-[rgba(212,175,55,0.18)] transition-all flex flex-col justify-between h-full group"
     >
-      <div
-        style={{
-          fontSize: '11px',
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--gold-muted)',
-          marginBottom: '12px',
-        }}
-      >
-        {title}
+      <div>
+        {/* Header / Department Info */}
+        <div className="flex gap-4 items-start mb-5">
+          <div className="w-12 h-12 rounded-xl bg-white border border-[rgba(255,255,255,0.05)] flex items-center justify-center p-2 flex-shrink-0 overflow-hidden">
+            {logoUrl ? (
+              <Image src={logoUrl} alt={orgName} width={48} height={48} className="w-full h-full object-contain" unoptimized />
+            ) : (
+              <div className="w-full h-full bg-[#D4AF37] flex items-center justify-center text-[#1A140E] font-bold text-lg">
+                {orgName.charAt(0)}
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold text-[#D4AF37] tracking-wider mb-0.5 uppercase">
+              ปี {pkg.exam_year}
+            </div>
+            <h2 className="text-lg font-bold text-[#F5E9D6] leading-snug truncate">
+              {pkg.name}
+            </h2>
+            <div className="text-xs text-[#A1866B] mt-0.5 truncate">
+              {orgName} • {posName}
+            </div>
+          </div>
+        </div>
+
+        {/* Ownership Badge */}
+        <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg w-fit mb-6">
+          <CheckCircle size={14} />
+          คุณเป็นเจ้าของแพ็กเกจนี้
+        </div>
+
+        <div className="h-px bg-[rgba(255,255,255,0.06)] w-full mb-5" />
+
+        {/* Stats Section */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="space-y-1">
+            <div className="text-xs text-[#A1866B] flex items-center gap-1">
+              <BookOpen size={12} />
+              สรุปเนื้อหา
+            </div>
+            <div className="text-sm font-bold text-[#F5E9D6]">
+              {pkg.total_summaries} เรื่อง
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs text-[#A1866B] flex items-center gap-1">
+              <Award size={12} />
+              ชุดข้อสอบ
+            </div>
+            <div className="text-sm font-bold text-[#F5E9D6]">
+              {pkg.total_exam_sets} ชุด{' '}
+              <span className="text-xs font-normal text-[#A1866B]">
+                ({pkg.total_questions} ข้อ)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Future Ready Slots:
+            This empty container reserves flex space for future analytics, 
+            progress bar, recent activity, weak topics, or stats,
+            without using fake data or placeholders. */}
+        <div className="flex flex-col gap-3 empty:hidden mb-6">
+          {/* Reserved for future progress bar or stats */}
+        </div>
       </div>
-      <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '12px' }}>
-        {children}
+
+      {/* Action Button */}
+      <div className="mt-auto">
+        <Link
+          href={`/package/${pkg.slug}`}
+          className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 px-4 rounded-xl w-full text-center transition-all hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2"
+          aria-label={`เรียนต่อแพ็กเกจ ${pkg.name}`}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+          เรียนต่อ
+        </Link>
       </div>
-      <span
-        style={{
-          display: 'inline-block',
-          fontSize: '11px',
-          fontWeight: 600,
-          color: 'var(--gold-muted)',
-          border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
-          borderRadius: '999px',
-          padding: '3px 10px',
-        }}
-      >
-        เร็ว ๆ นี้
-      </span>
-    </div>
+    </article>
   )
 }
 
 /** Guest empty state — not logged in. */
 function GuestEmptyState() {
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        backgroundColor: 'var(--bg-primary)',
-        color: 'var(--text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px 20px',
-      }}
-    >
-      <div
-        className="card"
-        style={{
-          maxWidth: '460px',
-          width: '100%',
-          padding: '48px 32px',
-          textAlign: 'center',
-        }}
-      >
-        {/* Emblem — reuse the brand mark motif (shield + dot) used in admin layout */}
-        <div
-          style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '50%',
-            background: 'var(--gold-tint, rgba(212,175,55,0.1))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--gold)',
-            margin: '0 auto 24px',
-          }}
-        >
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex items-center justify-center px-4 py-12">
+      <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
+        {/* Emblem */}
+        <div className="w-16 h-16 rounded-full bg-[rgba(212,175,55,0.1)] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             <circle cx="12" cy="10" r="3" fill="currentColor" />
           </svg>
         </div>
 
-        <h1
-          className="font-display"
-          style={{ fontSize: '26px', marginBottom: '12px', color: 'var(--text-primary)' }}
-        >
-          แดชบอร์ดข้อสอบของคุณ
+        <h1 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">
+          แดชบอร์ดการเรียนของคุณ
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', lineHeight: 1.7, marginBottom: '28px' }}>
-          เข้าสู่ระบบเพื่อดูชุดข้อสอบที่คุณซื้อ
-          ติดตามผลการเรียน
-          และกลับไปฝึกทำข้อสอบได้ทุกเมื่อ
+        <p className="text-[#A1866B] text-sm leading-relaxed mb-8">
+          เข้าสู่ระบบเพื่อดูแพ็กเกจที่คุณเข้าเรียนได้ ติดตามผลการเรียน และเข้าทบทวนเนื้อหาหรือทำข้อสอบ
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className="flex flex-col gap-3">
           <Link
             href="/login?redirect=/exams"
-            className="btn-primary"
-            style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
+            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
           >
             เข้าสู่ระบบ
           </Link>
           <Link
             href="/packages"
-            className="btn-outline"
-            style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
+            className="border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
           >
             สำรวจแพ็กเกจ
           </Link>
@@ -344,39 +307,10 @@ function GuestEmptyState() {
 /** Logged-in but owns no packages. */
 function NoPackagesEmptyState() {
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        backgroundColor: 'var(--bg-primary)',
-        color: 'var(--text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px 20px',
-      }}
-    >
-      <div
-        className="card"
-        style={{
-          maxWidth: '460px',
-          width: '100%',
-          padding: '48px 32px',
-          textAlign: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '50%',
-            background: 'var(--gold-tint, rgba(212,175,55,0.1))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--gold)',
-            margin: '0 auto 24px',
-          }}
-        >
+    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex items-center justify-center px-4 py-12">
+      <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
+        {/* Illustration */}
+        <div className="w-16 h-16 rounded-full bg-[rgba(212,175,55,0.1)] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <path d="M12 8v8" />
@@ -384,22 +318,18 @@ function NoPackagesEmptyState() {
           </svg>
         </div>
 
-        <h1
-          className="font-display"
-          style={{ fontSize: '26px', marginBottom: '12px', color: 'var(--text-primary)' }}
-        >
-          คุณยังไม่มีชุดข้อสอบ
+        <h1 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">
+          ยังไม่มีแพ็กเกจ
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', lineHeight: 1.7, marginBottom: '28px' }}>
-          เลือกชุดข้อสอบที่สนใจเพื่อเริ่มเรียนกับ Sobdai
+        <p className="text-[#A1866B] text-sm leading-relaxed mb-8">
+          เลือกแพ็กเกจที่สนใจเพื่อเริ่มต้นการเรียนและการเตรียมสอบกับ Sobdai
         </p>
 
         <Link
           href="/packages"
-          className="btn-primary"
-          style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
+          className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
         >
-          ดูแพ็กเกจทั้งหมด
+          เลือกแพ็กเกจ
         </Link>
       </div>
     </div>
