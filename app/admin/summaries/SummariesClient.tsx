@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { toggleSummaryPublish, deleteSummary } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
+import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
 
 interface SummariesClientProps {
   summaries: any[]
@@ -16,6 +17,7 @@ interface SummariesClientProps {
   search: string
   packageFilter: string
   statusFilter: string
+  subjectFilter: string
 }
 
 export default function SummariesClient({
@@ -25,7 +27,8 @@ export default function SummariesClient({
   currentPage,
   search,
   packageFilter,
-  statusFilter
+  statusFilter,
+  subjectFilter
 }: SummariesClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -118,14 +121,25 @@ export default function SummariesClient({
               {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
 
-            <select 
-              value={statusFilter} 
+            <select
+              value={statusFilter}
               onChange={(e) => updateParams({ status: e.target.value })}
-              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[200px]"
             >
               <option value="">All Statuses</option>
               <option value="published">Published</option>
               <option value="draft">Draft</option>
+            </select>
+
+            <select
+              value={subjectFilter}
+              onChange={(e) => updateParams({ subject: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[200px] truncate"
+            >
+              <option value="">All Subjects</option>
+              {getSubjectDropdownOptions().map((opt) => (
+                <option key={opt.code} value={opt.code}>{opt.label}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -145,7 +159,7 @@ export default function SummariesClient({
                 <th className="p-4 font-medium w-12 text-center">Order</th>
                 <th className="p-4 font-medium">Title & Slug</th>
                 <th className="p-4 font-medium">Package</th>
-                <th className="p-4 font-medium">Topic</th>
+                <th className="p-4 font-medium">Subject</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 font-medium text-right">Actions</th>
               </tr>
@@ -170,7 +184,20 @@ export default function SummariesClient({
                     <div className="text-[#F5E9D6] text-sm truncate max-w-[200px]">{summary.package_name}</div>
                   </td>
                   <td className="p-4">
-                    <div className="text-[#F5E9D6] text-sm truncate max-w-[150px]">{summary.topic || summary.subject || '-'}</div>
+                    <div className="flex flex-col gap-1">
+                      {isUnassignedSubject(summary.subject) ? (
+                        <span className="text-[#A1866B]/60 text-xs italic">ยังไม่กำหนด Subject</span>
+                      ) : (
+                        <span className="text-[#F5E9D6] text-xs px-2 py-1 bg-[#D4AF37]/10 rounded-lg border border-[#D4AF37]/20 whitespace-nowrap w-max">
+                          {getSubjectLabel(summary.subject)}
+                        </span>
+                      )}
+                      {summary.topic && (
+                        <span className="text-[#A1866B] text-[10px] uppercase font-bold tracking-wider">
+                          {summary.topic}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4">
                     <button type="submit" 

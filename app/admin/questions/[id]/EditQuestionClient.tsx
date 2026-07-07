@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 import { ArrowLeft, Save, Loader2, BookOpen } from 'lucide-react'
 import { updateQuestionAction } from '../actions'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { SUBJECTS, UNASSIGNED_SUBJECT, getSubjectDropdownOptions } from '@/lib/subjects'
 
 export default function EditQuestionClient({ question }: { question: any }) {
   const [isPending, startTransition] = useTransition()
@@ -192,7 +193,25 @@ export default function EditQuestionClient({ question }: { question: any }) {
 
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Subject</label>
-              <input defaultValue={question.subject} name="subject" type="text" placeholder="e.g. ความรู้ทั่วไป" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <select
+                name="subject"
+                defaultValue={question.subject || UNASSIGNED_SUBJECT.code}
+                className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+              >
+                {/* If the stored value is neither curated nor the unassigned
+                    sentinel (legacy free text), surface it as a readable
+                    option so the current value isn't lost on save. */}
+                {question.subject &&
+                  !SUBJECTS.some((s) => s.code === question.subject || s.label === question.subject) &&
+                  question.subject !== UNASSIGNED_SUBJECT.code && (
+                    <option value={question.subject}>{question.subject} (เดิม)</option>
+                  )}
+                {getSubjectDropdownOptions().map((opt) => (
+                  <option key={opt.code} value={opt.code === UNASSIGNED_SUBJECT.code ? '' : opt.code}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
