@@ -166,7 +166,7 @@ export default function MobileNav({ user, isAdmin, avatarUrl, onLoginClick, onRe
                     โปรไฟล์
                   </Link>
                   <Link
-                    href="/orders"
+                    href="/exams"
                     onClick={() => setMenuOpen(false)}
                     className="px-4 py-3 text-base font-medium text-[#F5E9D6] rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors"
                   >
