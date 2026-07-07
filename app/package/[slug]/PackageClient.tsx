@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import SummaryNavigation from '@/components/SummaryNavigation'
+import ExamNavigation from '@/components/ExamNavigation'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -51,8 +52,6 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
 }
 
 export default function PackageClient({ pkg, examSets, summaries, isPurchased }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean }) {
-  const sortedExamSets = examSets ? [...examSets].sort((a, b) => a.sort_order - b.sort_order) : []
-  
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
@@ -259,31 +258,8 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
                 <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">ชุดข้อสอบ</h3>
               </div>
               
-              <div className="space-y-4 flex-1">
-                {sortedExamSets.length > 0 ? (
-                  sortedExamSets.map((topic: any) => {
-                    const qCount = topic.qCount || 0
-                    return (
-                      <Link href={`/package/${pkg.slug}/exam/${topic.id}`} key={topic.id} className="block">
-                        <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col relative overflow-hidden">
-                          {topic.is_sample && (
-                            <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">ตัวอย่าง</div>
-                          )}
-                          <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-2 leading-snug group-hover:text-[#D4AF37] transition-colors pr-12">{topic.name}</h4>
-                          <p className="text-[#A1866B] text-[12px] mb-4 line-clamp-2">{topic.description || 'ชุดข้อสอบจำลองสนามจริง'}</p>
-                          <div className="flex gap-4 text-[#A1866B] text-[12px] mt-auto pt-2 border-t border-[rgba(255,255,255,0.05)]">
-                            <div className="flex items-center gap-1.5"><Clock size={12}/> {topic.duration_minutes} นาที</div>
-                            <div className="flex items-center gap-1.5"><FileText size={12}/> {qCount} ข้อ</div>
-                          </div>
-                        </div>
-                      </Link>
-                    )
-                  })
-                ) : (
-                  <div className="h-40 border border-dashed border-[rgba(255,255,255,0.1)] rounded-xl flex items-center justify-center text-[#A1866B] text-[13px]">
-                    กำลังจัดเตรียมชุดข้อสอบ
-                  </div>
-                )}
+              <div className="flex-1">
+                <ExamNavigation examSets={examSets} packageSlug={pkg.slug} />
               </div>
             </div>
 
