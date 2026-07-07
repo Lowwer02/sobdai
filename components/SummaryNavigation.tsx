@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Clock, ChevronDown } from 'lucide-react'
+import { UNASSIGNED_SUBJECT, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
 
 interface Summary {
   id: string
@@ -43,11 +44,13 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
     return () => mql.removeEventListener('change', update)
   }, [])
 
-  // Group summaries by subject
+  // Group summaries by subject. Use the curated label as the category key so
+  // legacy free-text values still group correctly, and surface records with
+  // no subject under "ยังไม่กำหนด Subject" instead of a generic bucket.
   const categories = useMemo(() => {
     const map = new Map<string, Summary[]>()
     for (const s of summaries) {
-      const key = s.subject || 'อื่น ๆ'
+      const key = isUnassignedSubject(s.subject) ? UNASSIGNED_SUBJECT.label : getSubjectLabel(s.subject)
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(s)
     }
@@ -83,7 +86,7 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
     // Re-group after filtering
     const map = new Map<string, Summary[]>()
     for (const s of filtered) {
-      const key = s.subject || 'อื่น ๆ'
+      const key = isUnassignedSubject(s.subject) ? UNASSIGNED_SUBJECT.label : getSubjectLabel(s.subject)
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(s)
     }

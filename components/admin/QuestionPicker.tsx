@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Search, Loader2, Plus, Check, Trash2, GripVertical, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { fetchQuestionsForPicker, fetchUniqueFilters } from '../../app/admin/exam-sets/questions.action'
+import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
 
 interface Question {
   id: string
@@ -189,7 +190,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                 </div>
                 <div className="flex gap-2">
                   <span className="text-[10px] text-[#A1866B] bg-[#0F0B07] px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)]">
-                    {q.subject || q.category || 'Uncategorized'}
+                    {isUnassignedSubject(q.subject) ? (q.category || 'ยังไม่กำหนด Subject') : getSubjectLabel(q.subject)}
                   </span>
                   <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${q.difficulty === 'Easy' ? 'text-[#22C55E] bg-[#22C55E]/10' : q.difficulty === 'Medium' ? 'text-[#EAB308] bg-[#EAB308]/10' : 'text-red-400 bg-red-400/10'}`}>
                     {q.difficulty}
@@ -251,7 +252,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
               </div>
               <select value={subject} onChange={e => { setSubject(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
                 <option value="">All Subjects</option>
-                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                {getSubjectDropdownOptions().map(opt => <option key={opt.code} value={opt.code === '__unassigned__' ? '' : opt.code}>{opt.label}</option>)}
               </select>
               <select value={topic} onChange={e => { setTopic(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
                 <option value="">All Topics</option>
@@ -305,7 +306,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                         <p className={`text-sm line-clamp-3 mb-2 ${isSelected ? 'text-[#F5E9D6]' : 'text-[#A1866B]'}`}>{q.content}</p>
                         <div className="flex flex-wrap gap-2 mt-auto">
                           <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)]">
-                            {q.subject || q.category || 'Uncategorized'}
+                            {isUnassignedSubject(q.subject) ? (q.category || 'ยังไม่กำหนด Subject') : getSubjectLabel(q.subject)}
                           </span>
                           <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)]">
                             {q.difficulty}

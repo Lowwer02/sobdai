@@ -4,6 +4,8 @@ export const legalConfig = {
   termsVersion: '1.0',
   privacyVersion: '1.0',
   cookiesVersion: '1.0',
+  aboutVersion: '1.0',
+  contactVersion: '1.0',
   lastUpdated: '30 มิถุนายน 2026', // Format for Thai users as the app is in Thai
 }
 

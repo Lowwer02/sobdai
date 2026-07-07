@@ -1,5 +1,6 @@
 import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import QuestionsClient from './QuestionsClient'
+import { UNASSIGNED_SUBJECT } from '@/lib/subjects'
 
 export default async function QuestionsPage({
   searchParams,
@@ -9,7 +10,7 @@ export default async function QuestionsPage({
   const { supabase, profile } = await requirePermission('content.read')
 
   const params = await searchParams
-  
+
   const page = typeof params.page === 'string' ? parseInt(params.page) : 1
   const search = typeof params.q === 'string' ? params.q : ''
   const statusFilter = typeof params.status === 'string' ? params.status : ''
@@ -23,12 +24,12 @@ export default async function QuestionsPage({
   const from = (page - 1) * limit
   const to = from + limit - 1
 
-  
+
   // Build Query
   let query = supabase
     .from('questions')
     .select('*', { count: 'exact' })
-    
+
   if (search) {
     query = query.ilike('content', `%${search}%`)
   }
@@ -41,8 +42,16 @@ export default async function QuestionsPage({
   if (categoryFilter && categoryFilter !== 'All') {
     query = query.eq('category', categoryFilter)
   }
+  // Subject filter: the special sentinel selects records with no subject
+  // (null/empty). Anything else matches the stored value (curated code or
+  // legacy free text). This is part of the existing query — no extra round
+  // trip introduced.
   if (subjectFilter && subjectFilter !== 'All') {
-    query = query.eq('subject', subjectFilter)
+    if (subjectFilter === UNASSIGNED_SUBJECT.code) {
+      query = query.or('subject.is.null,subject.eq.')
+    } else {
+      query = query.eq('subject', subjectFilter)
+    }
   }
   if (lawFilter && lawFilter !== 'All') {
     query = query.eq('law', lawFilter)
@@ -73,19 +82,21 @@ export default async function QuestionsPage({
     supabase.from('questions').select('*', { count: 'exact', head: true }).eq('status', 'Draft'),
   ])
 
-  // Fetch unique categories for the filter dropdown
+  // Filter dropdown values for legacy/optional columns. Subject is now a
+  // curated list (see lib/subjects.ts) — it no longer needs a scan of the
+  // table, so we drop subject from this fetch to keep the query small and
+  // avoid an extra per-table column scan.
   const { data: filterData } = await supabase
     .from('questions')
-    .select('category, subject, law, topic')
+    .select('category, law, topic')
 
   const uniqueCategories = Array.from(new Set(filterData?.map(c => c.category).filter(Boolean))) as string[]
-  const uniqueSubjects = Array.from(new Set(filterData?.map(c => c.subject).filter(Boolean))) as string[]
   const uniqueLaws = Array.from(new Set(filterData?.map(c => c.law).filter(Boolean))) as string[]
   const uniqueTopics = Array.from(new Set(filterData?.map(c => c.topic).filter(Boolean))) as string[]
 
   return (
-    <QuestionsClient 
-      questions={questions || []} 
+    <QuestionsClient
+      questions={questions || []}
       totalPages={totalPages}
       currentPage={page}
       search={search}
@@ -96,7 +107,6 @@ export default async function QuestionsPage({
       lawFilter={lawFilter}
       topicFilter={topicFilter}
       uniqueCategories={uniqueCategories}
-      uniqueSubjects={uniqueSubjects}
       uniqueLaws={uniqueLaws}
       uniqueTopics={uniqueTopics}
       totalCount={totalCount || 0}

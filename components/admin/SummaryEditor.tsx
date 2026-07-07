@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import Link from 'next/link'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { SUBJECTS, UNASSIGNED_SUBJECT, getSubjectDropdownOptions } from '@/lib/subjects'
 
 interface SummaryData {
   id?: string
@@ -173,14 +174,29 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-4 space-y-4">
             <div>
               <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Subject</label>
-              <input 
-                type="text" 
+              <select
                 name="subject"
-                value={formData.subject}
+                value={
+                  formData.subject ||
+                  (SUBJECTS.some((s) => s.code === formData.subject || s.label === formData.subject)
+                    ? formData.subject
+                    : UNASSIGNED_SUBJECT.code)
+                }
                 onChange={handleChange}
-                placeholder="e.g. ความรู้ความสามารถทั่วไป"
                 className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
-              />
+              >
+                {/* Surface a legacy free-text value (if any) so it isn't lost. */}
+                {formData.subject &&
+                  !SUBJECTS.some((s) => s.code === formData.subject || s.label === formData.subject) &&
+                  formData.subject !== UNASSIGNED_SUBJECT.code && (
+                    <option value={formData.subject}>{formData.subject} (เดิม)</option>
+                  )}
+                {getSubjectDropdownOptions().map((opt) => (
+                  <option key={opt.code} value={opt.code === UNASSIGNED_SUBJECT.code ? '' : opt.code}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Law</label>

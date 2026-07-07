@@ -28,12 +28,12 @@ export default function Footer() {
             <Link href="/cookies" className="hover:text-[#F5E9D6] transition-colors">
               นโยบายคุกกี้
             </Link>
-            <Link href="/#about" className="hover:text-[#F5E9D6] transition-colors">
+            <Link href="/about" className="hover:text-[#F5E9D6] transition-colors">
               เกี่ยวกับเรา
             </Link>
-            <a href={`mailto:${legalConfig.supportEmail}`} className="hover:text-[#F5E9D6] transition-colors">
+            <Link href="/contact" className="hover:text-[#F5E9D6] transition-colors">
               ติดต่อเรา
-            </a>
+            </Link>
           </div>
           
         </div>
