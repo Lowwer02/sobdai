@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { toggleSummaryPublish, deleteSummary } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
-import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
+import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject, UNASSIGNED_SUBJECT } from '@/lib/subjects'
 
 interface SummariesClientProps {
   summaries: any[]
@@ -18,6 +18,8 @@ interface SummariesClientProps {
   packageFilter: string
   statusFilter: string
   subjectFilter: string
+  documentFilter: string
+  uniqueDocuments: string[]
 }
 
 export default function SummariesClient({
@@ -28,7 +30,9 @@ export default function SummariesClient({
   search,
   packageFilter,
   statusFilter,
-  subjectFilter
+  subjectFilter,
+  documentFilter,
+  uniqueDocuments
 }: SummariesClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -141,6 +145,18 @@ export default function SummariesClient({
                 <option key={opt.code} value={opt.code}>{opt.label}</option>
               ))}
             </select>
+
+            <select
+              value={documentFilter}
+              onChange={(e) => updateParams({ document: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[200px] truncate"
+            >
+              <option value="">All Documents</option>
+              <option value={UNASSIGNED_SUBJECT.code}>{UNASSIGNED_SUBJECT.label}</option>
+              {uniqueDocuments.map(doc => (
+                <option key={doc} value={doc}>{doc}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -159,7 +175,7 @@ export default function SummariesClient({
                 <th className="p-4 font-medium w-12 text-center">Order</th>
                 <th className="p-4 font-medium">Title & Slug</th>
                 <th className="p-4 font-medium">Package</th>
-                <th className="p-4 font-medium">Subject</th>
+                <th className="p-4 font-medium">Subject / Document</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 font-medium text-right">Actions</th>
               </tr>
@@ -191,6 +207,13 @@ export default function SummariesClient({
                         <span className="text-[#F5E9D6] text-xs px-2 py-1 bg-[#D4AF37]/10 rounded-lg border border-[#D4AF37]/20 whitespace-nowrap w-max">
                           {getSubjectLabel(summary.subject)}
                         </span>
+                      )}
+                      {summary.document ? (
+                        <span className="text-[#A1866B] text-[11px] truncate max-w-[180px]" title={summary.document}>
+                          {summary.document}
+                        </span>
+                      ) : (
+                        <span className="text-[#A1866B]/40 text-[10px] italic">ไม่มี Document</span>
                       )}
                       {summary.topic && (
                         <span className="text-[#A1866B] text-[10px] uppercase font-bold tracking-wider">

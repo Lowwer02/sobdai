@@ -16,6 +16,7 @@ export default async function SummariesPage({
   const packageFilter = typeof params.package === 'string' ? params.package : ''
   const statusFilter = typeof params.status === 'string' ? params.status : ''
   const subjectFilter = typeof params.subject === 'string' ? params.subject : ''
+  const documentFilter = typeof params.document === 'string' ? params.document : ''
 
   const limit = 15
   const from = (page - 1) * limit
@@ -24,7 +25,7 @@ export default async function SummariesPage({
 
   let query = supabase
     .from('summaries')
-    .select('id, title, slug, subject, law, topic, sort_order, is_published, updated_at, packages!inner(name)', { count: 'exact' })
+    .select('id, title, slug, subject, document, law, topic, sort_order, is_published, updated_at, packages!inner(name)', { count: 'exact' })
 
   if (search) {
     query = query.ilike('title', `%${search}%`)
@@ -43,6 +44,14 @@ export default async function SummariesPage({
       query = query.eq('subject', subjectFilter)
     }
   }
+  // Document filter: behaves like Subject — same query, no extra round trip.
+  if (documentFilter && documentFilter !== 'All') {
+    if (documentFilter === UNASSIGNED_SUBJECT.code) {
+      query = query.or('document.is.null,document.eq.')
+    } else {
+      query = query.eq('document', documentFilter)
+    }
+  }
 
   query = query.range(from, to).order('sort_order', { ascending: true }).order('updated_at', { ascending: false })
 
@@ -57,6 +66,12 @@ export default async function SummariesPage({
 
   const { data: packages } = await supabase.from('packages').select('id, name').order('name')
 
+  // Distinct document names for the filter dropdown (single column scan).
+  const { data: docData } = await supabase
+    .from('summaries')
+    .select('document')
+  const uniqueDocuments = Array.from(new Set((docData || []).map(d => d.document).filter(Boolean))) as string[]
+
   return (
     <SummariesClient
       summaries={summaries}
@@ -67,6 +82,8 @@ export default async function SummariesPage({
       packageFilter={packageFilter}
       statusFilter={statusFilter}
       subjectFilter={subjectFilter}
+      documentFilter={documentFilter}
+      uniqueDocuments={uniqueDocuments}
     />
   )
 }

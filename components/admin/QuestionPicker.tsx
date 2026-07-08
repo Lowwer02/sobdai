@@ -9,6 +9,7 @@ interface Question {
   id: string
   content: string
   subject: string
+  document: string | null
   topic: string
   law: string
   difficulty: string
@@ -37,6 +38,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
   // Filters
   const [search, setSearch] = useState('')
   const [subject, setSubject] = useState('')
+  const [document, setDocument] = useState('')
   const [law, setLaw] = useState('')
   const [topic, setTopic] = useState('')
   const [difficulty, setDifficulty] = useState('')
@@ -49,12 +51,14 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
 
   // Filter Options
   const [subjects, setSubjects] = useState<string[]>([])
+  const [documents, setDocuments] = useState<string[]>([])
   const [laws, setLaws] = useState<string[]>([])
   const [topics, setTopics] = useState<string[]>([])
 
   useEffect(() => {
     fetchUniqueFilters().then(res => {
       setSubjects(res.uniqueSubjects)
+      setDocuments(res.uniqueDocuments || [])
       setLaws(res.uniqueLaws)
       setTopics(res.uniqueTopics)
     })
@@ -66,7 +70,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
     setLoading(true)
 
     fetchQuestionsForPicker({
-      search, subject, law, topic, difficulty, is_common: isCommon, page, limit: PAGE_SIZE
+      search, subject, document, law, topic, difficulty, is_common: isCommon, page, limit: PAGE_SIZE
     }).then(res => {
       if (isMounted) {
         setQuestions(res.data as Question[])
@@ -79,7 +83,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
     })
 
     return () => { isMounted = false }
-  }, [isOpen, search, subject, law, topic, difficulty, isCommon, page])
+  }, [isOpen, search, subject, document, law, topic, difficulty, isCommon, page])
 
   // --- Client-side Question Status filter (no API calls) ---
   // Reuses the existing `selectedQuestions` prop as the source of truth — no
@@ -253,6 +257,10 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
               <select value={subject} onChange={e => { setSubject(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
                 <option value="">All Subjects</option>
                 {getSubjectDropdownOptions().map(opt => <option key={opt.code} value={opt.code === '__unassigned__' ? '' : opt.code}>{opt.label}</option>)}
+              </select>
+              <select value={document} onChange={e => { setDocument(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[200px]">
+                <option value="">All Documents</option>
+                {documents.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <select value={topic} onChange={e => { setTopic(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
                 <option value="">All Topics</option>

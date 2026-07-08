@@ -4,6 +4,7 @@ export interface SummaryMetadata {
   title: string
   slug: string
   subject?: string
+  document?: string
   law?: string
   topic?: string
   package_ref?: string
@@ -68,6 +69,7 @@ export function parseMarkdownSummary(markdown: string): ParsedSummary {
       title,
       slug,
       subject: data.subject || '',
+      document: data.document || '',
       law: data.law || '',
       topic: data.topic || '',
       package_ref,

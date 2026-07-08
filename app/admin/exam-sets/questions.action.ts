@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/auth/server-protect"
 export async function fetchQuestionsForPicker(filters: {
   search?: string
   subject?: string
+  document?: string
   law?: string
   topic?: string
   difficulty?: string
@@ -14,7 +15,7 @@ export async function fetchQuestionsForPicker(filters: {
   limit?: number
 }) {
   const { supabase } = await requirePermission('content.write')
-  
+
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Unauthorized')
 
@@ -25,13 +26,16 @@ export async function fetchQuestionsForPicker(filters: {
 
   let query = supabase
     .from('questions')
-    .select('id, content, subject, topic, law, difficulty, is_common, category', { count: 'exact' })
+    .select('id, content, subject, document, topic, law, difficulty, is_common, category', { count: 'exact' })
 
   if (filters.search) {
     query = query.ilike('content', `%${filters.search}%`)
   }
   if (filters.subject) {
     query = query.eq('subject', filters.subject)
+  }
+  if (filters.document) {
+    query = query.eq('document', filters.document)
   }
   if (filters.law) {
     query = query.eq('law', filters.law)
@@ -57,12 +61,12 @@ export async function fetchQuestionsForPicker(filters: {
 
 export async function fetchQuestionDetailsForPicker(ids: string[]) {
   if (!ids.length) return []
-  
+
   const { supabase } = await requirePermission('content.write')
 
   const { data, error } = await supabase
     .from('questions')
-    .select('id, content, subject, topic, law, difficulty, is_common, category')
+    .select('id, content, subject, document, topic, law, difficulty, is_common, category')
     .in('id', ids)
 
   if (error) throw error
@@ -74,11 +78,12 @@ export async function fetchUniqueFilters() {
 
   const { data } = await supabase
     .from('questions')
-    .select('subject, law, topic')
+    .select('subject, law, topic, document')
 
   const uniqueSubjects = Array.from(new Set(data?.map(c => c.subject).filter(Boolean))) as string[]
+  const uniqueDocuments = Array.from(new Set(data?.map(c => c.document).filter(Boolean))) as string[]
   const uniqueLaws = Array.from(new Set(data?.map(c => c.law).filter(Boolean))) as string[]
   const uniqueTopics = Array.from(new Set(data?.map(c => c.topic).filter(Boolean))) as string[]
 
-  return { uniqueSubjects, uniqueLaws, uniqueTopics }
+  return { uniqueSubjects, uniqueDocuments, uniqueLaws, uniqueTopics }
 }
