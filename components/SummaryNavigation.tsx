@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Clock, ChevronDown } from 'lucide-react'
 import { UNASSIGNED_SUBJECT, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
+import ContentCard from '@/components/ContentCard'
 
 interface Summary {
   id: string
@@ -282,62 +283,16 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {items.map((s) => (
-                      <Link
-                        href={`/package/${packageSlug}/summary/${s.slug}`}
+                      <ContentCard
                         key={s.id}
-                        className="block"
-                      >
-                        <div
-                          style={{
-                            backgroundColor: 'rgba(255,255,255,0.02)',
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            borderRadius: '12px',
-                            padding: '14px 16px',
-                            transition: 'border-color 0.2s, background-color 0.2s',
-                          }}
-                          className="hover:border-[rgba(212,175,55,0.3)] hover:bg-[rgba(212,175,55,0.03)] group"
-                        >
-                          <h4
-                            style={{
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              color: '#F5E9D6',
-                              marginBottom: '4px',
-                              lineHeight: 1.45,
-                              transition: 'color 0.2s',
-                            }}
-                            className="group-hover:text-[#D4AF37]"
-                          >
-                            {s.title}
-                          </h4>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#A1866B', fontSize: '11px' }}>
-                              <Clock size={11} />
-                              {s.read_time_minutes || 5} นาที
-                              {s.topic && (
-                                <>
-                                  <span style={{ margin: '0 4px', opacity: 0.4 }}>•</span>
-                                  {s.topic}
-                                </>
-                              )}
-                            </div>
-                            <span
-                              style={{
-                                backgroundColor: 'rgba(34,197,94,0.1)',
-                                color: '#22C55E',
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: '700',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                              }}
-                            >
-                              พร้อมเรียน
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
+                        href={`/package/${packageSlug}/summary/${s.slug}`}
+                        title={s.title}
+                        meta={[
+                          { icon: <Clock size={11} />, text: `${s.read_time_minutes || 5} นาที` },
+                          ...(s.topic ? [{ text: s.topic }] : []),
+                        ]}
+                        badge={{ label: 'พร้อมเรียน', tone: 'success' }}
+                      />
                     ))}
                   </div>
                 </div>

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import Link from 'next/link'
 import { Search, Clock, ChevronDown, FileText } from 'lucide-react'
+import ContentCard from '@/components/ContentCard'
 
 /**
  * ExamNavigation — Exam Sets navigation for the Package Detail page.
@@ -290,25 +290,17 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {items.map((es) => (
-                      <Link
-                        href={`/package/${packageSlug}/exam/${es.id}`}
+                      <ContentCard
                         key={es.id}
-                        className="block"
-                      >
-                        {/* REUSED CARD — identical to the previous flat-list card.
-                            Runtime / CTA unchanged: this just navigates to the exam. */}
-                        <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-5 hover:border-[rgba(212,175,55,0.3)] transition-colors group h-full flex flex-col relative overflow-hidden">
-                          {es.is_sample && (
-                            <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">ตัวอย่าง</div>
-                          )}
-                          <h4 className="text-[15px] font-bold text-[#F5E9D6] mb-2 leading-snug group-hover:text-[#D4AF37] transition-colors pr-12">{es.name}</h4>
-                          <p className="text-[#A1866B] text-[12px] mb-4 line-clamp-2">{es.description || 'ชุดข้อสอบจำลองสนามจริง'}</p>
-                          <div className="flex gap-4 text-[#A1866B] text-[12px] mt-auto pt-2 border-t border-[rgba(255,255,255,0.05)]">
-                            <div className="flex items-center gap-1.5"><Clock size={12}/> {es.duration_minutes} นาที</div>
-                            <div className="flex items-center gap-1.5"><FileText size={12}/> {es.qCount || 0} ข้อ</div>
-                          </div>
-                        </div>
-                      </Link>
+                        href={`/package/${packageSlug}/exam/${es.id}`}
+                        title={es.name}
+                        description={es.description || 'ชุดข้อสอบจำลองสนามจริง'}
+                        meta={[
+                          { icon: <Clock size={11} />, text: `${es.duration_minutes} นาที` },
+                          { icon: <FileText size={11} />, text: `${es.qCount || 0} ข้อ` },
+                        ]}
+                        cornerBadge={es.is_sample ? 'ตัวอย่าง' : undefined}
+                      />
                     ))}
                   </div>
                 </div>
