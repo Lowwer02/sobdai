@@ -45,6 +45,23 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
     return () => mql.removeEventListener('change', update)
   }, [])
 
+  // Progressive loading (mobile only): each expanded category initially shows
+  // MOBILE_INITIAL items; "ดูเพิ่มอีก 8 รายการ" appends MOBILE_STEP more per
+  // click until all are visible. Desktop shows everything. No API calls —
+  // purely client-side slicing of the already-fetched list.
+  const MOBILE_INITIAL = 8
+  const MOBILE_STEP = 8
+  // limit per category, keyed by category label; absent key = initial limit.
+  const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({})
+
+  const loadMore = (category: string) => {
+    setCategoryLimits(prev => ({ ...prev, [category]: (prev[category] ?? MOBILE_INITIAL) + MOBILE_STEP }))
+  }
+  // Reset limits when search/filter changes so a new query starts fresh.
+  useEffect(() => {
+    setCategoryLimits({})
+  }, [searchQuery, activeFilter])
+
   // Group summaries by subject. Use the curated label as the category key so
   // legacy free-text values still group correctly, and surface records with
   // no subject under "ยังไม่กำหนด Subject" instead of a generic bucket.
@@ -202,6 +219,10 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Array.from(filteredCategories.entries()).map(([category, items]) => {
             const isExpanded = isCategoryExpanded(category)
+            // Progressive loading: slice on mobile; show all on desktop.
+            const limit = isDesktop ? items.length : (categoryLimits[category] ?? MOBILE_INITIAL)
+            const visibleItems = items.slice(0, limit)
+            const hasMore = items.length > limit
             return (
               <div
                 key={category}
@@ -265,7 +286,10 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                   )}
                 </button>
 
-                {/* Summary List — collapsible on mobile, always shown on desktop */}
+                {/* Summary List — collapsible on mobile, always shown on desktop.
+                    Uses a CSS grid 0fr → 1fr transition for the mobile accordion
+                    so the height is always content-driven (no magic per-card
+                    px estimate that clipped taller cards before). */}
                 <div
                   id={`summary-cat-${category}`}
                   role="region"
@@ -273,27 +297,50 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                   style={isDesktop
                     ? { padding: '0 12px 12px' }
                     : {
-                        maxHeight: isExpanded ? `${items.length * 100 + 20}px` : '0',
+                        display: 'grid',
+                        gridTemplateRows: isExpanded ? '1fr' : '0fr',
                         opacity: isExpanded ? 1 : 0,
-                        overflow: 'hidden',
-                        transition: 'max-height 0.3s ease, opacity 0.25s ease',
-                        padding: isExpanded ? '0 12px 12px' : '0 12px',
+                        transition: 'grid-template-rows 0.3s ease, opacity 0.25s ease',
                       }
                   }
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {items.map((s) => (
-                      <ContentCard
-                        key={s.id}
-                        href={`/package/${packageSlug}/summary/${s.slug}`}
-                        title={s.title}
-                        meta={[
-                          { icon: <Clock size={11} />, text: `${s.read_time_minutes || 5} นาที` },
-                          ...(s.topic ? [{ text: s.topic }] : []),
-                        ]}
-                        badge={{ label: 'พร้อมเรียน', tone: 'success' }}
-                      />
-                    ))}
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: isExpanded ? '0 12px 12px' : '0 12px' }}>
+                      {visibleItems.map((s) => (
+                        <ContentCard
+                          key={s.id}
+                          href={`/package/${packageSlug}/summary/${s.slug}`}
+                          title={s.title}
+                          meta={[
+                            { icon: <Clock size={11} />, text: `${s.read_time_minutes || 5} นาที` },
+                            ...(s.topic ? [{ text: s.topic }] : []),
+                          ]}
+                          badge={{ label: 'พร้อมเรียน', tone: 'success' }}
+                        />
+                      ))}
+                      {/* Progressive "load more" — mobile only, hidden on desktop
+                          and when all items are already visible. */}
+                      {!isDesktop && hasMore && (
+                        <button
+                          type="button"
+                          onClick={() => loadMore(category)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(212,175,55,0.2)',
+                            backgroundColor: 'rgba(212,175,55,0.05)',
+                            color: '#D4AF37',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                          }}
+                        >
+                          ดูเพิ่มอีก {MOBILE_STEP} รายการ
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
