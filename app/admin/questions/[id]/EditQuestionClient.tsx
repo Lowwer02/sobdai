@@ -215,6 +215,12 @@ export default function EditQuestionClient({ question }: { question: any }) {
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Document</label>
+              <input defaultValue={question.document} name="document" type="text" placeholder="e.g. พระราชบัญญัติการอุดมศึกษา พ.ศ.2562" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
+              <p className="text-xs text-[#A1866B]">ชื่อเอกสารอย่างเป็นทางการที่ข้อสอบนี้อ้างอิง</p>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Law (Optional)</label>
               <input defaultValue={question.law} name="law" type="text" placeholder="e.g. พ.ร.บ.ระเบียบข้าราชการพลเรือน" className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" />
             </div>

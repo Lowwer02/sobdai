@@ -17,6 +17,7 @@ export default async function QuestionsPage({
   const difficultyFilter = typeof params.difficulty === 'string' ? params.difficulty : ''
   const categoryFilter = typeof params.category === 'string' ? params.category : ''
   const subjectFilter = typeof params.subject === 'string' ? params.subject : ''
+  const documentFilter = typeof params.document === 'string' ? params.document : ''
   const lawFilter = typeof params.law === 'string' ? params.law : ''
   const topicFilter = typeof params.topic === 'string' ? params.topic : ''
 
@@ -53,6 +54,16 @@ export default async function QuestionsPage({
       query = query.eq('subject', subjectFilter)
     }
   }
+  // Document filter: behaves exactly like the Subject filter — part of the
+  // same query, no extra round trip. The sentinel selects records with no
+  // document set.
+  if (documentFilter && documentFilter !== 'All') {
+    if (documentFilter === UNASSIGNED_SUBJECT.code) {
+      query = query.or('document.is.null,document.eq.')
+    } else {
+      query = query.eq('document', documentFilter)
+    }
+  }
   if (lawFilter && lawFilter !== 'All') {
     query = query.eq('law', lawFilter)
   }
@@ -82,15 +93,15 @@ export default async function QuestionsPage({
     supabase.from('questions').select('*', { count: 'exact', head: true }).eq('status', 'Draft'),
   ])
 
-  // Filter dropdown values for legacy/optional columns. Subject is now a
-  // curated list (see lib/subjects.ts) — it no longer needs a scan of the
-  // table, so we drop subject from this fetch to keep the query small and
-  // avoid an extra per-table column scan.
+  // Filter dropdown values for free-text/optional columns. Subject is a
+  // curated list (lib/subjects.ts) so it is not scanned. Document is also
+  // surfaced here so the dropdown can list existing document names.
   const { data: filterData } = await supabase
     .from('questions')
-    .select('category, law, topic')
+    .select('category, law, topic, document')
 
   const uniqueCategories = Array.from(new Set(filterData?.map(c => c.category).filter(Boolean))) as string[]
+  const uniqueDocuments = Array.from(new Set(filterData?.map(c => c.document).filter(Boolean))) as string[]
   const uniqueLaws = Array.from(new Set(filterData?.map(c => c.law).filter(Boolean))) as string[]
   const uniqueTopics = Array.from(new Set(filterData?.map(c => c.topic).filter(Boolean))) as string[]
 
@@ -104,9 +115,11 @@ export default async function QuestionsPage({
       difficultyFilter={difficultyFilter}
       categoryFilter={categoryFilter}
       subjectFilter={subjectFilter}
+      documentFilter={documentFilter}
       lawFilter={lawFilter}
       topicFilter={topicFilter}
       uniqueCategories={uniqueCategories}
+      uniqueDocuments={uniqueDocuments}
       uniqueLaws={uniqueLaws}
       uniqueTopics={uniqueTopics}
       totalCount={totalCount || 0}

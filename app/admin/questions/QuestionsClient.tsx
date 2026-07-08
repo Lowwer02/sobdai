@@ -7,7 +7,7 @@ import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2 } from '
 import { deleteQuestionAction, bulkUpdateQuestionStatusAction } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
-import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
+import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject, UNASSIGNED_SUBJECT } from '@/lib/subjects'
 
 interface QuestionsClientProps {
   questions: any[]
@@ -18,9 +18,11 @@ interface QuestionsClientProps {
   difficultyFilter: string
   categoryFilter: string
   subjectFilter: string
+  documentFilter: string
   lawFilter: string
   topicFilter: string
   uniqueCategories: string[]
+  uniqueDocuments: string[]
   uniqueLaws: string[]
   uniqueTopics: string[]
   totalCount: number
@@ -38,9 +40,11 @@ export default function QuestionsClient({
   difficultyFilter,
   categoryFilter,
   subjectFilter,
+  documentFilter,
   lawFilter,
   topicFilter,
   uniqueCategories,
+  uniqueDocuments,
   uniqueLaws,
   uniqueTopics,
   totalCount,
@@ -307,6 +311,18 @@ export default function QuestionsClient({
               ))}
             </select>
 
+            <select
+              value={documentFilter}
+              onChange={(e) => updateParams({ document: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[180px] truncate"
+            >
+              <option value="">All Documents</option>
+              <option value={UNASSIGNED_SUBJECT.code}>{UNASSIGNED_SUBJECT.label}</option>
+              {uniqueDocuments.map(doc => (
+                <option key={doc} value={doc}>{doc}</option>
+              ))}
+            </select>
+
             <select 
               value={lawFilter} 
               onChange={(e) => updateParams({ law: e.target.value })}
@@ -352,7 +368,7 @@ export default function QuestionsClient({
                   />
                 </th>
                 <th className="p-4 font-medium w-[40%]">Question Preview</th>
-                <th className="p-4 font-medium">Subject / Topic</th>
+                <th className="p-4 font-medium">Subject / Document / Topic</th>
                 <th className="p-4 font-medium">Diff.</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 font-medium">Created</th>
@@ -393,6 +409,13 @@ export default function QuestionsClient({
                         <span className="text-[#F5E9D6] text-xs px-2 py-1 bg-[#D4AF37]/10 rounded-lg border border-[#D4AF37]/20 whitespace-nowrap w-max">
                           {getSubjectLabel(q.subject)}
                         </span>
+                      )}
+                      {q.document ? (
+                        <span className="text-[#A1866B] text-[11px] truncate max-w-[180px]" title={q.document}>
+                          {q.document}
+                        </span>
+                      ) : (
+                        <span className="text-[#A1866B]/40 text-[10px] italic">ไม่มี Document</span>
                       )}
                       {q.topic && (
                         <span className="text-[#A1866B] text-[10px] uppercase font-bold tracking-wider">

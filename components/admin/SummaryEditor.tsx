@@ -15,6 +15,7 @@ interface SummaryData {
   title: string
   slug: string
   subject: string
+  document: string
   law: string
   topic: string
   content_md: string
@@ -35,6 +36,7 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
     title: initialData?.title || '',
     slug: initialData?.slug || '',
     subject: initialData?.subject || '',
+    document: initialData?.document || '',
     law: initialData?.law || '',
     topic: initialData?.topic || '',
     content_md: initialData?.content_md || '',
@@ -199,9 +201,20 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
               </select>
             </div>
             <div>
+              <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Document</label>
+              <input
+                type="text"
+                name="document"
+                value={formData.document}
+                onChange={handleChange}
+                placeholder="e.g. พระราชบัญญัติการอุดมศึกษา พ.ศ.2562"
+                className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+              />
+            </div>
+            <div>
               <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Law</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 name="law"
                 value={formData.law}
                 onChange={handleChange}

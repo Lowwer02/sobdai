@@ -96,6 +96,7 @@ export async function commitSummaryImport(data: any, conflictResolution: 'replac
       title: data.title,
       slug: finalSlug,
       subject: data.subject,
+      document: data.document || null,
       law: data.law,
       topic: data.topic,
       content_md: data.content_md,
