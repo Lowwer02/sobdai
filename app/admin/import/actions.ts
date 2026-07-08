@@ -15,7 +15,12 @@ export async function importQuestionsAction(questions: ParsedQuestion[]) {
       return { success: false, error: 'No valid questions to import' }
     }
 
-    // Prepare payload (status defaults to Draft based on DB schema)
+    // Prepare payload (status defaults to Draft based on DB schema).
+    // Only fields that have a DB column are inserted. The parser also
+    // extracts v2.1 fields (document_type, learning_objective,
+    // knowledge_coverage, blueprint, question_type, choice_count) but those
+    // have no column yet (Content Template v2.1 future phase) and are
+    // intentionally NOT included here to avoid insert errors.
     const payload = questions.map(q => ({
       content: q.content,
       choice_a: q.choice_a,
@@ -33,6 +38,7 @@ export async function importQuestionsAction(questions: ParsedQuestion[]) {
       difficulty: q.difficulty,
       category: q.category || null,
       subject: q.subject || null,
+      document: q.document || null,
       law: q.law || null,
       topic: q.topic || null,
       tags: q.tags,

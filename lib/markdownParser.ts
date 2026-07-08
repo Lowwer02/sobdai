@@ -15,8 +15,15 @@ export interface ParsedQuestion {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   category: string;
   subject: string;
-  law: string;
+  document: string;
+  document_type: string;
   topic: string;
+  learning_objective: string;
+  knowledge_coverage: string;
+  blueprint: string;
+  question_type: string;
+  choice_count: string;
+  law: string;
   tags: string[];
 }
 
@@ -44,8 +51,40 @@ function extractField(chunk: string, regexPattern: RegExp): string {
 export function parseMarkdownQuestions(markdown: string): ParseResult[] {
   // Split by horizontal rule '---' or '***' ensuring it's on its own line
   const chunks = markdown.split(/\n\s*---\s*\n|\n\s*\*\*\*\s*\n/);
-  
+
   const results: ParseResult[] = [];
+
+  // Complete list of known labels used as boundaries in the lookahead.
+  // Adding every Content Template v2.1 label here is what stops a field from
+  // greedily swallowing the next field's value (the root cause of the bug
+  // where Document leaked into Subject, and LearningObjective/KnowledgeCoverage
+  // leaked into Topic).
+  const KNOWN_LABELS = [
+    'A\\.', 'B\\.', 'C\\.', 'D\\.', 'E\\.',
+    '\\*\\*Question:\\*\\*',
+    '\\*\\*Answer:\\*\\*',
+    '\\*\\*Hint:\\*\\*',
+    '\\*\\*Explanation:\\*\\*',
+    '\\*\\*Why A Wrong:\\*\\*',
+    '\\*\\*Why B Wrong:\\*\\*',
+    '\\*\\*Why C Wrong:\\*\\*',
+    '\\*\\*Why D Wrong:\\*\\*',
+    '\\*\\*Why E Wrong:\\*\\*',
+    '\\*\\*Reference:\\*\\*',
+    '\\*\\*Difficulty:\\*\\*',
+    '\\*\\*Blueprint:\\*\\*',
+    '\\*\\*QuestionType:\\*\\*',
+    '\\*\\*ChoiceCount:\\*\\*',
+    '\\*\\*Category:\\*\\*',
+    '\\*\\*Subject:\\*\\*',
+    '\\*\\*Document:\\*\\*',
+    '\\*\\*DocumentType:\\*\\*',
+    '\\*\\*Law:\\*\\*',
+    '\\*\\*Topic:\\*\\*',
+    '\\*\\*LearningObjective:\\*\\*',
+    '\\*\\*KnowledgeCoverage:\\*\\*',
+    '\\*\\*Tags:\\*\\*',
+  ].join('|');
 
   chunks.forEach((rawChunk, index) => {
     const chunk = rawChunk.trim();
@@ -53,13 +92,11 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
 
     const errors: string[] = [];
 
-    // Extracting fields using regex
-    // The format expects labels like **Question:**, A., B., C., D., **Answer:**
-    
-    // We use a strategy where we match everything after a label until the next label or EOF
+    // Match everything after a label, non-greedy, until the next known label
+    // or end of chunk. Each field is parsed independently with the full
+    // boundary list so values never bleed across fields.
     const extractMultiline = (labelRegex: string) => {
-      // Lookbehind for the label, match anything non-greedy until the next known label or end of string
-      const regex = new RegExp(`${labelRegex}\\s*([\\s\\S]*?)(?=\\n\\s*(?:A\\.|B\\.|C\\.|D\\.|\\*\\*Question:\\*\\*|\\*\\*Answer:\\*\\*|\\*\\*Hint:\\*\\*|\\*\\*Explanation:\\*\\*|\\*\\*Why A Wrong:\\*\\*|\\*\\*Why B Wrong:\\*\\*|\\*\\*Why C Wrong:\\*\\*|\\*\\*Why D Wrong:\\*\\*|\\*\\*Reference:\\*\\*|\\*\\*Difficulty:\\*\\*|\\*\\*Category:\\*\\*|\\*\\*Subject:\\*\\*|\\*\\*Law:\\*\\*|\\*\\*Topic:\\*\\*|\\*\\*Tags:\\*\\*)|$)`, 'i');
+      const regex = new RegExp(`${labelRegex}\\s*([\\s\\S]*?)(?=\\n\\s*(?:${KNOWN_LABELS})|$)`, 'i');
       return extractField(chunk, regex);
     };
 
@@ -68,7 +105,7 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     const choice_b = extractMultiline('B\\.');
     const choice_c = extractMultiline('C\\.');
     const choice_d = extractMultiline('D\\.');
-    
+
     const correct_answer_raw = extractMultiline('\\*\\*Answer:\\*\\*').toUpperCase().charAt(0);
     const hint = extractMultiline('\\*\\*Hint:\\*\\*');
     const full_explanation = extractMultiline('\\*\\*Explanation:\\*\\*');
@@ -77,12 +114,19 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     const why_c_wrong = extractMultiline('\\*\\*Why C Wrong:\\*\\*');
     const why_d_wrong = extractMultiline('\\*\\*Why D Wrong:\\*\\*');
     const reference = extractMultiline('\\*\\*Reference:\\*\\*');
-    
+
     const difficultyRaw = extractMultiline('\\*\\*Difficulty:\\*\\*');
     const category = extractMultiline('\\*\\*Category:\\*\\*');
     const subject = extractMultiline('\\*\\*Subject:\\*\\*');
+    const document = extractMultiline('\\*\\*Document:\\*\\*');
+    const document_type = extractMultiline('\\*\\*DocumentType:\\*\\*');
     const law = extractMultiline('\\*\\*Law:\\*\\*');
     const topic = extractMultiline('\\*\\*Topic:\\*\\*');
+    const learning_objective = extractMultiline('\\*\\*LearningObjective:\\*\\*');
+    const knowledge_coverage = extractMultiline('\\*\\*KnowledgeCoverage:\\*\\*');
+    const blueprint = extractMultiline('\\*\\*Blueprint:\\*\\*');
+    const question_type = extractMultiline('\\*\\*QuestionType:\\*\\*');
+    const choice_count = extractMultiline('\\*\\*ChoiceCount:\\*\\*');
     const tagsRaw = extractMultiline('\\*\\*Tags:\\*\\*');
 
     // Default formatting and validation
@@ -125,8 +169,15 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
       difficulty,
       category,
       subject,
+      document,
+      document_type,
       law,
       topic,
+      learning_objective,
+      knowledge_coverage,
+      blueprint,
+      question_type,
+      choice_count,
       tags
     } : null;
 
