@@ -125,9 +125,11 @@ export default function ContentCard({
           </p>
         )}
 
-        {/* Footer metadata row — fixed badge + truncating left meta */}
+        {/* Footer metadata row — fixed badge on the right; on the left the
+            leading meta items (e.g. "3 นาที") are fixed-width and never
+            truncate, while the LAST meta item (e.g. topic) absorbs leftover
+            space and ellipsifies. This guarantees time never wraps/clips. */}
         <div style={FOOTER_STYLE}>
-          {/* Left meta: first item flexible + truncating, rest fixed-width */}
           <div
             style={{
               display: 'flex',
@@ -142,7 +144,9 @@ export default function ContentCard({
             }}
           >
             {meta.map((m, i) => (
-              <MetaItem key={i} meta={m} primary={i === 0} />
+              // The final meta entry is the truncating one; all earlier ones
+              // (time, count) are fixed and fully visible.
+              <MetaItem key={i} meta={m} truncate={i === meta.length - 1} />
             ))}
           </div>
 
@@ -171,8 +175,12 @@ export default function ContentCard({
   )
 }
 
-/** One metadata chip. The primary one may truncate its trailing text. */
-function MetaItem({ meta, primary }: { meta: ContentCardMeta; primary: boolean }) {
+/**
+ * One metadata chip. When `truncate` is true (the trailing/last meta item,
+ * e.g. a topic), the chip absorbs leftover space and ellipsifies on overflow.
+ * Non-truncating chips (time, count) are fixed-width and always fully visible.
+ */
+function MetaItem({ meta, truncate }: { meta: ContentCardMeta; truncate: boolean }) {
   return (
     <span
       style={{
@@ -180,19 +188,16 @@ function MetaItem({ meta, primary }: { meta: ContentCardMeta; primary: boolean }
         alignItems: 'center',
         gap: '4px',
         whiteSpace: 'nowrap',
-        // Primary meta (e.g. "3 นาที") can shrink so its trailing text
-        // truncates instead of forcing the row to wrap. Non-primary items
-        // (e.g. "12 ข้อ") keep a fixed width.
-        flex: primary ? '1 1 auto' : '0 0 auto',
-        minWidth: primary ? 0 : 'auto',
-        overflow: primary ? 'hidden' : 'visible',
+        flex: truncate ? '1 1 auto' : '0 0 auto',
+        minWidth: truncate ? 0 : 'auto',
+        overflow: truncate ? 'hidden' : 'visible',
       }}
     >
       {meta.icon}
       <span
         style={{
-          overflow: primary ? 'hidden' : 'visible',
-          textOverflow: primary ? 'ellipsis' : 'clip',
+          overflow: truncate ? 'hidden' : 'visible',
+          textOverflow: truncate ? 'ellipsis' : 'clip',
         }}
       >
         {meta.text}
