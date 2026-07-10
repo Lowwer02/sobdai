@@ -32,11 +32,12 @@ export async function createExamSetAction(data: {
   duration_minutes: number
   is_sample: boolean
   sort_order: number
+  display_order: number
   question_ids: string[]
 }) {
   try {
     const { supabase } = await requirePermission('content.write')
-    
+
     // 1. Insert Exam Set
     const { data: examSet, error: insertError } = await supabase
       .from('exam_sets')
@@ -46,7 +47,8 @@ export async function createExamSetAction(data: {
         description: data.description,
         duration_minutes: data.duration_minutes,
         is_sample: data.is_sample,
-        sort_order: data.sort_order
+        sort_order: data.sort_order,
+        display_order: data.display_order
       })
       .select()
       .single()
@@ -87,11 +89,12 @@ export async function updateExamSetAction(id: string, data: {
   duration_minutes: number
   is_sample: boolean
   sort_order: number
+  display_order: number
   question_ids: string[]
 }) {
   try {
     const { supabase } = await requirePermission('content.write')
-    
+
     // 1. Update Exam Set
     const { error: updateError, data: updateData } = await supabase
       .from('exam_sets')
@@ -101,7 +104,8 @@ export async function updateExamSetAction(id: string, data: {
         description: data.description,
         duration_minutes: data.duration_minutes,
         is_sample: data.is_sample,
-        sort_order: data.sort_order
+        sort_order: data.sort_order,
+        display_order: data.display_order
       })
       .eq('id', id)
       .select('id')

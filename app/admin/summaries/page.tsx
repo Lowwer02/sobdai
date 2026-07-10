@@ -1,6 +1,7 @@
 import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import SummariesClient from './SummariesClient'
 import { UNASSIGNED_SUBJECT } from '@/lib/subjects'
+import { applyContentOrdering } from '@/lib/contentOrdering'
 
 export default async function SummariesPage({
   searchParams,
@@ -53,7 +54,7 @@ export default async function SummariesPage({
     }
   }
 
-  query = query.range(from, to).order('sort_order', { ascending: true }).order('updated_at', { ascending: false })
+  query = applyContentOrdering(query).range(from, to)
 
   const { data: rawSummaries, count } = await query
 

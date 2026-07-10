@@ -34,6 +34,7 @@ export default function ExamSetForm({
   const [durationMinutes, setDurationMinutes] = useState(initialData?.duration_minutes || 60)
   const [isSample, setIsSample] = useState(initialData?.is_sample || false)
   const [sortOrder, setSortOrder] = useState(initialData?.sort_order || 0)
+  const [displayOrder, setDisplayOrder] = useState(initialData?.display_order || 0)
   
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>(selectedQuestionsData)
   const [isDirty, setIsDirty] = useState(false)
@@ -57,6 +58,7 @@ export default function ExamSetForm({
         duration_minutes: durationMinutes,
         is_sample: isSample,
         sort_order: sortOrder,
+        display_order: displayOrder,
         question_ids: selectedQuestions.map(q => q.id)
       })
 
@@ -163,12 +165,23 @@ export default function ExamSetForm({
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-[#F5E9D6] font-medium block">Sort Order</label>
-                <input 
-                  type="number" 
-                  value={sortOrder} 
-                  onChange={e => setSortOrder(parseInt(e.target.value) || 0)} 
-                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors" 
+                <input
+                  type="number"
+                  value={sortOrder}
+                  onChange={e => setSortOrder(parseInt(e.target.value) || 0)}
+                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-[#F5E9D6] font-medium block">Display Order</label>
+                <input
+                  type="number"
+                  value={displayOrder}
+                  onChange={e => setDisplayOrder(parseInt(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                />
+                <p className="text-xs text-[#A1866B]">ค่ามากกว่า แสดงก่อน (เช่น 999 = บนสุด)</p>
               </div>
             </div>
 
