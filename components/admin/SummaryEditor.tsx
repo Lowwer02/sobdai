@@ -20,6 +20,7 @@ interface SummaryData {
   topic: string
   content_md: string
   sort_order: number
+  display_order: number
   is_published: boolean
 }
 
@@ -41,6 +42,7 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
     topic: initialData?.topic || '',
     content_md: initialData?.content_md || '',
     sort_order: initialData?.sort_order || 0,
+    display_order: initialData?.display_order || 0,
     is_published: initialData?.is_published || false,
   })
 
@@ -235,13 +237,25 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
             </div>
             <div>
               <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Sort Order</label>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 name="sort_order"
                 value={formData.sort_order}
                 onChange={handleChange}
                 className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
               />
+            </div>
+            <div>
+              <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Display Order</label>
+              <input
+                type="number"
+                name="display_order"
+                value={formData.display_order}
+                onChange={handleChange}
+                placeholder="0"
+                className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+              />
+              <p className="text-[10px] text-[#A1866B] mt-1">ค่ามากกว่า แสดงก่อน (เช่น 999 = บนสุด)</p>
             </div>
           </div>
         </div>

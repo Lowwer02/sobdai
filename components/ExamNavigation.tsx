@@ -107,10 +107,10 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
         const db = b.updated_at ? new Date(b.updated_at).getTime() : 0
         return db - da
       })
-    } else {
-      // 'all' — preserve the package's intended order (sort_order).
-      filtered = [...filtered].sort((a, b) => a.sort_order - b.sort_order)
     }
+    // 'all' — do NOT re-sort: respect the DB-side Smart Content Ordering
+    // (display_order → released_at → updated_at → created_at) that was applied
+    // in the server query. Client-side sort here would override it.
 
     // Group by category (sample / full).
     const map = new Map<string, ExamSet[]>()

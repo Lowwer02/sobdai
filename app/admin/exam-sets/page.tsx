@@ -1,5 +1,6 @@
 import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import ExamSetsClient from './ExamSetsClient'
+import { applyContentOrdering } from '@/lib/contentOrdering'
 
 export default async function ExamSetsPage({
   searchParams,
@@ -45,10 +46,8 @@ export default async function ExamSetsPage({
     query = query.eq('is_sample', typeFilter === 'Sample')
   }
 
-  // Add pagination and ordering
-  query = query
-    .range(from, to)
-    .order('created_at', { ascending: false })
+  // Add pagination and Smart Content Ordering (DB-side).
+  query = applyContentOrdering(query).range(from, to)
 
   const { data: rawExamSets, count, error } = await query
 

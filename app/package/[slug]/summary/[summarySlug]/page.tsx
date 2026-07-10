@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, LogIn } from 'lucide-react'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { applyContentOrdering } from '@/lib/contentOrdering'
 import SummaryClient from './SummaryClient'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, summarySlug: string }> }) {
@@ -122,13 +123,14 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
     )
   }
 
-  // Fetch previous and next summaries
-  const { data: allSummaries } = await supabase
-    .from('summaries')
-    .select('id, title, slug, sort_order')
-    .eq('package_id', pkg.id)
-    .eq('is_published', true)
-    .order('sort_order', { ascending: true })
+  // Fetch previous and next summaries using Smart Content Ordering.
+  const { data: allSummaries } = await applyContentOrdering(
+    supabase
+      .from('summaries')
+      .select('id, title, slug')
+      .eq('package_id', pkg.id)
+      .eq('is_published', true)
+  )
 
   // Check if package has Exam Sets
   const { count: examSetsCount } = await supabase
