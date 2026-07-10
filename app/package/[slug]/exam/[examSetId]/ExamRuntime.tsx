@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw } from 'lucide-react'
+import DownloadShareButton from '@/components/share/DownloadShareButton'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -137,6 +138,21 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   const score = questions.filter(q => answers[q.id] === q.correct_answer).length
   const accuracy = Math.round((score / questions.length) * 100)
   const answeredCount = Object.keys(answers).length
+
+  // Per-subject breakdown for the share card (computed once per render; only
+  // consumed on the result screen). Falls back to "ทั่วไป" when a question has
+  // no subject, so every question is accounted for.
+  const subjectBreakdown = useMemo(() => {
+    const map = new Map<string, { correct: number; total: number }>()
+    for (const q of questions) {
+      const key = q.subject || 'ทั่วไป'
+      const entry = map.get(key) || { correct: 0, total: 0 }
+      entry.total += 1
+      if (answers[q.id] === q.correct_answer) entry.correct += 1
+      map.set(key, entry)
+    }
+    return Array.from(map.entries()).map(([subject, v]) => ({ subject, ...v }))
+  }, [questions, answers])
 
   // Keyboard navigation
   useEffect(() => {
@@ -443,6 +459,16 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
               <BookOpen size={18} />
               ดูเฉลยอย่างละเอียด
             </button>
+            <DownloadShareButton
+              packageName={pkg.name || ''}
+              positionName={pkg.positions?.name || ''}
+              examName={examSet.title || examSet.name || ''}
+              scorePercent={accuracy}
+              correct={score}
+              wrong={questions.length - score}
+              timeUsedSeconds={timeUsed}
+              subjects={subjectBreakdown}
+            />
             <Link href={`/package/${pkg.slug}`} className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]">
               กลับหน้าหลัก
             </Link>
