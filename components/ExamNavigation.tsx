@@ -67,6 +67,22 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
     return () => mql.removeEventListener('change', update)
   }, [])
 
+  // Progressive loading (mobile only) — mirrors SummaryNavigation exactly.
+  // Each expanded category initially shows MOBILE_INITIAL cards; "ดูเพิ่มอีก 8
+  // รายการ" appends MOBILE_STEP more per click until all are visible. Desktop
+  // shows everything. Purely client-side slicing of the already-fetched list.
+  const MOBILE_INITIAL = 8
+  const MOBILE_STEP = 8
+  const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({})
+
+  const loadMore = (category: string) => {
+    setCategoryLimits(prev => ({ ...prev, [category]: (prev[category] ?? MOBILE_INITIAL) + MOBILE_STEP }))
+  }
+  // Reset limits when search/filter changes so a new query starts fresh.
+  useEffect(() => {
+    setCategoryLimits({})
+  }, [searchQuery, activeFilter])
+
   // Filter + search + grouping, recomputed via useMemo (no extra queries).
   const filteredCategories = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
@@ -211,6 +227,10 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Array.from(filteredCategories.entries()).map(([category, items]) => {
             const isExpanded = isCategoryExpanded(category)
+            // Progressive loading: slice on mobile; show all on desktop.
+            const limit = isDesktop ? items.length : (categoryLimits[category] ?? MOBILE_INITIAL)
+            const visibleItems = items.slice(0, limit)
+            const hasMore = items.length > limit
             return (
               <div
                 key={category}
@@ -272,7 +292,9 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
                   )}
                 </button>
 
-                {/* Exam Set List — collapsible on mobile, always shown on desktop */}
+                {/* Exam Set List — collapsible on mobile, always shown on desktop.
+                    CSS grid 0fr → 1fr transition (content-driven) so cards are
+                    never clipped, mirroring SummaryNavigation exactly. */}
                 <div
                   id={`exam-cat-${category}`}
                   role="region"
@@ -280,28 +302,51 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
                   style={isDesktop
                     ? { padding: '0 12px 12px' }
                     : {
-                        maxHeight: isExpanded ? `${items.length * 130 + 20}px` : '0',
+                        display: 'grid',
+                        gridTemplateRows: isExpanded ? '1fr' : '0fr',
                         opacity: isExpanded ? 1 : 0,
-                        overflow: 'hidden',
-                        transition: 'max-height 0.3s ease, opacity 0.25s ease',
-                        padding: isExpanded ? '0 12px 12px' : '0 12px',
+                        transition: 'grid-template-rows 0.3s ease, opacity 0.25s ease',
                       }
                   }
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {items.map((es) => (
-                      <ContentCard
-                        key={es.id}
-                        href={`/package/${packageSlug}/exam/${es.id}`}
-                        title={es.name}
-                        description={es.description || 'ชุดข้อสอบจำลองสนามจริง'}
-                        meta={[
-                          { icon: <Clock size={11} />, text: `${es.duration_minutes} นาที` },
-                          { icon: <FileText size={11} />, text: `${es.qCount || 0} ข้อ` },
-                        ]}
-                        cornerBadge={es.is_sample ? 'ตัวอย่าง' : undefined}
-                      />
-                    ))}
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: isExpanded ? '0 12px 12px' : '0 12px' }}>
+                      {visibleItems.map((es) => (
+                        <ContentCard
+                          key={es.id}
+                          href={`/package/${packageSlug}/exam/${es.id}`}
+                          title={es.name}
+                          description={es.description || 'ชุดข้อสอบจำลองสนามจริง'}
+                          meta={[
+                            { icon: <Clock size={11} />, text: `${es.duration_minutes} นาที` },
+                            { icon: <FileText size={11} />, text: `${es.qCount || 0} ข้อ` },
+                          ]}
+                          cornerBadge={es.is_sample ? 'ตัวอย่าง' : undefined}
+                        />
+                      ))}
+                      {/* Progressive "load more" — mobile only, hidden on
+                          desktop and when all items are already visible. */}
+                      {!isDesktop && hasMore && (
+                        <button
+                          type="button"
+                          onClick={() => loadMore(category)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(212,175,55,0.2)',
+                            backgroundColor: 'rgba(212,175,55,0.05)',
+                            color: '#D4AF37',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                          }}
+                        >
+                          ดูเพิ่มอีก {MOBILE_STEP} รายการ
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
