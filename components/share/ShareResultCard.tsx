@@ -108,13 +108,22 @@ export default function ShareResultCard({
       id="sobdai-share-card"
       style={{
         width: 1200,
-        height: 1200,
+        // Content-driven height: NO fixed height. The card grows to fit its
+        // content (many subjects, reserved area, QR, footer) so html-to-image
+        // exports everything without bottom clipping. Fixed `height` + `overflow:
+        // hidden` was the root cause of the clip.
         backgroundColor: BASE.bg,
         color: BASE.cream,
         fontFamily: 'Supermarket, system-ui, sans-serif',
         position: 'relative',
+        // `visible` so the card can grow; the off-screen wrapper in
+        // DownloadShareButton controls visibility during export.
         overflow: 'hidden',
-        padding: 56,
+        paddingTop: 56,
+        paddingRight: 56,
+        paddingLeft: 56,
+        // Bottom safe padding (≈56px) so html-to-image never cuts the footer.
+        paddingBottom: 64,
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -146,10 +155,10 @@ export default function ShareResultCard({
         }}
       />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', gap: 24 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 28 }}>
 
         {/* ---- HEADER (tightened hierarchy) ---- */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8 }}>
           <div
             style={{
               display: 'inline-flex',
@@ -167,8 +176,38 @@ export default function ShareResultCard({
             </svg>
             <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '0.02em', color: '#D4AF37' }}>Sobdai</span>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: BASE.cream, maxWidth: 980 }}>{packageName}</div>
-          <div style={{ fontSize: 15, color: BASE.muted }}>{positionName} · {examName}</div>
+          {/* Package name — clamped to max 2 lines so very long names never
+              overlap the rows below. Uses standard -webkit-line-clamp which
+              html-to-image renders correctly. */}
+          <div
+            className="line-clamp-2"
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: BASE.cream,
+              maxWidth: 980,
+              lineHeight: 1.35,
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2,
+              overflow: 'hidden',
+            }}
+          >
+            {packageName}
+          </div>
+          {/* Position · Exam name — clamped to 1 line. */}
+          <div
+            style={{
+              fontSize: 15,
+              color: BASE.muted,
+              maxWidth: 980,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {positionName} · {examName}
+          </div>
         </div>
 
         {/* ---- HEADLINE ---- */}
@@ -280,10 +319,11 @@ export default function ShareResultCard({
         )}
 
         {/* ---- RESERVED: Future Expansion Card (glass + grid + glow, NO data) ---- */}
+        {/* NOTE: no flex-grow. A fixed minHeight keeps the slot compact so it
+            never inflates and pushes QR/footer out of the exported canvas. */}
         <div
           style={{
-            flex: 1,
-            minHeight: 56,
+            height: 72,
             borderRadius: 20,
             background: BASE.glassBg,
             border: `1px solid ${BASE.glassBorder}`,

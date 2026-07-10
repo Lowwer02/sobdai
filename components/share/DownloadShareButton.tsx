@@ -42,8 +42,10 @@ export default function DownloadShareButton(props: DownloadShareButtonProps) {
     const dataUrl = await toPng(node, {
       pixelRatio: 1,
       cacheBust: true,
+      // width is fixed (1200); height is NOT passed so html-to-image uses the
+      // node's real rendered height (content-driven). Passing height:1200 was
+      // clipping the bottom when content exceeded 1200px.
       width: 1200,
-      height: 1200,
       backgroundColor: '#0F0B07',
     })
 
@@ -145,7 +147,9 @@ export default function DownloadShareButton(props: DownloadShareButtonProps) {
         {downloading ? 'กำลังเตรียม...' : 'ดาวน์โหลดรูป'}
       </button>
 
-      {/* Off-screen 1200×1200 card (capturable, never visible). */}
+      {/* Off-screen card (capturable, never visible). Width fixed at 1200; the
+          card grows to its natural content height, which html-to-image reads
+          directly (no clipping). */}
       <div
         aria-hidden="true"
         ref={cardRef}
@@ -154,7 +158,6 @@ export default function DownloadShareButton(props: DownloadShareButtonProps) {
           left: -2000,
           top: 0,
           width: 1200,
-          height: 1200,
           pointerEvents: 'none',
           zIndex: -1,
         }}
