@@ -1,72 +1,151 @@
 'use client'
 
 /**
- * DownloadShareButton — renders a ShareResultCard off-screen (visually hidden
- * but in the DOM, so html-to-image can capture it) and exports it to a
- * 1200×1200 PNG on click.
+ * DownloadShareButton — renders a ShareResultCard off-screen and either:
+ *   (a) shares it via the Web Share API (native share sheet) when supported,
+ *       passing the PNG as a file so LINE/Facebook/Messenger/Threads/
+ *       Instagram/X are all offered by the OS; or
+ *   (b) falls back to a plain PNG download.
  *
- * Pure client-side: no upload, no DB, no API, no storage. The PNG is produced
- * in-browser and offered as a download.
+ * Session 6.14.1:
+ *   - Awaits `document.fonts.ready` before exporting so the Supermarket font
+ *     is guaranteed to render into the PNG (no fallback font in the export).
+ *   - Adds Native Share with automatic PNG-download fallback.
+ *
+ * Pure client-side: no upload, no DB, no API, no storage.
  */
 
 import { useState, useRef, useCallback } from 'react'
 import { toPng } from 'html-to-image'
-import { Download, Loader2 } from 'lucide-react'
+import { Share2, Download, Loader2 } from 'lucide-react'
 import ShareResultCard, { type ShareResultCardProps } from './ShareResultCard'
 
 interface DownloadShareButtonProps extends ShareResultCardProps {
-  /** Optional filename for the downloaded PNG (without extension). */
   filename?: string
 }
 
 export default function DownloadShareButton(props: DownloadShareButtonProps) {
-  const [downloading, setDownloading] = useState(false)
+  const [busy, setBusy] = useState<'share' | 'download' | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
-  const handleDownload = useCallback(async () => {
+  // Produce the PNG data URL. Ensures the Supermarket font is loaded first so
+  // the export never falls back to a system font.
+  const renderPng = useCallback(async (): Promise<Blob> => {
     const node = document.getElementById('sobdai-share-card')
-    if (!node || downloading) return
+    if (!node) throw new Error('share card node not found')
 
-    setDownloading(true)
-    try {
-      // pixelRatio: 1 because the card is already 1200×1200 — we want the
-      // exact native pixels, not a 2x upscale.
-      const dataUrl = await toPng(node, {
-        pixelRatio: 1,
-        cacheBust: true,
-        width: 1200,
-        height: 1200,
-        backgroundColor: '#0F0B07',
-      })
-
-      const link = document.createElement('a')
-      const name = props.filename || `sobdai-result-${props.scorePercent}`
-      link.download = `${name}.png`
-      link.href = dataUrl
-      link.click()
-    } catch (err) {
-      console.error('ShareCard export failed:', err)
-    } finally {
-      setDownloading(false)
+    // Wait for webfonts so html-to-image bakes the real glyphs into the PNG.
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready } catch { /* fonts API best-effort */ }
     }
-  }, [downloading, props.filename, props.scorePercent])
+
+    const dataUrl = await toPng(node, {
+      pixelRatio: 1,
+      cacheBust: true,
+      width: 1200,
+      height: 1200,
+      backgroundColor: '#0F0B07',
+    })
+
+    const res = await fetch(dataUrl)
+    return res.blob()
+  }, [])
+
+  const baseFilename = props.filename || `sobdai-result-${props.scorePercent}`
+
+  // Native share: try Web Share API with a file (best — native sheet handles
+  // all apps). If unsupported or it fails, fall back to download.
+  const handleShare = useCallback(async () => {
+    if (busy) return
+    setBusy('share')
+    try {
+      const blob = await renderPng()
+      const file = new File([blob], `${baseFilename}.png`, { type: 'image/png' })
+      const nav = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean
+        share?: (data: ShareData) => Promise<void>
+      }
+
+      const shareData: ShareData = {
+        title: 'Sobdai — สรุปผลการทดสอบ',
+        text: `ทำข้อสอบได้ ${props.scorePercent}% บน Sobdai`,
+      }
+
+      // Prefer sharing the image file when the browser allows it.
+      if (nav.canShare && nav.canShare({ ...shareData, files: [file] }) && nav.share) {
+        await nav.share({ ...shareData, files: [file] })
+        return
+      }
+
+      // Text-only share (no image) if the browser supports Web Share but not
+      // file sharing.
+      if (nav.share) {
+        await nav.share(shareData)
+        return
+      }
+
+      // No Web Share API at all → download the PNG.
+      triggerDownload(blob, `${baseFilename}.png`)
+    } catch (err) {
+      // User cancelling the share sheet throws AbortError — don't log that.
+      const name = (err as { name?: string })?.name
+      if (name !== 'AbortError') console.error('Share failed:', err)
+    } finally {
+      setBusy(null)
+    }
+  }, [busy, renderPng, baseFilename, props.scorePercent])
+
+  // Plain PNG download (always available as an explicit option).
+  const handleDownload = useCallback(async () => {
+    if (busy) return
+    setBusy('download')
+    try {
+      const blob = await renderPng()
+      triggerDownload(blob, `${baseFilename}.png`)
+    } catch (err) {
+      console.error('ShareCard download failed:', err)
+    } finally {
+      setBusy(null)
+    }
+  }, [busy, renderPng, baseFilename])
+
+  function triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.download = filename
+    link.href = url
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const sharing = busy === 'share'
+  const downloading = busy === 'download'
 
   return (
     <>
-      {/* Visible button */}
+      {/* Primary: Native Share (auto-fallbacks to download internally) */}
+      <button
+        type="button"
+        onClick={handleShare}
+        disabled={!!busy}
+        className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        {sharing ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
+        {sharing ? 'กำลังเตรียม...' : 'แชร์ผลลัพธ์'}
+      </button>
+
+      {/* Secondary: explicit PNG download */}
       <button
         type="button"
         onClick={handleDownload}
-        disabled={downloading}
+        disabled={!!busy}
         className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-        {downloading ? 'กำลังเตรียมรูป...' : 'ดาวน์โหลดรูปแชร์'}
+        {downloading ? 'กำลังเตรียม...' : 'ดาวน์โหลดรูป'}
       </button>
 
-      {/* Off-screen render of the 1200×1200 card. Positioned absolutely off
-          the viewport so it is in the DOM (capturable) but never visible.
-          pointer-events:none + aria-hidden keep it out of interaction/a11y. */}
+      {/* Off-screen 1200×1200 card (capturable, never visible). */}
       <div
         aria-hidden="true"
         ref={cardRef}
