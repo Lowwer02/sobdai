@@ -26,6 +26,43 @@ function GoogleIcon() {
   )
 }
 
+/**
+ * Translate a Supabase auth error into a friendly Thai message.
+ *
+ * - Always logs the ORIGINAL Supabase error to the console for debugging.
+ * - Returns a stable Thai message for the known cases below.
+ * - For any unmapped error, falls back to a generic Thai message (never
+ *   surfaces the raw technical string to the user).
+ *
+ * Also returns `rateLimitHit` so callers can toggle the Google helper text.
+ */
+function translateAuthError(error: unknown): { message: string; rateLimitHit: boolean } {
+  // Always log the original for debugging — never expose it to users.
+  console.error('Supabase Auth Error:', error)
+
+  const msg =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : ''
+
+  // Map known Supabase messages to friendly Thai. Match on substrings so we
+  // still catch messages with extra context (e.g. a trailing hint).
+  if (/invalid login credentials/i.test(msg)) {
+    return { message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', rateLimitHit: false }
+  }
+  if (/user already registered/i.test(msg)) {
+    return { message: 'อีเมลนี้ถูกใช้งานแล้ว', rateLimitHit: false }
+  }
+  if (/over_email_send_rate_limit|email rate limit exceeded/i.test(msg)) {
+    return {
+      message: 'ระบบส่งอีเมลยืนยันใช้งานหนาแน่นในขณะนี้ แนะนำสมัครด้วย Google เพื่อเข้าใช้งานได้ทันที',
+      rateLimitHit: true,
+    }
+  }
+  // Unknown error — generic fallback, never the raw technical string.
+  return { message: 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง', rateLimitHit: false }
+}
+
 export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'login', redirectUrl }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot_password'>(initialMode)
   const [email, setEmail] = useState('')
@@ -33,6 +70,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [consentGiven, setConsentGiven] = useState(false)
+  // Set when the last error was an email-send rate limit, so we can show the
+  // "สมัครด้วย Google เพื่อเริ่มใช้งานได้ทันที" helper nudge (no duplicate button).
+  const [rateLimitHit, setRateLimitHit] = useState(false)
   
   const supabase = createClient()
 
@@ -44,6 +84,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
       setPassword('')
       setShowPassword(false)
       setConsentGiven(false)
+      setRateLimitHit(false)
     }
   }, [isOpen, initialMode])
 
@@ -79,7 +120,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
       },
     })
     if (error) {
-      toastEvent(error.message, 'error')
+      const { message } = translateAuthError(error)
+      toastEvent(message, 'error')
     } else {
       onClose()
     }
@@ -95,7 +137,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
         redirectTo: `${window.location.origin}/reset-password`,
       })
       if (error) {
-        toastEvent(error.message, 'error')
+        const { message, rateLimitHit } = translateAuthError(error)
+        setRateLimitHit(rateLimitHit)
+        toastEvent(message, 'error')
       } else {
         toastEvent('ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณแล้ว', 'success')
         onClose()
@@ -109,10 +153,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
         }
       })
       if (error) {
-        toastEvent(error.message, 'error')
+        const { message, rateLimitHit } = translateAuthError(error)
+        setRateLimitHit(rateLimitHit)
+        toastEvent(message, 'error')
       } else {
         if (data.user && data.user.identities && data.user.identities.length === 0) {
-          toastEvent('อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ', 'error')
+          // Supabase returns a user with no identities when the email is
+          // already registered (no error thrown in this configuration).
+          toastEvent('อีเมลนี้ถูกใช้งานแล้ว', 'error')
         } else {
           toastEvent('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือทดลองล็อกอินได้เลย', 'success')
           setEmail('')
@@ -127,7 +175,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
         password,
       })
       if (error) {
-        toastEvent('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error')
+        const { message, rateLimitHit } = translateAuthError(error)
+        setRateLimitHit(rateLimitHit)
+        toastEvent(message, 'error')
       } else if (data?.user) {
         const { data: profile } = await supabase.from('profiles').select('deleted_at, status').eq('id', data.user.id).single()
         if (profile?.deleted_at) {
@@ -300,6 +350,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                     <GoogleIcon />
                     {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
                   </button>
+
+                  {/* Rate-limit nudge: shows the existing Google button as the
+                      fast alternative. No duplicate button — just helper text. */}
+                  {rateLimitHit && (
+                    <p className="mt-3 text-[12px] text-center text-[#D4AF37] leading-relaxed">
+                      หรือสมัครด้วย Google เพื่อเริ่มใช้งานได้ทันที
+                    </p>
+                  )}
                   
                   {mode === 'register' && (
                     <p className="mt-4 text-[11.5px] text-center text-[#A1866B]/80 leading-relaxed">
