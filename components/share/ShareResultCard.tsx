@@ -1,22 +1,20 @@
 'use client'
 
 /**
- * ShareResultCard — a 1200×1200 PNG-ready card for sharing exam results on
- * social media (Facebook / LINE / Instagram / X / Threads).
+ * ShareResultCard — a 1200×1200 PNG-ready card for sharing exam results.
  *
- * Design direction: Sobdai theme — dark background, gold accent, premium,
- * minimal, glassmorphism. No emoji, no cartoon. Mirrors the approved mockup.
+ * Session 6.14.1 polish:
+ *   - Dynamic auto color theme (red/orange/gold/green) by score band.
+ *   - Dynamic background glow tinted by score band (still Sobdai dark).
+ *   - Hero score circle enlarged (~30%) with score-tinted glow; true hero.
+ *   - Header hierarchy tightened: logo → package → position → exam name.
+ *   - Motivation rendered as a premium glass card with quote styling.
+ *   - Reserved area styled as a Future Expansion card (glass + grid + glow,
+ *     NO data, NO placeholder text).
+ *   - Subject summary upgraded: percent + correct/total + premium spacing.
+ *   - Uses the Supermarket font everywhere (loaded via @font-face globally).
  *
- * Rendering:
- *   This component renders an off-screen 1200×1200 element. It is NOT visible
- *   to the user directly; DownloadShareButton wraps it and calls html-to-image
- *   to produce a PNG. Pure client-side — no upload, no DB, no API.
- *
- * Reserved area:
- *   A "future expansion slot" is built into the layout (a glass card with a
- *   subtle grid pattern). It shows NO data and NO placeholder text — it is
- *   decoration only, ready to host Top%, Ranking, Badges, Streaks, AI recs,
- *   etc. later without changing the main layout.
+ * Rendering stays pure client-side; no data flow changes.
  */
 
 import { SOBDAI_QR_SVG, SOBDAI_URL } from './qrCode'
@@ -28,44 +26,46 @@ export interface SubjectScore {
 }
 
 export interface ShareResultCardProps {
-  /** Package display name, e.g. "ตำรวจภูธรภาค ๘". */
   packageName: string
-  /** Position display name, e.g. "สอบตรงเข้ารับราชการ". */
   positionName: string
-  /** Exam set name. */
   examName: string
-  /** Overall score percentage 0–100. */
   scorePercent: number
-  /** Number of correct answers. */
   correct: number
-  /** Number of wrong/unanswered questions. */
   wrong: number
-  /** Total time used in seconds. */
   timeUsedSeconds: number
-  /** Per-subject breakdown (already computed by the caller). */
   subjects: SubjectScore[]
 }
 
-// ----- helpers ---------------------------------------------------------------
+// ----- score band → theme ---------------------------------------------------
+
+type ScoreBand = 'red' | 'orange' | 'gold' | 'green'
+
+interface Theme {
+  accent: string
+  /** Soft accent used for glows / backgrounds. */
+  glow: string
+  band: ScoreBand
+}
+
+function getTheme(percent: number): Theme {
+  if (percent >= 80) return { accent: '#22C55E', glow: 'rgba(34,197,94,0.16)', band: 'green' }
+  if (percent >= 60) return { accent: '#D4AF37', glow: 'rgba(212,175,55,0.16)', band: 'gold' }
+  if (percent >= 40) return { accent: '#F97316', glow: 'rgba(249,115,22,0.16)', band: 'orange' }
+  return { accent: '#EF4444', glow: 'rgba(239,68,68,0.16)', band: 'red' }
+}
 
 function getHeadline(percent: number): { headline: string; subtitle: string } {
-  if (percent >= 80) {
-    return { headline: 'ยอดเยี่ยม!', subtitle: 'คุณพร้อมสำหรับการสอบแล้ว' }
-  }
-  if (percent >= 60) {
-    return { headline: 'ทำได้ดี!', subtitle: 'ทบทวนอีกนิดรับรองผ่านฉลุย' }
-  }
+  if (percent >= 80) return { headline: 'ยอดเยี่ยม!', subtitle: 'คุณพร้อมสำหรับการสอบแล้ว' }
+  if (percent >= 60) return { headline: 'ทำได้ดี!', subtitle: 'ทบทวนอีกนิดรับรองผ่านฉลุย' }
+  if (percent >= 40) return { headline: 'ใกล้แล้ว', subtitle: 'คุณใกล้สอบผ่านแล้ว อีกนิดเดียว' }
   return { headline: 'อย่าท้อแท้', subtitle: 'ฝึกต่อไป คุณทำได้แน่นอน' }
 }
 
 function getMotivation(percent: number): string {
-  if (percent >= 80) {
-    return 'บทเรียนที่คุณทำได้ดี คือพื้นฐานของความสำเร็จ วันสอบจะเป็นวันของคุณ'
-  }
-  if (percent >= 60) {
-    return 'คุณใกล้สอบผ่านแล้ว ทบทวนจุดที่พลาด แล้วกลับมาทำใหม่อีกครั้ง'
-  }
-  return 'ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น ลองใหม่อีกครั้งได้เสมอ'
+  if (percent >= 80) return 'ผลลัพธ์นี้คือผลของความขยัน วันสอบจะเป็นวันของคุณ'
+  if (percent >= 60) return 'คุณใกล้สอบผ่านแล้ว ทบทวนจุดที่พลาดแล้วกลับมาให้ดีกว่าเดิม'
+  if (percent >= 40) return 'อีกนิดเดียวก็ผ่าน ลองดูเฉลยแล้วฝึกซ้ำในส่วนที่ยังไม่แข็งแรง'
+  return 'ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น ลองใหม่ได้เสมอ อย่าเพิ่งท้อ'
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -74,20 +74,14 @@ function formatDuration(totalSeconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-// ----- card -----------------------------------------------------------------
-
-const COLORS = {
+const BASE = {
   bg: '#0F0B07',
   cardBg: '#1A140E',
   cardBorder: 'rgba(255,255,255,0.06)',
   glassBg: 'rgba(255,255,255,0.03)',
   glassBorder: 'rgba(212,175,55,0.18)',
-  gold: '#D4AF37',
-  goldSoft: 'rgba(212,175,55,0.12)',
   cream: '#F5E9D6',
   muted: '#A1866B',
-  green: '#22C55E',
-  red: '#EF4444',
 }
 
 export default function ShareResultCard({
@@ -100,12 +94,12 @@ export default function ShareResultCard({
   timeUsedSeconds,
   subjects,
 }: ShareResultCardProps) {
+  const theme = getTheme(scorePercent)
   const { headline, subtitle } = getHeadline(scorePercent)
   const motivation = getMotivation(scorePercent)
-  const scoreColor = scorePercent >= 60 ? COLORS.green : COLORS.red
 
-  // Score ring maths (SVG circle).
-  const RADIUS = 88
+  // Enlarged hero (~30% bigger than v1): radius 88 → 116, container 240 → 320.
+  const RADIUS = 116
   const CIRC = 2 * Math.PI * RADIUS
   const dashOffset = CIRC - (CIRC * scorePercent) / 100
 
@@ -115,9 +109,9 @@ export default function ShareResultCard({
       style={{
         width: 1200,
         height: 1200,
-        backgroundColor: COLORS.bg,
-        color: COLORS.cream,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        backgroundColor: BASE.bg,
+        color: BASE.cream,
+        fontFamily: 'Supermarket, system-ui, sans-serif',
         position: 'relative',
         overflow: 'hidden',
         padding: 56,
@@ -126,21 +120,21 @@ export default function ShareResultCard({
         flexDirection: 'column',
       }}
     >
-      {/* Ambient gold glow (background decoration) */}
+      {/* Dynamic background glow tinted by score band (still Sobdai dark). */}
       <div
         style={{
           position: 'absolute',
-          top: -160,
+          top: 80,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 760,
-          height: 760,
+          width: 900,
+          height: 900,
           borderRadius: '50%',
-          background: `radial-gradient(circle, ${COLORS.goldSoft} 0%, transparent 70%)`,
+          background: `radial-gradient(circle, ${theme.glow} 0%, transparent 65%)`,
           pointerEvents: 'none',
         }}
       />
-      {/* Subtle grid texture (background decoration) */}
+      {/* Subtle grid texture (background decoration). */}
       <div
         style={{
           position: 'absolute',
@@ -152,11 +146,10 @@ export default function ShareResultCard({
         }}
       />
 
-      {/* Content stack */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', gap: 24 }}>
 
-        {/* ---- HEADER: logo / package / position / exam name ---- */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8 }}>
+        {/* ---- HEADER (tightened hierarchy) ---- */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 6 }}>
           <div
             style={{
               display: 'inline-flex',
@@ -164,50 +157,58 @@ export default function ShareResultCard({
               gap: 12,
               padding: '8px 18px',
               borderRadius: 999,
-              backgroundColor: COLORS.glassBg,
-              border: `1px solid ${COLORS.glassBorder}`,
+              backgroundColor: BASE.glassBg,
+              border: `1px solid ${BASE.glassBorder}`,
             }}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={BASE.glassBorder.includes('212') ? '#D4AF37' : theme.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <circle cx="12" cy="10" r="3" fill={COLORS.gold} stroke="none" />
+              <circle cx="12" cy="10" r="3" fill={theme.accent} stroke="none" />
             </svg>
-            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '0.02em', color: COLORS.gold }}>Sobdai</span>
+            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '0.02em', color: '#D4AF37' }}>Sobdai</span>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: COLORS.cream }}>{packageName}</div>
-          <div style={{ fontSize: 15, color: COLORS.muted }}>{positionName} · {examName}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: BASE.cream, maxWidth: 980 }}>{packageName}</div>
+          <div style={{ fontSize: 15, color: BASE.muted }}>{positionName} · {examName}</div>
         </div>
 
         {/* ---- HEADLINE ---- */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.cream, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: BASE.muted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             สรุปผลการทดสอบ
           </div>
-          <div style={{ fontSize: 40, fontWeight: 800, color: scoreColor, marginTop: 6, lineHeight: 1.1 }}>{headline}</div>
-          <div style={{ fontSize: 20, color: COLORS.muted, marginTop: 4 }}>{subtitle}</div>
+          <div style={{ fontSize: 44, fontWeight: 800, color: theme.accent, marginTop: 6, lineHeight: 1.1 }}>{headline}</div>
+          <div style={{ fontSize: 20, color: BASE.muted, marginTop: 4 }}>{subtitle}</div>
         </div>
 
-        {/* ---- HERO SCORE CIRCLE (largest element) ---- */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ position: 'relative', width: 240, height: 240 }}>
-            <svg width="240" height="240" viewBox="0 0 240 240">
-              <circle cx="120" cy="120" r={RADIUS} fill="none" stroke={COLORS.cardBorder} strokeWidth="14" />
+        {/* ---- HERO SCORE CIRCLE (enlarged + glow) ---- */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
+          <div
+            style={{
+              position: 'relative',
+              width: 320,
+              height: 320,
+              borderRadius: '50%',
+              boxShadow: `0 0 80px 8px ${theme.glow}`,
+            }}
+          >
+            <svg width="320" height="320" viewBox="0 0 320 320">
+              <circle cx="160" cy="160" r={RADIUS} fill="none" stroke={BASE.cardBorder} strokeWidth="16" />
               <circle
-                cx="120"
-                cy="120"
+                cx="160"
+                cy="160"
                 r={RADIUS}
                 fill="none"
-                stroke={scoreColor}
-                strokeWidth="14"
+                stroke={theme.accent}
+                strokeWidth="16"
                 strokeLinecap="round"
                 strokeDasharray={CIRC}
                 strokeDashoffset={dashOffset}
-                transform="rotate(-90 120 120)"
+                transform="rotate(-90 160 160)"
               />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ fontSize: 72, fontWeight: 800, color: COLORS.cream, lineHeight: 1 }}>
-                {scorePercent}<span style={{ fontSize: 36, color: COLORS.muted }}>%</span>
+              <div style={{ fontSize: 96, fontWeight: 800, color: BASE.cream, lineHeight: 1 }}>
+                {scorePercent}<span style={{ fontSize: 44, color: BASE.muted }}>%</span>
               </div>
             </div>
           </div>
@@ -216,52 +217,61 @@ export default function ShareResultCard({
         {/* ---- STATISTICS: 3 cards ---- */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
           {[
-            { value: correct, label: 'ตอบถูก', color: COLORS.green },
-            { value: wrong, label: 'ตอบผิด', color: COLORS.red },
-            { value: formatDuration(timeUsedSeconds), label: 'เวลาที่ใช้', color: COLORS.gold },
+            { value: correct, label: 'ตอบถูก', color: '#22C55E' },
+            { value: wrong, label: 'ตอบผิด', color: '#EF4444' },
+            { value: formatDuration(timeUsedSeconds), label: 'เวลาที่ใช้', color: '#D4AF37' },
           ].map((stat) => (
             <div
               key={stat.label}
               style={{
-                backgroundColor: COLORS.cardBg,
-                border: `1px solid ${COLORS.cardBorder}`,
+                backgroundColor: BASE.cardBg,
+                border: `1px solid ${BASE.cardBorder}`,
                 borderRadius: 20,
                 padding: '20px 12px',
                 textAlign: 'center',
               }}
             >
-              <div style={{ fontSize: 36, fontWeight: 800, color: stat.color }}>{stat.value}</div>
-              <div style={{ fontSize: 14, color: COLORS.muted, marginTop: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stat.label}</div>
+              <div style={{ fontSize: 38, fontWeight: 800, color: stat.color }}>{stat.value}</div>
+              <div style={{ fontSize: 14, color: BASE.muted, marginTop: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stat.label}</div>
             </div>
           ))}
         </div>
 
-        {/* ---- MOTIVATION ---- */}
+        {/* ---- MOTIVATION — premium glass card with quote style ---- */}
         <div
           style={{
+            backgroundColor: BASE.glassBg,
+            border: `1px solid ${BASE.glassBorder}`,
+            borderRadius: 20,
+            padding: '22px 28px',
             textAlign: 'center',
-            fontSize: 18,
-            color: COLORS.cream,
-            lineHeight: 1.5,
-            padding: '0 24px',
+            boxShadow: `0 0 40px 0 ${theme.glow}`,
+            position: 'relative',
           }}
         >
-          {motivation}
+          <div style={{ fontSize: 40, color: theme.accent, lineHeight: 0.6, opacity: 0.5, position: 'absolute', top: 16, left: 18 }}>&ldquo;</div>
+          <div style={{ fontSize: 19, color: BASE.cream, lineHeight: 1.55, padding: '0 20px', fontWeight: 600 }}>
+            {motivation}
+          </div>
+          <div style={{ fontSize: 40, color: theme.accent, lineHeight: 0.6, opacity: 0.5, position: 'absolute', bottom: 10, right: 18 }}>&rdquo;</div>
         </div>
 
-        {/* ---- SUMMARY BY SUBJECT (progress bars) ---- */}
+        {/* ---- SUMMARY BY SUBJECT (premium progress bars) ---- */}
         {subjects.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {subjects.map((s) => {
               const pct = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0
               return (
-                <div key={s.subject} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
-                    <span style={{ color: COLORS.cream, fontWeight: 600 }}>{s.subject}</span>
-                    <span style={{ color: COLORS.muted }}>{s.correct}/{s.total}</span>
+                <div key={s.subject} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ color: BASE.cream, fontWeight: 700, fontSize: 16 }}>{s.subject}</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                      <span style={{ color: theme.accent, fontWeight: 800, fontSize: 18 }}>{pct}%</span>
+                      <span style={{ color: BASE.muted, fontSize: 14 }}>{s.correct}/{s.total}</span>
+                    </div>
                   </div>
-                  <div style={{ height: 10, borderRadius: 999, backgroundColor: COLORS.cardBg, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, backgroundColor: COLORS.gold, borderRadius: 999 }} />
+                  <div style={{ height: 12, borderRadius: 999, backgroundColor: BASE.cardBg, overflow: 'hidden', border: `1px solid ${BASE.cardBorder}` }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg, ${theme.accent}, ${theme.glow})`, borderRadius: 999 }} />
                   </div>
                 </div>
               )
@@ -269,28 +279,23 @@ export default function ShareResultCard({
           </div>
         )}
 
-        {/* ---- RESERVED: Future Expansion Slot ---- */}
-        {/* No data, no placeholder text. Glass card + grid pattern decoration.
-            Ready to host Top%, Ranking, Badges, Streaks, AI recs, etc. later
-            without changing the main layout. */}
+        {/* ---- RESERVED: Future Expansion Card (glass + grid + glow, NO data) ---- */}
         <div
           style={{
             flex: 1,
-            minHeight: 60,
+            minHeight: 56,
             borderRadius: 20,
-            background: COLORS.glassBg,
-            border: `1px solid ${COLORS.glassBorder}`,
+            background: BASE.glassBg,
+            border: `1px solid ${BASE.glassBorder}`,
             backgroundImage:
               'linear-gradient(rgba(212,175,55,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.06) 1px, transparent 1px)',
             backgroundSize: '24px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            boxShadow: `inset 0 0 40px 0 ${theme.glow}`,
           }}
         />
 
         {/* ---- QR + FOOTER ---- */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, paddingTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, paddingTop: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div
               style={{
@@ -305,14 +310,14 @@ export default function ShareResultCard({
               dangerouslySetInnerHTML={{ __html: SOBDAI_QR_SVG }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ fontSize: 13, color: COLORS.muted }}>Scan เพื่อทดลองใช้งาน</div>
-              <div style={{ fontSize: 15, color: COLORS.cream, fontWeight: 600 }}>Sobdai</div>
+              <div style={{ fontSize: 13, color: BASE.muted }}>Scan เพื่อทดลองใช้งาน</div>
+              <div style={{ fontSize: 15, color: BASE.cream, fontWeight: 700 }}>Sobdai</div>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.gold }}>Sobdai</div>
-            <div style={{ fontSize: 13, color: COLORS.muted }}>เตรียมสอบอย่างมีระบบ</div>
-            <div style={{ fontSize: 13, color: COLORS.cream, fontWeight: 600 }}>{SOBDAI_URL.replace('https://', '')}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#D4AF37' }}>Sobdai</div>
+            <div style={{ fontSize: 13, color: BASE.muted }}>เตรียมสอบอย่างมีระบบ</div>
+            <div style={{ fontSize: 13, color: BASE.cream, fontWeight: 700 }}>{SOBDAI_URL.replace('https://', '')}</div>
           </div>
         </div>
       </div>
