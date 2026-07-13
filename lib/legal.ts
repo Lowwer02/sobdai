@@ -24,7 +24,7 @@ export interface SocialLink {
 }
 
 export const socialLinks: SocialLink[] = [
-  { key: 'facebook', label: 'Facebook', url: 'https://facebook.com/sobdai', active: true },
+  { key: 'facebook', label: 'Facebook', url: 'https://www.facebook.com/getsobdai/', active: true },
   { key: 'line', label: 'LINE OA', url: '', active: false },
   { key: 'tiktok', label: 'TikTok', url: '', active: false },
 ]
