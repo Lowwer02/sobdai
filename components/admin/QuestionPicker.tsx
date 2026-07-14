@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Search, Loader2, Plus, Check, Trash2, GripVertical, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, Loader2, Plus, Check, Trash2, GripVertical, ChevronLeft, ChevronRight, X, Info } from 'lucide-react'
 import { fetchQuestionsForPicker, fetchUniqueFilters, fetchQuestionUsage, type QuestionUsage } from '../../app/admin/exam-sets/questions.action'
 import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
+import QuestionInspector from './QuestionInspector'
 
 interface Question {
   id: string
@@ -51,6 +52,11 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
     [initialSelectedIds]
   )
   const [isOpen, setIsOpen] = useState(false)
+
+  // Question Inspector (read-only slide-over). null = closed. Opening it does
+  // NOT toggle selection — the trigger stops propagation so a card's click-to-
+  // select behavior is preserved.
+  const [inspectId, setInspectId] = useState<string | null>(null)
   
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(false)
@@ -408,7 +414,7 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
                       }`}>
                         {isSelected && <Check size={14} strokeWidth={3} />}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className={`text-sm line-clamp-3 mb-2 ${isSelected ? 'text-[#F5E9D6]' : 'text-[#A1866B]'}`}>{q.content}</p>
                         {/* Badges. Each is an atomic unit (whitespace-nowrap +
                             shrink-0) so it never breaks mid-label; the row wraps
@@ -469,6 +475,19 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
                           })()}
                         </div>
                       </div>
+                      {/* Inspector trigger — opens the read-only Question
+                          Inspector for this card. Independent of selection:
+                          stops propagation so it never toggles add/remove. */}
+                      <button
+                        type="button"
+                        aria-label={`Inspect question ${q.id}`}
+                        title="Inspect"
+                        onClick={(e) => { e.stopPropagation(); setInspectId(q.id) }}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors shrink-0"
+                      >
+                        <Info size={16} />
+                      </button>
                     </div>
                   )
                 })}
@@ -505,6 +524,10 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
           </div>
         </div>
       )}
+
+      {/* Question Inspector — read-only slide-over. Rendered outside the
+          modal block so it layers above it (z-[60] > modal z-50). null closes. */}
+      <QuestionInspector questionId={inspectId} onClose={() => setInspectId(null)} />
     </div>
   )
 }

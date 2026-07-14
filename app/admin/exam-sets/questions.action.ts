@@ -208,3 +208,131 @@ export async function fetchUniqueFilters() {
 
   return { uniqueSubjects, uniqueDocuments, uniqueLaws, uniqueTopics }
 }
+
+
+// ─── Question Inspector (read-only) ─────────────────────────────────────
+// Backs the Question Inspector drawer in the Picker. Two read-only actions:
+//   - fetchQuestionInspectorData(id): full metadata + content + timeline
+//   - fetchQuestionUsedIn(id): the "Used In" graph (exam sets + packages)
+// No edits, no writes, no schema change — pure reads over existing tables.
+
+/**
+ * Full read-only metadata + content + timeline for a single Question, for the
+ * Inspector. Includes fields the picker card doesn't carry (status, full
+ * choices/answer, created_at/updated_at). Returns null when the question is
+ * not found. Optional fields are nullable; the UI degrades gracefully.
+ */
+export interface QuestionInspectorData {
+  id: string
+  content: string | null
+  choice_a: string | null
+  choice_b: string | null
+  choice_c: string | null
+  choice_d: string | null
+  correct_answer: string | null
+  hint: string | null
+  full_explanation: string | null
+  reference: string | null
+  difficulty: string | null
+  category: string | null
+  tags: string[] | null
+  status: string | null
+  subject: string | null
+  document: string | null
+  law: string | null
+  topic: string | null
+  is_common: boolean | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export async function fetchQuestionInspectorData(
+  questionId: string
+): Promise<QuestionInspectorData | null> {
+  if (!questionId) return null
+  const { supabase } = await requirePermission('content.write')
+
+  const { data, error } = await supabase
+    .from('questions')
+    .select(`
+      id, content,
+      choice_a, choice_b, choice_c, choice_d, correct_answer,
+      hint, full_explanation, reference,
+      difficulty, category, tags, status,
+      subject, document, law, topic, is_common,
+      created_at, updated_at
+    `)
+    .eq('id', questionId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('fetchQuestionInspectorData failed:', error.message)
+    return null
+  }
+  return (data as QuestionInspectorData) ?? null
+}
+
+/**
+ * A single "Used In" reference: the Exam Set that contains the question and
+ * the Package that owns that Exam Set. `package_*` is null when the Exam Set's
+ * package could not be resolved (shouldn't happen — package_id is NOT NULL —
+ * but the UI degrades gracefully).
+ */
+export interface QuestionUsedInReference {
+  exam_set_id: string
+  exam_set_name: string
+  package_id: string | null
+  package_name: string | null
+  package_code: string | null
+  package_is_published: boolean | null
+}
+
+/**
+ * Read-only "Used In" graph for a Question: every Exam Set that contains it,
+ * each joined to its owning Package. Derived entirely from the existing
+ * exam_set_questions → exam_sets → packages relationships (the same source of
+ * truth as Usage counts). Returns an empty list when the question is unused
+ * or not found — the UI shows a friendly empty state.
+ */
+export async function fetchQuestionUsedIn(
+  questionId: string
+): Promise<QuestionUsedInReference[]> {
+  if (!questionId) return []
+  const { supabase } = await requirePermission('content.write')
+
+  const { data, error } = await supabase
+    .from('exam_set_questions')
+    .select(`
+      exam_set_id,
+      exam_sets (
+        id, name,
+        packages ( id, name, package_code, is_published )
+      )
+    `)
+    .eq('question_id', questionId)
+    .order('exam_set_id', { ascending: true })
+
+  if (error) {
+    console.error('fetchQuestionUsedIn failed:', error.message)
+    return []
+  }
+
+  const refs: QuestionUsedInReference[] = []
+  for (const row of data ?? []) {
+    const es = (row as any)?.exam_sets
+    if (!es) continue
+    // packages() on exam_sets is a single row (FK), but PostgREST may return
+    // it wrapped depending on shape — normalize both cases.
+    const pkg = Array.isArray(es.packages) ? es.packages[0] : es.packages
+    refs.push({
+      exam_set_id: es.id,
+      exam_set_name: es.name,
+      package_id: pkg?.id ?? null,
+      package_name: pkg?.name ?? null,
+      package_code: pkg?.package_code ?? null,
+      package_is_published: pkg?.is_published ?? null,
+    })
+  }
+  return refs
+}
+
