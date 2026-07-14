@@ -6,7 +6,6 @@ import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
-import { applyContentOrdering } from '@/lib/contentOrdering'
 
 // Homepage shows public package data + homepage settings that change
 // infrequently. Cache server-side (ISR) and revalidate every 5 minutes.
@@ -82,11 +81,37 @@ export default async function Home() {
     const count = settings.general.featured_count
     const fallback = settings.general.featured_fallback
 
-    // Query: featured packages first (ordered by the shared content ordering),
-    // then optionally top-up with latest non-featured if fallback says so.
+    // Query: featured packages first, ordered by the dedicated homepage
+    // ordering chain. NOTE: this intentionally does NOT use
+    // applyContentOrdering() — that helper sorts on display_order/released_at,
+    // which exist on summaries/exam_sets but NOT on packages (that mismatch
+    // caused a PostgREST 400 + empty homepage). Packages use their own
+    // homepage_order column instead.
     let featuredData: any[] = []
-    const featuredQuery = applyContentOrdering(
-      supabase
+    const featuredQuery = supabase
+      .from('packages')
+      .select(`
+        id, slug, exam_year, current_price, original_price, difficulty,
+        description, logo_url,
+        organizations ( name, logo_url ),
+        positions ( name )
+      `)
+      .eq('is_published', true)
+      .eq('featured_homepage', true)
+      .order('homepage_order', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(count)
+
+    const { data: featured } = await featuredQuery
+    featuredData = featured || []
+
+    // Top-up with latest non-featured packages if configured + short.
+    // Same ordering rationale: homepage_order → updated_at → created_at.
+    if (fallback === 'fill_latest' && featuredData.length < count) {
+      const need = count - featuredData.length
+      const excludeIds = featuredData.map((p: any) => p.id)
+      let q = supabase
         .from('packages')
         .select(`
           id, slug, exam_year, current_price, original_price, difficulty,
@@ -95,28 +120,11 @@ export default async function Home() {
           positions ( name )
         `)
         .eq('is_published', true)
-        .eq('featured_homepage', true)
-    ).limit(count)
-
-    const { data: featured } = await featuredQuery
-    featuredData = featured || []
-
-    // Top-up with latest non-featured packages if configured + short.
-    if (fallback === 'fill_latest' && featuredData.length < count) {
-      const need = count - featuredData.length
-      const excludeIds = featuredData.map((p: any) => p.id)
-      let q = applyContentOrdering(
-        supabase
-          .from('packages')
-          .select(`
-            id, slug, exam_year, current_price, original_price, difficulty,
-            description, logo_url,
-            organizations ( name, logo_url ),
-            positions ( name )
-          `)
-          .eq('is_published', true)
-          .eq('featured_homepage', false)
-      ).limit(need)
+        .eq('featured_homepage', false)
+        .order('homepage_order', { ascending: false })
+        .order('updated_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(need)
       if (excludeIds.length > 0) q = q.not('id', 'in', `(${excludeIds.join(',')})`)
       const { data: latest } = await q
       if (latest) featuredData = [...featuredData, ...latest]
