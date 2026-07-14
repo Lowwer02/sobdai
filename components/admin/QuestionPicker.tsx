@@ -20,6 +20,14 @@ interface Question {
 interface QuestionPickerProps {
   selectedQuestions: Question[]
   onChange: (questions: Question[]) => void
+  /**
+   * IDs of Questions that belonged to the Exam Set at the moment editing
+   * started (the pre-session snapshot). Lets the picker distinguish a
+   * question that is merely "picked this session" from one that is
+   * "already in this exam". Read-only — the picker never mutates it.
+   * Omit/empty on the Create flow (nothing is "already in" a new exam).
+   */
+  initialSelectedIds?: string[]
 }
 
 // Client-side "Question Status" filter for the picker.
@@ -34,7 +42,14 @@ type QuestionStatusFilter = 'all' | 'selected' | 'unselected'
 type QuestionUsageFilter = 'all' | 'used' | 'unused'
 const PAGE_SIZE = 10
 
-export default function QuestionPicker({ selectedQuestions, onChange }: QuestionPickerProps) {
+export default function QuestionPicker({ selectedQuestions, onChange, initialSelectedIds }: QuestionPickerProps) {
+  // Pre-session snapshot: which questions were already in this exam when
+  // editing started. Stable for the lifetime of the component; captured once.
+  // Used only to render the "In Current Exam" badge — never as selection state.
+  const initialInExamSet = useMemo(
+    () => new Set(initialSelectedIds ?? []),
+    [initialSelectedIds]
+  )
   const [isOpen, setIsOpen] = useState(false)
   
   const [questions, setQuestions] = useState<Question[]>([])
@@ -362,13 +377,29 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {pagedQuestions.map(q => {
                   const isSelected = selectedIdSet.has(q.id)
+                  // "Already in this exam" = selected AND present in the
+                  // pre-session snapshot. Distinct from merely picked this
+                  // session. Only meaningful on the Edit flow.
+                  const inCurrentExam = isSelected && initialInExamSet.has(q.id)
                   return (
-                    <div 
-                      key={q.id} 
+                    <div
+                      key={q.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={isSelected}
+                      data-selected={isSelected || undefined}
+                      data-in-current-exam={inCurrentExam || undefined}
                       onClick={() => isSelected ? handleRemove(q.id) : handleAdd(q)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          isSelected ? handleRemove(q.id) : handleAdd(q)
+                        }
+                      }}
+                      title={isSelected ? 'Click to remove from selection' : 'Click to add to selection'}
                       className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-4 ${
-                        isSelected 
-                          ? 'bg-[#D4AF37]/10 border-[#D4AF37]' 
+                        isSelected
+                          ? 'bg-[#D4AF37]/10 border-[#D4AF37] ring-1 ring-[#D4AF37]/40'
                           : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] hover:border-[#D4AF37]/50'
                       }`}
                     >
@@ -379,11 +410,29 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                       </div>
                       <div className="min-w-0">
                         <p className={`text-sm line-clamp-3 mb-2 ${isSelected ? 'text-[#F5E9D6]' : 'text-[#A1866B]'}`}>{q.content}</p>
-                        {/* Meta + usage badges. Each badge is an atomic unit
-                            (whitespace-nowrap + shrink-0) so it never breaks
-                            mid-label on small screens; the row still wraps
-                            gracefully when horizontal space runs out. */}
+                        {/* Badges. Each is an atomic unit (whitespace-nowrap +
+                            shrink-0) so it never breaks mid-label; the row wraps
+                            gracefully when horizontal space runs out.
+                            Order = visual priority:
+                              1. Selection state (editing context) — most important
+                              2. Subject / Difficulty (metadata)
+                              3. Usage (historical context) — least emphasized
+                            Per the design's redundancy rule, "In Current Exam" is
+                            shown only when distinct from a plain session pick. */}
                         <div className="flex flex-wrap gap-2 mt-auto">
+                          {/* Selection-context badge — highest emphasis. Solid gold
+                              for "In Current Exam" (committed before this session),
+                              outlined gold for "Selected this session". Reuses the
+                              existing Sobdai gold accent; no new badge system. */}
+                          {isSelected && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border whitespace-nowrap shrink-0 ${
+                              inCurrentExam
+                                ? 'text-[#1A140E] bg-[#D4AF37] border-[#D4AF37]'
+                                : 'text-[#D4AF37] bg-[#D4AF37]/10 border-[rgba(212,175,55,0.5)]'
+                            }`}>
+                              {inCurrentExam ? 'In Current Exam' : 'Selected'}
+                            </span>
+                          )}
                           <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)] whitespace-nowrap shrink-0">
                             {isUnassignedSubject(q.subject) ? (q.category || 'ยังไม่กำหนด Subject') : getSubjectLabel(q.subject)}
                           </span>
