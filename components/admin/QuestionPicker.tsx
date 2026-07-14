@@ -291,40 +291,64 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                   className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
                 />
               </div>
-              <select value={subject} onChange={e => { setSubject(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
-                <option value="">All Subjects</option>
-                {getSubjectDropdownOptions().map(opt => <option key={opt.code} value={opt.code === '__unassigned__' ? '' : opt.code}>{opt.label}</option>)}
-              </select>
-              <select value={document} onChange={e => { setDocument(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[200px]">
-                <option value="">All Documents</option>
-                {documents.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <select value={topic} onChange={e => { setTopic(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
-                <option value="">All Topics</option>
-                {topics.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <select value={difficulty} onChange={e => { setDifficulty(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
-                <option value="">All Difficulties</option>
-                <option value="Easy">Easy</option>
-                <option value="Medium">Medium</option>
-                <option value="Hard">Hard</option>
-              </select>
-              <select value={isCommon === undefined ? '' : isCommon ? 'true' : 'false'} onChange={e => { setIsCommon(e.target.value === '' ? undefined : e.target.value === 'true'); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
-                <option value="">All Types (Common/Specific)</option>
-                <option value="true">Common Only</option>
-                <option value="false">Organization Specific</option>
-              </select>
-              {/* Question Status — client-side only, never triggers a refetch. */}
+              {/* ── Group 1 · Content Hierarchy ──
+                  Subject → Document → Topic (most → least general).
+                  Grouped in one flex cluster so the content taxonomy reads as a
+                  unit. Topic is intentionally last and marked `data-cascade-target`
+                  so a future session can make it a dependent (cascading) filter on
+                  Subject without restructuring the layout — no cascading logic here. */}
+              <div className="contents group-1">
+                <select value={subject} onChange={e => { setSubject(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]">
+                  <option value="">All Subjects</option>
+                  {getSubjectDropdownOptions().map(opt => <option key={opt.code} value={opt.code === '__unassigned__' ? '' : opt.code}>{opt.label}</option>)}
+                </select>
+                <select value={document} onChange={e => { setDocument(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[200px]">
+                  <option value="">All Documents</option>
+                  {documents.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select
+                  data-cascade-target="topic"
+                  value={topic}
+                  onChange={e => { setTopic(e.target.value); setPage(1); }}
+                  className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm max-w-[150px]"
+                >
+                  <option value="">All Topics</option>
+                  {topics.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              {/* ── Group 2 · Question Properties ──
+                  Usage → Difficulty → Type. Independent attributes of a question,
+                  applied after the content taxonomy. */}
+              <div className="contents group-2">
+                {/* Question Usage — applied server-side via `fetchQuestionsForPicker`'s
+                    `usage` param (works across the whole Bank, not just the page). */}
+                <select value={usageFilter} onChange={e => { setUsageFilter(e.target.value as QuestionUsageFilter); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
+                  <option value="all">All Usage</option>
+                  <option value="used">Used</option>
+                  <option value="unused">Unused</option>
+                </select>
+                <select value={difficulty} onChange={e => { setDifficulty(e.target.value); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
+                  <option value="">All Difficulties</option>
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+                <select value={isCommon === undefined ? '' : isCommon ? 'true' : 'false'} onChange={e => { setIsCommon(e.target.value === '' ? undefined : e.target.value === 'true'); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
+                  <option value="">All Types (Common/Specific)</option>
+                  <option value="true">Common Only</option>
+                  <option value="false">Organization Specific</option>
+                </select>
+              </div>
+
+              {/* ── Selection state ──
+                  Last, because it reflects the current editing session (which
+                  questions are picked) rather than question metadata. Client-side
+                  only, never triggers a refetch. */}
               <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value as QuestionStatusFilter); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
                 <option value="all">ทั้งหมด</option>
                 <option value="selected">เลือกแล้ว</option>
                 <option value="unselected">ยังไม่ได้เลือก</option>
-              </select>
-              {/* Question Usage — client-side, driven by the batched usage counts. */}
-              <select value={usageFilter} onChange={e => { setUsageFilter(e.target.value as QuestionUsageFilter); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
-                <option value="all">All Usage</option>
-                <option value="used">Used</option>
-                <option value="unused">Unused</option>
               </select>
             </div>
 
