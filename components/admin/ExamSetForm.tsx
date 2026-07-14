@@ -39,6 +39,15 @@ export default function ExamSetForm({
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>(selectedQuestionsData)
   const [isDirty, setIsDirty] = useState(false)
 
+  // Pre-session snapshot of which questions belonged to the exam set when
+  // editing started. Captured ONCE (lazy initializer) and never updated as
+  // the Admin adds/removes — it's the "already in this exam" baseline we pass
+  // to the QuestionPicker so it can distinguish committed questions from
+  // session picks. On Create it is empty (nothing is "already in" a new exam).
+  const [initialSelectedIds] = useState<string[]>(() =>
+    (selectedQuestionsData ?? []).map(q => q?.id).filter(Boolean) as string[]
+  )
+
   useUnsavedChanges(isDirty)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -260,9 +269,10 @@ export default function ExamSetForm({
             )}
           </div>
 
-          <QuestionPicker 
-            selectedQuestions={selectedQuestions} 
-            onChange={(v) => { setSelectedQuestions(v); setIsDirty(true); }} 
+          <QuestionPicker
+            selectedQuestions={selectedQuestions}
+            onChange={(v) => { setSelectedQuestions(v); setIsDirty(true); }}
+            initialSelectedIds={initialSelectedIds}
           />
         </div>
       </div>
