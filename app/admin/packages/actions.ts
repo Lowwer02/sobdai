@@ -63,6 +63,7 @@ export async function createPackageAction(formData: FormData) {
       features: JSON.parse((formData.get('features') as string) || '[]'),
       is_published: formData.get('is_published') === 'on',
       featured_homepage: formData.get('featured_homepage') === 'on',
+      homepage_order: Number(formData.get('homepage_order')) || 0,
     }
     if (id) {
       payload.id = id
@@ -131,6 +132,7 @@ export async function updatePackageAction(id: string, formData: FormData) {
       features: JSON.parse((formData.get('features') as string) || '[]'),
       is_published: formData.get('is_published') === 'on',
       featured_homepage: formData.get('featured_homepage') === 'on',
+      homepage_order: Number(formData.get('homepage_order')) || 0,
       updated_at: new Date().toISOString()
     }
 

@@ -323,6 +323,16 @@ export default function CreateClient({ organizations, positions }: { organizatio
                   <span className="text-xs text-[#A1866B]">Featured บนหน้าแรก (Admin เลือกเอง)</span>
                 </div>
               </label>
+              <div className="space-y-1.5">
+                <label className="text-sm text-[#F5E9D6] font-medium block">Homepage Order</label>
+                <input
+                  type="number"
+                  name="homepage_order"
+                  defaultValue={0}
+                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] text-[#F5E9D6] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                />
+                <p className="text-[10px] text-[#A1866B]">ค่ามากกว่า แสดงก่อนบนหน้าแรก (ใช้เฉพาะเมื่อเปิด &quot;แสดงบนหน้าแรก&quot;)</p>
+              </div>
             </div>
 
             <div className="space-y-2 pt-2">
