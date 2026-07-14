@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home } from 'lucide-react'
 import { getAdminSession } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 import { redirect } from 'next/navigation'
@@ -17,6 +17,7 @@ const managementNav = [
   { name: 'Positions', href: '/admin/positions', icon: UserCircle2, permission: 'system.manage' },
   { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
+  { name: 'Homepage', href: '/admin/homepage', icon: Home, permission: 'content.write' },
 ]
 
 export default async function AdminLayout({

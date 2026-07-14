@@ -62,6 +62,7 @@ export async function createPackageAction(formData: FormData) {
       seo_description: formData.get('seo_description') as string,
       features: JSON.parse((formData.get('features') as string) || '[]'),
       is_published: formData.get('is_published') === 'on',
+      featured_homepage: formData.get('featured_homepage') === 'on',
     }
     if (id) {
       payload.id = id
@@ -81,6 +82,7 @@ export async function createPackageAction(formData: FormData) {
   }
 
   revalidatePath('/admin/packages')
+  revalidatePath('/')
   redirect('/admin/packages')
 }
 
@@ -128,6 +130,7 @@ export async function updatePackageAction(id: string, formData: FormData) {
       seo_description: formData.get('seo_description') as string,
       features: JSON.parse((formData.get('features') as string) || '[]'),
       is_published: formData.get('is_published') === 'on',
+      featured_homepage: formData.get('featured_homepage') === 'on',
       updated_at: new Date().toISOString()
     }
 
@@ -146,6 +149,7 @@ export async function updatePackageAction(id: string, formData: FormData) {
 
   revalidatePath('/admin/packages')
   revalidatePath(`/package/${formData.get('slug')}`) // revalidate public page too
+  revalidatePath('/') // featured_homepage may have changed
   redirect('/admin/packages')
 }
 
