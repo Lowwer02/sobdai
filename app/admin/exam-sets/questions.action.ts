@@ -65,6 +65,7 @@ export async function fetchQuestionsForPicker(filters: {
   topic?: string
   difficulty?: string
   is_common?: boolean
+  usage?: 'all' | 'used' | 'unused'
   page?: number
   limit?: number
 }) {
@@ -78,9 +79,72 @@ export async function fetchQuestionsForPicker(filters: {
   const from = (page - 1) * limit
   const to = from + limit - 1
 
-  let query = supabase
+  // Server-side Usage filter. "Usage" is derived from exam_set_questions
+  // (never duplicated on the questions row). PostgREST has no native
+  // NOT-EXISTS operator, so we resolve the set of used question_ids once
+  // (a single bounded query, deduped in JS), then apply `.in` (used) or
+  // `.not.in` (unused) BEFORE pagination so range/count operate on the
+  // filtered dataset. This is 2 round-trips total (not N+1) and composes
+  // with all other filters.
+  //
+  // Note: the proper long-term solution for very large banks is an EXISTS/
+  // NOT-EXISTS SQL RPC (already on the roadmap). This no-DB-change path is
+  // the SAFE Phase-1 implementation.
+  if (filters.usage === 'used' || filters.usage === 'unused') {
+    const { data: usedRows, error: usedErr } = await supabase
+      .from('exam_set_questions')
+      .select('question_id')
+    if (usedErr) throw usedErr
+
+    const usedIds = Array.from(
+      new Set((usedRows ?? []).map(r => r.question_id).filter(Boolean))
+    ) as string[]
+
+    if (filters.usage === 'used') {
+      // No question is used anywhere → empty result with accurate count 0.
+      if (usedIds.length === 0) return { data: [], count: 0 }
+      return queryQuestions(supabase, filters, from, to, q => q.in('id', usedIds))
+    }
+
+    // unused: exclude the used set. If nothing is used, everything is unused
+    // → no usage predicate needed (fetch normally).
+    const extraFilter = usedIds.length > 0
+      ? (q: ReturnType<typeof baseQuestionsQuery>) => q.not.in('id', usedIds)
+      : null
+    return queryQuestions(supabase, filters, from, to, extraFilter ?? undefined)
+  }
+
+  return queryQuestions(supabase, filters, from, to)
+}
+
+// Shared query builder so the usage branches and the default path build the
+// exact same filter chain (search/subject/topic/...) and ordering. An optional
+// `usageFilter` is injected right before range/order so it composes with the
+// rest. Keeping this extracted avoids drifting between the three call sites.
+type SupabaseQ = ReturnType<typeof baseQuestionsQuery>
+
+function baseQuestionsQuery(supabase: any) {
+  return supabase
     .from('questions')
     .select('id, content, subject, document, topic, law, difficulty, is_common, category', { count: 'exact' })
+}
+
+async function queryQuestions(
+  supabase: any,
+  filters: {
+    search?: string
+    subject?: string
+    document?: string
+    law?: string
+    topic?: string
+    difficulty?: string
+    is_common?: boolean
+  },
+  from: number,
+  to: number,
+  usageFilter?: (q: SupabaseQ) => SupabaseQ
+) {
+  let query = baseQuestionsQuery(supabase)
 
   if (filters.search) {
     query = query.ilike('content', `%${filters.search}%`)
@@ -102,6 +166,9 @@ export async function fetchQuestionsForPicker(filters: {
   }
   if (filters.is_common !== undefined) {
     query = query.eq('is_common', filters.is_common)
+  }
+  if (usageFilter) {
+    query = usageFilter(query)
   }
 
   query = query.range(from, to).order('created_at', { ascending: false })

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Search, Loader2, Plus, Check, Trash2, GripVertical, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { fetchQuestionsForPicker, fetchUniqueFilters } from '../../app/admin/exam-sets/questions.action'
+import { fetchQuestionsForPicker, fetchUniqueFilters, fetchQuestionUsage, type QuestionUsage } from '../../app/admin/exam-sets/questions.action'
 import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject } from '@/lib/subjects'
 
 interface Question {
@@ -26,6 +26,12 @@ interface QuestionPickerProps {
 // 'all' keeps the existing server-paginated flow unchanged; the other two
 // values slice the rendered set client-side (no extra API calls).
 type QuestionStatusFilter = 'all' | 'selected' | 'unselected'
+
+// "Question Usage" filter for the picker. Applied SERVER-SIDE via the `usage`
+// param on fetchQuestionsForPicker (so it works across the entire Bank, not
+// just the loaded page). Distinct from QuestionStatusFilter above, which is
+// still client-side. Usage Badge counts come from `fetchQuestionUsage`.
+type QuestionUsageFilter = 'all' | 'used' | 'unused'
 const PAGE_SIZE = 10
 
 export default function QuestionPicker({ selectedQuestions, onChange }: QuestionPickerProps) {
@@ -49,6 +55,15 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
   // filters above; it never triggers a refetch.
   const [statusFilter, setStatusFilter] = useState<QuestionStatusFilter>('all')
 
+  // Question Usage filter (client-side) + the batched usage counts for the
+  // currently loaded page. Powers both the badges and the usage filter.
+  const [usageFilter, setUsageFilter] = useState<QuestionUsageFilter>('all')
+  const [usageMap, setUsageMap] = useState<Record<string, QuestionUsage>>({})
+  // True while the per-page usage batch is in flight. Gates the badge so it
+  // shows a neutral placeholder instead of flashing "Unused" before the real
+  // count arrives — eliminates layout/visual shift during load.
+  const [usageLoading, setUsageLoading] = useState(false)
+
   // Filter Options
   const [subjects, setSubjects] = useState<string[]>([])
   const [documents, setDocuments] = useState<string[]>([])
@@ -70,12 +85,30 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
     setLoading(true)
 
     fetchQuestionsForPicker({
-      search, subject, document, law, topic, difficulty, is_common: isCommon, page, limit: PAGE_SIZE
-    }).then(res => {
-      if (isMounted) {
-        setQuestions(res.data as Question[])
-        setTotalCount(res.count)
-        setLoading(false)
+      search, subject, document, law, topic, difficulty, is_common: isCommon, usage: usageFilter, page, limit: PAGE_SIZE
+    }).then(async res => {
+      if (!isMounted) return
+      setQuestions(res.data as Question[])
+      setTotalCount(res.count)
+      setLoading(false)
+
+      // Batch-fetch usage counts for the loaded page in a single round-trip
+      // (no N+1). `usageLoading` gates the badge so it shows a neutral
+      // placeholder until counts arrive — no misleading "Unused" flash and
+      // no layout shift. Failure degrades gracefully to an empty map.
+      if (res.data && res.data.length > 0) {
+        const ids = (res.data as Question[]).map(q => q.id)
+        setUsageLoading(true)
+        try {
+          const usage = await fetchQuestionUsage(ids)
+          if (isMounted) setUsageMap(usage)
+        } catch (err) {
+          console.error(err)
+        } finally {
+          if (isMounted) setUsageLoading(false)
+        }
+      } else {
+        setUsageMap({})
       }
     }).catch(err => {
       console.error(err)
@@ -83,7 +116,7 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
     })
 
     return () => { isMounted = false }
-  }, [isOpen, search, subject, document, law, topic, difficulty, isCommon, page])
+  }, [isOpen, search, subject, document, law, topic, difficulty, isCommon, usageFilter, page])
 
   // --- Client-side Question Status filter (no API calls) ---
   // Reuses the existing `selectedQuestions` prop as the source of truth — no
@@ -98,6 +131,10 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
   // - 'all'        → server-paginated `questions` (unchanged behaviour)
   // - 'selected'   → every selected question, cross-page (per spec example)
   // - 'unselected' → currently-loaded `questions` minus selected ones
+  // NOTE: the Usage filter is now applied SERVER-SIDE (see the fetch effect and
+  // `fetchQuestionsForPicker`'s `usage` param), so it is NOT applied here —
+  // `questions` is already the filtered page, and `totalCount` is the filtered
+  // total. `usageMap` is retained only to power the Usage Badge on each card.
   const displayQuestions = useMemo<Question[]>(() => {
     if (statusFilter === 'selected') return selectedQuestions
     if (statusFilter === 'unselected') return questions.filter(q => !selectedIdSet.has(q.id))
@@ -283,6 +320,12 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                 <option value="selected">เลือกแล้ว</option>
                 <option value="unselected">ยังไม่ได้เลือก</option>
               </select>
+              {/* Question Usage — client-side, driven by the batched usage counts. */}
+              <select value={usageFilter} onChange={e => { setUsageFilter(e.target.value as QuestionUsageFilter); setPage(1); }} className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm">
+                <option value="all">All Usage</option>
+                <option value="used">Used</option>
+                <option value="unused">Unused</option>
+              </select>
             </div>
 
             {/* Question List */}
@@ -312,13 +355,45 @@ export default function QuestionPicker({ selectedQuestions, onChange }: Question
                       </div>
                       <div className="min-w-0">
                         <p className={`text-sm line-clamp-3 mb-2 ${isSelected ? 'text-[#F5E9D6]' : 'text-[#A1866B]'}`}>{q.content}</p>
+                        {/* Meta + usage badges. Each badge is an atomic unit
+                            (whitespace-nowrap + shrink-0) so it never breaks
+                            mid-label on small screens; the row still wraps
+                            gracefully when horizontal space runs out. */}
                         <div className="flex flex-wrap gap-2 mt-auto">
-                          <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)]">
+                          <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)] whitespace-nowrap shrink-0">
                             {isUnassignedSubject(q.subject) ? (q.category || 'ยังไม่กำหนด Subject') : getSubjectLabel(q.subject)}
                           </span>
-                          <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)]">
+                          <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)] whitespace-nowrap shrink-0">
                             {q.difficulty}
                           </span>
+                          {/* Usage badge — derived live from exam_set_questions
+                              via fetchQuestionUsage. While the per-page batch is
+                              in flight we show a neutral placeholder so the badge
+                              never flashes "Unused" before the real count lands
+                              (no visual/layout shift). Unused → hollow dot, muted;
+                              Used → filled dot, accent. Same atomic styling as the
+                              subject/difficulty badges above. */}
+                          {(() => {
+                            const entry = usageMap[q.id]
+                            const resolved = entry !== undefined
+                            const count = entry?.usage_count ?? 0
+                            const used = count > 0
+                            return (
+                              <span className={`text-[10px] px-2 py-0.5 rounded border whitespace-nowrap shrink-0 transition-colors ${
+                                !resolved || usageLoading
+                                  ? 'text-[#A1866B]/50 bg-black/30 border-[rgba(255,255,255,0.05)]'
+                                  : used
+                                    ? 'text-[#D4AF37] bg-[#D4AF37]/10 border-[rgba(212,175,55,0.3)]'
+                                    : 'text-[#A1866B] bg-black/30 border-[rgba(255,255,255,0.05)]'
+                              }`}>
+                                {!resolved || usageLoading
+                                  ? '○ …'
+                                  : used
+                                    ? `● Used in ${count}`
+                                    : '○ Unused'}
+                              </span>
+                            )
+                          })()}
                         </div>
                       </div>
                     </div>
