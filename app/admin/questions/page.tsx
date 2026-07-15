@@ -93,17 +93,45 @@ export default async function QuestionsPage({
     supabase.from('questions').select('*', { count: 'exact', head: true }).eq('status', 'Draft'),
   ])
 
-  // Filter dropdown values for free-text/optional columns. Subject is a
-  // curated list (lib/subjects.ts) so it is not scanned. Document is also
-  // surfaced here so the dropdown can list existing document names.
-  const { data: filterData } = await supabase
-    .from('questions')
-    .select('category, law, topic, document')
+  // Filter dropdown values. Documents / Topics / Laws come from the SAME
+  // single source of truth as the Question Picker: the get_question_metadata
+  // RPC (migration 022), which returns DISTINCT, non-null, sorted arrays and
+  // is immune to PostgREST's 1000-row cap. The previous implementation did a
+  // full-table `select('category, law, topic, document')` + JS dedup, which
+  // was silently truncated on Banks > 1000 rows — the exact bug that made
+  // newly imported Documents appear in the Picker but go missing here.
+  //
+  // Category is a legacy/optional free-text column the RPC doesn't cover;
+  // its distinct set is small and bounded, so it is fetched separately with
+  // an explicit cap (no row-cap risk). Subject is a curated list
+  // (lib/subjects.ts), not scanned.
+  type MetaRow = {
+    subjects: string[] | null
+    documents: string[] | null
+    topics: string[] | null
+    laws: string[] | null
+  }
+  const { data: metaData, error: metaErr } = (await (supabase as any).rpc('get_question_metadata')) as {
+    data: MetaRow[] | null
+    error: { message: string } | null
+  }
+  if (metaErr) {
+    console.error('get_question_metadata RPC failed:', metaErr.message)
+  }
+  const metaRow = (metaData && metaData[0]) || { subjects: null, documents: null, topics: null, laws: null }
 
-  const uniqueCategories = Array.from(new Set(filterData?.map(c => c.category).filter(Boolean))) as string[]
-  const uniqueDocuments = Array.from(new Set(filterData?.map(c => c.document).filter(Boolean))) as string[]
-  const uniqueLaws = Array.from(new Set(filterData?.map(c => c.law).filter(Boolean))) as string[]
-  const uniqueTopics = Array.from(new Set(filterData?.map(c => c.topic).filter(Boolean))) as string[]
+  // Category is not part of the shared metadata RPC; fetch its distinct
+  // values separately. Bounded + deduped in JS — safe because the distinct
+  // category set is small regardless of Bank size.
+  const { data: categoryData } = await supabase
+    .from('questions')
+    .select('category')
+    .not('category', 'is', null)
+
+  const uniqueCategories = Array.from(new Set((categoryData ?? []).map(c => c.category).filter(Boolean))) as string[]
+  const uniqueDocuments = metaRow.documents ?? []
+  const uniqueLaws = metaRow.laws ?? []
+  const uniqueTopics = metaRow.topics ?? []
 
   return (
     <QuestionsClient
