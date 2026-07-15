@@ -79,7 +79,6 @@ export default async function Home() {
   try {
     const supabase = createAnonServerClient()
     const count = settings.general.featured_count
-    const fallback = settings.general.featured_fallback
 
     // Query: featured packages first, ordered by the dedicated homepage
     // ordering chain. NOTE: this intentionally does NOT use
@@ -106,29 +105,12 @@ export default async function Home() {
     const { data: featured } = await featuredQuery
     featuredData = featured || []
 
-    // Top-up with latest non-featured packages if configured + short.
-    // Same ordering rationale: homepage_order → updated_at → created_at.
-    if (fallback === 'fill_latest' && featuredData.length < count) {
-      const need = count - featuredData.length
-      const excludeIds = featuredData.map((p: any) => p.id)
-      let q = supabase
-        .from('packages')
-        .select(`
-          id, slug, exam_year, current_price, original_price, difficulty,
-          description, logo_url,
-          organizations ( name, logo_url ),
-          positions ( name )
-        `)
-        .eq('is_published', true)
-        .eq('featured_homepage', false)
-        .order('homepage_order', { ascending: false })
-        .order('updated_at', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(need)
-      if (excludeIds.length > 0) q = q.not('id', 'in', `(${excludeIds.join(',')})`)
-      const { data: latest } = await q
-      if (latest) featuredData = [...featuredData, ...latest]
-    }
+    // BUSINESS RULE: the homepage renders ONLY packages where
+    // is_published = true AND featured_homepage = true. No exceptions.
+    // The previous fallback/top-up query injected non-featured packages
+    // (featured_homepage = false) when fewer than `count` were featured —
+    // that violated the rule and caused non-featured packages to appear.
+    // Removed: no fallback may include non-featured packages.
 
     if (featuredData.length > 0) {
       const counts = await getPackagePublicCounts(featuredData.map((p: any) => p.id))

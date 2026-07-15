@@ -86,8 +86,6 @@ export interface HomepageSeo {
 export interface HomepageGeneral {
   /** How many featured packages to show: 2 | 4 | 6. */
   featured_count: 2 | 4 | 6
-  /** What to show when fewer packages are featured than `featured_count`. */
-  featured_fallback: 'fill_latest' | 'show_available'
 }
 
 export interface HomepageSettings {
@@ -106,7 +104,6 @@ export interface HomepageSettings {
 export const HOMEPAGE_DEFAULTS: HomepageSettings = {
   general: {
     featured_count: 6,
-    featured_fallback: 'fill_latest',
   },
   hero: {
     badge: 'คลังข้อสอบราชการ 2569',
@@ -187,8 +184,6 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
   // --- general
   const fcRaw = r.general?.featured_count
   const featured_count: 2 | 4 | 6 = [2, 4, 6].includes(fcRaw) ? (fcRaw as 2 | 4 | 6) : d.general.featured_count
-  const featured_fallback =
-    r.general?.featured_fallback === 'show_available' ? 'show_available' : 'fill_latest'
 
   // --- hero
   const heroRaw = r.hero || {}
@@ -236,7 +231,7 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     .filter((s: HowToStep) => s.num && s.title && s.desc)
 
   return {
-    general: { featured_count, featured_fallback },
+    general: { featured_count },
     hero: {
       badge: cleanString(heroRaw.badge, d.hero.badge, 80),
       title: cleanString(heroRaw.title, d.hero.title, 200),
