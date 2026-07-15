@@ -197,16 +197,42 @@ export async function fetchQuestionDetailsForPicker(ids: string[]) {
 export async function fetchUniqueFilters() {
   const { supabase } = await requirePermission('content.write')
 
-  const { data } = await supabase
-    .from('questions')
-    .select('subject, law, topic, document')
+  // Distinct, non-null filter metadata is now computed in Postgres by the
+  // get_question_metadata RPC (migration 022) — one round-trip, no row cap.
+  // The previous implementation read every question row and deduped in JS,
+  // which was silently truncated by PostgREST's default 1000-row limit and
+  // caused filter values (e.g. Documents) to go missing on larger Banks.
+  // Sorted alphabetically by the RPC, so no client sorting is needed.
+  //
+  // The RPC is a custom Postgres function not covered by auto-generated DB
+  // types, so we cast through `unknown` like the other RPC callers here.
+  type MetaRow = {
+    subjects: string[] | null
+    documents: string[] | null
+    topics: string[] | null
+    laws: string[] | null
+  }
 
-  const uniqueSubjects = Array.from(new Set(data?.map(c => c.subject).filter(Boolean))) as string[]
-  const uniqueDocuments = Array.from(new Set(data?.map(c => c.document).filter(Boolean))) as string[]
-  const uniqueLaws = Array.from(new Set(data?.map(c => c.law).filter(Boolean))) as string[]
-  const uniqueTopics = Array.from(new Set(data?.map(c => c.topic).filter(Boolean))) as string[]
+  const { data, error } = (await (supabase as any).rpc('get_question_metadata')) as {
+    data: MetaRow[] | null
+    error: { message: string } | null
+  }
 
-  return { uniqueSubjects, uniqueDocuments, uniqueLaws, uniqueTopics }
+  if (error) {
+    console.error('get_question_metadata RPC failed:', error.message)
+    return { uniqueSubjects: [], uniqueDocuments: [], uniqueLaws: [], uniqueTopics: [] }
+  }
+
+  // The RPC returns exactly one row of arrays. Normalize nulls to [] for the
+  // empty-Bank / empty-column cases, and keep the original return shape so
+  // the consuming UI (QuestionPicker dropdowns) is unchanged.
+  const row = (data && data[0]) || { subjects: null, documents: null, topics: null, laws: null }
+  return {
+    uniqueSubjects: row.subjects ?? [],
+    uniqueDocuments: row.documents ?? [],
+    uniqueLaws: row.laws ?? [],
+    uniqueTopics: row.topics ?? [],
+  }
 }
 
 
