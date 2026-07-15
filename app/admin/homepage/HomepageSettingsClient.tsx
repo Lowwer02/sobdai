@@ -114,12 +114,6 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
               <option value={6}>6</option>
             </select>
           </Field>
-          <Field label="เมื่อ Featured น้อยกว่าที่กำหนด">
-            <select className={inputClass} value={settings.general.featured_fallback} onChange={e => update({ general: { ...settings.general, featured_fallback: e.target.value as 'fill_latest' | 'show_available' } })}>
-              <option value="fill_latest">เติมด้วยแพ็กเกจล่าสุด</option>
-              <option value="show_available">แสดงเท่าที่มี</option>
-            </select>
-          </Field>
         </div>
         <p className="text-[11px] text-[#A1866B] mt-3">เลือกแพ็กเกจ Featured ได้ที่หน้า edit ของแต่ละแพ็กเกจ (ช่อง &quot;แสดงบนหน้าแรก&quot;)</p>
       </section>
