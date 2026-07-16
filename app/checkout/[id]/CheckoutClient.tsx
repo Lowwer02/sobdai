@@ -121,11 +121,15 @@ export default function CheckoutClient({ pkg, userEmail }: CheckoutClientProps) 
           <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">สรุปแพ็กเกจ</h2>
           
           <div className="flex gap-4 items-start mb-6">
-            <div className="w-12 h-12 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] flex items-center justify-center p-2 flex-shrink-0">
-              {pkg.logo_url || pkg.organizations?.logo_url ? (
-                <Image src={pkg.logo_url || pkg.organizations?.logo_url} alt="logo" width={48} height={48} className="w-full h-full object-contain" />
+            <div className="w-20 h-20 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] flex-shrink-0 overflow-hidden">
+              {pkg.cover_image_url ? (
+                <Image src={pkg.cover_image_url} alt={pkg.positions?.name || pkg.name} width={80} height={80} className="w-full h-full object-cover" />
+              ) : pkg.logo_url || pkg.organizations?.logo_url ? (
+                <Image src={pkg.logo_url || pkg.organizations?.logo_url} alt="logo" width={80} height={80} className="w-full h-full object-contain p-2" />
               ) : (
-                <span className="text-xl font-display font-bold text-[#D4AF37]">{pkg.organizations?.name?.charAt(0) || 'O'}</span>
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-2xl font-display font-bold text-[#D4AF37]">{pkg.organizations?.name?.charAt(0) || 'O'}</span>
+                </div>
               )}
             </div>
             <div>
