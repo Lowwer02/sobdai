@@ -7,6 +7,7 @@ import DownloadShareButton from '@/components/share/DownloadShareButton'
 import { computeOutcome } from '@/lib/assessment/outcome'
 import { normalizeMode } from '@/lib/assessment/types'
 import type { AssessmentOutcome } from '@/lib/assessment/types'
+import { persistOutcome } from '@/app/assessment/actions'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -152,6 +153,17 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     setWeakTopics(result.weakTopics)
     setStatus('REVIEW')
     setCurrentIndex(-1)
+
+    // ── Epic 2: persist the Outcome as official learning history. ──────────
+    // Best-effort and fire-and-forget: the result screen renders from the
+    // in-memory `result` object regardless of whether persistence succeeds,
+    // so a DB/RLS/network failure cannot break the learner's experience.
+    // Errors are logged server-side by persistOutcome; we swallow them here.
+    // (Constitution AI-004/005: one Attempt → one immutable Outcome, stored
+    // once. Part IV §26: Persistence stores; Runtime continues independently.)
+    persistOutcome(result).catch((err) => {
+      console.error('Assessment Outcome persistence failed:', err)
+    })
   }
 
   // ── Derived display values (read from the Outcome when present) ──────────
