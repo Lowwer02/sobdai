@@ -66,6 +66,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
       original_price,
       is_published,
       cover_image_url,
+      logo_url,
       positions(name),
       organizations(name, logo_url)
     `)
