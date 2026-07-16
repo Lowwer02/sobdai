@@ -1,9 +1,12 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw } from 'lucide-react'
 import DownloadShareButton from '@/components/share/DownloadShareButton'
+import { computeOutcome } from '@/lib/assessment/outcome'
+import { normalizeMode } from '@/lib/assessment/types'
+import type { AssessmentOutcome } from '@/lib/assessment/types'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -38,11 +41,25 @@ interface ExamRuntimeProps {
 }
 
 export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRuntimeProps) {
+  // ── Assessment domain boundary ─────────────────────────────────────────
+  // Epic 1 (Assessment Runtime) introduces the Outcome boundary. The runtime
+  // delegates verdict/scoring computation to lib/assessment/outcome.ts and
+  // reads results from the resulting Outcome object — it no longer inlines
+  // that logic (Constitution AI-003: Runtime executes; it does not analyze).
+  // The Outcome is the Runtime → downstream handoff (Constitution AI-004).
+  const assessmentMode = normalizeMode(mode)
+  const isPractice = assessmentMode === 'practice'
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, ChoiceLetter>>({})
   const [flagged, setFlagged] = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<'IN_PROGRESS' | 'CONFIRM_SUBMIT' | 'REVIEW'>('IN_PROGRESS')
   const [isExplanationExpanded, setIsExplanationExpanded] = useState(false)
+
+  // Outcome: null until the attempt terminates. The Result view reads from
+  // this object rather than recomputing inline. (Constitution AI-005: once
+  // generated, never mutated.)
+  const [outcome, setOutcome] = useState<AssessmentOutcome | null>(null)
 
   // Reset expanded state when question changes
   useEffect(() => {
@@ -59,8 +76,12 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
   const q = questions[currentIndex]
 
-  // Timer Effect
+  // Timer Effect — runs ONLY for summative (simulation/mock) attempts.
+  // Practice Assessments are untimed by Product Philosophy (Part II §10.1:
+  // "Low Pressure"): the timer neither displays nor counts down, and can never
+  // force-submit a practice attempt. (Epic 1 authorized bug fix, Q3.)
   useEffect(() => {
+    if (isPractice) return          // untimed — no countdown, no auto-submit
     if (status !== 'IN_PROGRESS') return
     if (timeRemaining <= 0) {
       handleForceSubmit()
@@ -70,7 +91,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
       setTimeRemaining(prev => prev - 1)
     }, 1000)
     return () => clearInterval(timer)
-  }, [timeRemaining, status])
+  }, [timeRemaining, status, isPractice])
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -94,7 +115,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     if (status !== 'IN_PROGRESS') return
     setAnswers(prev => ({ ...prev, [q.id]: letter }))
     // Auto next on answer (only for non-practice modes)
-    if (mode !== 'practice' && currentIndex < questions.length - 1) {
+    if (!isPractice && currentIndex < questions.length - 1) {
       setTimeout(() => goNext(), 300)
     }
   }
@@ -109,50 +130,46 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   }
 
   const handleForceSubmit = () => {
-    setTimeUsed(initialTime - Math.max(0, timeRemaining))
-    calculateResults()
+    // ── Outcome trigger (Constitution AI-004: One Attempt → One Outcome) ──
+    // The Runtime computes the Outcome once at submission via the pure
+    // boundary in lib/assessment/outcome.ts, then transitions to REVIEW and
+    // reads all results from `outcome`. Verdict uses exam_sets.passing_score
+    // (data) rather than the former hard-coded 60/80 thresholds (Epic 1
+    // authorized bug fix, Q2).
+    const used = initialTime - Math.max(0, timeRemaining)
+    setTimeUsed(used)
+    const result = computeOutcome({
+      examSetId: String(examSet?.id ?? ''),
+      packageId: String(pkg?.id ?? ''),
+      mode: assessmentMode,
+      passingScore: Number(examSet?.passing_score ?? 60),
+      timeUsedSeconds: used,
+      questions,
+      answers,
+      flagged,
+    })
+    setOutcome(result)
+    setWeakTopics(result.weakTopics)
     setStatus('REVIEW')
     setCurrentIndex(-1)
   }
 
-  const calculateResults = () => {
-    const wrongQuestions = questions.filter(question => answers[question.id] !== question.correct_answer)
-    
-    // Calculate weak topics
-    const topicCounts: Record<string, { count: number, type: string }> = {}
-    
-    wrongQuestions.forEach(wq => {
-      if (wq.topic) topicCounts[wq.topic] = { count: (topicCounts[wq.topic]?.count || 0) + 1, type: 'Topic' }
-      if (wq.subject) topicCounts[wq.subject] = { count: (topicCounts[wq.subject]?.count || 0) + 1, type: 'Subject' }
-      if (wq.law) topicCounts[wq.law] = { count: (topicCounts[wq.law]?.count || 0) + 1, type: 'Law' }
-    })
+  // ── Derived display values (read from the Outcome when present) ──────────
+  // During IN_PROGRESS these fall back to live counts (used only by the
+  // CONFIRM_SUBMIT summary, which legitimately shows progress mid-attempt).
+  // After submit, all values come from the immutable Outcome object.
+  const score = outcome?.score ?? 0
+  const accuracy = outcome?.accuracy ?? 0
+  const answeredCount = outcome?.answeredCount ?? Object.keys(answers).length
+  const passed = outcome?.passed ?? false
 
-    const sortedWeak = Object.entries(topicCounts)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3)
-
-    setWeakTopics(sortedWeak)
-  }
-
-  const score = questions.filter(q => answers[q.id] === q.correct_answer).length
-  const accuracy = Math.round((score / questions.length) * 100)
-  const answeredCount = Object.keys(answers).length
-
-  // Per-subject breakdown for the share card (computed once per render; only
-  // consumed on the result screen). Falls back to "ทั่วไป" when a question has
-  // no subject, so every question is accounted for.
-  const subjectBreakdown = useMemo(() => {
-    const map = new Map<string, { correct: number; total: number }>()
-    for (const q of questions) {
-      const key = q.subject || 'ทั่วไป'
-      const entry = map.get(key) || { correct: 0, total: 0 }
-      entry.total += 1
-      if (answers[q.id] === q.correct_answer) entry.correct += 1
-      map.set(key, entry)
-    }
-    return Array.from(map.entries()).map(([subject, v]) => ({ subject, ...v }))
-  }, [questions, answers])
+  // Per-subject breakdown for the share card — read from the Outcome when
+  // available. (Before submit there is no Outcome and no share card, so this
+  // is only consumed on the result screen.)
+  const subjectBreakdown = useMemo(
+    () => outcome?.subjectBreakdown ?? [],
+    [outcome],
+  )
 
   // Keyboard navigation
   useEffect(() => {
@@ -211,7 +228,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // Choice rendering helper
   const renderChoice = (letter: ChoiceLetter, text: string) => {
     const isSelected = answers[q.id] === letter
-    const isAnsweredInPractice = mode === 'practice' && !!answers[q.id]
+    const isAnsweredInPractice = isPractice && !!answers[q.id]
     const isReview = status === 'REVIEW' || isAnsweredInPractice
     const isCorrectChoice = q.correct_answer === letter
     
@@ -272,7 +289,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
   // Practice Mode Immediate Feedback
   const renderPracticeFeedback = () => {
-    if (mode !== 'practice') return null
+    if (!isPractice) return null
     const isAnswered = !!answers[q.id]
     if (!isAnswered) return null
     const isCorrect = answers[q.id] === q.correct_answer
@@ -394,30 +411,32 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
           </div>
 
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 relative overflow-hidden">
-            {/* Background glow */}
-            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-sm bg-gradient-to-b ${accuracy >= 60 ? 'from-green-500/10' : 'from-red-500/10'} to-transparent opacity-50 blur-2xl pointer-events-none`} />
-            
+            {/* Background glow — keyed off the Outcome verdict (passed) rather
+                than a hard-coded accuracy threshold. The verdict is computed in
+                lib/assessment/outcome.ts using exam_sets.passing_score. */}
+            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-sm bg-gradient-to-b ${passed ? 'from-green-500/10' : 'from-red-500/10'} to-transparent opacity-50 blur-2xl pointer-events-none`} />
+
             <div className="relative z-10 flex flex-col items-center">
-              
+
               {/* Circular Progress Placeholder */}
               <div className="relative w-40 h-40 mb-6 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                   <circle className="text-[#0F0B07] stroke-current" strokeWidth="8" cx="50" cy="50" r="40" fill="transparent" />
-                  <circle 
-                    className={`${accuracy >= 60 ? 'text-green-500' : 'text-red-500'} stroke-current transition-all duration-1000 ease-out`} 
-                    strokeWidth="8" strokeLinecap="round" cx="50" cy="50" r="40" fill="transparent" 
+                  <circle
+                    className={`${passed ? 'text-green-500' : 'text-red-500'} stroke-current transition-all duration-1000 ease-out`}
+                    strokeWidth="8" strokeLinecap="round" cx="50" cy="50" r="40" fill="transparent"
                     strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * accuracy) / 100}
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-4xl font-display font-bold" style={{ color: accuracy >= 60 ? '#22c55e' : '#ef4444' }}>
+                  <div className="text-4xl font-display font-bold" style={{ color: passed ? '#22c55e' : '#ef4444' }}>
                     {accuracy}%
                   </div>
                 </div>
               </div>
 
               <div className="text-[#F5E9D6] font-bold text-lg mb-8 text-center px-4">
-                {accuracy >= 80 ? 'ยอดเยี่ยม! คุณพร้อมสำหรับการสอบแล้ว' : accuracy >= 60 ? 'ทำได้ดี! ทบทวนอีกนิดรับรองผ่านฉลุย' : 'ฝึกต่อไป! คุณทำได้แน่นอน'}
+                {passed ? 'ทำได้ดี! ทบทวนอีกนิดรับรองผ่านฉลุย' : 'ฝึกต่อไป! คุณทำได้แน่นอน'}
               </div>
 
               <div className="grid grid-cols-3 w-full gap-4 max-w-sm mb-8">
@@ -505,7 +524,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             {status === 'IN_PROGRESS' ? (
               <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono text-sm font-bold transition-all ${timeRemaining < 300 ? 'border-red-500/30 text-red-400 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse' : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#D4AF37]'}`}>
                 <Clock size={14} className={timeRemaining < 300 ? "animate-pulse" : ""} />
-                {mode === 'practice' ? 'ไม่จำกัดเวลา' : formatTime(timeRemaining)}
+                {isPractice ? 'ไม่จำกัดเวลา' : formatTime(timeRemaining)}
               </div>
             ) : (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#A1866B] text-sm font-bold">
@@ -620,14 +639,14 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
           <div className="flex items-center gap-2">
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
-              <button type="button" 
-                onClick={handleRequestSubmit} 
-                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${mode === 'practice' && !answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
-                disabled={mode === 'practice' && !answers[q.id]}
+              <button type="button"
+                onClick={handleRequestSubmit}
+                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${isPractice && !answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
+                disabled={isPractice && !answers[q.id]}
               >
-                {mode === 'practice' ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}
+                {isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}
               </button>
-            ) : status === 'IN_PROGRESS' && mode === 'practice' ? (
+            ) : status === 'IN_PROGRESS' && isPractice ? (
               <button type="button" 
                 onClick={goNext} 
                 disabled={!answers[q.id]}
@@ -671,22 +690,22 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             </div>
 
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
-              <button type="button" 
-                onClick={handleRequestSubmit} 
-                disabled={mode === 'practice' && !answers[q.id]}
-                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${mode === 'practice' && !answers[q.id] ? 'border-[rgba(255,255,255,0.1)] text-[#A1866B] opacity-50 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+              <button type="button"
+                onClick={handleRequestSubmit}
+                disabled={isPractice && !answers[q.id]}
+                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${isPractice && !answers[q.id] ? 'border-[rgba(255,255,255,0.1)] text-[#A1866B] opacity-50 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
               >
-                <span>{mode === 'practice' ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}</span>
-                <CheckCircle size={18} className={mode === 'practice' && !answers[q.id] ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+                <span>{isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}</span>
+                <CheckCircle size={18} className={isPractice && !answers[q.id] ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
               </button>
             ) : (
-              <button type="button" 
-                onClick={goNext} 
-                disabled={mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1}
-                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1) ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+              <button type="button"
+                onClick={goNext}
+                disabled={isPractice ? !answers[q.id] : currentIndex === questions.length - 1}
+                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(isPractice ? !answers[q.id] : currentIndex === questions.length - 1) ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
               >
                 <span>ข้อถัดไป</span>
-                <ChevronRight size={18} className={(mode === 'practice' ? !answers[q.id] : currentIndex === questions.length - 1) ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+                <ChevronRight size={18} className={(isPractice ? !answers[q.id] : currentIndex === questions.length - 1) ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
               </button>
             )}
           </div>
