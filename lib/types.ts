@@ -23,7 +23,13 @@ export interface Package {
 //     duration_minutes, is_sample, sort_order, created_at, updated_at
 //   - 019_display_order.sql: display_order, released_at (nullable)
 //   - 024_exam_sets_passing_score.sql: passing_score
+//   - 026_exam_set_foundation.sql: exam_type, status, subject, document
 // Prior drift (title / time_limit_minutes) removed during Milestone 1 Refactor #2.
+//
+// Intentionally ABSENT (per milestone decisions):
+//   - slug            : public exam routing is by UUID examSetId, no slug needed.
+//   - question_count  : exam_set_questions is the source of truth; computed via
+//                       COUNT(*) on demand. Caching deferred to a later milestone.
 export interface ExamSet {
   id: string;
   package_id: string;
@@ -35,6 +41,14 @@ export interface ExamSet {
   display_order: number;
   released_at: string | null;
   passing_score: number;
+  exam_type: 'document' | 'simulation';
+  status: 'draft' | 'published' | 'archived';
+  // subject/document are TEXT (no normalized lookup tables yet — migration 019
+  // defers them). Values must be chosen from Question Bank metadata
+  // (get_question_metadata()), never free-form. Stored on exam_sets purely to
+  // scope/filter sets; they are NOT foreign keys.
+  subject: string | null;
+  document: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +56,11 @@ export interface ExamSet {
 // ข้อสอบ
 export interface Question {
   id: string;
+  // Immutable business identifier (Q-000001, Q-000002, ...). Generated ONLY by
+  // the importer (app/admin/import/actions.ts) via the allocate_question_codes
+  // RPC. Unique + indexed at the DB; once set it can never change. Absent on
+  // questions created before migration 026 until they are (re)imported.
+  question_code?: string;
   content: string;
   choice_a: string;
   choice_b: string;
