@@ -189,3 +189,39 @@ export interface AssessmentOutcome {
   /** ISO timestamp the attempt was submitted (Outcome generation moment). */
   completedAt: string
 }
+
+// ─── AttemptHistoryItem — shared domain model (Persistence + Analytics) ──────
+// Moved out of app/assessment/actions.ts during the Milestone 1 Refactor #1:
+// shared Assessment domain types must live in the Assessment domain, not inside
+// a server-action module. Both the Persistence layer (app/assessment/actions.ts)
+// and the Analytics layer (lib/assessment/analytics.ts) consume this shape — so
+// it is a shared domain model by definition, and is owned here.
+//
+// It is the row shape of a persisted Outcome as read back from
+// exam_attempts — the raw material the Analytics derivation consumes.
+
+/**
+ * One persisted Outcome as retrieved from the attempts store. This is the raw
+ * input to Analytics derivation (computePersonalAnalytics) and the unit of
+ * learning history surfaced to the learner.
+ *
+ * Field naming intentionally matches the `exam_attempts` table columns, not the
+ * in-memory AssessmentOutcome camelCase shape; the persistence action is the
+ * boundary that maps between the two. (See app/assessment/actions.ts.)
+ */
+export interface AttemptHistoryItem {
+  id: string
+  exam_set_id: string
+  package_id: string
+  mode: AssessmentMode
+  total: number
+  score: number
+  answered_count: number
+  accuracy: number
+  time_used_seconds: number
+  passing_score: number
+  passed: boolean
+  /** The per-question answer summary (Outcome Layer 3). */
+  answer_summary: AnsweredQuestion[]
+  completed_at: string
+}

@@ -8,6 +8,7 @@ import { computeOutcome } from '@/lib/assessment/outcome'
 import { normalizeMode } from '@/lib/assessment/types'
 import type { AssessmentOutcome } from '@/lib/assessment/types'
 import { persistOutcome } from '@/app/assessment/actions'
+import type { ExamSet } from '@/lib/types'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -36,7 +37,7 @@ interface Question {
 
 interface ExamRuntimeProps {
   pkg: any
-  examSet: any
+  examSet: ExamSet
   questions: Question[]
   mode?: string
 }
@@ -68,7 +69,10 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   }, [currentIndex])
   
   // Timer State
-  const initialTime = (examSet.time_limit_minutes || 60) * 60
+  // duration_minutes is the real schema column (was previously read via the
+  // non-existent `time_limit_minutes`, which silently fell back to 60 every
+  // time). Aligned during Refactor #2.
+  const initialTime = (examSet.duration_minutes || 60) * 60
   const [timeRemaining, setTimeRemaining] = useState(initialTime)
   const [timeUsed, setTimeUsed] = useState(0)
 
@@ -418,7 +422,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
               <CheckCircle size={14} className="text-green-500" />
               ส่งข้อสอบเรียบร้อยแล้ว
             </div>
-            <h1 className="text-3xl font-bold text-[#F5E9D6] font-display mb-2">{examSet.title}</h1>
+            <h1 className="text-3xl font-bold text-[#F5E9D6] font-display mb-2">{examSet.name}</h1>
             <p className="text-[#A1866B]">{pkg.name}</p>
           </div>
 
@@ -493,7 +497,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             <DownloadShareButton
               packageName={pkg.name || ''}
               positionName={pkg.positions?.name || ''}
-              examName={examSet.title || examSet.name || ''}
+              examName={examSet.name || ''}
               scorePercent={accuracy}
               correct={score}
               wrong={questions.length - score}
@@ -527,7 +531,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
               <ChevronLeft size={20} />
             </Link>
             <div>
-              <div className="text-[10px] uppercase tracking-wider font-bold text-[#A1866B] mb-0.5">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.title}</div>
+              <div className="text-[10px] uppercase tracking-wider font-bold text-[#A1866B] mb-0.5">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.name}</div>
               <div className="text-sm font-bold text-[#F5E9D6] lg:hidden">ข้อ {currentIndex + 1} จาก {questions.length}</div>
             </div>
           </div>

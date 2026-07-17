@@ -21,19 +21,15 @@ import ContentCard from '@/components/ContentCard'
  *   grouping honest without guessing a subject from free-text names.
  */
 
-interface ExamSet {
-  id: string
-  name: string
-  description?: string | null
-  duration_minutes: number
-  is_sample: boolean
-  sort_order: number
-  updated_at?: string
-  qCount?: number
-}
+// Use the canonical ExamSet type from lib/types (aligned with the real schema
+// in Refactor #2) rather than a duplicated local interface. Extend with the
+// UI-only `qCount` (computed question count) that this component consumes.
+import type { ExamSet } from '@/lib/types'
+
+type ExamSetWithCount = ExamSet & { qCount?: number }
 
 interface ExamNavigationProps {
-  examSets: ExamSet[]
+  examSets: ExamSetWithCount[]
   packageSlug: string
 }
 
@@ -47,7 +43,7 @@ const FILTER_OPTIONS = [
 const SAMPLE_CATEGORY = 'ตัวอย่าง'
 const FULL_CATEGORY = 'เต็มรูปแบบ'
 
-function getCategoryFor(es: ExamSet): string {
+function getCategoryFor(es: ExamSetWithCount): string {
   return es.is_sample ? SAMPLE_CATEGORY : FULL_CATEGORY
 }
 
@@ -113,7 +109,7 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
     // in the server query. Client-side sort here would override it.
 
     // Group by category (sample / full).
-    const map = new Map<string, ExamSet[]>()
+    const map = new Map<string, ExamSetWithCount[]>()
     for (const es of filtered) {
       const key = getCategoryFor(es)
       if (!map.has(key)) map.set(key, [])

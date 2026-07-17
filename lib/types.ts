@@ -18,16 +18,25 @@ export interface Package {
 }
 
 // Exam Set
+// Aligned with the real `exam_sets` schema:
+//   - 001_init_admin_schema.sql: id, package_id, name, description,
+//     duration_minutes, is_sample, sort_order, created_at, updated_at
+//   - 019_display_order.sql: display_order, released_at (nullable)
+//   - 024_exam_sets_passing_score.sql: passing_score
+// Prior drift (title / time_limit_minutes) removed during Milestone 1 Refactor #2.
 export interface ExamSet {
   id: string;
   package_id: string;
-  title: string;
-  description: string;
-  time_limit_minutes: number;
-  passing_score: number;
+  name: string;
+  description: string | null;
+  duration_minutes: number;
   is_sample: boolean;
   sort_order: number;
+  display_order: number;
+  released_at: string | null;
+  passing_score: number;
   created_at: string;
+  updated_at: string;
 }
 
 // ข้อสอบ
