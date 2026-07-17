@@ -12,15 +12,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const { data: examSet } = await supabase
     .from('exam_sets')
-    .select('title')
+    .select('name')
     .eq('id', examSetId)
     .single()
 
   if (!examSet) return { title: 'Exam Not Found | Sobdai' }
 
   return {
-    title: `${examSet.title} | Sobdai`,
-    description: `ทำชุดข้อสอบ: ${examSet.title}`
+    title: `${examSet.name} | Sobdai`,
+    description: `ทำชุดข้อสอบ: ${examSet.name}`
   }
 }
 
@@ -189,7 +189,7 @@ export default async function ExamSetPage({
           {/* Header */}
           <div className="mb-12">
             <h1 className="text-3xl md:text-5xl font-display font-bold text-[#F5E9D6] mb-4 leading-tight">
-              {examSet.title}
+              {examSet.name}
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-sm text-[#A1866B]">
               <div className="flex items-center bg-[rgba(255,255,255,0.03)] px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)]">

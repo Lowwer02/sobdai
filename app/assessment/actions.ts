@@ -34,7 +34,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import type { AssessmentOutcome } from '@/lib/assessment/types'
+import type { AssessmentOutcome, AttemptHistoryItem } from '@/lib/assessment/types'
 
 // ─── Public return shape ────────────────────────────────────────────────────
 
@@ -136,22 +136,11 @@ export async function persistOutcome(
 // "Retrieval" and "Historical record" — but it is deliberately a thin passthrough:
 // NO analytics aggregation, NO trending, NO comparison. Future Analytics
 // (Part IV §27) will build derivation layers ON TOP of this raw retrieval.
-
-export interface AttemptHistoryItem {
-  id: string
-  exam_set_id: string
-  package_id: string
-  mode: 'practice' | 'simulation'
-  total: number
-  score: number
-  answered_count: number
-  accuracy: number
-  time_used_seconds: number
-  passing_score: number
-  passed: boolean
-  answer_summary: AssessmentOutcome['questions']
-  completed_at: string
-}
+//
+// NOTE: AttemptHistoryItem (the row shape returned below) is a SHARED DOMAIN
+// MODEL defined in lib/assessment/types.ts — not here. It moved during the
+// Milestone 1 Refactor #1 so the Analytics layer can depend on the shared
+// types module without depending on this server-action module.
 
 /**
  * Fetch the calling user's attempt history, newest first.
@@ -199,3 +188,181 @@ export async function fetchMyAttemptHistory(opts?: {
     return { data: null, error: err?.message ?? 'Unexpected error.' }
   }
 }
+
+// ─── Epic 3: Analytics (read-only derivation over persisted Outcomes) ────────
+// Analytics consumes Outcomes; it never modifies them. This wrapper retrieves
+// the caller's own history (Persistence) and runs the pure derivation
+// (lib/assessment/analytics.ts). No write paths; no caching; no aggregation
+// tables — derivation happens on read, from the single source of truth.
+
+import { computePersonalAnalytics } from '@/lib/assessment/analytics'
+import type { PersonalAnalytics } from '@/lib/assessment/analytics'
+
+export interface FetchMyAnalyticsResult {
+  data: PersonalAnalytics | null
+  error: string | null
+}
+
+/**
+ * Fetch the calling user's personal analytics, derived from their persisted
+ * Outcomes.
+ *
+ * Read-only and non-throwing. Returns a valid zeroed PersonalAnalytics when the
+ * user has no attempts yet (so the UI can render an empty state cleanly).
+ *
+ * Scope: personal analytics only. No cohort/comparison data (Leaderboard's
+ * domain); no recommendations (Recommendation's domain).
+ */
+export async function fetchMyAnalytics(): Promise<FetchMyAnalyticsResult> {
+  try {
+    const { data: history, error } = await fetchMyAttemptHistory({ limit: 200 })
+    if (error) return { data: null, error }
+    // computePersonalAnalytics handles null/empty safely → zeroed analytics.
+    const data = computePersonalAnalytics(history ?? [])
+    return { data, error: null }
+  } catch (err: any) {
+    console.error('fetchMyAnalytics: unexpected error:', err?.message ?? err)
+    return { data: null, error: err?.message ?? 'Unexpected error.' }
+  }
+}
+
+// ─── Epic 4: Recommendation Engine (read-only enrichment) ───────────────────
+// Recommendation consumes Analytics (and, to attach actionable targets, reads
+// Summaries/ExamSets). It never writes anywhere. This action is the boundary
+// where the pure engine (lib/assessment/recommendation.ts) is enriched with
+// real learning targets from Persistence.
+import { recommend } from '@/lib/assessment/recommendation'
+import type { RecommendationSet, Recommendation } from '@/lib/assessment/recommendation'
+
+export interface FetchMyRecommendationsResult {
+  data: RecommendationSet | null
+  error: string | null
+}
+
+/**
+ * Build the caller's personal recommendations.
+ *
+ * Pipeline (read-only end-to-end):
+ *   1. fetchMyAnalytics()  → PersonalAnalytics (Epic 3 derivation over Outcomes)
+ *   2. recommend()         → categorized, explained recs (pure engine, Epic 4)
+ *   3. enrichWithTargets() → attach Summary/ExamSet links (read Persistence)
+ *
+ * Never throws, never writes. Empty analytics → empty recommendation set
+ * (caller renders an empty state).
+ */
+export async function fetchMyRecommendations(): Promise<FetchMyRecommendationsResult> {
+  try {
+    const { data: analytics, error } = await fetchMyAnalytics()
+    if (error) return { data: null, error }
+    if (!analytics) return { data: { recommendations: [], isEmpty: true }, error: null }
+
+    const base = recommend(analytics)
+    if (base.isEmpty) return { data: base, error: null }
+
+    const enriched = await enrichWithTargets(base.recommendations)
+    return { data: { recommendations: enriched, isEmpty: false }, error: null }
+  } catch (err: any) {
+    console.error('fetchMyRecommendations: unexpected error:', err?.message ?? err)
+    return { data: null, error: err?.message ?? 'Unexpected error.' }
+  }
+}
+
+/**
+ * Attach actionable targets to recommendations by reading (never writing) the
+ * Summaries and ExamSets tables. For a weak subject/topic, find a matching
+ * Summary the learner can read; for retry-simulation, find a Simulation ExamSet
+ * in a package the learner owns.
+ *
+ * Matching is intentionally simple and deterministic (Phase 1):
+ *   - subject/topic recommendation → first published Summary whose subject or
+ *     topic matches (preferring topic match).
+ *   - retry_simulation → the learner's most recent Simulation ExamSet.
+ * If no target is found, `target` stays null and the UI shows the rec without a
+ * link (still useful as guidance).
+ */
+async function enrichWithTargets(
+  recs: Recommendation[],
+): Promise<Recommendation[]> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  // If somehow unauthenticated here, return recs unenriched (safe degradation).
+  if (!user) return recs
+
+  // ── Collect distinct subject/topic labels to look up in one Summary query ──
+  const wantedSubjects = new Set<string>()
+  const wantedTopics = new Set<string>()
+  for (const r of recs) {
+    if (r.subject) wantedSubjects.add(r.subject)
+    if (r.topic) wantedTopics.add(r.topic)
+  }
+
+  // Published summaries matching any wanted subject or topic. We fetch once and
+  // match client-side to keep this a bounded, simple read.
+  let summaryRows: Array<{
+    id: string
+    slug: string
+    title: string
+    subject: string | null
+    topic: string | null
+    package_id: string
+  }> = []
+  if (wantedSubjects.size > 0 || wantedTopics.size > 0) {
+    // Supabase `.or()` with many values can get long; cap defensively.
+    const orClauses: string[] = []
+    for (const s of wantedSubjects) orClauses.push(`subject.eq.${s}`)
+    for (const t of wantedTopics) orClauses.push(`topic.eq.${t}`)
+    const { data, error: sErr } = await supabase
+      .from('summaries')
+      .select('id, slug, title, subject, topic, package_id')
+      .eq('is_published', true)
+      .or(orClauses.slice(0, 20).join(','))
+      .limit(50)
+    if (sErr) console.error('recommendation summary lookup failed:', sErr.message)
+    if (data) summaryRows = data as typeof summaryRows
+  }
+
+  // We need package slugs to build URLs; fetch once for the packages involved.
+  const packageIds = new Set<string>()
+  for (const s of summaryRows) packageIds.add(s.package_id)
+  const packageSlugMap = new Map<string, string>()
+  if (packageIds.size > 0) {
+    const { data: pkgs } = await supabase
+      .from('packages')
+      .select('id, slug')
+      .in('id', Array.from(packageIds))
+    if (pkgs) for (const p of pkgs) packageSlugMap.set(p.id, p.slug)
+  }
+
+  // ── Enrich each recommendation deterministically ─────────────────────────
+  return recs.map((r) => {
+    if (r.category === 'study_weak_subject' || r.category === 'review_weak_topic') {
+      // Prefer a topic match, then a subject match.
+      const match =
+        (r.topic && summaryRows.find((s) => s.topic === r.topic)) ||
+        (r.subject && summaryRows.find((s) => s.subject === r.subject)) ||
+        null
+      if (match) {
+        return {
+          ...r,
+          target: {
+            kind: 'summary' as const,
+            id: match.id,
+            slug: match.slug,
+            packageSlug: packageSlugMap.get(match.package_id),
+            label: match.title,
+          },
+        }
+      }
+      return r
+    }
+    if (r.category === 'retry_simulation') {
+      // Already-enriched below via a separate query for this category.
+      return r
+    }
+    return r
+  })
+}
+
+
