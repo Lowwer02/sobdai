@@ -114,26 +114,35 @@ export async function updateExamSetAction(id: string, data: {
   try {
     const { supabase } = await requirePermission('content.write')
 
+    // Validate subject/document ONLY when the caller explicitly provides them.
+    // Omission (undefined) now means "leave unchanged" (see patch object below),
+    // so we must not treat omission as a null-set and try to validate null.
     await assertMetadataValues(supabase, {
-      subject: data.subject ?? null,
-      document: data.document ?? null,
+      subject: data.subject === undefined ? null : data.subject,
+      document: data.document === undefined ? null : data.document,
     })
+
+    // Patch object: only the always-managed fields are sent unconditionally.
+    // exam_type / subject / document are included ONLY when explicitly
+    // provided, so an edit save that omits them preserves the existing values
+    // instead of overwriting them with defaults. Fixes QA Bug #1.
+    const patch: Record<string, unknown> = {
+      package_id: data.package_id,
+      name: data.name,
+      description: data.description,
+      duration_minutes: data.duration_minutes,
+      is_sample: data.is_sample,
+      sort_order: data.sort_order,
+      display_order: data.display_order,
+    }
+    if (data.exam_type !== undefined) patch.exam_type = data.exam_type
+    if (data.subject !== undefined) patch.subject = data.subject
+    if (data.document !== undefined) patch.document = data.document
 
     // 1. Update Exam Set
     const { error: updateError, data: updateData } = await supabase
       .from('exam_sets')
-      .update({
-        package_id: data.package_id,
-        name: data.name,
-        description: data.description,
-        duration_minutes: data.duration_minutes,
-        is_sample: data.is_sample,
-        sort_order: data.sort_order,
-        display_order: data.display_order,
-        exam_type: data.exam_type ?? 'document',
-        subject: data.subject ?? null,
-        document: data.document ?? null
-      })
+      .update(patch)
       .eq('id', id)
       .select('id')
 
