@@ -126,7 +126,7 @@ type SupabaseQ = ReturnType<typeof baseQuestionsQuery>
 function baseQuestionsQuery(supabase: any) {
   return supabase
     .from('questions')
-    .select('id, content, subject, document, topic, law, difficulty, is_common, category', { count: 'exact' })
+    .select('id, content, subject, document, topic, law, difficulty, is_common, category, question_code, status', { count: 'exact' })
 }
 
 async function queryQuestions(
@@ -147,7 +147,12 @@ async function queryQuestions(
   let query = baseQuestionsQuery(supabase)
 
   if (filters.search) {
-    query = query.ilike('content', `%${filters.search}%`)
+    // Search matches EITHER content OR question_code (Session 6.17: search by
+    // Question Code OR Content). Composed via PostgREST `or` so it still
+    // combines with the other `.eq()` filters below. The term is reused for
+    // both columns so a single search box covers both. Escaping commas is not
+    // needed here because the term is the only operand in each clause.
+    query = query.or(`content.ilike.%${filters.search}%,question_code.ilike.%${filters.search}%`)
   }
   if (filters.subject) {
     query = query.eq('subject', filters.subject)
@@ -187,7 +192,7 @@ export async function fetchQuestionDetailsForPicker(ids: string[]) {
 
   const { data, error } = await supabase
     .from('questions')
-    .select('id, content, subject, document, topic, law, difficulty, is_common, category')
+    .select('id, content, subject, document, topic, law, difficulty, is_common, category, question_code, status')
     .in('id', ids)
 
   if (error) throw error

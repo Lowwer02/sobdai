@@ -16,6 +16,11 @@ interface Question {
   difficulty: string
   is_common: boolean
   category: string
+  // Added in Session 6.17 for the picker columns + search-by-code.
+  // Both are nullable on the DB; questions created before migration 026 have
+  // question_code = NULL. Optional here so the type is backward-compatible.
+  question_code?: string | null
+  status?: string | null
 }
 
 interface QuestionPickerProps {
@@ -248,6 +253,9 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-[#F5E9D6] mb-1">
                   <span className="text-[#A1866B] mr-2">{index + 1}.</span>
+                  {q.question_code && (
+                    <span className="font-mono text-[10px] text-[#A1866B]/70 mr-2">{q.question_code}</span>
+                  )}
                   <span className="line-clamp-2">{q.content}</span>
                 </div>
                 <div className="flex gap-2">
@@ -415,14 +423,22 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
                         {isSelected && <Check size={14} strokeWidth={3} />}
                       </div>
                       <div className="min-w-0 flex-1">
+                        {/* Question Code — immutable business identifier (Q-000001).
+                            Monospace + muted so it reads as a stable reference, not
+                            content. Pre-migration-026 questions have no code; show
+                            a muted dash so the row keeps its alignment. */}
+                        <div className="text-[10px] font-mono text-[#A1866B]/70 mb-1">
+                          {q.question_code || '—'}
+                        </div>
                         <p className={`text-sm line-clamp-3 mb-2 ${isSelected ? 'text-[#F5E9D6]' : 'text-[#A1866B]'}`}>{q.content}</p>
                         {/* Badges. Each is an atomic unit (whitespace-nowrap +
                             shrink-0) so it never breaks mid-label; the row wraps
                             gracefully when horizontal space runs out.
                             Order = visual priority:
                               1. Selection state (editing context) — most important
-                              2. Subject / Difficulty (metadata)
-                              3. Usage (historical context) — least emphasized
+                              2. Status (Draft/Review/Published) — content lifecycle
+                              3. Subject / Difficulty (metadata)
+                              4. Usage (historical context) — least emphasized
                             Per the design's redundancy rule, "In Current Exam" is
                             shown only when distinct from a plain session pick. */}
                         <div className="flex flex-wrap gap-2 mt-auto">
@@ -439,9 +455,30 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
                               {inCurrentExam ? 'In Current Exam' : 'Selected'}
                             </span>
                           )}
+                          {/* Status (Draft/Review/Published) — content lifecycle.
+                              Published = green, Review = amber, Draft = muted.
+                              Mirrors the Question Bank list styling. */}
+                          {q.status && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border whitespace-nowrap shrink-0 ${
+                              q.status === 'Published'
+                                ? 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20'
+                                : q.status === 'Review'
+                                  ? 'text-[#EAB308] bg-[#EAB308]/10 border-[#EAB308]/20'
+                                  : 'text-[#A1866B] bg-black/30 border-[rgba(255,255,255,0.1)]'
+                            }`}>
+                              {q.status}
+                            </span>
+                          )}
                           <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)] whitespace-nowrap shrink-0">
                             {isUnassignedSubject(q.subject) ? (q.category || 'ยังไม่กำหนด Subject') : getSubjectLabel(q.subject)}
                           </span>
+                          {/* Document — shown only when set, to avoid badge noise
+                              on the many questions that have none. */}
+                          {q.document && (
+                            <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)] whitespace-nowrap shrink-0 max-w-[160px] truncate">
+                              {q.document}
+                            </span>
+                          )}
                           <span className="text-[10px] text-[#A1866B] bg-black/30 px-2 py-0.5 rounded border border-[rgba(255,255,255,0.05)] whitespace-nowrap shrink-0">
                             {q.difficulty}
                           </span>

@@ -3,10 +3,38 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback } from 'react'
-import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2, Copy } from 'lucide-react'
-import { deleteExamSetAction, createExamSetAction } from './actions'
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2, Copy, Send, Archive, RotateCcw } from 'lucide-react'
+import { deleteExamSetAction, setExamSetStatusAction } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import StatusBadge from '@/components/admin/StatusBadge'
+import { getSubjectLabel } from '@/lib/subjects'
 import { toastEvent } from '@/hooks/useToast'
+
+// Allowed exam_sets.status transitions in the UI (Session 6.17). Each maps to
+// the existing setExamSetStatusAction — the server (validate_exam_set_for_publish
+// RPC) is the sole source of truth; the client performs NO business validation.
+// `verb` is used in the confirm dialog copy ("Publish …", "Archive …").
+type ExamSetStatus = 'draft' | 'published' | 'archived'
+interface StatusTransition {
+  to: ExamSetStatus
+  verb: string          // imperative verb for the button + dialog
+  icon: typeof Send
+  className: string     // button classes (color)
+}
+// Per current status, which transitions are offered in the row's action menu.
+const TRANSITIONS: Record<ExamSetStatus, StatusTransition[]> = {
+  draft: [
+    { to: 'published', verb: 'Publish', icon: Send, className: 'text-[#22C55E] hover:bg-[#22C55E]/10' },
+    { to: 'archived', verb: 'Archive', icon: Archive, className: 'text-[#A1866B] hover:bg-black/30' },
+  ],
+  published: [
+    { to: 'draft', verb: 'Revert to Draft', icon: RotateCcw, className: 'text-[#EAB308] hover:bg-[#EAB308]/10' },
+    { to: 'archived', verb: 'Archive', icon: Archive, className: 'text-[#A1866B] hover:bg-black/30' },
+  ],
+  archived: [
+    { to: 'draft', verb: 'Restore to Draft', icon: RotateCcw, className: 'text-[#EAB308] hover:bg-[#EAB308]/10' },
+  ],
+}
 
 interface ExamSetsClientProps {
   examSets: any[]
@@ -36,6 +64,16 @@ export default function ExamSetsClient({
   const [setToActOn, setSetToActOn] = useState<{id: string, name: string} | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
+
+  // Status transition modal. `statusTarget` carries both the row identity and
+  // the transition being confirmed; null = dialog closed. We reuse one dialog
+  // for all four transitions (Publish / Revert / Archive / Restore).
+  const [statusTarget, setStatusTarget] = useState<{
+    id: string
+    name: string
+    transition: StatusTransition
+  } | null>(null)
+  const [isStatusChanging, setIsStatusChanging] = useState(false)
 
   // URL updating helper
   const updateParams = useCallback((updates: Record<string, string>) => {
@@ -76,6 +114,30 @@ export default function ExamSetsClient({
       setSetToActOn(null)
     } else {
       toastEvent(res?.error || 'ลบไม่สำเร็จ', 'error')
+    }
+  }
+
+  const handleStatusClick = (id: string, name: string, transition: StatusTransition) => {
+    setStatusTarget({ id, name, transition })
+  }
+
+  const confirmStatusChange = async () => {
+    if (!statusTarget) return
+    setIsStatusChanging(true)
+    // No client-side validation. The server's validate_exam_set_for_publish RPC
+    // is authoritative for the publish rules; we just relay its message.
+    const res = await setExamSetStatusAction(statusTarget.id, statusTarget.transition.to)
+    setIsStatusChanging(false)
+    if (res?.success) {
+      toastEvent(`${statusTarget.transition.verb}d: ${statusTarget.name}`)
+      setStatusTarget(null)
+      // Refresh server data so the Status badge + available transitions update
+      // immediately from the source of truth (the DB row).
+      router.refresh()
+    } else {
+      // Surface the server's validation message verbatim — this is where
+      // publish-rule failures (no_questions / duplicate_order / ...) appear.
+      toastEvent(res?.error || 'Status change failed', 'error')
     }
   }
 
@@ -146,22 +208,31 @@ export default function ExamSetsClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
-                <th className="p-4 font-medium w-[30%]">Exam Name</th>
+                <th className="p-4 font-medium w-[26%]">Exam Name</th>
                 <th className="p-4 font-medium">Package</th>
+                <th className="p-4 font-medium">Status</th>
+                <th className="p-4 font-medium">Exam Type</th>
+                <th className="p-4 font-medium">Subject / Document</th>
                 <th className="p-4 font-medium text-center">Questions</th>
                 <th className="p-4 font-medium text-center">Duration</th>
                 <th className="p-4 font-medium">Type</th>
+                <th className="p-4 font-medium">Updated</th>
                 <th className="p-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
               {examSets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                  <td colSpan={10} className="p-12 text-center text-[#A1866B]">
                     No exam sets found.
                   </td>
                 </tr>
-              ) : examSets.map((set) => (
+              ) : examSets.map((set) => {
+                // Status defaults to 'draft' at the DB (migration 026); coerce
+                // null/undefined defensively so the transitions map always keys.
+                const status: ExamSetStatus = (set.status as ExamSetStatus) || 'draft'
+                const transitions = TRANSITIONS[status] || []
+                return (
                 <tr key={set.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
                   <td className="p-4">
                     <div className="text-[#F5E9D6] font-medium">{set.name}</div>
@@ -171,6 +242,20 @@ export default function ExamSetsClient({
                     <span className="text-[#A1866B] text-xs px-2 py-1 bg-[#0F0B07] rounded-lg border border-[rgba(255,255,255,0.05)] whitespace-nowrap">
                       {set.package_name}
                     </span>
+                  </td>
+                  <td className="p-4">
+                    <StatusBadge status={status} />
+                  </td>
+                  <td className="p-4">
+                    <span className="text-xs text-[#A1866B] capitalize">{set.exam_type || 'document'}</span>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-xs text-[#F5E9D6]">
+                      {set.subject ? getSubjectLabel(set.subject) : <span className="text-[#A1866B]/60">—</span>}
+                    </div>
+                    <div className="text-[10px] text-[#A1866B] mt-0.5 truncate max-w-[160px]">
+                      {set.document || <span className="text-[#A1866B]/60">—</span>}
+                    </div>
                   </td>
                   <td className="p-4 text-center">
                     <span className="text-[#F5E9D6] font-bold">{set.question_count}</span>
@@ -185,16 +270,37 @@ export default function ExamSetsClient({
                       <span className="text-xs font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded">Full</span>
                     )}
                   </td>
+                  <td className="p-4 text-xs text-[#A1866B] whitespace-nowrap">
+                    {set.updated_at ? new Date(set.updated_at).toLocaleDateString() : '—'}
+                  </td>
                   <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1 flex-wrap">
+                      {/* Lifecycle transitions — server-authoritative, no client
+                          validation. Each opens the confirm dialog. Hidden when
+                          there are none for the current status (e.g. archived has
+                          only Restore). */}
+                      {transitions.map(t => {
+                        const Icon = t.icon
+                        return (
+                          <button
+                            key={t.to}
+                            type="button"
+                            onClick={() => handleStatusClick(set.id, set.name, t)}
+                            className={`p-2 transition-colors rounded-lg ${t.className}`}
+                            title={t.verb}
+                          >
+                            <Icon size={16} />
+                          </button>
+                        )
+                      })}
                       <Link href={`/admin/exam-sets/${set.id}/edit`}>
                         <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
                           <Edit size={16} />
                         </button>
                       </Link>
-                      <button type="button" 
+                      <button type="button"
                         onClick={() => handleDeleteClick(set.id, set.name)}
-                        className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10" 
+                        className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10"
                         title="Delete"
                       >
                         <Trash2 size={16} />
@@ -202,7 +308,8 @@ export default function ExamSetsClient({
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -249,6 +356,34 @@ export default function ExamSetsClient({
         cancelText="ยกเลิก"
         isDestructive={true}
         isLoading={isDeleting}
+      />
+
+      {/* Status Transition Modal — shared by Publish / Revert / Archive / Restore.
+          No client-side validation: the description explains what will happen,
+          and the server (validate_exam_set_for_publish RPC) is authoritative.
+          For Publish specifically, validation failures (no questions, duplicate
+          order, etc.) surface as a toast after confirm, straight from the RPC. */}
+      <ConfirmDialog
+        isOpen={!!statusTarget}
+        onClose={() => !isStatusChanging && setStatusTarget(null)}
+        onConfirm={confirmStatusChange}
+        title={statusTarget ? `${statusTarget.transition.verb} Exam Set` : ''}
+        description={
+          <div className="space-y-2 text-[#F5E9D6]">
+            <div>{statusTarget?.transition.verb}: <span className="text-[#D4AF37] font-medium">{statusTarget?.name}</span></div>
+            {statusTarget?.transition.to === 'published' ? (
+              <p className="text-[#A1866B] text-xs">
+                Publishing runs the server's publish-rule check: the set must contain at least one question, no duplicate questions, and unique display order. If any rule fails, the status will not change and the reason will be shown.
+              </p>
+            ) : (
+              <p className="text-[#A1866B] text-xs">This changes the Exam Set status. You can change it again later.</p>
+            )}
+          </div>
+        }
+        confirmText={statusTarget?.transition.verb || 'Confirm'}
+        cancelText="ยกเลิก"
+        isDestructive={statusTarget?.transition.to === 'archived'}
+        isLoading={isStatusChanging}
       />
 
     </div>
