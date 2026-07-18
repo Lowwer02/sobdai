@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, X, Loader2, RefreshCw } from 'lucide-react'
 import QuestionPicker from './QuestionPicker'
+import StatusBadge from './StatusBadge'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { publishDraftQuestionsInExamSetAction } from '@/app/admin/exam-sets/actions'
+import { fetchUniqueFilters } from '@/app/admin/exam-sets/questions.action'
+import { getSubjectLabel } from '@/lib/subjects'
 import { toastEvent } from '@/hooks/useToast'
 
 interface ExamSetFormProps {
@@ -35,7 +38,32 @@ export default function ExamSetForm({
   const [isSample, setIsSample] = useState(initialData?.is_sample || false)
   const [sortOrder, setSortOrder] = useState(initialData?.sort_order || 0)
   const [displayOrder, setDisplayOrder] = useState(initialData?.display_order || 0)
-  
+
+  // ── Document-based Exam Set foundation fields (migration 026) ──
+  // exam_type is a closed enum (document | simulation; simulation is OUT OF
+  // SCOPE this milestone but the column accepts it). subject/document MUST be
+  // chosen from Question Bank metadata — never free-form — because the server
+  // action (assertMetadataValues) rejects anything not in get_question_metadata().
+  // We populate the dropdowns from fetchUniqueFilters() (the same source the
+  // Question Picker uses), so the options always match what the server validates.
+  const [examType, setExamType] = useState<'document' | 'simulation'>(
+    initialData?.exam_type === 'simulation' ? 'simulation' : 'document'
+  )
+  const [subject, setSubject] = useState<string>(initialData?.subject || '')
+  const [documentField, setDocumentField] = useState<string>(initialData?.document || '')
+
+  // Metadata option lists (raw values from the Question Bank). Empty until the
+  // fetch resolves. Empty subject list = show only "— None —".
+  const [subjectOptions, setSubjectOptions] = useState<string[]>([])
+  const [documentOptions, setDocumentOptions] = useState<string[]>([])
+
+  useEffect(() => {
+    fetchUniqueFilters().then(res => {
+      setSubjectOptions(res.uniqueSubjects || [])
+      setDocumentOptions(res.uniqueDocuments || [])
+    }).catch(err => console.error('fetchUniqueFilters failed', err))
+  }, [])
+
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>(selectedQuestionsData)
   const [isDirty, setIsDirty] = useState(false)
 
@@ -68,7 +96,13 @@ export default function ExamSetForm({
         is_sample: isSample,
         sort_order: sortOrder,
         display_order: displayOrder,
-        question_ids: selectedQuestions.map(q => q.id)
+        question_ids: selectedQuestions.map(q => q.id),
+        // Foundation fields. exam_type always has a value; subject/document
+        // send null when blank so the patch-object update can clear them
+        // (assertMetadataValues only validates non-empty strings).
+        exam_type: examType,
+        subject: subject || null,
+        document: documentField || null
       })
 
       if (res.success) {
@@ -149,10 +183,10 @@ export default function ExamSetForm({
 
             <div className="space-y-2">
               <label className="text-sm text-[#F5E9D6] font-medium block">Assign to Package *</label>
-              <select 
-                required 
-                value={packageId} 
-                onChange={e => setPackageId(e.target.value)} 
+              <select
+                required
+                value={packageId}
+                onChange={e => setPackageId(e.target.value)}
                 className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
               >
                 {packages.map(p => (
@@ -160,6 +194,51 @@ export default function ExamSetForm({
                 ))}
               </select>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-[#F5E9D6] font-medium block">Exam Type</label>
+              <select
+                value={examType}
+                onChange={e => setExamType(e.target.value as 'document' | 'simulation')}
+                className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+              >
+                <option value="document">Document</option>
+                <option value="simulation">Simulation</option>
+              </select>
+              <p className="text-xs text-[#A1866B]">Simulation exams are out of scope this milestone.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm text-[#F5E9D6] font-medium block">Subject</label>
+                <select
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                >
+                  <option value="">— None —</option>
+                  {subjectOptions.map(s => (
+                    <option key={s} value={s}>{getSubjectLabel(s)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-[#F5E9D6] font-medium block">Document</label>
+                <select
+                  value={documentField}
+                  onChange={e => setDocumentField(e.target.value)}
+                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                >
+                  <option value="">— None —</option>
+                  {documentOptions.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-[#A1866B] -mt-2">
+              Subject &amp; Document must be chosen from the Question Bank metadata.
+            </p>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -211,7 +290,48 @@ export default function ExamSetForm({
 
         {/* Right Column: Question Picker */}
         <div className="lg:col-span-2 space-y-6">
-          
+
+          {/* Read-only information panel — only meaningful on Edit (Create has
+              no persisted row yet). Mirrors the fields the spec calls out:
+              Total Questions, Passing Score, Duration, Created, Updated. All
+              values come from initialData (already loaded via select('*') in the
+              edit server page). Passing Score has no UI editor in this form, so
+              it is read-only here; Duration is editable above but echoed here as
+              a read-only fact for quick reference. */}
+          {isEdit && initialData && (
+            <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 shadow-xl">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-[#A1866B] border-b border-[rgba(255,255,255,0.05)] pb-3 mb-4">At a Glance</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[#A1866B]">Total Questions</div>
+                  <div className="text-[#F5E9D6] font-bold mt-0.5">{totalQuestions}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[#A1866B]">Passing Score</div>
+                  <div className="text-[#F5E9D6] font-bold mt-0.5">{initialData.passing_score ?? '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[#A1866B]">Duration</div>
+                  <div className="text-[#F5E9D6] font-bold mt-0.5">{initialData.duration_minutes ?? durationMinutes} min</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[#A1866B]">Created</div>
+                  <div className="text-[#F5E9D6] font-medium mt-0.5">{initialData.created_at ? new Date(initialData.created_at).toLocaleDateString() : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[#A1866B]">Updated</div>
+                  <div className="text-[#F5E9D6] font-medium mt-0.5">{initialData.updated_at ? new Date(initialData.updated_at).toLocaleDateString() : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[#A1866B]">Status</div>
+                  <div className="mt-0.5">
+                    <StatusBadge status={initialData.status} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.05)] pb-3">
               <h3 className="text-xl font-bold font-display text-[#F5E9D6]">Publish Readiness</h3>

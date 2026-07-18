@@ -29,7 +29,7 @@ export default async function EditExamSetPage({ params }: { params: Promise<{ id
     .from('exam_set_questions')
     .select(`
       sort_order,
-      questions (id, content, subject, topic, law, difficulty, is_common, category, status)
+      questions (id, content, subject, topic, law, difficulty, is_common, category, status, question_code)
     `)
     .eq('exam_set_id', id)
     .order('sort_order', { ascending: true })
