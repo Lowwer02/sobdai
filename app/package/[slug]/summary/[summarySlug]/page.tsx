@@ -132,11 +132,12 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
       .eq('is_published', true)
   )
 
-  // Check if package has Exam Sets
+  // Check if package has published Exam Sets (draft/archived must not trigger the CTA)
   const { count: examSetsCount } = await supabase
     .from('exam_sets')
     .select('id', { count: 'exact', head: true })
     .eq('package_id', pkg.id)
+    .eq('status', 'published')
 
   const hasExamSets = (examSetsCount || 0) > 0
 

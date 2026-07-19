@@ -57,11 +57,13 @@ export default async function PackagePage({ params }: PageProps) {
         .eq('is_published', true)
     ),
     // exam_sets with the same ordering chain, DB-side.
+    // Only show published exam sets to end users (status filter mirrors summaries).
     applyContentOrdering(
       supabase
         .from('exam_sets')
         .select('id, name, description, duration_minutes, is_sample, sort_order, display_order')
         .eq('package_id', pkg.id)
+        .eq('status', 'published')
     ),
     // Purchase check only matters for logged-in users
     user

@@ -14,6 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     .from('exam_sets')
     .select('name')
     .eq('id', examSetId)
+    .eq('status', 'published')
     .single()
 
   if (!examSet) return { title: 'Exam Not Found | Sobdai' }
@@ -49,12 +50,14 @@ export default async function ExamSetPage({
   const pkg = pkgResult.data
   if (!pkg) return notFound()
 
-  // 2. Fetch exam set (depends on pkg.id).
+  // 2. Fetch exam set (depends on pkg.id). Only published sets are accessible
+  //    to end users; draft/archived sets must 404 even when the URL is known.
   const { data: examSet } = await supabase
     .from('exam_sets')
     .select('*')
     .eq('id', examSetId)
     .eq('package_id', pkg.id)
+    .eq('status', 'published')
     .single()
 
   if (!examSet) return notFound()
