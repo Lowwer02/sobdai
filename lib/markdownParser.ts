@@ -25,6 +25,11 @@ export interface ParsedQuestion {
   choice_count: string;
   law: string;
   tags: string[];
+  // IG-2 axes (Content Template v2.2 — Session 6.19.2). Empty string when the
+  // authored content doesn't carry the label (v2.1 content); the importer
+  // converts empty → NULL on insert. Vocabulary per Blueprint v3.0.
+  question_pattern: string;
+  section: string;
 }
 
 export interface ParseResult {
@@ -73,6 +78,8 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     '\\*\\*Reference:\\*\\*',
     '\\*\\*Difficulty:\\*\\*',
     '\\*\\*Blueprint:\\*\\*',
+    '\\*\\*QuestionPattern:\\*\\*',
+    '\\*\\*Section:\\*\\*',
     '\\*\\*QuestionType:\\*\\*',
     '\\*\\*ChoiceCount:\\*\\*',
     '\\*\\*Category:\\*\\*',
@@ -127,6 +134,10 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     const blueprint = extractMultiline('\\*\\*Blueprint:\\*\\*');
     const question_type = extractMultiline('\\*\\*QuestionType:\\*\\*');
     const choice_count = extractMultiline('\\*\\*ChoiceCount:\\*\\*');
+    // IG-2 axes (Content Template v2.2 §3 Patch B). Empty string when the
+    // label is absent (v2.1 content) — backward compatible by design.
+    const question_pattern = extractMultiline('\\*\\*QuestionPattern:\\*\\*');
+    const section = extractMultiline('\\*\\*Section:\\*\\*');
     const tagsRaw = extractMultiline('\\*\\*Tags:\\*\\*');
 
     // Default formatting and validation
@@ -178,7 +189,9 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
       blueprint,
       question_type,
       choice_count,
-      tags
+      tags,
+      question_pattern,
+      section
     } : null;
 
     results.push({

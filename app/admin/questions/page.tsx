@@ -20,6 +20,11 @@ export default async function QuestionsPage({
   const documentFilter = typeof params.document === 'string' ? params.document : ''
   const lawFilter = typeof params.law === 'string' ? params.law : ''
   const topicFilter = typeof params.topic === 'string' ? params.topic : ''
+  // IG-2 axes (Session 6.20 E-0.6) — four new filters, same query pattern.
+  const blueprintTypeFilter = typeof params.blueprint_type === 'string' ? params.blueprint_type : ''
+  const learningObjectiveFilter = typeof params.learning_objective === 'string' ? params.learning_objective : ''
+  const questionPatternFilter = typeof params.question_pattern === 'string' ? params.question_pattern : ''
+  const sectionFilter = typeof params.section === 'string' ? params.section : ''
 
   const limit = 15
   const from = (page - 1) * limit
@@ -70,6 +75,22 @@ export default async function QuestionsPage({
   if (topicFilter && topicFilter !== 'All') {
     query = query.eq('topic', topicFilter)
   }
+  // IG-2 axes — same eq() filter pattern as Subject/Document/Law/Topic above.
+  // No sentinel for "unassigned" on these (NULL handling is via the same
+  // implicit "filter value absent → no row matches" rule the others use for
+  // non-sentinel filters; a NULL-axis Browser filter is out of scope for E-0).
+  if (blueprintTypeFilter && blueprintTypeFilter !== 'All') {
+    query = query.eq('blueprint_type', blueprintTypeFilter)
+  }
+  if (learningObjectiveFilter && learningObjectiveFilter !== 'All') {
+    query = query.eq('learning_objective', learningObjectiveFilter)
+  }
+  if (questionPatternFilter && questionPatternFilter !== 'All') {
+    query = query.eq('question_pattern', questionPatternFilter)
+  }
+  if (sectionFilter && sectionFilter !== 'All') {
+    query = query.eq('section', sectionFilter)
+  }
 
   // Add pagination and ordering
   query = query
@@ -110,6 +131,11 @@ export default async function QuestionsPage({
     documents: string[] | null
     topics: string[] | null
     laws: string[] | null
+    // IG-2 axes (migration 028). Nullable for the empty-Bank case.
+    blueprint_types: string[] | null
+    learning_objectives: string[] | null
+    question_patterns: string[] | null
+    sections: string[] | null
   }
   const { data: metaData, error: metaErr } = (await (supabase as any).rpc('get_question_metadata')) as {
     data: MetaRow[] | null
@@ -118,7 +144,16 @@ export default async function QuestionsPage({
   if (metaErr) {
     console.error('get_question_metadata RPC failed:', metaErr.message)
   }
-  const metaRow = (metaData && metaData[0]) || { subjects: null, documents: null, topics: null, laws: null }
+  const metaRow = (metaData && metaData[0]) || {
+    subjects: null,
+    documents: null,
+    topics: null,
+    laws: null,
+    blueprint_types: null,
+    learning_objectives: null,
+    question_patterns: null,
+    sections: null,
+  }
 
   // Category is not part of the shared metadata RPC; fetch its distinct
   // values separately. Bounded + deduped in JS — safe because the distinct
@@ -132,6 +167,12 @@ export default async function QuestionsPage({
   const uniqueDocuments = metaRow.documents ?? []
   const uniqueLaws = metaRow.laws ?? []
   const uniqueTopics = metaRow.topics ?? []
+  // IG-2 axes — distinct non-null sets from the RPC. Empty arrays when no
+  // row has the axis populated (mixed v2.1/v2.2 repository steady state).
+  const uniqueBlueprintTypes = metaRow.blueprint_types ?? []
+  const uniqueLearningObjectives = metaRow.learning_objectives ?? []
+  const uniqueQuestionPatterns = metaRow.question_patterns ?? []
+  const uniqueSections = metaRow.sections ?? []
 
   return (
     <QuestionsClient
@@ -146,10 +187,18 @@ export default async function QuestionsPage({
       documentFilter={documentFilter}
       lawFilter={lawFilter}
       topicFilter={topicFilter}
+      blueprintTypeFilter={blueprintTypeFilter}
+      learningObjectiveFilter={learningObjectiveFilter}
+      questionPatternFilter={questionPatternFilter}
+      sectionFilter={sectionFilter}
       uniqueCategories={uniqueCategories}
       uniqueDocuments={uniqueDocuments}
       uniqueLaws={uniqueLaws}
       uniqueTopics={uniqueTopics}
+      uniqueBlueprintTypes={uniqueBlueprintTypes}
+      uniqueLearningObjectives={uniqueLearningObjectives}
+      uniqueQuestionPatterns={uniqueQuestionPatterns}
+      uniqueSections={uniqueSections}
       totalCount={totalCount || 0}
       publishedCount={publishedCount || 0}
       reviewCount={reviewCount || 0}
