@@ -284,7 +284,7 @@ export default function QuestionsClient({
             />
           </form>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <select 
               value={statusFilter} 
               onChange={(e) => updateParams({ status: e.target.value })}
