@@ -54,6 +54,12 @@ export interface ExamSet {
 }
 
 // ข้อสอบ
+// IG-2 axes (migration 027 — Session 6.20 E-0): the four Blueprint v3.0 filter
+// axes are nullable. Existing rows have NULL → Engine treats as Incomplete
+// Metadata → reduced Confidence per Scoring Model v1.0 §11. The enum unions
+// below mirror the DB CHECK constraints exactly; the vocabulary is the
+// authoritative Blueprint v3.0 set (IG-2 Amendment Appendix A). Note the
+// Pattern sixth value is the two-word `Matching Concept` (not `Matching`).
 export interface Question {
   id: string;
   // Immutable business identifier (Q-000001, Q-000002, ...). Generated ONLY by
@@ -81,6 +87,21 @@ export interface Question {
   subject?: string;
   law?: string;
   topic?: string;
+  // IG-2 axes (migration 027). Nullable for v2.1-authored content and any
+  // pre-migration row. Vocabulary per Blueprint v3.0 / IG-2 Amendment.
+  blueprint_type?: 'Memory' | 'Concept' | 'Procedure' | 'Scenario' | null;
+  learning_objective?: 'LO1' | 'LO2' | 'LO3' | 'LO4' | null;
+  question_pattern?:
+    | 'Positive'
+    | 'Negative'
+    | 'Best Answer'
+    | 'Scenario'
+    | 'Sequence'
+    | 'Matching Concept'
+    | null;
+  // Free-text legal-section reference, e.g. 'ม.6–8'. Normalized by the
+  // importer (trim, unicode NFC, en-dash U+2013 for ranges) before insert.
+  section?: string | null;
   created_at: string;
 }
 

@@ -21,10 +21,20 @@ interface QuestionsClientProps {
   documentFilter: string
   lawFilter: string
   topicFilter: string
+  // IG-2 axes (Session 6.20 E-0.6)
+  blueprintTypeFilter: string
+  learningObjectiveFilter: string
+  questionPatternFilter: string
+  sectionFilter: string
   uniqueCategories: string[]
   uniqueDocuments: string[]
   uniqueLaws: string[]
   uniqueTopics: string[]
+  // IG-2 distinct value sets (from get_question_metadata RPC, migration 028)
+  uniqueBlueprintTypes: string[]
+  uniqueLearningObjectives: string[]
+  uniqueQuestionPatterns: string[]
+  uniqueSections: string[]
   totalCount: number
   publishedCount: number
   reviewCount: number
@@ -43,10 +53,18 @@ export default function QuestionsClient({
   documentFilter,
   lawFilter,
   topicFilter,
+  blueprintTypeFilter,
+  learningObjectiveFilter,
+  questionPatternFilter,
+  sectionFilter,
   uniqueCategories,
   uniqueDocuments,
   uniqueLaws,
   uniqueTopics,
+  uniqueBlueprintTypes,
+  uniqueLearningObjectives,
+  uniqueQuestionPatterns,
+  uniqueSections,
   totalCount,
   publishedCount,
   reviewCount,
@@ -334,14 +352,63 @@ export default function QuestionsClient({
               ))}
             </select>
 
-            <select 
-              value={topicFilter} 
+            <select
+              value={topicFilter}
               onChange={(e) => updateParams({ topic: e.target.value })}
               className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
             >
               <option value="">All Topics</option>
               {uniqueTopics.map(topic => (
                 <option key={topic} value={topic}>{topic}</option>
+              ))}
+            </select>
+
+            {/* IG-2 axes (Session 6.20 E-0.6) — same dropdown pattern as the
+                existing filters. Distinct values come from the extended
+                get_question_metadata RPC (migration 028). Empty when no row
+                has the axis populated (mixed v2.1/v2.2 repository). */}
+
+            <select
+              value={blueprintTypeFilter}
+              onChange={(e) => updateParams({ blueprint_type: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Blueprint Types</option>
+              {uniqueBlueprintTypes.map(bt => (
+                <option key={bt} value={bt}>{bt}</option>
+              ))}
+            </select>
+
+            <select
+              value={learningObjectiveFilter}
+              onChange={(e) => updateParams({ learning_objective: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Learning Objectives</option>
+              {uniqueLearningObjectives.map(lo => (
+                <option key={lo} value={lo}>{lo}</option>
+              ))}
+            </select>
+
+            <select
+              value={questionPatternFilter}
+              onChange={(e) => updateParams({ question_pattern: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Question Patterns</option>
+              {uniqueQuestionPatterns.map(qp => (
+                <option key={qp} value={qp}>{qp}</option>
+              ))}
+            </select>
+
+            <select
+              value={sectionFilter}
+              onChange={(e) => updateParams({ section: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[150px] truncate"
+            >
+              <option value="">All Sections</option>
+              {uniqueSections.map(sec => (
+                <option key={sec} value={sec}>{sec}</option>
               ))}
             </select>
           </div>

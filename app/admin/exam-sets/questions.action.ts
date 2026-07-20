@@ -211,11 +211,19 @@ export async function fetchUniqueFilters() {
   //
   // The RPC is a custom Postgres function not covered by auto-generated DB
   // types, so we cast through `unknown` like the other RPC callers here.
+  // IG-2 axes (migration 028) are included in the return shape but not
+  // surfaced in the Exam Set Question Picker UI — that Picker filters on
+  // subject/document/topic/law only. The four IG-2 axes remain available
+  // for the admin Question Bank page (app/admin/questions).
   type MetaRow = {
     subjects: string[] | null
     documents: string[] | null
     topics: string[] | null
     laws: string[] | null
+    blueprint_types: string[] | null
+    learning_objectives: string[] | null
+    question_patterns: string[] | null
+    sections: string[] | null
   }
 
   const { data, error } = (await (supabase as any).rpc('get_question_metadata')) as {
@@ -231,7 +239,16 @@ export async function fetchUniqueFilters() {
   // The RPC returns exactly one row of arrays. Normalize nulls to [] for the
   // empty-Bank / empty-column cases, and keep the original return shape so
   // the consuming UI (QuestionPicker dropdowns) is unchanged.
-  const row = (data && data[0]) || { subjects: null, documents: null, topics: null, laws: null }
+  const row = (data && data[0]) || {
+    subjects: null,
+    documents: null,
+    topics: null,
+    laws: null,
+    blueprint_types: null,
+    learning_objectives: null,
+    question_patterns: null,
+    sections: null,
+  }
   return {
     uniqueSubjects: row.subjects ?? [],
     uniqueDocuments: row.documents ?? [],
