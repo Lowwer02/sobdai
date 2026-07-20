@@ -167,18 +167,27 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
     return questions
   }, [statusFilter, selectedQuestions, questions, selectedIdSet])
 
-  // In 'all' mode the server is authoritative for the total (it knows about
-  // questions beyond the loaded page). In the other two modes the visible set
-  // is fully client-side, so its length is the total.
-  const effectiveTotal = statusFilter === 'all' ? totalCount : displayQuestions.length
+  // 'selected' is fully client-side: all selected questions are held in memory
+  // across pages, so displayQuestions.length is the true total.
+  // 'all' and 'unselected' both rely on server-side pagination — the server is
+  // the only authority on how many rows match the current filters. Using
+  // displayQuestions.length for 'unselected' was the bug: it returned only the
+  // count of unselected questions on the *current page* (≤ PAGE_SIZE), which
+  // permanently disabled the Next button after page 1.
+  const effectiveTotal = statusFilter === 'selected' ? displayQuestions.length : totalCount
 
-  // Client-side pagination slice for the filtered modes. In 'all' mode the
-  // server already returns only the current page, so we render it as-is.
+  // 'selected': paginate the full in-memory selected list across virtual pages.
+  // 'all' / 'unselected': the server already returned exactly the current page;
+  //   displayQuestions is that page (possibly client-filtered for 'unselected').
+  //   No further slicing — slicing a ≤PAGE_SIZE array by PAGE_SIZE offset would
+  //   always yield an empty result on pages > 1.
   const pagedQuestions = useMemo(() => {
-    if (statusFilter === 'all') return questions
-    const from = (page - 1) * PAGE_SIZE
-    return displayQuestions.slice(from, from + PAGE_SIZE)
-  }, [statusFilter, questions, displayQuestions, page])
+    if (statusFilter === 'selected') {
+      const from = (page - 1) * PAGE_SIZE
+      return displayQuestions.slice(from, from + PAGE_SIZE)
+    }
+    return displayQuestions
+  }, [statusFilter, displayQuestions, page])
 
   const handleAdd = (q: Question) => {
     if (!selectedQuestions.find(sq => sq.id === q.id)) {
