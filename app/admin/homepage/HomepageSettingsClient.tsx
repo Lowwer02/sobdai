@@ -5,7 +5,7 @@ import { Save, Loader2, Plus, Trash2 } from 'lucide-react'
 import { saveHomepageSettings } from './actions'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { toastEvent } from '@/hooks/useToast'
-import type { HomepageSettings, FeatureItem, HowToStep, CtaButton } from '@/lib/homepageConfig'
+import type { HomepageSettings, FeatureItem, HowToStep, CtaButton, SupportConfig } from '@/lib/homepageConfig'
 
 const ICON_OPTIONS = [
   { key: 'exam', label: 'ข้อสอบ' },
@@ -229,6 +229,45 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
         </Field>
         <Field label="OG Image URL (ไม่บังคับ)" hint="เว้นว่าง = ใช้ค่าเริ่มต้น">
           <input className={inputClass} value={settings.seo.og_image_url} onChange={e => update({ seo: { ...settings.seo, og_image_url: e.target.value } })} />
+        </Field>
+      </section>
+
+      {/* ─── Support ─── */}
+      <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+        <h2 className="text-[#D4AF37] font-bold font-display">Support Sobdai</h2>
+        <p className="text-[10px] text-[#A1866B] -mt-2">
+          แสดง Support Card ใต้ Purchase CTA บนหน้า Package Detail
+        </p>
+        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(212,175,55,0.3)] transition-colors">
+          <input
+            type="checkbox"
+            checked={settings.support.enabled}
+            onChange={e => update({ support: { ...settings.support, enabled: e.target.checked } })}
+            className="w-4 h-4 accent-[#D4AF37]"
+          />
+          <span className="text-sm text-[#F5E9D6]">เปิดใช้งาน Support Card</span>
+        </label>
+        <Field label="Support Title" hint="หัวข้อการ์ด เช่น ชอบ Sobdai ไหม?">
+          <input
+            className={inputClass}
+            value={settings.support.title}
+            onChange={e => update({ support: { ...settings.support, title: e.target.value } })}
+          />
+        </Field>
+        <Field label="Support Description">
+          <textarea
+            className={inputClass}
+            rows={3}
+            value={settings.support.description}
+            onChange={e => update({ support: { ...settings.support, description: e.target.value } })}
+          />
+        </Field>
+        <Field label="Button Label" hint="ข้อความปุ่ม เช่น สนับสนุน Sobdai">
+          <input
+            className={inputClass}
+            value={settings.support.button_label}
+            onChange={e => update({ support: { ...settings.support, button_label: e.target.value } })}
+          />
         </Field>
       </section>
 

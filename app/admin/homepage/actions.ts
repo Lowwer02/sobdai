@@ -7,16 +7,38 @@ import { getHomepageSettings, normalizeHomepageSettings } from '@/lib/homepageCo
 /**
  * Save the homepage_settings singleton.
  *
- * The form sends a plain object per group (general/hero/cta/sections/seo) plus
- * the features/howto arrays. We run it through `normalizeHomepageSettings`
- * BEFORE persisting so only validated, typed data is ever stored — never
- * free-form JSON. This keeps the DB clean and the render safe.
+ * Core fields (general/hero/cta/sections/seo/features/howto) are saved directly.
+ * Support config lives under extended_config.support — we read the existing
+ * extended_config row first, merge only the support key, then update so any
+ * other extended_config data is preserved.
  */
 export async function saveHomepageSettings(raw: any) {
   const { supabase } = await requirePermission('content.write')
 
   // Validate + coerce first; reject if normalization yields nothing usable.
   const clean = normalizeHomepageSettings(raw)
+
+  // Read the current extended_config so we can merge support into it without
+  // clobbering any future keys that may be stored there.
+  const { data: existing } = await supabase
+    .from('homepage_settings')
+    .select('extended_config')
+    .eq('id', 1)
+    .single()
+
+  const existingExt = (existing?.extended_config && typeof existing.extended_config === 'object')
+    ? existing.extended_config
+    : {}
+
+  const mergedExtendedConfig = {
+    ...existingExt,
+    support: {
+      enabled: clean.support.enabled,
+      title: clean.support.title,
+      description: clean.support.description,
+      button_label: clean.support.button_label,
+    },
+  }
 
   const { error } = await supabase
     .from('homepage_settings')
@@ -28,6 +50,7 @@ export async function saveHomepageSettings(raw: any) {
       seo: clean.seo,
       features: clean.features,
       howto: clean.howto,
+      extended_config: mergedExtendedConfig,
     })
     .eq('id', 1)
 
