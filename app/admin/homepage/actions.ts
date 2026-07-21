@@ -32,12 +32,7 @@ export async function saveHomepageSettings(raw: any) {
 
   const mergedExtendedConfig = {
     ...existingExt,
-    support: {
-      enabled: clean.support.enabled,
-      title: clean.support.title,
-      description: clean.support.description,
-      button_label: clean.support.button_label,
-    },
+    support: clean.support,
   }
 
   const { error } = await supabase
