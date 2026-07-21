@@ -1,28 +1,29 @@
 'use client'
 
+/**
+ * Support Sobdai Card — secondary action below Purchase CTA on Package Detail.
+ *
+ * v1.1: forwards all SupportConfig fields to SupportModal. Visual weight
+ * stays subdued so the card never competes with the Purchase CTA above it.
+ */
+
 import React, { useState } from 'react'
 import { Heart } from 'lucide-react'
 import SupportModal from './SupportModal'
+import type { SupportConfig } from '@/lib/homepageConfig'
 
-interface SupportCardProps {
-  title: string
-  description: string
-  buttonLabel: string
-}
+type SupportCardProps = Omit<SupportConfig, 'enabled'>
 
-/**
- * Support Sobdai Card — secondary action below the Purchase CTA on
- * the Package Detail page.
- *
- * Visual weight is intentionally subdued: uses a muted border, smaller
- * typography, and a ghost-style button so it never competes with the
- * primary Purchase CTA above it.
- *
- * Future-ready: accepts title / description / buttonLabel from Admin config
- * (via extended_config.support). Opening the modal is entirely client-side —
- * no redirect, no external link.
- */
-export default function SupportCard({ title, description, buttonLabel }: SupportCardProps) {
+export default function SupportCard({
+  title,
+  description,
+  button_label,
+  qr_image_url,
+  promptpay_name,
+  bank_name,
+  account_number,
+  footer_message,
+}: SupportCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   return (
@@ -50,9 +51,7 @@ export default function SupportCard({ title, description, buttonLabel }: Support
         </div>
 
         {/* Description */}
-        <p className="text-[#A1866B] text-[12px] leading-relaxed">
-          {description}
-        </p>
+        <p className="text-[#A1866B] text-[12px] leading-relaxed">{description}</p>
 
         {/* Ghost CTA button */}
         <button
@@ -73,7 +72,7 @@ export default function SupportCard({ title, description, buttonLabel }: Support
             ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(212,175,55,0.2)'
           }}
         >
-          {buttonLabel}
+          {button_label}
         </button>
       </div>
 
@@ -82,6 +81,11 @@ export default function SupportCard({ title, description, buttonLabel }: Support
         onClose={() => setIsModalOpen(false)}
         title={title}
         description={description}
+        qr_image_url={qr_image_url}
+        promptpay_name={promptpay_name}
+        bank_name={bank_name}
+        account_number={account_number}
+        footer_message={footer_message}
       />
     </>
   )

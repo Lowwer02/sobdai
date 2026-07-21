@@ -243,9 +243,15 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
               <SupportCard
                 title={supportConfig.title}
                 description={supportConfig.description}
-                buttonLabel={supportConfig.button_label}
+                button_label={supportConfig.button_label}
+                qr_image_url={supportConfig.qr_image_url}
+                promptpay_name={supportConfig.promptpay_name}
+                bank_name={supportConfig.bank_name}
+                account_number={supportConfig.account_number}
+                footer_message={supportConfig.footer_message}
               />
             )}
+
 
           {/* ================= LEARNING RESOURCES ================= */}
 
