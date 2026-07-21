@@ -272,11 +272,12 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     }))
     .filter((s: HowToStep) => s.num && s.title && s.desc)
 
-  // --- support (stored under extended_config.support; not a dedicated column)
+  // --- support (stored under extended_config.support in the DB, but when called
+  //     from the save action the client sends it as a top-level `support` key)
+  const supFromTopLevel = (typeof r.support === 'object' && r.support !== null) ? r.support : null
   const extRaw = r.extended_config || {}
-  const supRaw = (typeof extRaw.support === 'object' && extRaw.support !== null)
-    ? extRaw.support
-    : {}
+  const supFromExt = (typeof extRaw.support === 'object' && extRaw.support !== null) ? extRaw.support : null
+  const supRaw = supFromTopLevel || supFromExt || {}
   const support: SupportConfig = {
     enabled: typeof supRaw.enabled === 'boolean' ? supRaw.enabled : d.support.enabled,
     title: cleanString(supRaw.title, d.support.title, 120),
