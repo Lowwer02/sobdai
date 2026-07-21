@@ -97,6 +97,24 @@ export interface HomepageSettings {
   /** Phase 1 moves Features + HowTo copy into config (admin-editable text). */
   features: FeatureItem[]
   howto: HowToStep[]
+  /**
+   * Support Sobdai configuration. Stored under extended_config.support in the
+   * DB JSONB column — never a dedicated column. Designed to grow (QR image,
+   * PromptPay, bank account, etc.) without requiring new migrations.
+   */
+  support: SupportConfig
+}
+
+/**
+ * Support Sobdai configuration. v1 is a placeholder card + modal.
+ * Future versions will add qr_image_url, bank_account, thank_you_message, etc.
+ */
+export interface SupportConfig {
+  /** Show or hide the Support Card on the Package Detail page. Default true. */
+  enabled: boolean
+  title: string
+  description: string
+  button_label: string
 }
 
 // ─── Defaults (mirror the original hardcoded homepage) ──────────────────────
@@ -146,6 +164,13 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     { num: '03', title: 'ทำข้อสอบทีละข้อ', desc: 'ระบบ Flashcard ทำทีละข้อ มีคำใบ้ช่วย + เฉลยละเอียดทุกข้อ' },
     { num: '04', title: 'ติดตามผล', desc: 'ดูสถิติคะแนน วิเคราะห์จุดอ่อน ฝึกซ้ำจนแม่นยำ' },
   ],
+  support: {
+    enabled: true,
+    title: 'ชอบ Sobdai ไหม?',
+    description:
+      'หาก Sobdai ช่วยให้การเตรียมสอบของคุณง่ายขึ้น สามารถสนับสนุนการพัฒนาได้ตามสมัครใจ',
+    button_label: 'สนับสนุน Sobdai',
+  },
 }
 
 // ─── Validators (strict; no free-form JSON leaks into render) ───────────────
@@ -230,6 +255,18 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     }))
     .filter((s: HowToStep) => s.num && s.title && s.desc)
 
+  // --- support (stored under extended_config.support; not a dedicated column)
+  const extRaw = r.extended_config || {}
+  const supRaw = (typeof extRaw.support === 'object' && extRaw.support !== null)
+    ? extRaw.support
+    : {}
+  const support: SupportConfig = {
+    enabled: typeof supRaw.enabled === 'boolean' ? supRaw.enabled : d.support.enabled,
+    title: cleanString(supRaw.title, d.support.title, 120),
+    description: cleanString(supRaw.description, d.support.description, 400),
+    button_label: cleanString(supRaw.button_label, d.support.button_label, 80),
+  }
+
   return {
     general: { featured_count },
     hero: {
@@ -259,6 +296,7 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     },
     features,
     howto,
+    support,
   }
 }
 

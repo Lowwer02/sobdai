@@ -4,6 +4,7 @@ import PackageClient from './PackageClient'
 import { notFound } from 'next/navigation'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { applyContentOrdering } from '@/lib/contentOrdering'
+import { getHomepageSettings } from '@/lib/homepageConfig'
 import { Suspense } from 'react'
 
 interface PageProps {
@@ -40,7 +41,7 @@ export default async function PackagePage({ params }: PageProps) {
 
   // Now that we have the package id + user, run the dependent queries in parallel.
   const user = userResult.data.user
-  const [countsMap, draftProfile, summaries, examSets, order] = await Promise.all([
+  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings] = await Promise.all([
     getPackagePublicCounts([pkg.id]),
     // Only need a profile lookup if the package is an unpublished draft
     pkg.is_published
@@ -75,6 +76,9 @@ export default async function PackagePage({ params }: PageProps) {
           .in('status', ORDER_COMPLETED_STATUSES)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // Homepage settings (ISR-cached anon read) to get supportConfig.
+    // Runs in the same parallel batch — no extra sequential round-trip.
+    getHomepageSettings(),
   ])
 
   // Apply counts
@@ -98,10 +102,11 @@ export default async function PackagePage({ params }: PageProps) {
   }
 
   const isPurchased = Boolean((order as any)?.data)
+  const supportConfig = homepageSettings.support
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <PackageClient pkg={pkg} examSets={examSetsData} summaries={summaries?.data || []} isPurchased={isPurchased} />
+      <PackageClient pkg={pkg} examSets={examSetsData} summaries={summaries?.data || []} isPurchased={isPurchased} supportConfig={supportConfig} />
     </Suspense>
   )
 }

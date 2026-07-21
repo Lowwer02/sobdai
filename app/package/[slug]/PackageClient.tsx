@@ -8,6 +8,8 @@ import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, 
 import { toastEvent } from '@/hooks/useToast'
 import SummaryNavigation from '@/components/SummaryNavigation'
 import ExamNavigation from '@/components/ExamNavigation'
+import SupportCard from '@/components/SupportCard'
+import type { SupportConfig } from '@/lib/homepageConfig'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -51,7 +53,7 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
   )
 }
 
-export default function PackageClient({ pkg, examSets, summaries, isPurchased }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean }) {
+export default function PackageClient({ pkg, examSets, summaries, isPurchased, supportConfig }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean, supportConfig: SupportConfig }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
@@ -234,7 +236,19 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased }:
 
           </div>
 
+            {/* Support Card — secondary action, rendered below the top grid row,
+                outside the sticky pricing block so it scrolls naturally.
+                Conditionally rendered based on Admin config. */}
+            {supportConfig.enabled && (
+              <SupportCard
+                title={supportConfig.title}
+                description={supportConfig.description}
+                buttonLabel={supportConfig.button_label}
+              />
+            )}
+
           {/* ================= LEARNING RESOURCES ================= */}
+
           <div id="resources" className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             
             {/* 4. SUMMARY BANK */}
