@@ -106,8 +106,9 @@ export interface HomepageSettings {
 }
 
 /**
- * Support Sobdai configuration. v1 is a placeholder card + modal.
- * Future versions will add qr_image_url, bank_account, thank_you_message, etc.
+ * Support Sobdai configuration. v1.1 adds PromptPay QR + bank info.
+ * All data lives under extended_config.support in the DB JSONB column —
+ * never a dedicated column. Designed to grow without requiring migrations.
  */
 export interface SupportConfig {
   /** Show or hide the Support Card on the Package Detail page. Default true. */
@@ -115,6 +116,17 @@ export interface SupportConfig {
   title: string
   description: string
   button_label: string
+  // v1.1 additions
+  /** Supabase Storage public URL for the PromptPay QR image. Empty = show placeholder. */
+  qr_image_url: string
+  /** Display name shown below the QR, e.g. "ชื่อ Sobdai". */
+  promptpay_name: string
+  /** Optional bank name, e.g. "ธนาคารกสิกรไท". */
+  bank_name: string
+  /** Optional account number. */
+  account_number: string
+  /** Footer note, e.g. "ขอบคุณที่สนับสนุน Sobdai ♥". */
+  footer_message: string
 }
 
 // ─── Defaults (mirror the original hardcoded homepage) ──────────────────────
@@ -170,6 +182,11 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     description:
       'หาก Sobdai ช่วยให้การเตรียมสอบของคุณง่ายขึ้น สามารถสนับสนุนการพัฒนาได้ตามสมัครใจ',
     button_label: 'สนับสนุน Sobdai',
+    qr_image_url: '',
+    promptpay_name: '',
+    bank_name: '',
+    account_number: '',
+    footer_message: 'ขอบคุณทุกการสนับสนุนที่ช่วยให้ Sobdai พัฒนาต่อไปได้ ♥',
   },
 }
 
@@ -265,6 +282,12 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     title: cleanString(supRaw.title, d.support.title, 120),
     description: cleanString(supRaw.description, d.support.description, 400),
     button_label: cleanString(supRaw.button_label, d.support.button_label, 80),
+    // v1.1 fields — empty string = not configured (show placeholder / hide section)
+    qr_image_url: typeof supRaw.qr_image_url === 'string' ? supRaw.qr_image_url : '',
+    promptpay_name: typeof supRaw.promptpay_name === 'string' ? supRaw.promptpay_name : '',
+    bank_name: typeof supRaw.bank_name === 'string' ? supRaw.bank_name : '',
+    account_number: typeof supRaw.account_number === 'string' ? supRaw.account_number : '',
+    footer_message: cleanString(supRaw.footer_message, d.support.footer_message, 200),
   }
 
   return {
