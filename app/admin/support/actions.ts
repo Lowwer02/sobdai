@@ -15,7 +15,7 @@ import type { SupportConfig } from '@/lib/homepageConfig'
  * The homepage core fields (general/hero/cta/etc.) are NOT touched.
  */
 export async function saveSupportSettings(supportInput: SupportConfig) {
-  const { supabase } = await requirePermission('content.write')
+  const { supabase } = await requirePermission('support.manage')
 
   // Validate through the normalizer by wrapping in the expected shape.
   // The normalizer checks raw.support first (top-level), which is what we pass.
@@ -54,7 +54,7 @@ export async function saveSupportSettings(supportInput: SupportConfig) {
 
 /** Read the current Support config for the admin page. */
 export async function getSupportSettingsForAdmin(): Promise<SupportConfig> {
-  const { supabase } = await requirePermission('content.write')
+  const { supabase } = await requirePermission('support.manage')
   const settings = await getHomepageSettings(supabase)
   return settings.support
 }

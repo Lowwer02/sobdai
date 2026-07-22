@@ -14,18 +14,22 @@ export type Permission =
   | 'financial.manage'
   // System
   | 'system.manage'
+  // Support / Donation settings (owner + admin only; contains financial info)
+  | 'support.manage'
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [
     'content.read', 'content.write', 'content.publish', 'content.delete',
     'users.read', 'users.write',
     'orders.read', 'financial.manage',
-    'system.manage'
+    'system.manage',
+    'support.manage',
   ],
   admin: [
     'content.read', 'content.write', 'content.publish', 'content.delete',
     'users.read', 'users.write',
-    'orders.read', 'financial.manage'
+    'orders.read', 'financial.manage',
+    'support.manage',
   ],
   editor: [
     'content.read', 'content.write'
@@ -49,4 +53,23 @@ export function hasRole(currentRole: string | null | undefined, targetRole: Role
 export function getRolePermissions(role: string | null | undefined): Permission[] {
   if (!role) return []
   return ROLE_PERMISSIONS[role as Role] || []
+}
+
+/**
+ * Role hierarchy for ordered comparisons (lower index = higher authority).
+ * Useful for "at least X role" checks without enumerating permissions.
+ */
+const ROLE_HIERARCHY: Role[] = ['owner', 'admin', 'editor', 'support', 'user']
+
+/**
+ * Returns true if `currentRole` is at least as privileged as `minRole`.
+ * Example: isAtLeastRole('admin', 'editor') → true
+ *          isAtLeastRole('editor', 'admin') → false
+ */
+export function isAtLeastRole(currentRole: string | null | undefined, minRole: Role): boolean {
+  if (!currentRole) return false
+  const currentIdx = ROLE_HIERARCHY.indexOf(currentRole as Role)
+  const minIdx = ROLE_HIERARCHY.indexOf(minRole)
+  if (currentIdx === -1 || minIdx === -1) return false
+  return currentIdx <= minIdx
 }

@@ -18,7 +18,7 @@ const managementNav = [
   { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
   { name: 'Homepage', href: '/admin/homepage', icon: Home, permission: 'content.write' },
-  { name: 'Support', href: '/admin/support', icon: Heart, permission: 'content.write' },
+  { name: 'Support', href: '/admin/support', icon: Heart, permission: 'support.manage' },
   { name: 'Promotions', href: '/admin/promotions', icon: Megaphone, permission: 'content.write' },
 ]
 
