@@ -1,15 +1,11 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
-import Image from 'next/image'
-import { Save, Loader2, Plus, Trash2, Camera, QrCode, Eye, X as XIcon } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Save, Loader2, Plus, Trash2 } from 'lucide-react'
 import { saveHomepageSettings } from './actions'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { toastEvent } from '@/hooks/useToast'
-import { createClient } from '@/lib/supabase/client'
-import QRCropper from '@/components/QRCropper'
-import SupportModal from '@/components/SupportModal'
-import type { HomepageSettings, FeatureItem, HowToStep, CtaButton, SupportConfig } from '@/lib/homepageConfig'
+import type { HomepageSettings, FeatureItem, HowToStep, CtaButton } from '@/lib/homepageConfig'
 
 const ICON_OPTIONS = [
   { key: 'exam', label: 'ข้อสอบ' },
@@ -62,15 +58,6 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
   const [isPending, startTransition] = useTransition()
   const [isDirty, setIsDirty] = useState(false)
 
-  // QR image upload state
-  const [selectedQRImage, setSelectedQRImage] = useState<string | null>(null)
-  const [isQRCropperOpen, setIsQRCropperOpen] = useState(false)
-  const [isQRUploading, setIsQRUploading] = useState(false)
-  const fileQRInputRef = useRef<HTMLInputElement>(null)
-
-  // Support Modal preview state (uses current unsaved form values)
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-
   useUnsavedChanges(isDirty)
 
   const update = (patch: Partial<HomepageSettings>) => {
@@ -88,58 +75,6 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
         toastEvent(res.error || 'บันทึกไม่สำเร็จ', 'error')
       }
     })
-  }
-
-  /** File picker → read as data URL → open QRCropper */
-  const handleQRFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return
-    const file = e.target.files[0]
-    if (file.size > 4 * 1024 * 1024) {
-      toastEvent('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 4 MB', 'error')
-      e.target.value = ''
-      return
-    }
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = () => {
-      setSelectedQRImage(reader.result as string)
-      setIsQRCropperOpen(true)
-    }
-  }
-
-  /**
-   * Receive cropped WebP blob from QRCropper → upload to
-   * package-assets/support/qr.webp → save public URL into settings.
-   * Using package-assets bucket (existing, public-read + auth-write RLS).
-   * Path: support/qr.webp  (global support asset, not tied to any package).
-   */
-  const handleQRSave = async (blob: Blob) => {
-    try {
-      setIsQRUploading(true)
-      const supabase = createClient()
-      const filePath = 'support/qr.webp'
-
-      const { error: uploadError } = await supabase.storage
-        .from('package-assets')
-        .upload(filePath, blob, { contentType: 'image/webp', upsert: true })
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('package-assets')
-        .getPublicUrl(filePath)
-
-      // Cache-bust so the new image is visible immediately without redeployment
-      const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`
-      update({ support: { ...settings.support, qr_image_url: cacheBustedUrl } })
-      toastEvent('อัปโหลด QR Code สำเร็จ', 'success')
-    } catch (err: any) {
-      toastEvent(err.message || 'เกิดข้อผิดพลาดในการอัปโหลด QR', 'error')
-    } finally {
-      setIsQRUploading(false)
-      setSelectedQRImage(null)
-      if (fileQRInputRef.current) fileQRInputRef.current.value = ''
-    }
   }
 
 
@@ -298,169 +233,6 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
         </Field>
       </section>
 
-      {/* ─── Support ─── */}
-      <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-5">
-        {/* Section header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-[#D4AF37] font-bold font-display">Support Sobdai</h2>
-            <p className="text-[10px] text-[#A1866B] mt-0.5">
-              แสดง Support Card ใต้ Purchase CTA บนหน้า Package Detail
-            </p>
-          </div>
-          {/* Preview button — opens real SupportModal with current (unsaved) form values */}
-          <button
-            id="support-preview-button"
-            type="button"
-            onClick={() => setIsPreviewOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-[#D4AF37] transition-all"
-            style={{
-              background: 'rgba(212,175,55,0.07)',
-              border: '1px solid rgba(212,175,55,0.2)',
-            }}
-            title="ดูตัวอย่าง Support Modal"
-          >
-            <Eye size={13} />
-            ดูตัวอย่าง
-          </button>
-        </div>
-
-        {/* Enable toggle */}
-        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(212,175,55,0.3)] transition-colors">
-          <input
-            type="checkbox"
-            checked={settings.support.enabled}
-            onChange={e => update({ support: { ...settings.support, enabled: e.target.checked } })}
-            className="w-4 h-4 accent-[#D4AF37]"
-          />
-          <span className="text-sm text-[#F5E9D6]">เปิดใช้งาน Support Card</span>
-        </label>
-
-        {/* Core text fields */}
-        <Field label="Support Title" hint="หัวข้อการ์ด เช่น ชอบ Sobdai ไหม?">
-          <input
-            className={inputClass}
-            value={settings.support.title}
-            onChange={e => update({ support: { ...settings.support, title: e.target.value } })}
-          />
-        </Field>
-        <Field label="Support Description">
-          <textarea
-            className={inputClass}
-            rows={3}
-            value={settings.support.description}
-            onChange={e => update({ support: { ...settings.support, description: e.target.value } })}
-          />
-        </Field>
-        <Field label="Button Label" hint="ข้อความปุ่ม เช่น สนับสนุน Sobdai">
-          <input
-            className={inputClass}
-            value={settings.support.button_label}
-            onChange={e => update({ support: { ...settings.support, button_label: e.target.value } })}
-          />
-        </Field>
-
-        {/* Divider */}
-        <div className="border-t border-[rgba(255,255,255,0.05)] pt-1">
-          <p className="text-[11px] text-[#A1866B] font-bold uppercase tracking-wider mb-4">PromptPay &amp; ช่องทางชำระเงิน</p>
-        </div>
-
-        {/* QR Image upload */}
-        <Field label="QR Code Image" hint="WebP · อัตโนมัติ resize 512×512 · เว้นว่าง = แสดง placeholder">
-          <div className="flex items-start gap-4">
-            {/* Current QR thumbnail */}
-            <div
-              className="flex-shrink-0 w-[72px] h-[72px] rounded-xl overflow-hidden flex items-center justify-center"
-              style={{ backgroundColor: settings.support.qr_image_url ? '#FFFFFF' : '#0F0B07', border: '1px solid rgba(212,175,55,0.15)' }}
-            >
-              {settings.support.qr_image_url ? (
-                <Image
-                  src={settings.support.qr_image_url}
-                  alt="QR Code"
-                  width={64}
-                  height={64}
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <QrCode size={28} className="text-[#A1866B]/40" />
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 flex-1">
-              {/* Upload button */}
-              <label
-                htmlFor="qr-upload-input"
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-[#F5E9D6] cursor-pointer transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-              >
-                {isQRUploading ? <Loader2 size={14} className="animate-spin text-[#D4AF37]" /> : <Camera size={14} className="text-[#D4AF37]" />}
-                {isQRUploading ? 'กำลังอัปโหลด...' : 'อัปโหลด QR Code'}
-              </label>
-              <input
-                id="qr-upload-input"
-                ref={fileQRInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleQRFileChange}
-              />
-
-              {/* Clear button */}
-              {settings.support.qr_image_url && (
-                <button
-                  type="button"
-                  onClick={() => update({ support: { ...settings.support, qr_image_url: '' } })}
-                  className="flex items-center gap-1.5 text-[12px] text-[#A1866B] hover:text-red-400 transition-colors"
-                >
-                  <XIcon size={12} /> ลบ QR Code
-                </button>
-              )}
-            </div>
-          </div>
-        </Field>
-
-        {/* PromptPay Name */}
-        <Field label="PromptPay Name" hint="ชื่อที่แสดงใต้ QR เช่น นาย Sobdai Dev">
-          <input
-            className={inputClass}
-            value={settings.support.promptpay_name}
-            placeholder="เช่น Sobdai"
-            onChange={e => update({ support: { ...settings.support, promptpay_name: e.target.value } })}
-          />
-        </Field>
-
-        {/* Optional bank info */}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Bank Name (ไม่บังคับ)" hint="เช่น ธนาคารกสิกรไท">
-            <input
-              className={inputClass}
-              value={settings.support.bank_name}
-              placeholder="เว้นว่าง = ไม่แสดง"
-              onChange={e => update({ support: { ...settings.support, bank_name: e.target.value } })}
-            />
-          </Field>
-          <Field label="Account Number (ไม่บังคับ)">
-            <input
-              className={inputClass}
-              value={settings.support.account_number}
-              placeholder="เว้นว่าง = ไม่แสดง"
-              onChange={e => update({ support: { ...settings.support, account_number: e.target.value } })}
-            />
-          </Field>
-        </div>
-
-        {/* Footer message */}
-        <Field label="Footer Message" hint="ข้อความด้านล่างได้เลย เช่น ขอบคุณทุกการสนับสนุน ♥">
-          <input
-            className={inputClass}
-            value={settings.support.footer_message}
-            onChange={e => update({ support: { ...settings.support, footer_message: e.target.value } })}
-          />
-        </Field>
-      </section>
-
       {/* ─── Save bar ─── */}
       <div className="sticky bottom-4 flex justify-end gap-3">
         <button
@@ -473,28 +245,6 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
           บันทึก
         </button>
       </div>
-
-      {/* QR Cropper — separate concern from AvatarCropper */}
-      <QRCropper
-        isOpen={isQRCropperOpen}
-        imageSrc={selectedQRImage}
-        onClose={() => { setIsQRCropperOpen(false); setSelectedQRImage(null); if (fileQRInputRef.current) fileQRInputRef.current.value = '' }}
-        onSave={handleQRSave}
-      />
-
-      {/* Support Modal Preview — uses current unsaved form values */}
-      <SupportModal
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        title={settings.support.title}
-        description={settings.support.description}
-        qr_image_url={settings.support.qr_image_url}
-        promptpay_name={settings.support.promptpay_name}
-        bank_name={settings.support.bank_name}
-        account_number={settings.support.account_number}
-        footer_message={settings.support.footer_message}
-      />
     </div>
   )
 }
-
