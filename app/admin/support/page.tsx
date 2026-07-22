@@ -3,7 +3,7 @@ import SupportSettingsClient from './SupportSettingsClient'
 import { getSupportSettingsForAdmin } from './actions'
 
 export default async function SupportSettingsPage() {
-  await requirePermission('content.write')
+  await requirePermission('support.manage')
   const supportConfig = await getSupportSettingsForAdmin()
 
   return (
