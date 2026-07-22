@@ -4,6 +4,7 @@ import './globals.css'
 import Navbar from '@/components/Navbar'
 import ToastContainer from '@/components/admin/ToastContainer'
 import Footer from '@/components/Footer'
+import FloatingSupport from '@/components/FloatingSupport'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 
 const sarabun = Sarabun({
@@ -47,6 +48,7 @@ export default async function RootLayout({
         <Navbar />
         <main className="flex-grow">{children}</main>
         <Footer supportConfig={homepageSettings.support} />
+        <FloatingSupport supportConfig={homepageSettings.support} />
         <ToastContainer />
       </body>
     </html>
