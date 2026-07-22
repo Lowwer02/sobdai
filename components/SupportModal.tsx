@@ -11,7 +11,7 @@
  * the modal never renders a broken image.
  */
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { X, Heart, Sparkles, QrCode, Building2 } from 'lucide-react'
 import type { SupportConfig } from '@/lib/homepageConfig'
@@ -33,15 +33,66 @@ export default function SupportModal({
   account_number,
   footer_message,
 }: SupportModalProps) {
-  // ESC key + body scroll lock
+  const panelRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  // ESC key + focus trap + body scroll lock + focus restore
   useEffect(() => {
     if (!isOpen) return
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handleKey)
+
+    // Save currently focused element to restore upon close
+    previousFocusRef.current = document.activeElement as HTMLElement
+
+    // Auto-focus modal panel or close button
+    const timer = setTimeout(() => {
+      const closeBtn = panelRef.current?.querySelector<HTMLButtonElement>('#support-modal-close')
+      if (closeBtn) {
+        closeBtn.focus()
+      } else if (panelRef.current) {
+        panelRef.current.focus()
+      }
+    }, 50)
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+
+      // Tab Focus Trap
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusables = panelRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusables.length === 0) return
+
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus()
+            e.preventDefault()
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus()
+            e.preventDefault()
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
     document.body.style.overflow = 'hidden'
+
     return () => {
-      document.removeEventListener('keydown', handleKey)
+      clearTimeout(timer)
+      document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = ''
+      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+        previousFocusRef.current.focus()
+      }
     }
   }, [isOpen, onClose])
 
@@ -58,11 +109,14 @@ export default function SupportModal({
       onClick={onClose}
       aria-modal="true"
       role="dialog"
-      aria-label={title}
+      aria-labelledby="support-modal-title"
+      aria-describedby="support-modal-desc"
     >
       {/* Panel */}
       <div
-        className="relative w-full max-w-sm rounded-[24px] overflow-hidden shadow-2xl"
+        ref={panelRef}
+        tabIndex={-1}
+        className="relative w-full max-w-sm rounded-[24px] overflow-hidden shadow-2xl focus:outline-none"
         style={{
           backgroundColor: '#1A140E',
           border: '1px solid rgba(212,175,55,0.25)',
@@ -83,8 +137,8 @@ export default function SupportModal({
           id="support-modal-close"
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-xl flex items-center justify-center text-[#A1866B] hover:text-[#F5E9D6] hover:bg-white/5 transition-colors"
-          aria-label="ปิด"
+          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-xl flex items-center justify-center text-[#A1866B] hover:text-[#F5E9D6] hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+          aria-label="ปิดป๊อปอัป"
         >
           <X size={18} />
         </button>
@@ -101,8 +155,8 @@ export default function SupportModal({
             >
               <Heart size={22} className="text-[#D4AF37]" fill="rgba(212,175,55,0.3)" />
             </div>
-            <h2 className="text-[18px] font-bold font-display text-[#F5E9D6]">{title}</h2>
-            <p className="text-[#A1866B] text-[13px] leading-relaxed max-w-xs">{description}</p>
+            <h2 id="support-modal-title" className="text-[18px] font-bold font-display text-[#F5E9D6]">{title}</h2>
+            <p id="support-modal-desc" className="text-[#A1866B] text-[13px] leading-relaxed max-w-xs">{description}</p>
           </div>
 
           {/* ── QR Section ── */}

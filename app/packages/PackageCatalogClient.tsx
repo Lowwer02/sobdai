@@ -106,6 +106,7 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
                 role="radio"
                 aria-checked={activeFilter === option.value}
                 onClick={() => setActiveFilter(option.value)}
+                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
                 style={{
                   padding: '8px 16px',
                   borderRadius: '8px',
@@ -123,7 +124,7 @@ export default function PackageCatalogClient({ packages }: PackageCatalogClientP
                     : {
                         backgroundColor: 'transparent',
                         borderColor: 'var(--border-subtle)',
-                        color: 'var(--text-muted)',
+                        color: '#C5B097',
                       }),
                 }}
               >

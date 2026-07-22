@@ -85,6 +85,8 @@ export default function Footer({ supportConfig }: FooterProps) {
               <button
                 id="footer-support-button"
                 type="button"
+                aria-haspopup="dialog"
+                aria-expanded={isModalOpen}
                 onClick={() => setIsModalOpen(true)}
                 className="inline-flex items-center gap-1.5 text-[#D4AF37] hover:text-[#F1D17A] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/25 px-3.5 py-1.5 rounded-full transition-all text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 shadow-sm"
               >

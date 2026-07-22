@@ -56,17 +56,18 @@ export default function FloatingSupport({ supportConfig }: FloatingSupportProps)
     <>
       {/* Floating Action Button — bottom-right, safe-area aware */}
       <div
-        className="fixed z-40 bottom-6 right-6"
+        className="fixed z-40"
         style={{
-          // Respect iPhone home indicator and Android nav bar
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          paddingRight: 'env(safe-area-inset-right)',
+          bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+          right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
         }}
       >
         <button
           id="floating-support-button"
           type="button"
           aria-label="สนับสนุน Sobdai — เปิด Support"
+          aria-haspopup="dialog"
+          aria-expanded={isModalOpen}
           onClick={() => setIsModalOpen(true)}
           className="group flex items-center gap-2 rounded-full font-bold text-[13px] text-[#1A140E] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0B07] active:scale-95"
           style={{
