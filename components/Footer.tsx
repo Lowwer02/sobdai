@@ -1,7 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { Heart } from 'lucide-react'
 import { legalConfig, socialLinks, type SocialLink } from '@/lib/legal'
+import SupportModal from '@/components/SupportModal'
+import type { SupportConfig } from '@/lib/homepageConfig'
+
+interface FooterProps {
+  supportConfig?: SupportConfig
+}
 
 /** Minimal outline social icons (lucide-react has no brand icons). */
 function SocialIcon({ name, size = 20 }: { name: SocialLink['key']; size?: number }) {
@@ -37,12 +45,14 @@ function SocialIcon({ name, size = 20 }: { name: SocialLink['key']; size?: numbe
   )
 }
 
-export default function Footer() {
+export default function Footer({ supportConfig }: FooterProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
   return (
     <footer className="bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] py-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* Top row: brand + legal links (unchanged layout) */}
+        {/* Top row: brand + legal links + support button */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex flex-col items-center md:items-start">
             <div className="text-xl font-display font-bold text-[#D4AF37] mb-2 tracking-wide">
@@ -53,7 +63,7 @@ export default function Footer() {
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#A1866B]">
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#A1866B] items-center">
             <Link href="/terms" className="hover:text-[#F5E9D6] transition-colors">
               เงื่อนไขการให้บริการ
             </Link>
@@ -69,12 +79,23 @@ export default function Footer() {
             <Link href="/contact" className="hover:text-[#F5E9D6] transition-colors">
               ติดต่อเรา
             </Link>
+
+            {/* Support button — rendered dynamically when Support is enabled */}
+            {supportConfig?.enabled && (
+              <button
+                id="footer-support-button"
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center gap-1.5 text-[#D4AF37] hover:text-[#F1D17A] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/25 px-3.5 py-1.5 rounded-full transition-all text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 shadow-sm"
+              >
+                <Heart size={13} className="fill-[#D4AF37]/40 text-[#D4AF37]" />
+                <span>{supportConfig.button_label || 'สนับสนุน Sobdai'}</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Social section — sits above copyright, separated by a divider.
-            Future-ready: disabled entries (active:false) render greyed and
-            non-interactive, so flipping them on later needs no layout change. */}
+        {/* Social section — sits above copyright, separated by a divider. */}
         <div className="mt-8 pt-8 border-t border-[rgba(255,255,255,0.05)]">
           <div className="flex flex-col items-center gap-4">
             <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#A1866B]">
@@ -85,7 +106,6 @@ export default function Footer() {
                 const baseClass =
                   'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px]'
                 if (!social.active) {
-                  // Reserved slot — visible but disabled, ready for future.
                   return (
                     <span
                       key={social.key}
@@ -116,6 +136,22 @@ export default function Footer() {
         </div>
 
       </div>
+
+      {/* Reusable SupportModal instance for Footer */}
+      {supportConfig?.enabled && (
+        <SupportModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={supportConfig.title}
+          description={supportConfig.description}
+          qr_image_url={supportConfig.qr_image_url}
+          promptpay_name={supportConfig.promptpay_name}
+          bank_name={supportConfig.bank_name}
+          account_number={supportConfig.account_number}
+          footer_message={supportConfig.footer_message}
+        />
+      )}
     </footer>
   )
 }
+
