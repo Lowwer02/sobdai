@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar'
 import ToastContainer from '@/components/admin/ToastContainer'
 import Footer from '@/components/Footer'
 import FloatingSupport from '@/components/FloatingSupport'
+import ActivityProvider from '@/components/ActivityProvider'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 
 const sarabun = Sarabun({
@@ -45,6 +46,7 @@ export default async function RootLayout({
         <link rel="preload" href="/fonts/supermarket.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body className={`${sarabun.className} min-h-screen flex flex-col`}>
+        <ActivityProvider />
         <Navbar />
         <main className="flex-grow">{children}</main>
         <Footer supportConfig={homepageSettings.support} />
@@ -54,4 +56,3 @@ export default async function RootLayout({
     </html>
   )
 }
-
