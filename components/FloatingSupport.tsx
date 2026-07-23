@@ -30,17 +30,22 @@ interface FloatingSupportProps {
   supportConfig: SupportConfig
 }
 
-/** Paths where the floating button must never appear. */
+/** Route prefixes where the floating button must never appear. */
+const EXCLUDED_PREFIXES = ['/admin', '/login', '/register', '/auth', '/api']
+
+/** Specific regex patterns where the floating button must never appear. */
 const EXCLUDED_PATH_PATTERNS = [
-  /^\/login$/,
   /^\/reset-password$/,
-  /^\/auth\//,
   /^\/package\/[^/]+\/exam\//,
   /^\/assessment\//,
 ]
 
 function isExcludedPath(pathname: string): boolean {
-  return EXCLUDED_PATH_PATTERNS.some((pattern) => pattern.test(pathname))
+  if (!pathname) return false
+  if (EXCLUDED_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
+    return true
+  }
+  return EXCLUDED_PATH_PATTERNS.some(pattern => pattern.test(pathname))
 }
 
 export default function FloatingSupport({ supportConfig }: FloatingSupportProps) {
