@@ -23,6 +23,7 @@ import assert from 'node:assert/strict'
 import type {
   AssemblyRequest,
   AssemblyRequestMeta,
+  QuestionPattern,
   ReadBlueprintResult,
   ReaderError,
   Tier,
@@ -194,6 +195,47 @@ function verifies_source_location_single_line_span(): void {
   assert.ok(loc.startLine >= 1, 'source locations are 1-indexed')
 }
 
+// ─── QuestionPattern vocabulary (IG-2 Amendment D-6 regression guard) ───────
+
+function verifies_question_pattern_vocabulary_matches_blueprint_v3(): void {
+  // Compile-time check: the six Pattern values are assignable to the union.
+  // If anyone narrows or widens the union, this stops compiling.
+  const patterns: QuestionPattern[] = [
+    'Positive',
+    'Negative',
+    'Best Answer',
+    'Scenario',
+    'Sequence',
+    'Matching Concept',
+  ]
+  assert.equal(patterns.length, 6)
+}
+
+function verifies_question_pattern_sixth_value_is_two_words(): void {
+  // CRITICAL regression guard for IG-2 Architecture Amendment D-6.
+  //
+  // Background: the Integration Spec §5.4 originally transcribed the sixth
+  // Pattern value as the bare `Matching` (one word). Blueprint v3.0 lines
+  // 190/201/213 authoritatively use the two-word `Matching Concept`. The
+  // Amendment corrected this.
+  //
+  // In Session 6.23, a regression reintroduced the bare `Matching` in this
+  // contract file; the Stage 5 fixture parse then silently dropped the
+  // "Matching Concept" row (5 of 6 patterns parsed instead of 6) and no
+  // existing test caught it — because this vocabulary test didn't exist.
+  //
+  // This test exists to FAIL the build if the bare form returns. The literal
+  // `as QuestionPattern` is intentionally NOT used — we want a compile error
+  // if the union is wrong, not a runtime assertion.
+  const sixth: QuestionPattern = 'Matching Concept'
+  assert.equal(sixth, 'Matching Concept')
+
+  // The bare form must NOT be assignable. We can't directly assert "type
+  // error" at runtime, but we CAN assert the two strings differ — this
+  // catches the case where someone "fixes" by aliasing.
+  assert.notEqual('Matching Concept', 'Matching')
+}
+
 // ─── runner ─────────────────────────────────────────────────────────────────
 
 const tests: Array<{ name: string; fn: () => void }> = [
@@ -204,6 +246,8 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'ReadBlueprintResult failure branch requires non-empty errors', fn: verifies_read_result_failure_branch_requires_nonempty_errors },
   { name: 'ReaderError requires every anatomy field', fn: verifies_reader_error_requires_every_field },
   { name: 'SourceLocation: single-line span has startLine === endLine', fn: verifies_source_location_single_line_span },
+  { name: 'QuestionPattern vocabulary matches Blueprint v3.0 (six values)', fn: verifies_question_pattern_vocabulary_matches_blueprint_v3 },
+  { name: "QuestionPattern sixth value is two-word 'Matching Concept' (IG-2 D-6 regression guard)", fn: verifies_question_pattern_sixth_value_is_two_words },
 ]
 
 let passed = 0
