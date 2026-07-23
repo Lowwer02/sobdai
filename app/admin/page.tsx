@@ -1,6 +1,16 @@
 import { getAdminSession } from '@/lib/auth/server-protect'
-import { ORDER_STATUS } from '@/lib/orderUtils'
-import { Users, Package, FileQuestion, ShoppingCart, CheckSquare } from 'lucide-react'
+import { getAdminDashboardMetrics } from '@/lib/admin/dashboardMetrics'
+import {
+  Activity,
+  BookOpen,
+  CalendarDays,
+  CheckSquare,
+  FileQuestion,
+  Package,
+  ShoppingCart,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 
 export const metadata = {
   title: 'Admin Dashboard | Sobdai',
@@ -25,71 +35,81 @@ function StatCard({ title, value, icon: Icon, trend }: { title: string, value: s
   )
 }
 
-export default async function AdminDashboard() {
-  const { supabase, profile } = await getAdminSession()
+function MetricSection({
+  title,
+  children,
+  columns = 'lg:grid-cols-4',
+}: {
+  title: string
+  children: React.ReactNode
+  columns?: string
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-[#A1866B]">{title}</h2>
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${columns} gap-6`}>
+        {children}
+      </div>
+    </section>
+  )
+}
 
-  
-  // Fetch true counts
-  const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
-  const { count: pkgsCount } = await supabase.from('packages').select('*', { count: 'exact', head: true })
-  const { count: qsCount } = await supabase.from('questions').select('*', { count: 'exact', head: true })
-  const { count: esCount } = await supabase.from('exam_sets').select('*', { count: 'exact', head: true })
-  const { count: ordersCount } = await supabase.from('orders').select('*', { count: 'exact', head: true })
-  
-  const { data: revData } = await supabase.from('orders').select('amount').eq('status', ORDER_STATUS.PAID)
-  const totalRevenue = revData?.reduce((sum, order) => sum + Number(order.amount), 0) || 0
+export default async function AdminDashboard() {
+  const { supabase } = await getAdminSession()
+  const metrics = await getAdminDashboardMetrics(supabase)
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Overview Dashboard</h1>
-        <p className="text-[#A1866B] mt-1">Real-time statistics from Supabase.</p>
+        <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Business Health Dashboard</h1>
+        <p className="text-[#A1866B] mt-1">Real-time business and usage statistics from Supabase.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Users" value={usersCount?.toLocaleString() || '0'} icon={Users} />
-        <StatCard title="Total Revenue" value={`฿${totalRevenue.toLocaleString()}`} icon={ShoppingCart} />
-        <StatCard title="Active Packages" value={pkgsCount?.toLocaleString() || '0'} icon={Package} />
-        <StatCard title="Total Orders" value={ordersCount?.toLocaleString() || '0'} icon={ShoppingCart} />
-      </div>
+      <MetricSection title="Usage" columns="lg:grid-cols-3">
+        <StatCard title="Active Today" value={metrics.activeToday.toLocaleString()} icon={Activity} />
+        <StatCard title="Monthly Active" value={metrics.monthlyActive.toLocaleString()} icon={CalendarDays} />
+        <StatCard title="New Users Today" value={metrics.newUsersToday.toLocaleString()} icon={UserPlus} />
+      </MetricSection>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Questions Bank" value={qsCount?.toLocaleString() || '0'} icon={FileQuestion} />
-        <StatCard title="Exam Sets" value={esCount?.toLocaleString() || '0'} icon={CheckSquare} />
-      </div>
+      <MetricSection title="Business">
+        <StatCard title="Total Users" value={metrics.totalUsers.toLocaleString()} icon={Users} />
+        <StatCard title="Revenue" value={`฿${metrics.revenue.toLocaleString()}`} icon={ShoppingCart} />
+        <StatCard title="Orders" value={metrics.orders.toLocaleString()} icon={ShoppingCart} />
+        <StatCard title="Active Packages" value={metrics.activePackages.toLocaleString()} icon={Package} />
+      </MetricSection>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 min-h-[300px] flex items-center justify-center">
-          <div className="text-center">
-             <h2 className="text-lg font-bold text-[#F5E9D6] mb-2">Analytics Center</h2>
-             <p className="text-[#A1866B] text-sm">Detailed charts and funnel analytics will be available in future updates after active usage.</p>
-          </div>
-        </div>
-        
-        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6">
-          <h2 className="text-lg font-bold text-[#F5E9D6] mb-4">System Status</h2>
+      <MetricSection title="Content" columns="lg:grid-cols-3">
+        <StatCard title="Questions" value={metrics.questions.toLocaleString()} icon={FileQuestion} />
+        <StatCard title="Exam Sets" value={metrics.examSets.toLocaleString()} icon={CheckSquare} />
+        <StatCard title="Summary Bank" value={metrics.summaries.toLocaleString()} icon={BookOpen} />
+      </MetricSection>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-[#A1866B]">System</h2>
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 max-w-xl">
+          <h3 className="text-lg font-bold text-[#F5E9D6] mb-4">System Status</h3>
           <div className="space-y-4">
-             <div className="p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg flex items-center justify-between">
-                <div className="text-[#F5E9D6] text-sm font-medium">Database</div>
-                <div className="flex items-center gap-1.5 text-xs text-[#22C55E] font-bold">
-                   <div className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse"></div>
-                   Connected
-                </div>
-             </div>
-             <div className="p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg flex items-center justify-between">
-                <div className="text-[#F5E9D6] text-sm font-medium">Authentication</div>
-                <div className="flex items-center gap-1.5 text-xs text-[#22C55E] font-bold">
-                   <div className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse"></div>
-                   Connected
-                </div>
-             </div>
-             <div className="p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg flex items-center justify-between">
-                <div className="text-[#F5E9D6] text-sm font-medium">Mock Data</div>
-                <div className="text-xs text-[#D4AF37] font-bold">0%</div>
-             </div>
+            <div className="p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg flex items-center justify-between">
+              <div className="text-[#F5E9D6] text-sm font-medium">Database</div>
+              <div className="flex items-center gap-1.5 text-xs text-[#22C55E] font-bold">
+                <div className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse"></div>
+                Connected
+              </div>
+            </div>
+            <div className="p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg flex items-center justify-between">
+              <div className="text-[#F5E9D6] text-sm font-medium">Authentication</div>
+              <div className="flex items-center gap-1.5 text-xs text-[#22C55E] font-bold">
+                <div className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse"></div>
+                Connected
+              </div>
+            </div>
+            <div className="p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg flex items-center justify-between">
+              <div className="text-[#F5E9D6] text-sm font-medium">Mock Data</div>
+              <div className="text-xs text-[#D4AF37] font-bold">0%</div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
