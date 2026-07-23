@@ -6,8 +6,10 @@ import {
   CalendarDays,
   CheckSquare,
   FileQuestion,
+  HeartPulse,
   Package,
   ShoppingCart,
+  Timer,
   UserPlus,
   Users,
 } from 'lucide-react'
@@ -16,21 +18,35 @@ export const metadata = {
   title: 'Admin Dashboard | Sobdai',
 }
 
-function StatCard({ title, value, icon: Icon, trend }: { title: string, value: string | number, icon: any, trend?: string }) {
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  tone = 'default',
+}: {
+  title: string
+  value: string | number
+  icon: any
+  trend?: string
+  tone?: 'default' | 'healthy' | 'warning'
+}) {
+  const accent = tone === 'warning' ? '#EAB308' : tone === 'healthy' ? '#22C55E' : '#D4AF37'
+
   return (
     <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 flex flex-col h-full relative overflow-hidden group hover:border-[#D4AF37]/30 transition-colors">
       <div className="flex justify-between items-start mb-4">
-        <div className="w-10 h-10 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] group-hover:bg-[#D4AF37]/20 transition-colors">
+        <div className="w-10 h-10 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center group-hover:bg-[#D4AF37]/20 transition-colors" style={{ color: accent }}>
           <Icon size={20} />
         </div>
         {trend && (
-          <div className="text-[#22C55E] text-xs font-bold px-2 py-1 bg-[#22C55E]/10 rounded-full">
+          <div className="text-xs font-bold px-2 py-1 rounded-full" style={{ color: accent, backgroundColor: `${accent}1A` }}>
             {trend}
           </div>
         )}
       </div>
       <div className="text-[#A1866B] text-sm mb-1">{title}</div>
-      <div className="text-[#D4AF37] text-3xl font-display font-bold tracking-tight">{value}</div>
+      <div className="text-3xl font-display font-bold tracking-tight" style={{ color: accent }}>{value}</div>
     </div>
   )
 }
@@ -66,9 +82,12 @@ export default async function AdminDashboard() {
       </div>
 
       <MetricSection title="Usage" columns="lg:grid-cols-3">
+        <StatCard title="Business Health" value={metrics.businessHealth.label} icon={HeartPulse} tone={metrics.businessHealth.tone} />
         <StatCard title="Active Today" value={metrics.activeToday.toLocaleString()} icon={Activity} />
         <StatCard title="Monthly Active" value={metrics.monthlyActive.toLocaleString()} icon={CalendarDays} />
+        <StatCard title="Returning Users" value={metrics.returningUsers.toLocaleString()} icon={Users} />
         <StatCard title="New Users Today" value={metrics.newUsersToday.toLocaleString()} icon={UserPlus} />
+        <StatCard title="Last Activity" value={metrics.lastActivity} icon={Timer} />
       </MetricSection>
 
       <MetricSection title="Business">
