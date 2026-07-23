@@ -60,11 +60,19 @@ export type Tier = 1 | 2 | 3 | 4
 export type BlueprintType = 'Memory' | 'Concept' | 'Procedure' | 'Scenario'
 
 /**
- * Question Pattern axis. From Integration Spec §5.4. Enum: Positive / Negative /
- * Best Answer / Scenario / Sequence / Matching. This is one of the four IG-2
- * axes. NOTE: distinct from Content Template v2.1's QuestionType enum
- * (MCQ4/MCQ5/True-False/Matching/Ordering/Essay) — see Architecture Amendment
- * Request (IG-2 paused).
+ * Question Pattern axis. From Integration Spec §5.4 (corrected by IG-2
+ * Architecture Amendment D-6). Enum: Positive / Negative / Best Answer /
+ * Scenario / Sequence / Matching Concept. This is one of the four IG-2 axes.
+ *
+ * NOTE 1: distinct from Content Template v2.1's QuestionType enum
+ * (MCQ4/MCQ5/True-False/Matching/Ordering/Essay) — QuestionType is Format,
+ * not cognitive Pattern (IG-2 Amendment §3).
+ *
+ * NOTE 2: the sixth value is the TWO-WORD `Matching Concept` (matching
+ * Blueprint v3.0 lines 190/201/213 verbatim), NOT the bare `Matching`. The
+ * bare form was a transcription error in Integration Spec §5.4 corrected by
+ * Amendment D-6. The DB CHECK constraint (migration 027) and Content
+ * Template v2.2 both use the two-word form; this contract must match.
  */
 export type QuestionPattern =
   | 'Positive'
@@ -72,7 +80,7 @@ export type QuestionPattern =
   | 'Best Answer'
   | 'Scenario'
   | 'Sequence'
-  | 'Matching'
+  | 'Matching Concept'
 
 /**
  * Learning Objective identifier. From Integration Spec §4.3 (`lo_distribution`).

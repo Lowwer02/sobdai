@@ -403,3 +403,208 @@ ${ALL_REQUIRED_SECTIONS}`
 // normalizer.stage4.test.ts (constructing a BlueprintMetadata with a CRLF in
 // the title string, bypassing the parser).
 
+// ─── Stage 5/6 fixtures: realistic Blueprint fragments ────────────────────
+// A compact but structurally faithful Blueprint covering every business-node
+// section Stage 5 must project. Used by the Stage 5 + Stage 6 tests as the
+// canonical "everything parses" input.
+
+/**
+ * Compact Blueprint that exercises every Stage 5 business-node projector:
+ * Tier Definitions, Tier Mapping, Distribution Constraints pseudocode,
+ * Coverage Rules (CR-1..CR-5), Mandatory Topics (CR-1 binding),
+ * LO Definitions, LO Distribution, Pattern Types, Pattern Distribution Target,
+ * Pattern × Blueprint Type, Duplicate Prevention, Similarity Metric,
+ * Distribution Master Table, Difficulty Distribution, Blueprint Type
+ * Distribution, Set 1..5.
+ *
+ * Numbers are realistic but compact (2 documents, 2 Sets visible in Master).
+ * This is NOT Blueprint v3.0 — it's a minimal projection test fixture.
+ */
+export function buildStage5CompleteBlueprint(): string {
+  return `# Simulation Exam Blueprint — v3.0
+
+> **Engine Version**: 1.0.0 | **Blueprint Version**: 3.0.0 | **Position ID**: \`test-position\`
+
+## Distribution Rules — Tier System
+
+### Tier Definitions
+
+| Tier | Label | Range (ข้อ/ชุด, ฐาน 100) | เกณฑ์การจัดระดับ |
+|---|---|---|---|
+| **Tier 1** | Core | 13–20 | กฎหมายแม่บท |
+| **Tier 2** | Domain | 8–15 | กฎหมายที่เกี่ยวข้อง |
+| **Tier 3** | Supporting | 5–13 | กลุ่มเป้าหมาย |
+| **Tier 4** | Supplementary | 5–10 | ความรู้ทั่วไป |
+
+### Tier Mapping — Test Position
+
+| Document | Tier |
+|---|---|
+| 1. พ.ร.บ.ทดสอบ 2560 | Tier 1: Core |
+| 2. พ.ร.บ.อีกอัน 2562 | Tier 2: Domain |
+
+### Distribution Constraints
+
+\`\`\`
+FOR each simulation_set:
+  SUM(all documents) = 100
+
+  SUM(tier_1) >= 30% of total
+  SUM(tier_4) <= 25% of total
+
+  Anchor Rule:
+    1 document per set gets +5 above tier.max
+    max 1 anchor per set
+\`\`\`
+
+## Coverage Rules
+
+| Rule | คำอธิบาย | Enforcement |
+|---|---|---|
+| **CR-1: Mandatory Topics** | Topic สำคัญต้องปรากฏในทุก Set | Hard — Fail ถ้าขาด |
+| **CR-2: Minimum Unique Topics** | แต่ละ Set ต้องมี Topic ไม่ซ้ำ ≥ 70% | Hard — Fail ถ้าต่ำกว่า |
+| **CR-3: Cross-Set Rotation** | Topic + Difficulty + Type เดียวกัน ห้ามปรากฏเกิน 5 Set | Soft — Warning |
+| **CR-4: Document Coverage** | ทุก Document ต้องปรากฏในทุก Set (minimum 5 ข้อ) | Hard — Fail ถ้าขาด |
+| **CR-5: Section Sweep** | สำหรับ Tier 1: ทุก Section หลักต้องถูกวัดอย่างน้อย 1 ครั้ง | Soft — Warning |
+
+### Mandatory Topics (CR-1)
+
+ต้องปรากฏใน **ทุก Set**:
+
+| Document | Mandatory Topic | เหตุผล |
+|---|---|---|
+| พ.ร.บ.ทดสอบ 2560 | หลักการ (ม.6–8) | หลักปรัชญา |
+| พ.ร.บ.อีกอัน 2562 | Topic บังคับ | ต้องรู้ |
+
+## Learning Objectives — LO Mapping
+
+### นิยาม Learning Objectives
+
+| LO | ชื่อ | Bloom's Level | คำอธิบาย | Blueprint Type |
+|---|---|---|---|---|
+| **LO1** | Knowledge Recall | Remember | จำ | Memory |
+| **LO2** | Conceptual | Understand | เข้าใจ | Concept |
+| **LO3** | Procedural | Apply | ประยุกต์ | Procedure |
+| **LO4** | Contextual | Evaluate | วิเคราะห์ | Scenario |
+
+### สัดส่วน LO ต่อ Set
+
+| LO | สัดส่วน | จำนวน/ชุด | เหตุผล |
+|---|---|---|---|
+| LO1 | 20–25% | 20–25 | จำพื้นฐาน |
+| LO2 | 30–35% | 30–35 | แกนหลัก |
+| LO3 | 20–25% | 20–25 | ปฏิบัติ |
+| LO4 | 15–20% | 15–20 | คิดสูง |
+
+## Question Pattern Layer
+
+### Pattern Types
+
+| Pattern | คำอธิบาย | ตัวอย่างโจทย์ | สัดส่วน |
+|---|---|---|---|
+| **Positive** | ถามถูก | "ข้อใดถูก" | 35–40% |
+| **Negative** | ถามผิด | "ข้อใดไม่ใช่" | 15–20% |
+| **Best Answer** | เลือกดีสุด | "ข้อใดเหมาะสมที่สุด" | 10–15% |
+| **Scenario** | สถานการณ์ | "นาย ก. ..." | 15–20% |
+| **Sequence** | ลำดับ | "ลำดับถูกคือข้อใด" | 5–10% |
+| **Matching Concept** | จับคู่ | "จับคู่มาตรา" | 5–10% |
+
+### Pattern Distribution Target (100 ข้อ/ชุด)
+
+| Pattern | Min | Max | Target |
+|---|---|---|---|
+| Positive | 35 | 40 | 38 |
+| Negative | 15 | 20 | 18 |
+| Best Answer | 10 | 15 | 12 |
+| Scenario | 15 | 20 | 18 |
+| Sequence | 5 | 10 | 7 |
+| Matching Concept | 5 | 10 | 7 |
+| **รวม** | — | — | **100** |
+
+### ความสัมพันธ์ Pattern × Blueprint Type
+
+| | Memory | Concept | Procedure | Scenario |
+|---|---|---|---|---|
+| Positive | ✅ Primary | ✅ Primary | ✅ | ⬜ |
+| Negative | ✅ | ✅ Primary | ✅ | ⬜ |
+| Best Answer | ⬜ | ✅ | ✅ | ✅ Primary |
+| Scenario | ⬜ | ⬜ | ✅ | ✅ Primary |
+| Sequence | ⬜ | ⬜ | ✅ Primary | ⬜ |
+| Matching Concept | ✅ | ✅ Primary | ⬜ | ⬜ |
+
+## Duplicate Prevention Rules
+
+### ระดับการป้องกัน
+
+| Level | ขอบเขต | กฎ | Enforcement |
+|---|---|---|---|
+| **L1** | ภายใน Set | Topic + Difficulty + Type เดียวกัน = ห้ามซ้ำ | Hard |
+| **L2** | ภายใน Set | Section/มาตรา เดียวกัน ≤ 3 ข้อ/Set | Hard |
+| **L3** | ข้าม Set | Topic + Difficulty + Type ห้ามเกิน 5 Set | Soft |
+| **L4** | ข้าม Set | Concept ห้ามซ้ำเกิน 50% | Soft |
+| **L5** | ข้าม Set | Scenario ต้องมีบริบทต่างกัน | Soft |
+
+### Similarity Metric
+
+\`\`\`
+calculate_similarity(question_a, question_b):
+  topic_sim    = 1.0 if same_topic    else 0.0   (weight: 0.40)
+  section_sim  = 1.0 if same_section  else 0.0   (weight: 0.20)
+  type_sim     = 1.0 if same_type     else 0.0   (weight: 0.15)
+  diff_sim     = 1.0 if same_diff     else 0.0   (weight: 0.10)
+  keyword_sim  = jaccard(keywords_a, keywords_b)  (weight: 0.15)
+  total = weighted_sum(above)
+  >= 0.85 → BLOCK
+  >= 0.70 → WARN
+  <  0.70 → PASS
+\`\`\`
+
+## Distribution Master Table
+
+### จำนวนข้อต่อ Document ต่อ Set
+
+| Document | S1 | S2 | S3 | S4 | S5 | รวม |
+|---|---|---|---|---|---|---|
+| 1. พ.ร.บ.ทดสอบ 2560 | **20** | 13 | 12 | 13 | 13 | 71 |
+| 2. พ.ร.บ.อีกอัน 2562 | 5 | 5 | 10 | 5 | 8 | 33 |
+
+### Difficulty Distribution ต่อ Set
+
+| Difficulty | S1 | S2 | S3 | S4 | S5 |
+|---|---|---|---|---|---|
+| Easy | 26 | 26 | 20 | 22 | 23 |
+| Medium | 54 | 49 | 51 | 56 | 52 |
+| Hard | 20 | 25 | 29 | 22 | 25 |
+
+### Blueprint Type Distribution ต่อ Set
+
+| Type | S1 | S2 | S3 | S4 | S5 |
+|---|---|---|---|---|---|
+| Memory | 24 | 26 | 19 | 22 | 21 |
+| Concept | 39 | 31 | 35 | 31 | 35 |
+| Procedure | 23 | 27 | 24 | 30 | 24 |
+| Scenario | 14 | 16 | 22 | 17 | 20 |
+
+## Set 1 — กฎหมายหลัก
+
+Set 1 content.
+
+## Set 2 — บริหาร
+
+Set 2 content.
+
+## Set 3 — นวัตกรรม
+
+Set 3 content.
+
+## Set 4 — หลักสูตร
+
+Set 4 content.
+
+## Set 5 — แผนงาน
+
+Set 5 content.
+`
+}
+
+
