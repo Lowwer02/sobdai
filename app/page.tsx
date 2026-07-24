@@ -9,6 +9,7 @@ import type { PackageCardData } from '@/components/PackageCard'
 import PromotionSection from '@/components/PromotionSection'
 import AnnouncementBar from '@/components/AnnouncementBar'
 import ProductValueSection from '@/components/ProductValueSection'
+import CandidateJourneySection from '@/components/CandidateJourneySection'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 
@@ -291,46 +292,8 @@ export default async function Home() {
         </section>
       )}
 
-      {/* ===================== How it Works ===================== */}
-      {sections.howto && howto.length > 0 && (
-        <section style={{ padding: '80px 20px', maxWidth: '1100px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <h2 className="font-display" style={{ fontSize: 'clamp(24px, 4vw, 36px)', marginBottom: '10px' }}>
-              วิธีใช้งาน
-            </h2>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: '20px',
-            }}
-          >
-            {howto.map((step, i) => (
-              <div
-                key={step.num}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  animation: `fadeInUp 0.4s ease ${i * 0.08}s both`,
-                }}
-              >
-                <div className="font-display" style={{ fontSize: '36px', color: 'rgba(212, 168, 67, 0.25)', lineHeight: 1 }}>
-                  {step.num}
-                </div>
-                <h3 className="font-display" style={{ fontSize: '18px', color: 'var(--gold-light)', fontWeight: 'normal' }}>
-                  {step.title}
-                </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', lineHeight: 1.7 }}>
-                  {step.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* ===================== Candidate Journey ===================== */}
+      {sections.howto && <CandidateJourneySection />}
 
       {/* ===================== Promotions =====================
           Renders remaining live promotions in cards banner (highest priority promo
