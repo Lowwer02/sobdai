@@ -54,16 +54,29 @@ const ICONS: Record<string, React.ReactNode> = {
 // Render a CTA button from config. Supports internal (Link) + external (a).
 function CtaLink({ cta, className, style }: { cta: CtaButton; className?: string; style?: React.CSSProperties }) {
   if (!cta.label || !cta.href) return null
+  const linkStyle: React.CSSProperties = {
+    ...style,
+    textDecoration: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
   if (cta.type === 'external') {
     return (
-      <a href={cta.href} target={cta.open_in_new_tab ? '_blank' : undefined} rel={cta.open_in_new_tab ? 'noopener noreferrer' : undefined}>
-        <button type="button" className={className} style={style}>{cta.label}</button>
+      <a
+        href={cta.href}
+        target={cta.open_in_new_tab ? '_blank' : undefined}
+        rel={cta.open_in_new_tab ? 'noopener noreferrer' : undefined}
+        className={className}
+        style={linkStyle}
+      >
+        {cta.label}
       </a>
     )
   }
   return (
-    <Link href={cta.href}>
-      <button type="button" className={className} style={style}>{cta.label}</button>
+    <Link href={cta.href} className={className} style={linkStyle}>
+      {cta.label}
     </Link>
   )
 }
@@ -290,10 +303,19 @@ export default async function Home() {
             />
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <Link href="/packages">
-                <button type="button" className="btn-outline" style={{ padding: '12px 28px', fontSize: '14px' }}>
-                  {hero.browse_cta_label}
-                </button>
+              <Link
+                href="/packages"
+                className="btn-outline"
+                style={{
+                  padding: '12px 28px',
+                  fontSize: '14px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {hero.browse_cta_label}
               </Link>
             </div>
           </div>
@@ -350,13 +372,6 @@ export default async function Home() {
                 {livePackages.map((pkg, i) => (
                   <PackageCard key={pkg.id} pkg={pkg} index={i} />
                 ))}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: '40px' }}>
-                <Link href="/packages">
-                  <button type="button" className="btn-outline" style={{ padding: '12px 32px' }}>
-                    {package_explorer.cta_label}
-                  </button>
-                </Link>
               </div>
             </>
           ) : (

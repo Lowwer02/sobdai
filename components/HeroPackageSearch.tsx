@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import Link from 'next/link'
@@ -34,6 +34,12 @@ export default function HeroPackageSearch({ chips, placeholder, chipLabel }: Her
     }
     router.push(`/packages?q=${encodeURIComponent(trimmed)}`)
   }
+
+  useEffect(() => {
+    if (!isPending) return
+    const timeout = window.setTimeout(() => setIsPending(false), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [isPending])
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape' && query) {
@@ -70,7 +76,6 @@ export default function HeroPackageSearch({ chips, placeholder, chipLabel }: Her
             flex: 1,
             minWidth: 0,
             border: 0,
-            outline: 'none',
             background: 'transparent',
             color: '#21170E',
             fontSize: '14.5px',
