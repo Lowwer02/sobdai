@@ -2,8 +2,11 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
+import { getHomepagePromotions } from '@/lib/homepagePromotions'
+import type { HomepagePromotion } from '@/lib/homepagePromotions'
 import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
+import PromotionSection from '@/components/PromotionSection'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 
@@ -75,6 +78,7 @@ export default async function Home() {
   const settings = await getHomepageSettings()
 
   let livePackages: PackageCardData[] = []
+  let homepagePromotions: HomepagePromotion[] = []
 
   try {
     const supabase = createAnonServerClient()
@@ -102,8 +106,16 @@ export default async function Home() {
       .order('created_at', { ascending: false })
       .limit(count)
 
-    const { data: featured } = await featuredQuery
-    featuredData = featured || []
+    // Run featured-packages and promotions in parallel — both are independent
+    // reads, so one batch saves a round-trip. Promotion fetch is isolated in
+    // its own try/catch below so a promotion failure can never break packages.
+    const [featuredResult, promotionsResult] = await Promise.all([
+      featuredQuery,
+      getHomepagePromotions(),
+    ])
+
+    featuredData = featuredResult.data || []
+    homepagePromotions = promotionsResult
 
     // BUSINESS RULE: the homepage renders ONLY packages where
     // is_published = true AND featured_homepage = true. No exceptions.
@@ -221,6 +233,14 @@ export default async function Home() {
           </div>
         </section>
       )}
+
+      {/* ===================== Promotions =====================
+          Renders only live (published + active + in-window, placement =
+          'homepage') promotions, ordered by priority DESC, display_order ASC,
+          created_at DESC, capped at MAX_HOMEPAGE_PROMOTIONS. Hidden entirely
+          when there are none. Fetched in parallel with featured packages and
+          isolated so a promotion failure can never affect packages. */}
+      {homepagePromotions.length > 0 && <PromotionSection promotions={homepagePromotions} />}
 
       {/* ===================== Exam Sets ===================== */}
       {sections.featured && (
