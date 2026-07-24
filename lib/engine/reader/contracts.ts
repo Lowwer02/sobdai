@@ -430,19 +430,70 @@ export interface ReaderError {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. Reader result — the entry-point return type
+// 5. Reader result — the entry-point return type (Stage 8 output)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * The result of reading a Blueprint. Reader Pipeline §3.
+ * Reader execution metadata. From Reader Pipeline §10 (AssemblyRequest
+ * Generation) + Runtime API §9 (Audit Model — Execution Trace + Version
+ * Trace). Carries the deterministic identity of THIS Reader run.
  *
- * Either an AssemblyRequest (success) or a non-empty list of ReaderErrors
- * (failure). A successful read MAY still carry warnings (severity 'warning');
- * those are NOT in the error list — they travel with the AssemblyRequest via
- * the Runtime API's Warnings collection.
+ * All fields are stable strings or null — no Date, no random — so the
+ * ReaderResult's determinism contract holds: byte-identical Blueprint →
+ * byte-identical ReaderResult (Reader Pipeline Principle 2).
  *
- * Discriminated union: callers narrow on `ok`.
+ * `timestampIso` is OPTIONAL: when provided by the caller (the orchestrator),
+ * it's carried through for audit; when absent, null. The Reader itself never
+ * reads the wall clock.
  */
-export type ReadBlueprintResult =
-  | { ok: true; assemblyRequest: AssemblyRequest }
-  | { ok: false; errors: ReaderError[] }
+export interface ReaderExecutionMeta {
+  /** The Reader implementation version that produced this result. Constant "1.0.0" for v1.0. */
+  readonly readerVersion: '1.0.0'
+  /** Blueprint schema major version the Reader targeted (e.g. "3"). Null when input couldn't be parsed at all. */
+  readonly schemaVersionMajor: string | null
+  /**
+   * Optional caller-supplied ISO timestamp. Null when not provided. The Reader
+   * never generates one (would violate determinism); the orchestrator may.
+   */
+  readonly timestampIso: string | null
+}
+
+/**
+ * The final Reader result. From Reader Pipeline §3 (entry-point return type)
+ * + §10 (AssemblyRequest Generation) + §11 (Fail Fast / Loud / Deterministic).
+ *
+ * Stage 8 produces this. Both branches carry the FULL aggregated diagnostics
+ * list (success still includes warnings; failure includes the blocking/fatal
+ * errors that halted the pipeline). Both branches also carry the Blueprint
+ * metadata and the Reader execution metadata — the success/failure
+ * distinction is solely about whether an `assemblyRequest` was produced.
+ *
+ * DISCRIMINATED UNION: callers narrow on `ok`.
+ *  - `ok: true`  — pipeline completed; `assemblyRequest` is present and valid.
+ *                  `diagnostics` may still carry `warning`-severity entries.
+ *  - `ok: false` — pipeline halted at a stage whose diagnostics included a
+ *                  `fatal` or `blocking` entry; `assemblyRequest` is absent.
+ *                  `diagnostics` carries every diagnostic emitted up to the halt.
+ *
+ * IMMUTABILITY: every field is `readonly`. The discriminated union's two
+ * branches share most fields so the caller can inspect diagnostics and
+ * metadata regardless of success/failure without duplicating logic.
+ *
+ * DETERMINISM (Reader Pipeline Principle 2): same Blueprint input → same
+ * ReaderResult, byte-for-byte. Achieved by: every stage is a pure function;
+ * the aggregator sorts diagnostics deterministically; the execution metadata
+ * carries only stable values (no Date/random inside the Reader).
+ */
+export type ReadBlueprintResult = {
+  /** Discriminator. */
+  readonly ok: boolean
+  /** Aggregated diagnostics from ALL stages that ran (Stage 7 output). */
+  readonly diagnostics: readonly ReaderError[]
+  /** Stage-4-normalized metadata. Present even on failure (for debugging). */
+  readonly metadata: import('./normalizer').CanonicalBlueprintMetadata
+  /** Reader execution metadata (version, schema major, optional timestamp). */
+  readonly executionMeta: ReaderExecutionMeta
+} & (
+  | { readonly ok: true; readonly assemblyRequest: AssemblyRequest }
+  | { readonly ok: false }
+)
