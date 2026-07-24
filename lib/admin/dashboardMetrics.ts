@@ -5,6 +5,13 @@ type SupabaseClient = {
   from: (table: string) => any
 }
 
+const INTERNAL_ROLES = [
+  'owner',
+  'admin',
+  'editor',
+  'support',
+] as const
+
 export type AdminDashboardMetrics = {
   businessHealth: {
     label: 'Healthy' | 'Low Activity'
@@ -25,6 +32,11 @@ export type AdminDashboardMetrics = {
 }
 
 const HEALTHY_ACTIVE_TODAY_THRESHOLD = 20
+const INTERNAL_ROLE_FILTER = `(${INTERNAL_ROLES.join(',')})`
+
+function externalProfiles(supabase: SupabaseClient) {
+  return supabase.from('profiles').not('role', 'in', INTERNAL_ROLE_FILTER)
+}
 
 function getBusinessHealth(activeToday: number): AdminDashboardMetrics['businessHealth'] {
   return activeToday > HEALTHY_ACTIVE_TODAY_THRESHOLD
@@ -80,12 +92,12 @@ export async function getAdminDashboardMetrics(supabase: SupabaseClient): Promis
     ordersResult,
     revenueResult,
   ] = await Promise.all([
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('last_seen_at', todayStart),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('last_seen_at', monthStart),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('last_seen_at', todayStart).lt('created_at', todayStart),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
-    supabase.from('profiles').select('last_seen_at').not('last_seen_at', 'is', null).order('last_seen_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    externalProfiles(supabase).select('id', { count: 'exact', head: true }).gte('last_seen_at', todayStart),
+    externalProfiles(supabase).select('id', { count: 'exact', head: true }).gte('last_seen_at', monthStart),
+    externalProfiles(supabase).select('id', { count: 'exact', head: true }).gte('last_seen_at', todayStart).lt('created_at', todayStart),
+    externalProfiles(supabase).select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
+    externalProfiles(supabase).select('last_seen_at').not('last_seen_at', 'is', null).order('last_seen_at', { ascending: false }).limit(1).maybeSingle(),
+    externalProfiles(supabase).select('id', { count: 'exact', head: true }),
     supabase.from('packages').select('id', { count: 'exact', head: true }).eq('is_published', true),
     supabase.from('questions').select('id', { count: 'exact', head: true }),
     supabase.from('exam_sets').select('id', { count: 'exact', head: true }),
