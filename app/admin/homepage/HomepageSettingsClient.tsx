@@ -1,18 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Save, Loader2, Plus, Trash2 } from 'lucide-react'
+import { Save, Loader2 } from 'lucide-react'
 import { saveHomepageSettings } from './actions'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { toastEvent } from '@/hooks/useToast'
-import type { HomepageSettings, FeatureItem, HowToStep, CtaButton } from '@/lib/homepageConfig'
-
-const ICON_OPTIONS = [
-  { key: 'exam', label: 'ข้อสอบ' },
-  { key: 'hint', label: 'คำใบ้' },
-  { key: 'explain', label: 'เฉลย' },
-  { key: 'lock', label: 'ล็อก/ซื้อขาด' },
-]
+import type { HomepageSettings, CtaButton } from '@/lib/homepageConfig'
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -77,31 +70,6 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
     })
   }
 
-
-  // Feature / HowTo array editors
-  const updateFeature = (i: number, patch: Partial<FeatureItem>) => {
-    const features = [...settings.features]
-    features[i] = { ...features[i], ...patch }
-    update({ features })
-  }
-  const addFeature = () => update({ features: [...settings.features, { icon: 'exam', title: '', description: '' }] })
-  const removeFeature = (i: number) => update({ features: settings.features.filter((_, idx) => idx !== i) })
-
-  const updateStep = (i: number, patch: Partial<HowToStep>) => {
-    const howto = [...settings.howto]
-    howto[i] = { ...howto[i], ...patch }
-    update({ howto })
-  }
-  const addStep = () => update({ howto: [...settings.howto, { num: '', title: '', desc: '' }] })
-  const removeStep = (i: number) => update({ howto: settings.howto.filter((_, idx) => idx !== i) })
-
-  const stats = settings.hero.stats
-  const updateStat = (i: number, patch: Partial<typeof stats[0]>) => {
-    const next = [...stats]
-    next[i] = { ...next[i], ...patch }
-    update({ hero: { ...settings.hero, stats: next } })
-  }
-
   return (
     <div className="space-y-6 max-w-4xl">
       {/* ─── General / Featured ─── */}
@@ -131,41 +99,29 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
         <Field label="Subtitle">
           <textarea className={inputClass} rows={2} value={settings.hero.subtitle} onChange={e => update({ hero: { ...settings.hero, subtitle: e.target.value } })} />
         </Field>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-[#A1866B] font-bold uppercase">สถิติ (Social Proof)</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {stats.map((s, i) => (
-              <div key={i} className="p-3 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] space-y-2">
-                <input className={inputClass} placeholder="value" value={s.value} onChange={e => updateStat(i, { value: e.target.value })} />
-                <input className={inputClass} placeholder="label" value={s.label} onChange={e => updateStat(i, { label: e.target.value })} />
-              </div>
-            ))}
-          </div>
-        </div>
+        <Field label="Search Placeholder">
+          <input className={inputClass} value={settings.hero.search_placeholder} onChange={e => update({ hero: { ...settings.hero, search_placeholder: e.target.value } })} />
+        </Field>
+        <Field label="Search Chip Label">
+          <input className={inputClass} value={settings.hero.search_chip_label} onChange={e => update({ hero: { ...settings.hero, search_chip_label: e.target.value } })} />
+        </Field>
+        <Field label="Browse CTA Label">
+          <input className={inputClass} value={settings.hero.browse_cta_label} onChange={e => update({ hero: { ...settings.hero, browse_cta_label: e.target.value } })} />
+        </Field>
       </section>
 
       {/* ─── CTA ─── */}
       <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
         <h2 className="text-[#D4AF37] font-bold font-display">CTA</h2>
-        <Field label="ปุ่มหลัก (Hero)">
-          <CtaEditor value={settings.cta.primary} onChange={primary => update({ cta: { ...settings.cta, primary } })} />
+        <Field label="Final CTA — Title">
+          <input className={inputClass} value={settings.cta.final_title} onChange={e => update({ cta: { ...settings.cta, final_title: e.target.value } })} />
         </Field>
-        <Field label="ปุ่มรอง (Hero)">
-          <CtaEditor value={settings.cta.secondary} onChange={secondary => update({ cta: { ...settings.cta, secondary } })} />
+        <Field label="Final CTA — Subtitle">
+          <input className={inputClass} value={settings.cta.final_subtitle} onChange={e => update({ cta: { ...settings.cta, final_subtitle: e.target.value } })} />
         </Field>
-        <div className="pt-2 border-t border-[rgba(255,255,255,0.05)] space-y-3">
-          <Field label="Final CTA — Title">
-            <input className={inputClass} value={settings.cta.final_title} onChange={e => update({ cta: { ...settings.cta, final_title: e.target.value } })} />
-          </Field>
-          <Field label="Final CTA — Subtitle">
-            <input className={inputClass} value={settings.cta.final_subtitle} onChange={e => update({ cta: { ...settings.cta, final_subtitle: e.target.value } })} />
-          </Field>
-          <Field label="Final CTA — ปุ่ม">
-            <CtaEditor value={settings.cta.final_button} onChange={final_button => update({ cta: { ...settings.cta, final_button } })} />
-          </Field>
-        </div>
+        <Field label="Final CTA — ปุ่ม">
+          <CtaEditor value={settings.cta.final_button} onChange={final_button => update({ cta: { ...settings.cta, final_button } })} />
+        </Field>
       </section>
 
       {/* ─── Sections ─── */}
@@ -181,40 +137,90 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
         </div>
       </section>
 
-      {/* ─── Features ─── */}
+      {/* ─── Package Explorer ─── */}
       <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[#D4AF37] font-bold font-display">Features (ทำไมต้องสอบได้)</h2>
-          <button type="button" onClick={addFeature} className="text-xs bg-[#D4AF37]/10 border border-[rgba(212,175,55,0.3)] text-[#D4AF37] px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/20 flex items-center gap-1.5"><Plus size={14} /> เพิม</button>
-        </div>
-        {settings.features.map((f, i) => (
-          <div key={i} className="p-4 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] space-y-2">
-            <div className="flex justify-between items-center">
-              <select className={`${inputClass} max-w-[160px]`} value={f.icon} onChange={e => updateFeature(i, { icon: e.target.value })}>
-                {ICON_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-              </select>
-              <button type="button" onClick={() => removeFeature(i)} className="text-[#A1866B] hover:text-red-400 p-1"><Trash2 size={14} /></button>
-            </div>
-            <input className={inputClass} placeholder="Title" value={f.title} onChange={e => updateFeature(i, { title: e.target.value })} />
-            <textarea className={inputClass} rows={2} placeholder="Description" value={f.description} onChange={e => updateFeature(i, { description: e.target.value })} />
-          </div>
-        ))}
+        <h2 className="text-[#D4AF37] font-bold font-display">Package Explorer</h2>
+        <Field label="Title">
+          <input className={inputClass} value={settings.package_explorer.title} onChange={e => update({ package_explorer: { ...settings.package_explorer, title: e.target.value } })} />
+        </Field>
+        <Field label="Subtitle">
+          <textarea className={inputClass} rows={2} value={settings.package_explorer.subtitle} onChange={e => update({ package_explorer: { ...settings.package_explorer, subtitle: e.target.value } })} />
+        </Field>
+        <Field label="CTA Label">
+          <input className={inputClass} value={settings.package_explorer.cta_label} onChange={e => update({ package_explorer: { ...settings.package_explorer, cta_label: e.target.value } })} />
+        </Field>
+        <Field label="Empty State Title">
+          <input className={inputClass} value={settings.package_explorer.empty_title} onChange={e => update({ package_explorer: { ...settings.package_explorer, empty_title: e.target.value } })} />
+        </Field>
+        <Field label="Empty State Description">
+          <textarea className={inputClass} rows={2} value={settings.package_explorer.empty_description} onChange={e => update({ package_explorer: { ...settings.package_explorer, empty_description: e.target.value } })} />
+        </Field>
       </section>
 
-      {/* ─── How To ─── */}
+      {/* ─── Support ─── */}
       <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[#D4AF37] font-bold font-display">How To (วิธีใช้งาน)</h2>
-          <button type="button" onClick={addStep} className="text-xs bg-[#D4AF37]/10 border border-[rgba(212,175,55,0.3)] text-[#D4AF37] px-3 py-1.5 rounded-lg hover:bg-[#D4AF37]/20 flex items-center gap-1.5"><Plus size={14} /> เพิ่ม</button>
+        <h2 className="text-[#D4AF37] font-bold font-display">Support</h2>
+        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(212,175,55,0.3)] transition-colors">
+          <input type="checkbox" checked={settings.support.enabled} onChange={e => update({ support: { ...settings.support, enabled: e.target.checked } })} className="w-4 h-4 accent-[#D4AF37]" />
+          <span className="text-sm text-[#F5E9D6]">เปิดปุ่มสนับสนุน Sobdai</span>
+        </label>
+        <Field label="Title">
+          <input className={inputClass} value={settings.support.title} onChange={e => update({ support: { ...settings.support, title: e.target.value } })} />
+        </Field>
+        <Field label="Description">
+          <textarea className={inputClass} rows={2} value={settings.support.description} onChange={e => update({ support: { ...settings.support, description: e.target.value } })} />
+        </Field>
+        <Field label="Button Label">
+          <input className={inputClass} value={settings.support.button_label} onChange={e => update({ support: { ...settings.support, button_label: e.target.value } })} />
+        </Field>
+        <Field label="PromptPay QR Image URL">
+          <input className={inputClass} value={settings.support.qr_image_url} onChange={e => update({ support: { ...settings.support, qr_image_url: e.target.value } })} />
+        </Field>
+        <Field label="PromptPay Name">
+          <input className={inputClass} value={settings.support.promptpay_name} onChange={e => update({ support: { ...settings.support, promptpay_name: e.target.value } })} />
+        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Bank Name">
+            <input className={inputClass} value={settings.support.bank_name} onChange={e => update({ support: { ...settings.support, bank_name: e.target.value } })} />
+          </Field>
+          <Field label="Account Number">
+            <input className={inputClass} value={settings.support.account_number} onChange={e => update({ support: { ...settings.support, account_number: e.target.value } })} />
+          </Field>
         </div>
-        {settings.howto.map((s, i) => (
-          <div key={i} className="p-4 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] space-y-2">
-            <div className="flex gap-2">
-              <input className={`${inputClass} max-w-[80px]`} placeholder="01" value={s.num} onChange={e => updateStep(i, { num: e.target.value })} />
-              <input className={inputClass} placeholder="Title" value={s.title} onChange={e => updateStep(i, { title: e.target.value })} />
-              <button type="button" onClick={() => removeStep(i)} className="text-[#A1866B] hover:text-red-400 p-1"><Trash2 size={14} /></button>
-            </div>
-            <textarea className={inputClass} rows={2} placeholder="Description" value={s.desc} onChange={e => updateStep(i, { desc: e.target.value })} />
+        <Field label="Footer Message">
+          <input className={inputClass} value={settings.support.footer_message} onChange={e => update({ support: { ...settings.support, footer_message: e.target.value } })} />
+        </Field>
+      </section>
+
+      {/* ─── Footer ─── */}
+      <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-3">
+        <h2 className="text-[#D4AF37] font-bold font-display">Footer Social Links</h2>
+        {settings.footer.social_links.map((social, index) => (
+          <div key={social.key} className="p-4 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={social.active}
+                onChange={e => {
+                  const social_links = [...settings.footer.social_links]
+                  social_links[index] = { ...social, active: e.target.checked }
+                  update({ footer: { ...settings.footer, social_links } })
+                }}
+                className="w-4 h-4 accent-[#D4AF37]"
+              />
+              <span className="text-sm text-[#F5E9D6]">{social.label}</span>
+            </label>
+            <Field label={`${social.label} URL`}>
+              <input
+                className={inputClass}
+                value={social.url}
+                onChange={e => {
+                  const social_links = [...settings.footer.social_links]
+                  social_links[index] = { ...social, url: e.target.value }
+                  update({ footer: { ...settings.footer, social_links } })
+                }}
+              />
+            </Field>
           </div>
         ))}
       </section>

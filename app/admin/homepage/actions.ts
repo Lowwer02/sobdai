@@ -7,10 +7,10 @@ import { getHomepageSettings, normalizeHomepageSettings } from '@/lib/homepageCo
 /**
  * Save the homepage_settings singleton.
  *
- * Core fields (general/hero/cta/sections/seo/features/howto) are saved directly.
- * Support config lives under extended_config.support — we read the existing
- * extended_config row first, merge only the support key, then update so any
- * other extended_config data is preserved.
+ * Core fields (general/hero/cta/sections/seo/features/howto) are saved
+ * directly. Extended groups (package_explorer/footer/support) live under
+ * extended_config — we read the existing extended_config row first, merge only
+ * known keys, then update so any future extended_config data is preserved.
  */
 export async function saveHomepageSettings(raw: any) {
   const { supabase } = await requirePermission('content.write')
@@ -32,6 +32,8 @@ export async function saveHomepageSettings(raw: any) {
 
   const mergedExtendedConfig = {
     ...existingExt,
+    package_explorer: clean.package_explorer,
+    footer: clean.footer,
     support: clean.support,
   }
 

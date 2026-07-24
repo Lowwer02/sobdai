@@ -16,6 +16,7 @@ const sarabun = Sarabun({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://sobdai.com'),
   title: 'สอบได้ — เตรียมสอบข้าราชการออนไลน์',
   description: 'ระบบข้อสอบออนไลน์เตรียมสอบข้าราชการ ฝึกทำข้อสอบทีละข้อ มีคำใบ้และเฉลยละเอียด ครบทุกกรมทุกตำแหน่ง',
   keywords: ['สอบข้าราชการ', 'ข้อสอบราชการ', 'เตรียมสอบ', 'ก.พ.', 'ข้อสอบออนไลน์'],
@@ -49,7 +50,7 @@ export default async function RootLayout({
         <ActivityProvider />
         <Navbar />
         <main className="flex-grow">{children}</main>
-        <Footer supportConfig={homepageSettings.support} />
+        <Footer supportConfig={homepageSettings.support} footerConfig={homepageSettings.footer} />
         <FloatingSupport supportConfig={homepageSettings.support} />
         <ToastContainer />
       </body>
