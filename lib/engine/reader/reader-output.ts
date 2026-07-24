@@ -150,7 +150,7 @@ export function readBlueprint(
   const stage3Diagnostics = validateMetadata(doc)
   if (containsHaltDiagnostic(stage3Diagnostics)) {
     return buildFailureResult({
-      diagnostics: aggregate(stage2Diagnostics, stage3Diagnostics),
+      diagnostics: aggregate(stage2Diagnostics, stage3Diagnostics, []),
       metadata: normalizeMetadata(doc.metadata),
       schemaVersionMajor: extractSchemaMajor(doc.metadata.blueprintVersion),
       timestampIso,
@@ -181,7 +181,7 @@ export function readBlueprint(
       category: 'generation.missing_contract_field',
       location: { startLine: 1, endLine: doc.lineCount || 1 },
       severity: 'blocking',
-      explanation: `${buildFailure.code}: ${buildFailure.message}`,
+      explanation: `${buildResult.code}: ${buildResult.message}`,
       recommendation:
         'Fix the Blueprint so all required pieces are present (see the Stage 6 build-failure code in the explanation).',
     }
