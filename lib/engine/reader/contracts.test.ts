@@ -106,9 +106,29 @@ function verifies_tier_rejects_out_of_range(): void {
 
 // ─── discriminated union narrows on `ok` ────────────────────────────────────
 
+/** Minimal CanonicalBlueprintMetadata for constructing test ReaderResults. */
+const TEST_META: import('./normalizer').CanonicalBlueprintMetadata = {
+  engineVersion: '1.0.0',
+  blueprintVersion: '3.0.0',
+  positionId: 'b',
+  title: 'T',
+  sourceLine: 1,
+  form: 'blockquote',
+}
+
+/** Minimal ReaderExecutionMeta for test ReaderResults. */
+const TEST_EXEC_META: import('./contracts').ReaderExecutionMeta = {
+  readerVersion: '1.0.0',
+  schemaVersionMajor: '3',
+  timestampIso: null,
+}
+
 function verifies_read_result_success_branch(): void {
   const result: ReadBlueprintResult = {
     ok: true,
+    diagnostics: [],
+    metadata: TEST_META,
+    executionMeta: TEST_EXEC_META,
     assemblyRequest: {
       identity: {
         blueprint_id: 'b',
@@ -137,17 +157,20 @@ function verifies_read_result_success_branch(): void {
   }
 
   if (result.ok) {
-    // Narrowed: assemblyRequest is accessible.
+    // Narrowed: assemblyRequest is accessible on the success branch.
     assert.equal(result.assemblyRequest.target.sets, 1)
+    // Both branches share diagnostics + metadata + executionMeta.
+    assert.equal(result.diagnostics.length, 0)
+    assert.equal(result.executionMeta.readerVersion, '1.0.0')
   } else {
     assert.fail('should have narrowed to success branch')
   }
 }
 
 function verifies_read_result_failure_branch_requires_nonempty_errors(): void {
-  // When ok === false, errors MUST be present and non-empty — a "failure"
-  // with no errors is itself a bug (Runtime API §7.4 No Silent Failure).
-  const errors: ReaderError[] = [
+  // When ok === false, diagnostics MUST be non-empty — a "failure" with no
+  // diagnostics is itself a bug (Runtime API §7.4 No Silent Failure).
+  const diagnostics: ReaderError[] = [
     {
       category: 'structural.missing_section',
       location: { startLine: 1, endLine: 1 },
@@ -156,11 +179,18 @@ function verifies_read_result_failure_branch_requires_nonempty_errors(): void {
       recommendation: 'Add a Document Registry section listing the source documents.',
     },
   ]
-  const result: ReadBlueprintResult = { ok: false, errors }
+  const result: ReadBlueprintResult = {
+    ok: false,
+    diagnostics,
+    metadata: TEST_META,
+    executionMeta: TEST_EXEC_META,
+  }
 
   if (!result.ok) {
-    assert.ok(result.errors.length > 0, 'failure must carry at least one error')
-    assert.equal(result.errors[0].category, 'structural.missing_section')
+    assert.ok(result.diagnostics.length > 0, 'failure must carry at least one diagnostic')
+    assert.equal(result.diagnostics[0]!.category, 'structural.missing_section')
+    // assemblyRequest must NOT be accessible on the failure branch.
+    // (TypeScript enforces this via the discriminated union — compile-time.)
   }
 }
 
