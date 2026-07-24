@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Search } from 'lucide-react'
 import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
@@ -16,9 +17,19 @@ interface PackageCatalogClientProps {
   packages: PackageCardData[]
 }
 
+function normalizeFilter(filter: string | undefined) {
+  return FILTER_OPTIONS.some(option => option.value === filter) ? filter! : 'all'
+}
+
 export default function PackageCatalogClient({ packages }: PackageCatalogClientProps) {
+  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get('q') ?? '')
+    setActiveFilter(normalizeFilter(searchParams.get('filter') ?? undefined))
+  }, [searchParams])
 
   const filteredPackages = useMemo(() => {
     let result = [...packages]

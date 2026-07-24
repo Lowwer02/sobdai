@@ -2,6 +2,7 @@ import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import PackageCatalogClient from './PackageCatalogClient'
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 
 export const metadata: Metadata = {
   title: 'แพ็กเกจข้อสอบทั้งหมด | Sobdai',
@@ -45,5 +46,9 @@ export default async function PackageCatalogPage() {
     console.error('Failed to fetch packages:', error)
   }
 
-  return <PackageCatalogClient packages={packages} />
+  return (
+    <Suspense fallback={null}>
+      <PackageCatalogClient packages={packages} />
+    </Suspense>
+  )
 }

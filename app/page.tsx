@@ -10,6 +10,8 @@ import PromotionSection from '@/components/PromotionSection'
 import AnnouncementBar from '@/components/AnnouncementBar'
 import ProductValueSection from '@/components/ProductValueSection'
 import CandidateJourneySection from '@/components/CandidateJourneySection'
+import HeroPackageSearch from '@/components/HeroPackageSearch'
+import type { HeroSearchChip } from '@/components/HeroPackageSearch'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 
@@ -66,6 +68,55 @@ function CtaLink({ cta, className, style }: { cta: CtaButton; className?: string
   )
 }
 
+function addUniqueChip(chips: HeroSearchChip[], labels: Set<string>, label: string, href: string) {
+  const cleanLabel = label.trim()
+  if (!cleanLabel || labels.has(cleanLabel) || chips.length >= 7) return
+  labels.add(cleanLabel)
+  chips.push({ label: cleanLabel, href })
+}
+
+function buildHeroSearchChips(packages: any[]): HeroSearchChip[] {
+  const chips: HeroSearchChip[] = []
+  const labels = new Set<string>()
+
+  if (packages.some((pkg) => Number(pkg.current_price) === 0)) {
+    addUniqueChip(chips, labels, 'ฟรี', '/packages?filter=free')
+  }
+
+  if (packages.length > 0) {
+    addUniqueChip(chips, labels, 'ล่าสุด', '/packages?filter=latest')
+  }
+
+  const organizations = new Map<string, number>()
+  const positions = new Map<string, number>()
+
+  for (const pkg of packages) {
+    const orgName = pkg.organizations?.name?.trim()
+    const positionName = pkg.positions?.name?.trim()
+
+    if (orgName) organizations.set(orgName, (organizations.get(orgName) ?? 0) + 1)
+    if (positionName) positions.set(positionName, (positions.get(positionName) ?? 0) + 1)
+  }
+
+  const rankedOrganizations = [...organizations.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
+    .slice(0, 4)
+
+  const rankedPositions = [...positions.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
+    .slice(0, 4)
+
+  for (const [label] of rankedOrganizations) {
+    addUniqueChip(chips, labels, label, `/packages?q=${encodeURIComponent(label)}`)
+  }
+
+  for (const [label] of rankedPositions) {
+    addUniqueChip(chips, labels, label, `/packages?q=${encodeURIComponent(label)}`)
+  }
+
+  return chips
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getHomepageSettings()
   const og = settings.seo.og_image_url || undefined
@@ -82,6 +133,7 @@ export default async function Home() {
 
   let livePackages: PackageCardData[] = []
   let homepagePromotions: HomepagePromotion[] = []
+  let heroSearchChips: HeroSearchChip[] = []
 
   try {
     const supabase = createAnonServerClient()
@@ -109,16 +161,29 @@ export default async function Home() {
       .order('created_at', { ascending: false })
       .limit(count)
 
+    const chipPackagesQuery = supabase
+      .from('packages')
+      .select(`
+        current_price,
+        created_at,
+        organizations ( name ),
+        positions ( name )
+      `)
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+
     // Run featured-packages and promotions in parallel — both are independent
     // reads, so one batch saves a round-trip. Promotion fetch is isolated in
     // its own try/catch below so a promotion failure can never break packages.
-    const [featuredResult, promotionsResult] = await Promise.all([
+    const [featuredResult, promotionsResult, chipPackagesResult] = await Promise.all([
       featuredQuery,
       getHomepagePromotions(),
+      chipPackagesQuery,
     ])
 
     featuredData = featuredResult.data || []
     homepagePromotions = promotionsResult
+    heroSearchChips = buildHeroSearchChips(chipPackagesResult.data || [])
 
     // BUSINESS RULE: the homepage renders ONLY packages where
     // is_published = true AND featured_homepage = true. No exceptions.
@@ -210,8 +275,14 @@ export default async function Home() {
               {hero.subtitle}
             </p>
 
+            <HeroPackageSearch chips={heroSearchChips} />
+
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <CtaLink cta={cta.primary} className="btn-primary" style={{ padding: '14px 36px', fontSize: '16px' }} />
+              <Link href="/packages">
+                <button type="button" className="btn-outline" style={{ padding: '12px 28px', fontSize: '14px' }}>
+                  ดูชุดข้อสอบทั้งหมด
+                </button>
+              </Link>
             </div>
           </div>
         </section>
@@ -325,4 +396,3 @@ export default async function Home() {
     </div>
   )
 }
-
