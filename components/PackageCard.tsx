@@ -24,11 +24,46 @@ interface PackageCardData {
 interface PackageCardProps {
   pkg: PackageCardData
   index?: number
+  searchQuery?: string
 }
 
 export type { PackageCardData }
 
-export default function PackageCard({ pkg, index = 0 }: PackageCardProps) {
+function normalizeText(value: string) {
+  return value.toLowerCase().trim()
+}
+
+function HighlightedText({ text, query }: { text: string; query?: string }) {
+  const cleanQuery = normalizeText(query || '')
+  if (!cleanQuery) return <>{text}</>
+
+  const lowerText = text.toLowerCase()
+  const matchIndex = lowerText.indexOf(cleanQuery)
+  if (matchIndex === -1) return <>{text}</>
+
+  const before = text.slice(0, matchIndex)
+  const match = text.slice(matchIndex, matchIndex + cleanQuery.length)
+  const after = text.slice(matchIndex + cleanQuery.length)
+
+  return (
+    <>
+      {before}
+      <mark
+        style={{
+          background: 'rgba(212, 168, 67, 0.22)',
+          color: 'inherit',
+          borderRadius: '4px',
+          padding: '0 2px',
+        }}
+      >
+        {match}
+      </mark>
+      {after}
+    </>
+  )
+}
+
+export default function PackageCard({ pkg, index = 0, searchQuery }: PackageCardProps) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url
@@ -107,7 +142,7 @@ export default function PackageCard({ pkg, index = 0 }: PackageCardProps) {
             position: 'relative',
           }}
         >
-          {orgName}
+          <HighlightedText text={orgName} query={searchQuery} />
         </div>
 
         {/* Position Name */}
@@ -122,7 +157,7 @@ export default function PackageCard({ pkg, index = 0 }: PackageCardProps) {
             position: 'relative',
           }}
         >
-          {posName}
+          <HighlightedText text={posName} query={searchQuery} />
         </h3>
 
         {/* Description */}

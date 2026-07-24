@@ -68,9 +68,9 @@ function CtaLink({ cta, className, style }: { cta: CtaButton; className?: string
   )
 }
 
-function addUniqueChip(chips: HeroSearchChip[], labels: Set<string>, label: string, href: string) {
+function addUniqueChip(chips: HeroSearchChip[], labels: Set<string>, label: string, href: string, maxChips = 5) {
   const cleanLabel = label.trim()
-  if (!cleanLabel || labels.has(cleanLabel) || chips.length >= 7) return
+  if (!cleanLabel || labels.has(cleanLabel) || chips.length >= maxChips) return
   labels.add(cleanLabel)
   chips.push({ label: cleanLabel, href })
 }
@@ -78,43 +78,34 @@ function addUniqueChip(chips: HeroSearchChip[], labels: Set<string>, label: stri
 function buildHeroSearchChips(packages: any[]): HeroSearchChip[] {
   const chips: HeroSearchChip[] = []
   const labels = new Set<string>()
+  const MAX_CHIPS = 5
 
+  // 1. Free
   if (packages.some((pkg) => Number(pkg.current_price) === 0)) {
-    addUniqueChip(chips, labels, 'ฟรี', '/packages?filter=free')
+    addUniqueChip(chips, labels, 'ฟรี', '/packages?filter=free', MAX_CHIPS)
   }
 
+  // 2. Latest
   if (packages.length > 0) {
-    addUniqueChip(chips, labels, 'ล่าสุด', '/packages?filter=latest')
+    addUniqueChip(chips, labels, 'ล่าสุด', '/packages?filter=latest', MAX_CHIPS)
   }
 
-  const organizations = new Map<string, number>()
+  // 3. Top Positions (ONLY positions, no long organization names for compact UI)
   const positions = new Map<string, number>()
-
   for (const pkg of packages) {
-    const orgName = pkg.organizations?.name?.trim()
     const positionName = pkg.positions?.name?.trim()
-
-    if (orgName) organizations.set(orgName, (organizations.get(orgName) ?? 0) + 1)
     if (positionName) positions.set(positionName, (positions.get(positionName) ?? 0) + 1)
   }
 
-  const rankedOrganizations = [...organizations.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
-    .slice(0, 4)
-
   const rankedPositions = [...positions.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
-    .slice(0, 4)
-
-  for (const [label] of rankedOrganizations) {
-    addUniqueChip(chips, labels, label, `/packages?q=${encodeURIComponent(label)}`)
-  }
 
   for (const [label] of rankedPositions) {
-    addUniqueChip(chips, labels, label, `/packages?q=${encodeURIComponent(label)}`)
+    if (chips.length >= MAX_CHIPS) break
+    addUniqueChip(chips, labels, label, `/packages?q=${encodeURIComponent(label)}`, MAX_CHIPS)
   }
 
-  return chips
+  return chips.slice(0, MAX_CHIPS)
 }
 
 export async function generateMetadata(): Promise<Metadata> {
