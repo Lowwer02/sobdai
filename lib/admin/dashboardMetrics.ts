@@ -74,6 +74,13 @@ function formatLastActivity(value?: string | null, now = new Date()) {
   return `${date} ${time}`
 }
 
+function assertMetricResult(metricName: string, result: { error?: unknown }) {
+  if (!result.error) return
+
+  console.error(`Dashboard metric failed: ${metricName}`, result.error)
+  throw new Error(`Dashboard metric failed: ${metricName}`)
+}
+
 export async function getAdminDashboardMetrics(supabase: SupabaseClient): Promise<AdminDashboardMetrics> {
   const todayStart = getBangkokRangeStart('day')
   const monthStart = getBangkokRangeStart('month')
@@ -105,6 +112,20 @@ export async function getAdminDashboardMetrics(supabase: SupabaseClient): Promis
     supabase.from('orders').select('id', { count: 'exact', head: true }),
     supabase.from('orders').select('amount').eq('status', ORDER_STATUS.PAID),
   ])
+
+  assertMetricResult('Active Today', activeTodayResult)
+  assertMetricResult('Monthly Active', monthlyActiveResult)
+  assertMetricResult('Returning Users', returningUsersResult)
+  assertMetricResult('New Users Today', newUsersTodayResult)
+  assertMetricResult('Last Activity', lastActivityResult)
+  assertMetricResult('Total Users', usersResult)
+  assertMetricResult('Active Packages', packagesResult)
+  assertMetricResult('Questions', questionsResult)
+  assertMetricResult('Exam Sets', examSetsResult)
+  assertMetricResult('Summary Bank', summariesResult)
+  assertMetricResult('Orders', ordersResult)
+  assertMetricResult('Revenue', revenueResult)
+
   const activeToday = activeTodayResult.count ?? 0
 
   return {
