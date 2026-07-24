@@ -152,7 +152,7 @@ export default async function Home() {
         <section
           style={{
             position: 'relative',
-            padding: '80px 20px 100px',
+            padding: '72px 20px 64px',
             textAlign: 'center',
             overflow: 'hidden',
           }}
@@ -162,7 +162,7 @@ export default async function Home() {
             aria-hidden
             style={{
               position: 'absolute',
-              top: '-60px',
+              top: '-40px',
               left: '50%',
               transform: 'translateX(-50%)',
               width: '600px',
@@ -172,7 +172,7 @@ export default async function Home() {
             }}
           />
 
-          <div style={{ maxWidth: '720px', margin: '0 auto', position: 'relative' }}>
+          <div style={{ maxWidth: '680px', margin: '0 auto', position: 'relative' }}>
             <div style={{ marginBottom: '20px' }}>
               <span className="badge badge-gold" style={{ fontSize: '13px', padding: '4px 14px' }}>
                 {hero.badge}
@@ -184,7 +184,7 @@ export default async function Home() {
               style={{
                 fontSize: 'clamp(36px, 7vw, 64px)',
                 lineHeight: 1.15,
-                marginBottom: '20px',
+                marginBottom: '18px',
                 background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -197,46 +197,21 @@ export default async function Home() {
 
             <p
               style={{
-                fontSize: '17px',
+                fontSize: '17.5px',
                 color: 'var(--text-secondary)',
-                lineHeight: 1.75,
-                marginBottom: '36px',
-                maxWidth: '540px',
-                margin: '0 auto 36px',
+                lineHeight: 1.6,
+                marginBottom: '32px',
+                maxWidth: '520px',
+                margin: '0 auto 32px',
                 whiteSpace: 'pre-line',
               }}
             >
               {hero.subtitle}
             </p>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <CtaLink cta={cta.primary} className="btn-primary" style={{ padding: '14px 32px', fontSize: '16px' }} />
-              <CtaLink cta={cta.secondary} className="btn-outline" style={{ padding: '13px 28px', fontSize: '15px' }} />
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <CtaLink cta={cta.primary} className="btn-primary" style={{ padding: '14px 36px', fontSize: '16px' }} />
             </div>
-
-            {/* Social proof */}
-            {hero.stats.length > 0 && (
-              <div
-                style={{
-                  marginTop: '48px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '32px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                {hero.stats.map((stat) => (
-                  <div key={stat.label} style={{ textAlign: 'center' }}>
-                    <div className="font-display" style={{ fontSize: '28px', color: 'var(--gold-light)', lineHeight: 1.1 }}>
-                      {stat.value}
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {stat.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </section>
       )}
