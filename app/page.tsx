@@ -114,7 +114,24 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: settings.seo.title,
     description: settings.seo.description,
-    openGraph: og ? { images: [og] } : undefined,
+    openGraph: {
+      title: settings.seo.title,
+      description: settings.seo.description,
+      ...(og ? { images: [og] } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: settings.seo.title,
+      description: settings.seo.description,
+      ...(og ? { images: [og] } : {}),
+    },
+    alternates: {
+      canonical: '/',
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
   }
 }
 
@@ -195,7 +212,7 @@ export default async function Home() {
     console.error('Failed to fetch packages:', error)
   }
 
-  const { hero, cta, sections, features, howto } = settings
+  const { hero, cta, sections, package_explorer } = settings
   const topPromotion = homepagePromotions[0] ?? null
   const remainingPromotions = homepagePromotions.slice(1)
 
@@ -266,12 +283,16 @@ export default async function Home() {
               {hero.subtitle}
             </p>
 
-            <HeroPackageSearch chips={heroSearchChips} />
+            <HeroPackageSearch
+              chips={heroSearchChips}
+              placeholder={hero.search_placeholder}
+              chipLabel={hero.search_chip_label}
+            />
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <Link href="/packages">
                 <button type="button" className="btn-outline" style={{ padding: '12px 28px', fontSize: '14px' }}>
-                  ดูชุดข้อสอบทั้งหมด
+                  {hero.browse_cta_label}
                 </button>
               </Link>
             </div>
@@ -290,10 +311,10 @@ export default async function Home() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '32px' }}>
             <div>
               <h2 className="font-display" style={{ fontSize: 'clamp(22px, 3.5vw, 32px)', marginBottom: '6px', color: 'var(--text-primary)' }}>
-                เริ่มต้นจากตำแหน่งที่คุณสนใจ
+                {package_explorer.title}
               </h2>
               <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
-                เลือกกรมและตำแหน่งที่ต้องการเพื่อเริ่มฝึกทำข้อสอบทีละข้อ
+                {package_explorer.subtitle}
               </p>
             </div>
             <Link
@@ -309,7 +330,7 @@ export default async function Home() {
               }}
               className="group"
             >
-              <span>ดูชุดข้อสอบทั้งหมด</span>
+              <span>{package_explorer.cta_label}</span>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200 group-hover:translate-x-1">
                 <path d="M5 12h14" />
                 <path d="m12 5 7 7-7 7" />
@@ -333,7 +354,7 @@ export default async function Home() {
               <div style={{ textAlign: 'center', marginTop: '40px' }}>
                 <Link href="/packages">
                   <button type="button" className="btn-outline" style={{ padding: '12px 32px' }}>
-                    ดูชุดข้อสอบทั้งหมด ({livePackages.length} ชุด)
+                    {package_explorer.cta_label}
                   </button>
                 </Link>
               </div>
@@ -347,8 +368,8 @@ export default async function Home() {
                   <path d="m8 12 4 4 4-4" />
                 </svg>
               </div>
-              <h3 className="font-display" style={{ fontSize: '20px', marginBottom: '8px', color: 'var(--text-primary)' }}>กำลังเตรียมชุดข้อสอบใหม่</h3>
-              <p style={{ color: 'var(--text-muted)', maxWidth: '400px' }}>ทีมงานกำลังอัปเดตคลังข้อสอบและสรุปเนื้อหาสำหรับปีล่าสุด กลับมาเช็คใหม่เร็วๆ นี้นะครับ</p>
+              <h3 className="font-display" style={{ fontSize: '20px', marginBottom: '8px', color: 'var(--text-primary)' }}>{package_explorer.empty_title}</h3>
+              <p style={{ color: 'var(--text-muted)', maxWidth: '400px' }}>{package_explorer.empty_description}</p>
             </div>
           )}
         </section>

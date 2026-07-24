@@ -45,6 +45,9 @@ export interface HomepageHero {
   badge: string
   title: string
   subtitle: string
+  search_placeholder: string
+  search_chip_label: string
+  browse_cta_label: string
   stats: HeroStat[]
 }
 
@@ -83,6 +86,25 @@ export interface HomepageSeo {
   og_image_url: string
 }
 
+export interface PackageExplorerSettings {
+  title: string
+  subtitle: string
+  cta_label: string
+  empty_title: string
+  empty_description: string
+}
+
+export interface FooterSocialLink {
+  key: 'facebook' | 'line' | 'tiktok'
+  label: string
+  url: string
+  active: boolean
+}
+
+export interface FooterSettings {
+  social_links: FooterSocialLink[]
+}
+
 export interface HomepageGeneral {
   /** How many featured packages to show: 2 | 4 | 6. */
   featured_count: 2 | 4 | 6
@@ -94,6 +116,8 @@ export interface HomepageSettings {
   cta: HomepageCta
   sections: HomepageSections
   seo: HomepageSeo
+  package_explorer: PackageExplorerSettings
+  footer: FooterSettings
   /** Phase 1 moves Features + HowTo copy into config (admin-editable text). */
   features: FeatureItem[]
   howto: HowToStep[]
@@ -139,6 +163,9 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     badge: 'คลังข้อสอบราชการ 2569',
     title: 'เตรียมสอบข้าราชการ\nอย่างมีระบบ',
     subtitle: 'ฝึกทำข้อสอบจริง เข้าใจเหตุผล พร้อมสอบมั่นใจ',
+    search_placeholder: 'ค้นหาตำแหน่ง เช่น นักวิชาการศึกษา, นิติกร',
+    search_chip_label: 'ค้นหายอดนิยม:',
+    browse_cta_label: 'ดูชุดข้อสอบทั้งหมด',
     stats: [
       { value: '100+', label: 'ข้อสอบ/ชุด' },
       { value: '1 ปี', label: 'สิทธิ์ใช้งาน' },
@@ -163,6 +190,20 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     title: 'Sobdai — เตรียมสอบข้าราชการอย่างมีระบบ',
     description: 'ฝึกทำข้อสอบทีละข้อแบบ Flashcard มีคำใบ้และเฉลยละเอียดทุกข้อ ซื้อขาดต่อชุดข้อสอบ ใช้ได้ 1 ปี',
     og_image_url: '',
+  },
+  package_explorer: {
+    title: 'เลือกเส้นทางเตรียมสอบของคุณ',
+    subtitle: 'แต่ละชุดข้อสอบมาพร้อมสรุปเนื้อหา แบบฝึกหัด เฉลยละเอียด และการติดตามความพร้อม',
+    cta_label: 'ดูเส้นทางเตรียมสอบทั้งหมด',
+    empty_title: 'กำลังเตรียมชุดข้อสอบใหม่',
+    empty_description: 'ทีมงานกำลังอัปเดตคลังข้อสอบและสรุปเนื้อหาสำหรับปีล่าสุด กลับมาเช็คใหม่เร็วๆ นี้นะครับ',
+  },
+  footer: {
+    social_links: [
+      { key: 'facebook', label: 'Facebook', url: 'https://facebook.com/sobdai', active: true },
+      { key: 'line', label: 'LINE OA', url: '', active: false },
+      { key: 'tiktok', label: 'TikTok', url: '', active: false },
+    ],
   },
   features: [
     { icon: 'exam', title: 'ข้อสอบรายตำแหน่ง', description: 'คลังข้อสอบเฉพาะกรมและตำแหน่ง ตรงประเด็นกว่าหนังสือทั่วไป' },
@@ -248,6 +289,33 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
   // --- seo
   const seoRaw = r.seo || {}
 
+  // --- extended config groups
+  const extRaw = r.extended_config || {}
+
+  // package_explorer can arrive top-level from the admin client state, but is
+  // stored under extended_config.package_explorer to avoid schema churn.
+  const packageExplorerRaw =
+    (typeof r.package_explorer === 'object' && r.package_explorer !== null)
+      ? r.package_explorer
+      : ((typeof extRaw.package_explorer === 'object' && extRaw.package_explorer !== null) ? extRaw.package_explorer : {})
+  const footerRaw =
+    (typeof r.footer === 'object' && r.footer !== null)
+      ? r.footer
+      : ((typeof extRaw.footer === 'object' && extRaw.footer !== null) ? extRaw.footer : {})
+  const footerLinksRaw = Array.isArray(footerRaw.social_links) ? footerRaw.social_links : []
+  const fallbackFooterLinks = d.footer.social_links
+  const footerKeys: FooterSocialLink['key'][] = ['facebook', 'line', 'tiktok']
+  const social_links: FooterSocialLink[] = footerKeys.map((key) => {
+    const rawLink = footerLinksRaw.find((link: any) => link?.key === key)
+    const fallback = fallbackFooterLinks.find(link => link.key === key)!
+    return {
+      key,
+      label: cleanString(rawLink?.label, fallback.label, 40),
+      url: typeof rawLink?.url === 'string' ? rawLink.url : fallback.url,
+      active: typeof rawLink?.active === 'boolean' ? rawLink.active : fallback.active,
+    }
+  })
+
   // --- features (strict: icon/title/description required, bounded)
   const featuresRaw = Array.isArray(r.features) ? r.features : []
   const features: FeatureItem[] = (featuresRaw.length > 0 ? featuresRaw : d.features)
@@ -275,7 +343,6 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
   // --- support (stored under extended_config.support in the DB, but when called
   //     from the save action the client sends it as a top-level `support` key)
   const supFromTopLevel = (typeof r.support === 'object' && r.support !== null) ? r.support : null
-  const extRaw = r.extended_config || {}
   const supFromExt = (typeof extRaw.support === 'object' && extRaw.support !== null) ? extRaw.support : null
   const supRaw = supFromTopLevel || supFromExt || {}
   const support: SupportConfig = {
@@ -297,6 +364,9 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
       badge: cleanString(heroRaw.badge, d.hero.badge, 80),
       title: cleanString(heroRaw.title, d.hero.title, 200),
       subtitle: cleanString(heroRaw.subtitle, d.hero.subtitle, 400),
+      search_placeholder: cleanString(heroRaw.search_placeholder, d.hero.search_placeholder, 140),
+      search_chip_label: cleanString(heroRaw.search_chip_label, d.hero.search_chip_label, 60),
+      browse_cta_label: cleanString(heroRaw.browse_cta_label, d.hero.browse_cta_label, 80),
       stats,
     },
     cta: {
@@ -317,6 +387,16 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
       title: cleanString(seoRaw.title, d.seo.title, 120),
       description: cleanString(seoRaw.description, d.seo.description, 300),
       og_image_url: cleanString(seoRaw.og_image_url, '', 500),
+    },
+    package_explorer: {
+      title: cleanString(packageExplorerRaw.title, d.package_explorer.title, 120),
+      subtitle: cleanString(packageExplorerRaw.subtitle, d.package_explorer.subtitle, 300),
+      cta_label: cleanString(packageExplorerRaw.cta_label, d.package_explorer.cta_label, 80),
+      empty_title: cleanString(packageExplorerRaw.empty_title, d.package_explorer.empty_title, 120),
+      empty_description: cleanString(packageExplorerRaw.empty_description, d.package_explorer.empty_description, 300),
+    },
+    footer: {
+      social_links,
     },
     features,
     howto,

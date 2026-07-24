@@ -12,9 +12,11 @@ export type HeroSearchChip = {
 
 interface HeroPackageSearchProps {
   chips: HeroSearchChip[]
+  placeholder: string
+  chipLabel: string
 }
 
-export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
+export default function HeroPackageSearch({ chips, placeholder, chipLabel }: HeroPackageSearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [isPending, setIsPending] = useState(false)
@@ -62,7 +64,7 @@ export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="ค้นหาตำแหน่ง เช่น นักวิชาการศึกษา, นิติกร"
+          placeholder={placeholder}
           aria-label="ค้นหาตำแหน่งที่ต้องการสอบ"
           style={{
             flex: 1,
@@ -106,7 +108,7 @@ export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
           }}
         >
           <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: '2px', opacity: 0.8 }}>
-            ค้นหายอดนิยม:
+            {chipLabel}
           </span>
           {displayChips.map((chip) => (
             <Link

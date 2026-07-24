@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { Heart } from 'lucide-react'
 import { legalConfig, socialLinks, type SocialLink } from '@/lib/legal'
 import SupportModal from '@/components/SupportModal'
-import type { SupportConfig } from '@/lib/homepageConfig'
+import type { FooterSettings, SupportConfig } from '@/lib/homepageConfig'
 
 interface FooterProps {
   supportConfig?: SupportConfig
+  footerConfig?: FooterSettings
 }
 
 /** Minimal outline social icons (lucide-react has no brand icons). */
@@ -45,8 +46,9 @@ function SocialIcon({ name, size = 20 }: { name: SocialLink['key']; size?: numbe
   )
 }
 
-export default function Footer({ supportConfig }: FooterProps) {
+export default function Footer({ supportConfig, footerConfig }: FooterProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const renderedSocialLinks = footerConfig?.social_links || socialLinks
 
   return (
     <footer className="bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] py-12 mt-auto">
@@ -104,7 +106,7 @@ export default function Footer({ supportConfig }: FooterProps) {
               ติดตามเรา
             </span>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              {socialLinks.map((social) => {
+              {renderedSocialLinks.map((social) => {
                 const baseClass =
                   'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px]'
                 if (!social.active) {
@@ -156,4 +158,3 @@ export default function Footer({ supportConfig }: FooterProps) {
     </footer>
   )
 }
-
