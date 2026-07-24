@@ -51,93 +51,113 @@ export default function PackageCard({ pkg, index = 0 }: PackageCardProps) {
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
         }}
       >
         {/* Hover Gradient Background */}
         <div 
           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{ background: 'linear-gradient(to bottom, rgba(212,175,55,0.02), transparent)' }} 
+          style={{ background: 'linear-gradient(to bottom, rgba(212,168,67,0.03), transparent)' }} 
         />
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', position: 'relative' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {logoUrl ? (
-              <div style={{ width: 32, height: 32, borderRadius: '6px', overflow: 'hidden', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                <Image src={logoUrl} alt={orgName} width={32} height={32} style={{ objectFit: 'contain' }} unoptimized />
+              <div style={{ width: 34, height: 34, borderRadius: '8px', overflow: 'hidden', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <Image src={logoUrl} alt={orgName} width={34} height={34} style={{ objectFit: 'contain' }} unoptimized />
               </div>
             ) : (
-              <div style={{ width: 32, height: 32, borderRadius: '6px', backgroundColor: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1A140E', fontWeight: 'bold', fontSize: '14px' }}>
+              <div style={{ width: 34, height: 34, borderRadius: '8px', backgroundColor: 'var(--gold-tint)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-light)', fontWeight: 'bold', fontSize: '14px' }}>
                 {orgName.charAt(0)}
               </div>
             )}
-            <div
+            <span
               style={{
-                fontSize: '11px',
+                fontSize: '11.5px',
                 color: 'var(--gold-muted)',
                 fontWeight: '600',
+                letterSpacing: '0.06em',
                 textTransform: 'uppercase',
-                letterSpacing: '0.08em',
               }}
             >
               ปี {pkg.exam_year}
-            </div>
-          </div>
-          {hasDiscount && (
-            <span className="badge badge-green" style={{ fontSize: '11px', padding: '2px 8px' }}>
-              ลด {discountPercent}%
             </span>
-          )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="badge badge-gold" style={{ fontSize: '11px', padding: '2px 8px' }}>
+              {pkg.difficulty}
+            </span>
+            {hasDiscount && (
+              <span className="badge badge-green" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                ลด {discountPercent}%
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Department */}
+        {/* Department Name */}
         <div
-          className="font-display"
-          style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 'normal', position: 'relative' }}
+          style={{
+            fontSize: '12.5px',
+            color: 'var(--text-muted)',
+            marginBottom: '4px',
+            fontWeight: '500',
+            position: 'relative',
+          }}
         >
           {orgName}
         </div>
 
-        {/* Position */}
+        {/* Position Name */}
         <h3
+          className="group-hover:text-[var(--gold-light)] transition-colors duration-200"
           style={{
             fontSize: '18px',
             fontWeight: '600',
             color: 'var(--text-primary)',
-            marginBottom: '8px',
+            marginBottom: '10px',
             lineHeight: 1.35,
-            position: 'relative'
+            position: 'relative',
           }}
         >
           {posName}
         </h3>
 
-        {/* Description / Difficulty */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', position: 'relative' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            ระดับ: {pkg.difficulty}
-          </span>
-          <span style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: 'var(--text-muted)', opacity: 0.5 }} />
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {pkg.description || 'เตรียมสอบพร้อมสรุปและข้อสอบจริง'}
-          </span>
-        </div>
+        {/* Description */}
+        <p
+          style={{
+            fontSize: '13.5px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.55,
+            marginBottom: '20px',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          {pkg.description || 'คลังข้อสอบเตรียมสอบข้าราชการ พร้อมสรุปและเฉลยอย่างละเอียด'}
+        </p>
 
-        <div className="divider" style={{ margin: 'auto 0 16px 0', opacity: 0.5 }} />
+        <div className="divider" style={{ margin: 'auto 0 16px 0', opacity: 0.3 }} />
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-             <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-               {pkg.total_questions} ข้อ
-             </div>
-             <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-               {pkg.total_exam_sets} ชุด
-             </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span>{pkg.total_questions} ข้อ</span>
+            </div>
+            <span>·</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+              <span>{pkg.total_exam_sets} ชุด</span>
+            </div>
           </div>
+
           <div style={{ textAlign: 'right' }}>
             {hasDiscount && (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'line-through', marginBottom: '2px' }}>
