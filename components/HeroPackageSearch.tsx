@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, KeyboardEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import Link from 'next/link'
@@ -17,6 +17,7 @@ interface HeroPackageSearchProps {
 export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const [isPending, setIsPending] = useState(false)
 
   // Limit display to top 5 chips max for clean 1-2 line wrapping on mobile
   const displayChips = chips.slice(0, 5)
@@ -24,11 +25,18 @@ export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = query.trim()
+    setIsPending(true)
     if (!trimmed) {
       router.push('/packages')
       return
     }
     router.push(`/packages?q=${encodeURIComponent(trimmed)}`)
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape' && query) {
+      setQuery('')
+    }
   }
 
   return (
@@ -53,6 +61,7 @@ export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="ค้นหาตำแหน่ง เช่น นักวิชาการศึกษา, นิติกร"
           aria-label="ค้นหาตำแหน่งที่ต้องการสอบ"
           style={{
@@ -69,15 +78,18 @@ export default function HeroPackageSearch({ chips }: HeroPackageSearchProps) {
         <button
           type="submit"
           className="btn-primary"
+          disabled={isPending}
           style={{
             flex: '0 0 auto',
             padding: '11px 20px',
             borderRadius: '12px',
             fontSize: '14px',
             fontWeight: 600,
+            opacity: isPending ? 0.72 : 1,
+            cursor: isPending ? 'wait' : 'pointer',
           }}
         >
-          ค้นหา
+          {isPending ? 'กำลังค้นหา...' : 'ค้นหา'}
         </button>
       </form>
 
