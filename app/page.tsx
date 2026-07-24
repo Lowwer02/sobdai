@@ -8,6 +8,7 @@ import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
 import PromotionSection from '@/components/PromotionSection'
 import AnnouncementBar from '@/components/AnnouncementBar'
+import ProductValueSection from '@/components/ProductValueSection'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 
@@ -240,10 +241,10 @@ export default async function Home() {
         </section>
       )}
 
-      {/* ===================== Promotions =====================
-          Renders remaining live promotions in cards banner (highest priority promo
-          is rendered in the Announcement Bar above Hero). */}
-      {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
+      {/* ===================== Product Value Section =====================
+          Positions Sobdai's learning outcomes over passive reading/video watching.
+          Placed above Package Explorer to build intent before package selection. */}
+      {sections.features && <ProductValueSection />}
 
       {/* ===================== Package Explorer ===================== */}
       {sections.featured && (
@@ -315,58 +316,6 @@ export default async function Home() {
         </section>
       )}
 
-      {/* ===================== Features ===================== */}
-      {sections.features && features.length > 0 && (
-        <section
-          style={{
-            padding: '80px 20px',
-            background: 'linear-gradient(180deg, transparent 0%, rgba(212, 168, 67, 0.03) 50%, transparent 100%)',
-          }}
-        >
-          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-              <h2 className="font-display" style={{ fontSize: 'clamp(24px, 4vw, 36px)', marginBottom: '10px' }}>
-                ทำไมต้องสอบได้
-              </h2>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                gap: '16px',
-              }}
-            >
-              {features.map((f: FeatureItem) => (
-                <div key={f.title} className="card" style={{ padding: '24px', transition: 'transform 0.2s' }}>
-                  <div
-                    style={{
-                      width: 46,
-                      height: 46,
-                      borderRadius: 12,
-                      background: 'var(--gold-tint)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--gold)',
-                      marginBottom: '16px',
-                    }}
-                  >
-                    {ICONS[f.icon] || ICONS.exam}
-                  </div>
-                  <h3 className="font-display" style={{ fontSize: '17px', marginBottom: '8px', fontWeight: 'normal' }}>
-                    {f.title}
-                  </h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', lineHeight: 1.65 }}>
-                    {f.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* ===================== How it Works ===================== */}
       {sections.howto && howto.length > 0 && (
         <section style={{ padding: '80px 20px', maxWidth: '1100px', margin: '0 auto' }}>
@@ -407,6 +356,11 @@ export default async function Home() {
           </div>
         </section>
       )}
+
+      {/* ===================== Promotions =====================
+          Renders remaining live promotions in cards banner (highest priority promo
+          is rendered in the Announcement Bar above Hero). */}
+      {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
 
       {/* ===================== CTA ===================== */}
       {sections.cta && (
