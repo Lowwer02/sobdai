@@ -7,6 +7,7 @@ import type { HomepagePromotion } from '@/lib/homepagePromotions'
 import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
 import PromotionSection from '@/components/PromotionSection'
+import AnnouncementBar from '@/components/AnnouncementBar'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 
@@ -137,9 +138,14 @@ export default async function Home() {
   }
 
   const { hero, cta, sections, features, howto } = settings
+  const topPromotion = homepagePromotions[0] ?? null
+  const remainingPromotions = homepagePromotions.slice(1)
 
   return (
     <div style={{ minHeight: '100vh' }}>
+      {/* ===================== Announcement Bar ===================== */}
+      <AnnouncementBar promotion={topPromotion} />
+
       {/* ===================== Hero ===================== */}
       {sections.hero && (
         <section
@@ -235,12 +241,9 @@ export default async function Home() {
       )}
 
       {/* ===================== Promotions =====================
-          Renders only live (published + active + in-window, placement =
-          'homepage') promotions, ordered by priority DESC, display_order ASC,
-          created_at DESC, capped at MAX_HOMEPAGE_PROMOTIONS. Hidden entirely
-          when there are none. Fetched in parallel with featured packages and
-          isolated so a promotion failure can never affect packages. */}
-      {homepagePromotions.length > 0 && <PromotionSection promotions={homepagePromotions} />}
+          Renders remaining live promotions in cards banner (highest priority promo
+          is rendered in the Announcement Bar above Hero). */}
+      {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
 
       {/* ===================== Exam Sets ===================== */}
       {sections.featured && (
