@@ -24,6 +24,15 @@ export type PromotionStatus = 'draft' | 'published' | 'archived'
 
 export type LinkType = 'internal' | 'external'
 
+/**
+ * Placement slot (where the promotion renders). Known value 'homepage' gets
+ * full literal autocomplete; the intersected `string & {}` keeps the type
+ * open so future placements (sidebar, hero, post-purchase, ...) are a pure
+ * data concern and don't require a type edit here. (No CHECK constraint at
+ * the DB level — by design.)
+ */
+export type Placement = 'homepage' | (string & {})
+
 export interface Promotion {
   id: string
   internal_name: string
@@ -42,6 +51,7 @@ export interface Promotion {
   start_at: string | null
   end_at: string | null
   active: boolean
+  placement: Placement
   created_at: string
   updated_at: string
 }
