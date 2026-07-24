@@ -245,16 +245,37 @@ export default async function Home() {
           is rendered in the Announcement Bar above Hero). */}
       {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
 
-      {/* ===================== Exam Sets ===================== */}
+      {/* ===================== Package Explorer ===================== */}
       {sections.featured && (
-        <section id="exams" style={{ padding: '20px 20px 80px', maxWidth: '1100px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h2 className="font-display" style={{ fontSize: 'clamp(24px, 4vw, 36px)', marginBottom: '10px' }}>
-              ชุดข้อสอบยอดนิยม
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-              เลือกกรมและตำแหน่งที่ต้องการ
-            </p>
+        <section id="exams" style={{ padding: '40px 20px 80px', maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '32px' }}>
+            <div>
+              <h2 className="font-display" style={{ fontSize: 'clamp(22px, 3.5vw, 32px)', marginBottom: '6px', color: 'var(--text-primary)' }}>
+                เริ่มต้นจากตำแหน่งที่คุณสนใจ
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
+                เลือกกรมและตำแหน่งที่ต้องการเพื่อเริ่มฝึกทำข้อสอบทีละข้อ
+              </p>
+            </div>
+            <Link
+              href="/packages"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--gold-light)',
+                fontSize: '14px',
+                fontWeight: 600,
+              }}
+              className="group"
+            >
+              <span>ดูชุดข้อสอบทั้งหมด</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200 group-hover:translate-x-1">
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </Link>
           </div>
 
           {livePackages.length > 0 ? (
@@ -263,17 +284,17 @@ export default async function Home() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                  gap: '16px',
+                  gap: '20px',
                 }}
               >
                 {livePackages.map((pkg, i) => (
                   <PackageCard key={pkg.id} pkg={pkg} index={i} />
                 ))}
               </div>
-              <div style={{ textAlign: 'center', marginTop: '32px' }}>
+              <div style={{ textAlign: 'center', marginTop: '40px' }}>
                 <Link href="/packages">
-                  <button type="button" className="btn-outline" style={{ padding: '12px 28px' }}>
-                    ดูชุดข้อสอบทั้งหมด
+                  <button type="button" className="btn-outline" style={{ padding: '12px 32px' }}>
+                    ดูชุดข้อสอบทั้งหมด ({livePackages.length} ชุด)
                   </button>
                 </Link>
               </div>
