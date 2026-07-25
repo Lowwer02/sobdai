@@ -160,36 +160,13 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
       {/* ─── Support ─── */}
       <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-3">
         <h2 className="text-[#D4AF37] font-bold font-display">Support</h2>
+        <p className="text-[11px] text-[#A1866B]">
+          หน้าแรกควบคุมเฉพาะการแสดงผล Support เท่านั้น แก้ไขข้อความ QR และข้อมูลบัญชีได้ที่หน้า Support
+        </p>
         <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(212,175,55,0.3)] transition-colors">
           <input type="checkbox" checked={settings.support.enabled} onChange={e => update({ support: { ...settings.support, enabled: e.target.checked } })} className="w-4 h-4 accent-[#D4AF37]" />
-          <span className="text-sm text-[#F5E9D6]">เปิดปุ่มสนับสนุน Sobdai</span>
+          <span className="text-sm text-[#F5E9D6]">แสดง Support บนหน้าแรกและส่วนกลางของเว็บ</span>
         </label>
-        <Field label="Title">
-          <input className={inputClass} value={settings.support.title} onChange={e => update({ support: { ...settings.support, title: e.target.value } })} />
-        </Field>
-        <Field label="Description">
-          <textarea className={inputClass} rows={2} value={settings.support.description} onChange={e => update({ support: { ...settings.support, description: e.target.value } })} />
-        </Field>
-        <Field label="Button Label">
-          <input className={inputClass} value={settings.support.button_label} onChange={e => update({ support: { ...settings.support, button_label: e.target.value } })} />
-        </Field>
-        <Field label="PromptPay QR Image URL">
-          <input className={inputClass} value={settings.support.qr_image_url} onChange={e => update({ support: { ...settings.support, qr_image_url: e.target.value } })} />
-        </Field>
-        <Field label="PromptPay Name">
-          <input className={inputClass} value={settings.support.promptpay_name} onChange={e => update({ support: { ...settings.support, promptpay_name: e.target.value } })} />
-        </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Bank Name">
-            <input className={inputClass} value={settings.support.bank_name} onChange={e => update({ support: { ...settings.support, bank_name: e.target.value } })} />
-          </Field>
-          <Field label="Account Number">
-            <input className={inputClass} value={settings.support.account_number} onChange={e => update({ support: { ...settings.support, account_number: e.target.value } })} />
-          </Field>
-        </div>
-        <Field label="Footer Message">
-          <input className={inputClass} value={settings.support.footer_message} onChange={e => update({ support: { ...settings.support, footer_message: e.target.value } })} />
-        </Field>
       </section>
 
       {/* ─── Footer ─── */}
