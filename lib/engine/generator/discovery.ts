@@ -78,7 +78,43 @@ import type { DocumentRegistryEntry, LearningObjective } from '../reader/contrac
 import type { SyntheticBankRow } from '../shared/testing/fixtures'
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. Public API — Discovery
+// Module constants
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The per-Set question count assumed when the QueryPlan does not expose one.
+ *
+ * Architecture note (read before changing):
+ *  - This is Blueprint v3.0's published default (5 Sets × 100 questions/Set).
+ *  - The QueryPlan (E-2B output) does NOT currently carry `perSet` — the Query
+ *    Planner dropped it as a Solver concern (the Solver re-derives the actual
+ *    per-Set allocation from joint constraints). Pool Validation's L1 diversity
+ *    check still needs a per-Set reference count, so it falls back to this
+ *    constant.
+ *  - This constant SHOULD disappear once `perSet` becomes an explicit field on
+ *    the FROZEN QueryPlan contract (a future contract revision, not this
+ *    session). At that point `checkL1Diversity` reads `pool.queryPlan.perSet`
+ *    directly and this constant is deleted. Tracked as a Known Limitation of
+ *    E-2D.
+ */
+const DEFAULT_BLUEPRINT_PER_SET = 100
+
+//////////////////////////////////////////////////////////////////////////
+// STAGE 3 — CANDIDATE DISCOVERY
+//
+// Materialize E-2C's eligible Bank rows into immutable Candidate objects
+// (Architecture §5). Each Candidate carries five facets (§5.2): Identity,
+// Metadata, Completeness, Confidence, Provenance. Discovery DISCOVERS only —
+// it never ranks, selects, solves, or reads content (§5.6).
+//
+// This stage group contains:
+//   - Public API   : DiscoveryInput, DiscoveryResult, DiscoveryContext
+//   - Helpers      : facet builders, Tier derivation, slot/coverage projection
+//   - Entry point  : discoverCandidates()
+//////////////////////////////////////////////////////////////////////////
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3.1 Public API — Discovery
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -102,30 +138,7 @@ export type DiscoveryResult =
   | { readonly ok: false; readonly fatalDiagnostics: readonly FatalDiagnostic[] }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 2. Public API — Pool Validation
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Stage 4 result. Carries the validated pool (UNCHANGED — Validation never
- * mutates per §7.5), the FROZEN ShortfallReport, and a worst-severity rollup.
- *
- * This is a thin carrier that composes ONLY FROZEN contract types
- * (`CandidatePool`, `ShortfallReport`, `GeneratorSeverity`). It introduces NO
- * new diagnostic vocabulary — no new severity, no new axis, no new entry shape.
- * It is the minimal carrier the §2.2 "Validated Pool + Shortfall Report"
- * output contract requires.
- */
-export interface PoolValidationResult {
-  /** The validated pool. Unchanged — Validation reports, never repairs. */
-  readonly pool: CandidatePool
-  /** Per-axis shortfalls detected (FROZEN contract). Empty when pool passes. */
-  readonly shortfallReport: ShortfallReport
-  /** Worst severity across `shortfallReport.entries`. 'Pass' when empty. */
-  readonly classification: GeneratorSeverity
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 3. Discovery — materialization helpers
+// 3.2 Discovery — materialization helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -349,7 +362,7 @@ function isCr1Binding(b: unknown): b is Cr1DocumentTopicBinding {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. Discovery — the public entry point
+// 3.3 Discovery — the public entry point
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -478,8 +491,46 @@ function tierDerivationFatal(row: SyntheticBankRow): FatalDiagnostic {
   }
 }
 
+//////////////////////////////////////////////////////////////////////////
+// STAGE 4 — POOL VALIDATION
+//
+// Validate the CandidatePool against every checkable Blueprint axis, detect
+// shortfalls, and classify the result (Architecture §7). Validation REPORTS
+// ONLY — it never repairs, expands, selects, or weakens filters (§7.5). It
+// honors the §7.3 per-axis boundary: joint constraints (SUM=100, tier floors,
+// the anchor rule) are the Solver's job (IG-5) and are NOT attempted here.
+//
+// This stage group contains:
+//   - Public API   : PoolValidationResult
+//   - Helpers      : severity rollup, per-axis check functions
+//   - Entry point  : validatePool()
+//////////////////////////////////////////////////////////////////////////
+
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. Pool Validation — helpers
+// 4.1 Public API — Pool Validation
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Stage 4 result. Carries the validated pool (UNCHANGED — Validation never
+ * mutates per §7.5), the FROZEN ShortfallReport, and a worst-severity rollup.
+ *
+ * This is a thin carrier that composes ONLY FROZEN contract types
+ * (`CandidatePool`, `ShortfallReport`, `GeneratorSeverity`). It introduces NO
+ * new diagnostic vocabulary — no new severity, no new axis, no new entry shape.
+ * It is the minimal carrier the §2.2 "Validated Pool + Shortfall Report"
+ * output contract requires.
+ */
+export interface PoolValidationResult {
+  /** The validated pool. Unchanged — Validation reports, never repairs. */
+  readonly pool: CandidatePool
+  /** Per-axis shortfalls detected (FROZEN contract). Empty when pool passes. */
+  readonly shortfallReport: ShortfallReport
+  /** Worst severity across `shortfallReport.entries`. 'Pass' when empty. */
+  readonly classification: GeneratorSeverity
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4.2 Pool Validation — helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Severity rank for worst-severity rollup (Pass < Warning < Blocking < Fatal). */
@@ -644,11 +695,9 @@ function checkDocuments(pool: CandidatePool): ShortfallEntry[] {
 function checkL1Diversity(pool: CandidatePool): ShortfallEntry[] {
   const entries: ShortfallEntry[] = []
   const setCount = inferSetCount(pool.queryPlan)
-  // perSet isn't on the QueryPlan directly; recover it from LO targets if
-  // possible, else default to Blueprint v3.0's 100. The QueryPlan doesn't
-  // carry perSet (E-2B dropped it as a Solver concern), so we use 100 as the
-  // Blueprint v3.0 constant. This is a known limitation; documented.
-  const perSet = 100
+  // The QueryPlan does not yet expose perSet (see DEFAULT_BLUEPRINT_PER_SET's
+  // architecture note). Use the Blueprint v3.0 default as the L1 reference.
+  const perSet = DEFAULT_BLUEPRINT_PER_SET
 
   for (let set = 1; set <= setCount; set++) {
     const tuples = new Set<string>()
@@ -673,7 +722,7 @@ function checkL1Diversity(pool: CandidatePool): ShortfallEntry[] {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 6. Pool Validation — the public entry point
+// 4.3 Pool Validation — the public entry point
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
