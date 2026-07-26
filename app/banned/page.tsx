@@ -1,9 +1,12 @@
 import Link from 'next/link'
 import { AlertCircle } from 'lucide-react'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata = {
+export const metadata = createPageMetadata({
   title: 'บัญชีถูกระงับ | Sobdai',
-}
+  path: '/banned',
+  noindex: true,
+})
 
 export default function BannedPage() {
   return (

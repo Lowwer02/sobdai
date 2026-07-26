@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import MyOrdersClient from './MyOrdersClient'
 import type { Metadata } from 'next'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'คำสั่งซื้อของฉัน | Sobdai',
   description: 'ดูประวัติการซื้อแพ็กเกจทั้งหมดของคุณ',
-}
+  path: '/orders',
+  noindex: true,
+})
 
 export default async function MyOrdersPage() {
   const supabase = await createClient()

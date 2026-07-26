@@ -14,6 +14,7 @@ import HeroPackageSearch from '@/components/HeroPackageSearch'
 import type { HeroSearchChip } from '@/components/HeroPackageSearch'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
+import { createPageMetadata } from '@/lib/seo'
 
 // Homepage shows public package data + homepage settings that change
 // infrequently. Cache server-side (ISR) and revalidate every 5 minutes.
@@ -124,28 +125,12 @@ function buildHeroSearchChips(packages: any[]): HeroSearchChip[] {
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getHomepageSettings()
   const og = settings.seo.og_image_url || undefined
-  return {
+  return createPageMetadata({
     title: settings.seo.title,
     description: settings.seo.description,
-    openGraph: {
-      title: settings.seo.title,
-      description: settings.seo.description,
-      ...(og ? { images: [og] } : {}),
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: settings.seo.title,
-      description: settings.seo.description,
-      ...(og ? { images: [og] } : {}),
-    },
-    alternates: {
-      canonical: '/',
-    },
-    robots: {
-      index: true,
-      follow: true,
-    },
-  }
+    path: '/',
+    ...(og ? { image: og } : {}),
+  })
 }
 
 export default async function Home() {

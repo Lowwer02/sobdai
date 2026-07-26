@@ -7,11 +7,14 @@ import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
 import type { Metadata } from 'next'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'ข้อสอบของฉัน | Sobdai',
   description: 'แดชบอร์ดข้อสอบของคุณ — กลับไปทำชุดข้อสอบที่ซื้อไว้ได้อย่างรวดเร็ว',
-}
+  path: '/exams',
+  noindex: true,
+})
 
 /**
  * My Exam Dashboard (Phase 0).

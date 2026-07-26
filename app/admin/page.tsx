@@ -13,10 +13,13 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata = {
+export const metadata = createPageMetadata({
   title: 'Admin Dashboard | Sobdai',
-}
+  path: '/admin',
+  noindex: true,
+})
 
 function StatCard({
   title,

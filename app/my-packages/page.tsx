@@ -5,11 +5,14 @@ import { getPackagePublicCounts } from '@/lib/publicData'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import type { Metadata } from 'next'
 import { BookOpen, Award, CheckCircle, ChevronLeft } from 'lucide-react'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'แพ็กเกจของฉัน | Sobdai',
   description: 'แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้',
-}
+  path: '/my-packages',
+  noindex: true,
+})
 
 interface LearningCardData {
   id: string

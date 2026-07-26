@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import CheckoutClient from './CheckoutClient'
 import Link from 'next/link'
+import { createPageMetadata } from '@/lib/seo'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -21,12 +22,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     .eq('id', id)
     .single()
 
-  if (!pkg) return { title: 'Not Found | Sobdai' }
-
-  return {
-    title: `สั่งซื้อ: ${pkg.name} | Sobdai`,
-    description: `ดำเนินการสั่งซื้อแพ็กเกจ ${pkg.name}`
+  if (!pkg) {
+    return createPageMetadata({
+      title: 'Not Found | Sobdai',
+      path: `/checkout/${id}`,
+      noindex: true,
+    })
   }
+
+  return createPageMetadata({
+    title: `สั่งซื้อ: ${pkg.name} | Sobdai`,
+    description: `ดำเนินการสั่งซื้อแพ็กเกจ ${pkg.name}`,
+    path: `/checkout/${id}`,
+    noindex: true,
+  })
 }
 
 export default async function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
