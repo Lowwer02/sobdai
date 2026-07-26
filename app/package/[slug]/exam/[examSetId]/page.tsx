@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { Lock, Clock, FileText, ChevronRight, Activity, Zap } from 'lucide-react'
 import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { createPageMetadata } from '@/lib/seo'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, examSetId: string }> }) {
-  const { examSetId } = await params
+  const { slug, examSetId } = await params
 
   const supabase = await createClient()
 
@@ -17,12 +18,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     .eq('status', 'published')
     .single()
 
-  if (!examSet) return { title: 'Exam Not Found | Sobdai' }
-
-  return {
-    title: `${examSet.name} | Sobdai`,
-    description: `ทำชุดข้อสอบ: ${examSet.name}`
+  if (!examSet) {
+    return createPageMetadata({
+      title: 'Exam Not Found | Sobdai',
+      path: `/package/${slug}/exam/${examSetId}`,
+      noindex: true,
+    })
   }
+
+  return createPageMetadata({
+    title: `${examSet.name} | Sobdai`,
+    description: `ทำชุดข้อสอบ: ${examSet.name}`,
+    path: `/package/${slug}/exam/${examSetId}`,
+    noindex: true,
+  })
 }
 
 export default async function ExamSetPage({

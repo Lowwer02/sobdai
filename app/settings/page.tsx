@@ -2,11 +2,14 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import SettingsClient from './SettingsClient'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata = {
+export const metadata = createPageMetadata({
   title: 'My Profile | Sobdai',
   description: 'Manage your Sobdai profile and account settings',
-}
+  path: '/settings',
+  noindex: true,
+})
 
 export default async function SettingsPage() {
   const cookieStore = await cookies()

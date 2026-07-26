@@ -6,9 +6,42 @@ import { getPackagePublicCounts } from '@/lib/publicData'
 import { applyContentOrdering } from '@/lib/contentOrdering'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
+import { createPageMetadata } from '@/lib/seo'
 
 interface PageProps {
   params: Promise<{ slug: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = await createClient()
+
+  const { data: pkg } = await supabase
+    .from('packages')
+    .select('name, slug, description, logo_url, cover_image_url, is_published, organizations(name), positions(name)')
+    .eq('slug', slug)
+    .single()
+
+  if (!pkg) {
+    return createPageMetadata({
+      title: 'Package Not Found | Sobdai',
+      path: `/package/${slug}`,
+      noindex: true,
+    })
+  }
+
+  const title = `${pkg.name} | Sobdai`
+  const description = pkg.description || 'แพ็กเกจข้อสอบออนไลน์สำหรับเตรียมสอบข้าราชการบน Sobdai'
+  const image = pkg.cover_image_url || pkg.logo_url || undefined
+
+  return createPageMetadata({
+    title,
+    description,
+    path: `/package/${pkg.slug}`,
+    ...(image ? { image } : {}),
+    noindex: !pkg.is_published,
+  })
 }
 
 export default async function PackagePage({ params }: PageProps) {

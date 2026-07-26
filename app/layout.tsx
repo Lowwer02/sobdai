@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Sarabun } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
@@ -7,6 +7,8 @@ import Footer from '@/components/Footer'
 import FloatingSupport from '@/components/FloatingSupport'
 import ActivityProvider from '@/components/ActivityProvider'
 import { getHomepageSettings } from '@/lib/homepageConfig'
+import StructuredData from '@/components/StructuredData'
+import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL, THEME_COLOR, createPageMetadata } from '@/lib/seo'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
@@ -16,20 +18,28 @@ const sarabun = Sarabun({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://sobdai.com'),
-  title: 'สอบได้ — เตรียมสอบข้าราชการออนไลน์',
-  description: 'ระบบข้อสอบออนไลน์เตรียมสอบข้าราชการ ฝึกทำข้อสอบทีละข้อ มีคำใบ้และเฉลยละเอียด ครบทุกกรมทุกตำแหน่ง',
-  keywords: ['สอบข้าราชการ', 'ข้อสอบราชการ', 'เตรียมสอบ', 'ก.พ.', 'ข้อสอบออนไลน์'],
-  openGraph: {
+  ...createPageMetadata({
     title: 'สอบได้ — เตรียมสอบข้าราชการออนไลน์',
-    description: 'ฝึกทำข้อสอบทีละข้อ มีคำใบ้และเฉลยละเอียด',
-    locale: 'th_TH',
-    type: 'website',
+    description: SITE_DESCRIPTION,
+    path: '/',
+  }),
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  keywords: ['สอบข้าราชการ', 'ข้อสอบราชการ', 'เตรียมสอบ', 'ก.พ.', 'ข้อสอบออนไลน์'],
+  manifest: '/manifest.webmanifest',
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'google-site-verification-placeholder',
+  },
+  icons: {
+    icon: [{ url: '/icon.png', type: 'image/png' }],
+    apple: [{ url: '/apple-icon.png', type: 'image/png' }],
   },
 }
 
-export const viewport = {
-  themeColor: '#0f0b08',
+export const viewport: Viewport = {
+  themeColor: THEME_COLOR,
   width: 'device-width',
   initialScale: 1,
 }
@@ -45,6 +55,17 @@ export default async function RootLayout({
     <html lang="th" className={sarabun.variable}>
       <head>
         <link rel="preload" href="/fonts/supermarket.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <StructuredData
+          data={{
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: SITE_NAME,
+            url: SITE_URL,
+            description: SITE_DESCRIPTION,
+            inLanguage: 'th-TH',
+            image: `${SITE_URL}${DEFAULT_OG_IMAGE}`,
+          }}
+        />
       </head>
       <body className={`${sarabun.className} min-h-screen flex flex-col`}>
         <ActivityProvider />

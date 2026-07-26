@@ -6,6 +6,7 @@ import { Lock, LogIn } from 'lucide-react'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import { applyContentOrdering } from '@/lib/contentOrdering'
 import SummaryClient from './SummaryClient'
+import { createPageMetadata } from '@/lib/seo'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, summarySlug: string }> }) {
   const { slug, summarySlug } = await params
@@ -23,16 +24,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     .eq('slug', summarySlug)
     .single()
 
-  if (!summary) return { title: 'Summary Not Found | Sobdai' }
+  if (!summary) {
+    return createPageMetadata({
+      title: 'Summary Not Found | Sobdai',
+      path: `/package/${slug}/summary/${summarySlug}`,
+      noindex: true,
+    })
+  }
 
-  return {
+  return createPageMetadata({
     title: `${summary.title} | Sobdai Knowledge Hub`,
     description: `สรุปเนื้อหา: ${summary.topic || summary.subject || summary.title}`,
-    openGraph: {
-      title: `${summary.title} | Sobdai`,
-      description: `สรุปเนื้อหาเตรียมสอบ`,
-    }
-  }
+    path: `/package/${slug}/summary/${summarySlug}`,
+    noindex: true,
+  })
 }
 
 export default async function SummaryPage({ params }: { params: Promise<{ slug: string, summarySlug: string }> }) {

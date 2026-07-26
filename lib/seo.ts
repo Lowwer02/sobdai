@@ -1,0 +1,100 @@
+import type { Metadata } from 'next'
+
+export const SITE_NAME = 'Sobdai'
+export const SITE_URL = 'https://sobdai.com'
+export const SITE_DESCRIPTION =
+  'ระบบข้อสอบออนไลน์เตรียมสอบข้าราชการ ฝึกทำข้อสอบทีละข้อ มีคำใบ้และเฉลยละเอียด ครบทุกกรมทุกตำแหน่ง'
+export const DEFAULT_OG_IMAGE = '/opengraph-image.jpg'
+export const THEME_COLOR = '#0f0b08'
+
+export type PublicRoute = {
+  path: string
+  changeFrequency: 'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never'
+  priority: number
+}
+
+export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
+  { path: '/', changeFrequency: 'weekly', priority: 1 },
+  { path: '/packages', changeFrequency: 'daily', priority: 0.9 },
+  { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/contact', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/downloads', changeFrequency: 'monthly', priority: 0.5 },
+  { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
+  { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
+  { path: '/cookies', changeFrequency: 'yearly', priority: 0.3 },
+]
+
+export function absoluteUrl(path = '/'): string {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+export function createPageMetadata({
+  title,
+  description = SITE_DESCRIPTION,
+  path = '/',
+  image = DEFAULT_OG_IMAGE,
+  noindex = false,
+}: {
+  title: string
+  description?: string
+  path?: string
+  image?: string
+  noindex?: boolean
+}): Metadata {
+  const url = absoluteUrl(path)
+  const imageUrl = absoluteUrl(image)
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${SITE_NAME} preview`,
+        },
+      ],
+      locale: 'th_TH',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [imageUrl],
+    },
+    robots: noindex
+      ? {
+          index: false,
+          follow: false,
+          googleBot: {
+            index: false,
+            follow: false,
+          },
+        }
+      : {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+          },
+        },
+  }
+}
+
+export function createJsonLd(data: Record<string, unknown>) {
+  return {
+    __html: JSON.stringify(data).replace(/</g, '\\u003c'),
+  }
+}

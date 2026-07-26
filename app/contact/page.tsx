@@ -3,11 +3,13 @@ import path from 'path'
 import { Metadata } from 'next'
 import { LEGAL } from '@/lib/legal'
 import LegalLayout from '@/components/legal/LegalLayout'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: `ติดต่อเรา | ${LEGAL.companyName}`,
   description: 'ช่องทางการติดต่อทีมงาน Sobdai และการแจ้งปัญหาการใช้งาน',
-}
+  path: '/contact',
+})
 
 export default async function ContactPage() {
   const filePath = path.join(process.cwd(), 'content', 'legal', 'contact.md')

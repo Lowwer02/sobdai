@@ -4,11 +4,14 @@ import { fetchMyAnalytics, fetchMyRecommendations } from '@/app/assessment/actio
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ChevronLeft, Sparkles } from 'lucide-react'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'ผลการเรียนของฉัน | Sobdai',
   description: 'สรุปผลและแนวโน้มการทำข้อสอบของคุณ',
-}
+  path: '/assessment/analytics',
+  noindex: true,
+})
 
 export default async function MyAnalyticsPage() {
   // Auth gate — matches the /settings convention.

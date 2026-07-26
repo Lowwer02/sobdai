@@ -3,11 +3,13 @@ import { getPackagePublicCounts } from '@/lib/publicData'
 import PackageCatalogClient from './PackageCatalogClient'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'แพ็กเกจข้อสอบทั้งหมด | Sobdai',
   description: 'เลือกชุดข้อสอบราชการตามกรมและตำแหน่งที่ต้องการ มีทั้งแพ็กเกจฟรีและ Premium',
-}
+  path: '/packages',
+})
 
 // Public catalog page: cache like the homepage
 export const revalidate = 300

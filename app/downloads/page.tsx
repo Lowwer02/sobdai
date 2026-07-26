@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { createPageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: 'คลังเนื้อหา | Sobdai',
   description: 'เตรียมพบกับสื่อการเรียนรูปแบบใหม่ที่จะช่วยให้การเตรียมสอบมีประสิทธิภาพมากยิ่งขึ้น',
-}
+  path: '/downloads',
+})
 
 const UPCOMING_RESOURCES = [
   {
