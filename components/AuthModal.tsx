@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
+import { login, signUp } from '@/lib/analytics'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -162,6 +163,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
           // already registered (no error thrown in this configuration).
           toastEvent('อีเมลนี้ถูกใช้งานแล้ว', 'error')
         } else {
+          signUp('email')
           toastEvent('สมัครสมาชิกสำเร็จ! กรุณาเช็คอีเมลเพื่อยืนยันตัวตน หรือทดลองล็อกอินได้เลย', 'success')
           setEmail('')
           setPassword('')
@@ -190,6 +192,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
           await supabase.auth.signOut()
           window.location.href = '/login?banned=1'
         } else {
+          login('email')
           toastEvent('เข้าสู่ระบบสำเร็จ', 'success')
           if (onSuccess) onSuccess()
           else onClose()
