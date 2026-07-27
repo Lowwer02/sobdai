@@ -9,6 +9,7 @@ import { normalizeMode } from '@/lib/assessment/types'
 import type { AssessmentOutcome } from '@/lib/assessment/types'
 import { persistOutcome } from '@/app/assessment/actions'
 import type { ExamSet } from '@/lib/types'
+import { completeExam, startExam, submitExam } from '@/lib/analytics'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -67,6 +68,17 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   useEffect(() => {
     setIsExplanationExpanded(false)
   }, [currentIndex])
+
+  // Track start_exam event on runtime initialization
+  useEffect(() => {
+    if (examSet?.id && examSet?.name) {
+      startExam(
+        examSet.id,
+        examSet.name,
+        examSet.subject || pkg?.name || undefined
+      )
+    }
+  }, [examSet?.id])
   
   // Timer State
   // duration_minutes is the real schema column (was previously read via the
@@ -157,6 +169,9 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     setWeakTopics(result.weakTopics)
     setStatus('REVIEW')
     setCurrentIndex(-1)
+
+    submitExam(examSet.id)
+    completeExam(examSet.id, result.score, result.score, result.total - result.score)
 
     // ── Epic 2: persist the Outcome as official learning history. ──────────
     // Best-effort and fire-and-forget: the result screen renders from the
