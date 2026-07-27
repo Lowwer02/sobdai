@@ -54,9 +54,6 @@ export default async function RootLayout({
 
   return (
     <html lang="th" className={sarabun.variable}>
-      {process.env.NEXT_PUBLIC_GTM_ID && (
-        <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
-      )}
       <head>
         <link rel="preload" href="/fonts/supermarket.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <StructuredData
@@ -72,6 +69,9 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${sarabun.className} min-h-screen flex flex-col`}>
+        {process.env.NEXT_PUBLIC_GTM_ID && (
+          <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+        )}
         <ActivityProvider />
         <Navbar />
         <main className="flex-grow">{children}</main>
