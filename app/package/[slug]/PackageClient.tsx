@@ -6,6 +6,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
+import { beginCheckout, viewPackage } from '@/lib/analytics'
 import SummaryNavigation from '@/components/SummaryNavigation'
 import ExamNavigation from '@/components/ExamNavigation'
 import SupportCard from '@/components/SupportCard'
@@ -70,6 +71,12 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
       router.replace(pathname, { scroll: false })
     }
   }, [searchParams, pathname, router])
+
+  React.useEffect(() => {
+    if (pkg?.id && pkg?.name && typeof pkg?.current_price === 'number') {
+      viewPackage(pkg.id, pkg.name, pkg.current_price)
+    }
+  }, [pkg?.id, pkg?.name, pkg?.current_price])
 
   return (
     <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
@@ -221,7 +228,11 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
                 </Link>
               ) : (
                 <Link href={`/checkout/${pkg.id}`} className="block w-full">
-                  <button type="button" className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display">
+                  <button
+                    type="button"
+                    onClick={() => beginCheckout(pkg.id, pkg.name, pkg.current_price)}
+                    className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display"
+                  >
                     <Lock size={18} />
                     ซื้อแพ็กเกจนี้
                   </button>
