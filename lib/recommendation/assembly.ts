@@ -5,9 +5,13 @@
  *
  * Source of truth: Recommendation Engine Architecture v1.0 §11.
  *
- * Converts filtered ScoredCandidates into EngineRecommendations. This is the
- * ONLY place priority is assigned (refinement 2) — it's a presentation concern
- * applied at the final output boundary, AFTER dedup + business rules.
+ * Converts filtered ScoredCandidates into immutable EngineRecommendations.
+ * This is the ONLY place priority is assigned (refinement 2) — it is applied
+ * at the final Engine output boundary, AFTER dedup + ranking + business rules.
+ *
+ * Assembly does NOT perform target enrichment, URL construction, ownership
+ * checks, or UI DTO transformation. Those live outside E-3 in the Application
+ * Service / Target Resolver layer.
  *
  * Pure functions. No side effects, no I/O.
  */
@@ -42,10 +46,10 @@ export function signalToCategory(signal: DiscoverySignal): RecommendationCategor
   return SIGNAL_TO_CATEGORY.get(signal) ?? 'review_weak_topic'
 }
 
-// ─── Title + Reason builders (Thai localization) ────────────────────────────
+// ─── Title + Reason builders (Thai learner-facing text) ─────────────────────
 
 /**
- * Build a Thai display title for a recommendation.
+ * Build a Thai learner-facing title for a recommendation.
  * The template follows §11 Appendix B.
  */
 function buildTitle(candidate: ScoredCandidate['candidate']): string {
@@ -73,7 +77,7 @@ function buildTitle(candidate: ScoredCandidate['candidate']): string {
 }
 
 /**
- * Build a Thai display reason for a recommendation.
+ * Build a Thai learner-facing reason for a recommendation.
  * Incorporates evidence data (accuracy, attempt count) for traceability.
  */
 function buildReason(candidate: ScoredCandidate['candidate']): string {
@@ -109,9 +113,9 @@ function buildReason(candidate: ScoredCandidate['candidate']): string {
 // ─── Target builder ─────────────────────────────────────────────────────────
 
 /**
- * Build a RecommendationTarget from the candidate's content reference.
- * The target's packageSlug starts null — the server action resolves it
- * (it needs a DB lookup the Engine doesn't do).
+ * Build an engine-level RecommendationTarget from the candidate's content
+ * reference. The target's packageSlug starts null because resolving it
+ * requires DB access, which belongs outside the Engine.
  */
 function buildTarget(candidate: ScoredCandidate['candidate']): RecommendationTarget {
   const content = candidate.content
@@ -150,8 +154,8 @@ function buildStats(
  * Assemble the final RecommendationSet from filtered ScoredCandidates.
  *
  * This is where priority is assigned (refinement 2): sequential 1, 2, 3, ...
- * in the final score-sorted order AFTER dedup + business rules. Priority
- * is a presentation concern — it reflects display order, not raw score.
+ * in the final score-sorted order AFTER dedup + ranking + business rules.
+ * Priority reflects final Engine output order, not raw candidate score order.
  *
  * @param candidates     The filtered, score-sorted, deduplicated candidates.
  * @param dedupedCount   How many candidates were collapsed during dedup (for stats).

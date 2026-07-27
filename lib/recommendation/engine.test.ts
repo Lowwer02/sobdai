@@ -10,9 +10,9 @@
  * Coverage targets:
  *  - Scoring factors produce sub-scores in 0..100.
  *  - RuleBasedScoringStrategy orchestrates factors (weights sum correctly).
- *  - Engine pipeline: evaluate → rank → dedup → rules → assemble.
+ *  - Engine pipeline: evaluate → score → dedup → rank → rules → assemble.
  *  - Priority assigned during ASSEMBLY, not during RANKING (refinement 2).
- *  - Dedup keeps highest-score candidate per contentId.
+ *  - Dedup keeps highest-score candidate per content identity.
  *  - Business rules filter correctly (caps, evidence, total).
  *  - Determinism: same inputs → same output.
  *  - Empty input → empty RecommendationSet.
@@ -40,6 +40,7 @@ import type {
   RecommendationCandidate,
   RecommendationPolicy,
   DiscoverySignal,
+  RecommendationContentType,
 } from './contracts'
 import type { ScoredCandidate, UserContext, ScoringContext } from './engine-contracts'
 
@@ -48,6 +49,7 @@ import type { ScoredCandidate, UserContext, ScoringContext } from './engine-cont
 function mkCandidate(opts: {
   id?: string
   signal?: DiscoverySignal
+  type?: RecommendationContentType
   contentId?: string
   subject?: string | null
   topic?: string | null
@@ -56,12 +58,13 @@ function mkCandidate(opts: {
   difficulty?: string | null
 } = {}): RecommendationCandidate {
   const signal = opts.signal ?? 'weak_subject'
+  const type = opts.type ?? 'summary'
   const contentId = opts.contentId ?? 'c-1'
   return {
     id: opts.id ?? `rc-${signal}-${contentId}`,
-    type: 'summary',
+    type,
     content: {
-      kind: 'summary',
+      kind: type,
       contentId,
       title: 'Test Summary',
       slug: 'test-slug',
@@ -261,19 +264,30 @@ function verifies_priority_reflects_final_order_after_rules(): void {
 
 // ─── Dedup ──────────────────────────────────────────────────────────────────
 
-function verifies_dedup_keeps_highest_score_per_content(): void {
-  // Same contentId discovered via two different signals.
+function verifies_dedup_keeps_highest_score_per_content_identity(): void {
+  // Same content identity discovered via two different signals.
   const candidates = [
     mkCandidate({ signal: 'weak_subject', contentId: 'shared' }),
     mkCandidate({ signal: 'strong_subject', contentId: 'shared' }),
   ]
   const result = rank(candidates, buildPolicy())
-  // Only ONE recommendation for contentId 'shared'.
+  // Only ONE recommendation for content identity 'summary:shared'.
   const sharedRecs = result.recommendations.filter((r) => r.candidateId.includes('shared'))
   // Dedup happens before assembly; only the highest-score survives.
   // (weak_subject scores higher than strong_subject → weak_subject wins.)
   assert.equal(sharedRecs.length, 1, 'deduplicated to 1')
   assert.ok(result.stats.dedupedCount >= 1, `dedupedCount should be >= 1`)
+}
+
+function verifies_dedup_identity_includes_content_type(): void {
+  // Same raw id in different content types must not collapse.
+  const candidates = [
+    mkCandidate({ type: 'summary', signal: 'weak_subject', contentId: 'shared-id' }),
+    mkCandidate({ type: 'question', signal: 'weak_subject', contentId: 'shared-id' }),
+  ]
+  const result = rank(candidates, buildPolicy())
+  assert.equal(result.recommendations.length, 2)
+  assert.equal(result.stats.dedupedCount, 0)
 }
 
 // ─── Business rules ─────────────────────────────────────────────────────────
@@ -390,7 +404,8 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'priority no gaps after rules filter (assigned at assembly)', fn: verifies_priority_reflects_final_order_after_rules },
   { name: 'assembleRecommendations assigns priority directly', fn: verifies_assembly_assigns_priority_not_ranking },
   // Dedup
-  { name: 'dedup keeps highest score per contentId', fn: verifies_dedup_keeps_highest_score_per_content },
+  { name: 'dedup keeps highest score per content identity', fn: verifies_dedup_keeps_highest_score_per_content_identity },
+  { name: 'dedup identity includes content type', fn: verifies_dedup_identity_includes_content_type },
   // Business rules
   { name: 'MinimumEvidenceRule drops insufficient evidence', fn: verifies_minimum_evidence_drops_insufficient },
   { name: 'TotalCapRule limits output', fn: verifies_total_cap_limits_output },

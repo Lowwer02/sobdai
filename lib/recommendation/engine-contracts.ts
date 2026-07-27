@@ -12,8 +12,9 @@
  * KEY DESIGN (refinements applied):
  *  - RuleBasedScoringStrategy is an ORCHESTRATOR of ScoringFactor[] — it
  *    contains zero scoring logic itself (§7 refinement 1).
- *  - Priority is a PRESENTATION concern assigned during Assembly, NOT during
- *    Ranking. Ranking produces ordering only (§8/§11 refinement 2).
+ *  - Pipeline order is evaluate → score → dedup → rank → rules → assemble.
+ *  - Priority is assigned during Assembly, NOT during Ranking. Ranking
+ *    produces ordering only (§8/§11 refinement 2).
  */
 
 import type {
@@ -107,7 +108,7 @@ export interface ScoredCandidate {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * A business constraint applied after ranking + dedup (§10). Each rule can
+ * A business constraint applied after dedup + ranking (§10). Each rule can
  * DROP candidates or REORDER them. Rules are pluggable (array of functions).
  */
 export interface BusinessRule {
@@ -135,8 +136,9 @@ export type RecommendationCategory =
   | 'continue_practice'
 
 /**
- * The content target to link to. May be null if enrichment is deferred.
- * Backward-compatible with the existing RecommendationTarget shape.
+ * Engine-level content target. May be null if no actionable target can be
+ * represented from the candidate alone. Database-only target enrichment and
+ * UI DTO transformation happen outside E-3.
  */
 export interface RecommendationTarget {
   readonly kind: RecommendationContentType | 'none'
@@ -148,9 +150,8 @@ export interface RecommendationTarget {
 
 /**
  * A final recommendation — the Engine's output unit (§4.2).
- * Backward-compatible with the existing Recommendation interface (same
- * fields: category, priority, title, reason, target). Adds: score,
- * scoringBreakdown, candidateId for traceability.
+ * Immutable E-3 output object. Compatibility transformations for legacy UI
+ * recommendation DTOs happen outside the Engine.
  *
  * Priority is assigned during Assembly (§11), NOT during Ranking (§8).
  */

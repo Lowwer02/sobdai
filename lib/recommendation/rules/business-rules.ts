@@ -1,7 +1,7 @@
 /**
  * lib/recommendation/rules/business-rules.ts
  * ----------------------------------------------------------------------------
- * v1.0 Business Rules — applied after ranking + dedup (§10).
+ * v1.0 Business Rules — applied after dedup + ranking (§10).
  *
  * Each rule implements the BusinessRule interface. Rules can DROP candidates
  * or leave them. They are applied sequentially by the engine pipeline.

@@ -10,10 +10,10 @@
  * rank() is the Engine's single public entry point. It runs the 5-stage
  * pipeline:
  *   1. Evaluate (ScoringStrategy scores each candidate via ScoringFactor[])
- *   2. Rank (sort by score descending; NO priority assignment)
- *   3. Dedup (same contentId → keep highest score)
+ *   2. Dedup (same content identity → keep highest score)
+ *   3. Rank (sort deduplicated candidates by score; NO priority assignment)
  *   4. Business Rules (caps, evidence, total limit)
- *   5. Assemble (signal→category, Thai title/reason, PRIORITY assigned here)
+ *   5. Assemble immutable EngineRecommendation objects (priority assigned here)
  *
  * The Engine NEVER:
  *   - Queries the database (works with candidates only).
@@ -83,14 +83,14 @@ export function rank(
     }
   })
 
-  // ── Stage 2: Rank (sort by score descending; NO priority) ─────────────
-  const ranked = rankByScore(scored)
+  // ── Stage 2: Dedup (same content identity → keep highest score) ───────
+  const { deduplicated, dedupedCount } = deduplicateByContent(scored)
 
-  // ── Stage 3: Dedup (same contentId → keep highest score) ──────────────
-  const { deduplicated, dedupedCount } = deduplicateByContent(ranked)
+  // ── Stage 3: Rank the final candidate set before business rules ───────
+  const ranked = rankByScore(deduplicated)
 
   // ── Stage 4: Business Rules ───────────────────────────────────────────
-  let filtered: readonly ScoredCandidate[] = deduplicated
+  let filtered: readonly ScoredCandidate[] = ranked
   for (const rule of businessRules) {
     filtered = rule.apply(filtered, policy)
   }
@@ -124,28 +124,46 @@ function rankByScore(
 // ─── Deduplication (§9) ─────────────────────────────────────────────────────
 
 /**
- * Deduplicate by contentId. When the same content appears via multiple
+ * Deduplicate by content identity. When the same content appears via multiple
  * signals, keep the candidate with the highest score. Record how many
  * were collapsed.
  *
- * The input is already score-sorted (from ranking), so the FIRST occurrence
- * of each contentId is the highest-scoring — we just keep the first.
+ * This happens before final ranking so ranking operates on the final unique
+ * candidate set. Ties are broken deterministically by signal, then contentId.
  */
 function deduplicateByContent(
-  ranked: readonly ScoredCandidate[]
+  scored: readonly ScoredCandidate[]
 ): { deduplicated: readonly ScoredCandidate[]; dedupedCount: number } {
-  const seen = new Set<string>()
-  const out: ScoredCandidate[] = []
+  const byIdentity = new Map<string, ScoredCandidate>()
 
-  for (const sc of ranked) {
-    const contentId = sc.candidate.content.contentId
-    if (seen.has(contentId)) continue
-    seen.add(contentId)
-    out.push(sc)
+  for (const sc of scored) {
+    const identity = contentIdentity(sc)
+    const existing = byIdentity.get(identity)
+    if (!existing || compareScoredForDedup(sc, existing) < 0) {
+      byIdentity.set(identity, sc)
+    }
   }
+
+  const deduplicated = [...byIdentity.values()]
 
   return {
-    deduplicated: out,
-    dedupedCount: ranked.length - out.length,
+    deduplicated,
+    dedupedCount: scored.length - deduplicated.length,
   }
+}
+
+function contentIdentity(sc: ScoredCandidate): string {
+  return `${sc.candidate.content.kind}:${sc.candidate.content.contentId}`
+}
+
+/**
+ * Compare two scored candidates for dedup winner selection.
+ * Returns a negative number when `a` should win.
+ */
+function compareScoredForDedup(a: ScoredCandidate, b: ScoredCandidate): number {
+  if (b.score !== a.score) return b.score - a.score
+  if (a.candidate.signal < b.candidate.signal) return -1
+  if (a.candidate.signal > b.candidate.signal) return 1
+  return a.candidate.content.contentId < b.candidate.content.contentId ? -1
+    : a.candidate.content.contentId > b.candidate.content.contentId ? 1 : 0
 }
