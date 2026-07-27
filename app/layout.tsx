@@ -9,6 +9,7 @@ import ActivityProvider from '@/components/ActivityProvider'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import StructuredData from '@/components/StructuredData'
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL, THEME_COLOR, createPageMetadata } from '@/lib/seo'
+import { GoogleTagManager } from '@next/third-parties/google'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
@@ -53,6 +54,9 @@ export default async function RootLayout({
 
   return (
     <html lang="th" className={sarabun.variable}>
+      {process.env.NEXT_PUBLIC_GTM_ID && (
+        <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+      )}
       <head>
         <link rel="preload" href="/fonts/supermarket.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <StructuredData
