@@ -33,11 +33,18 @@
 
 import type {
   BlueprintType,
+  CoverageRule,
   CoverageRuleId,
   Difficulty,
+  DistributionConstraints,
+  DocumentRegistryEntry,
+  DuplicatePreventionRule,
   EnforcementLevel,
   LearningObjective,
+  LoDistribution,
   QuestionPattern,
+  RunTarget,
+  RunUnit,
   Tier,
 } from '../reader/contracts'
 
@@ -417,7 +424,42 @@ export interface DuplicateRuleMetadata {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 8. Shortfall Report (§7.2, §10.3)
+// 8. Constraint Snapshot — read-only AssemblyRequest constraint projection
+// ═══════════════════════════════════════════════════════════════════════════
+
+type DeepReadonly<T> =
+  T extends (...args: readonly never[]) => unknown
+    ? T
+    : T extends readonly (infer U)[]
+      ? readonly DeepReadonly<U>[]
+      : T extends object
+        ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+        : T
+
+/**
+ * Constraint Snapshot — the canonical Engine vocabulary for the read-only
+ * projection of AssemblyRequest constraint declarations carried to the Solver.
+ *
+ * It is NOT the AssemblyRequest. It carries only the approved IG-5 subset:
+ * distribution constraints, coverage rules, duplicate-prevention rules, LO
+ * distribution, document Tier assignments, and run context. Identity,
+ * exclusions, meta, and per-axis distribution tables are deliberately omitted.
+ *
+ * IMMUTABILITY: deeply read-only by contract. The Generator attaches it to the
+ * CandidateSet; Ranking and Solver carry/read the same reference unchanged.
+ */
+export interface ConstraintSnapshot {
+  readonly distributionConstraints: DeepReadonly<DistributionConstraints>
+  readonly coverageRules: readonly DeepReadonly<CoverageRule>[]
+  readonly duplicatePrevention: readonly DeepReadonly<DuplicatePreventionRule>[]
+  readonly loDistribution: DeepReadonly<LoDistribution>
+  readonly documentRegistry: readonly DeepReadonly<Pick<DocumentRegistryEntry, 'id' | 'tier'>>[]
+  readonly target: DeepReadonly<RunTarget>
+  readonly runUnit: RunUnit
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 9. Shortfall Report (§7.2, §10.3)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -463,7 +505,7 @@ export type ShortfallAxis =
   | 'duplicate_diversity'
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 9. CandidateStatistics — aggregate counts for audit/monitoring (§11)
+// 10. CandidateStatistics — aggregate counts for audit/monitoring (§11)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -493,7 +535,7 @@ export interface CandidateStatistics {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 10. CandidateSet — the immutable OUTPUT contract (§10.3)
+// 11. CandidateSet — the immutable OUTPUT contract (§10.3)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -571,6 +613,7 @@ export interface CandidateSet {
   readonly slotIndex: SlotIndex
   readonly shortfallReport: ShortfallReport
   readonly coverageSatisfaction: CoverageSatisfaction
+  readonly constraintSnapshot: ConstraintSnapshot
   readonly warnings: readonly GeneratorWarning[]
   readonly statistics: CandidateStatistics
   readonly exclusionsLog: readonly ExclusionEntry[]
@@ -600,7 +643,7 @@ export interface ExclusionEntry {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 11. CandidateGenerationResult — top-level Generator result
+// 12. CandidateGenerationResult — top-level Generator result
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -642,7 +685,7 @@ export type GeneratorFatalCategory =
   | 'internal_error'
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 12. Re-exports — single import surface for downstream stages
+// 13. Re-exports — single import surface for downstream stages
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type {

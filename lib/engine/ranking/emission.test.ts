@@ -30,6 +30,7 @@ import type {
   ScoringConfidence,
 } from '../scoring/contracts'
 import { stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import type { RankedCandidateSet } from './contracts'
 import { emitRankedCandidateSet } from './emission'
 import { prepareScoreOrdering } from './runtime'
@@ -169,6 +170,7 @@ function mkCandidateSet(codes: readonly string[], warning?: GeneratorWarning): C
     slotIndex: { slots: new Map() },
     shortfallReport: { entries: [] },
     coverageSatisfaction: { bindings: [] },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: warning === undefined ? [] : [warning],
     statistics: {
       totalCandidates: codes.length,
@@ -238,6 +240,7 @@ function verifies_carries_forward_candidate_set_fields_by_reference(): void {
   assert.equal(ranked.candidateSet, candidateSet)
   assert.equal(ranked.shortfallReport, candidateSet.shortfallReport)
   assert.equal(ranked.coverageSatisfaction, candidateSet.coverageSatisfaction)
+  assert.equal(ranked.constraintSnapshot, candidateSet.constraintSnapshot)
   assert.equal(ranked.warnings, candidateSet.warnings)
   assert.equal(ranked.warnings[0], warning)
 }

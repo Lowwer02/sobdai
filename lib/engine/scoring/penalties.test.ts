@@ -35,6 +35,7 @@ import { propagateConfidence } from './confidence'
 import { aggregatePenalties } from './penalties'
 import { extractSignals } from './signals'
 import { stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ function candidateSet(): CandidateSet {
     slotIndex: { slots: new Map() },
     shortfallReport: { entries: [] },
     coverageSatisfaction: { bindings: [] },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: 1,

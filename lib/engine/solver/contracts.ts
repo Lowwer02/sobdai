@@ -49,6 +49,7 @@
 import type {
   BlueprintSlot,
   CandidateSet,
+  ConstraintSnapshot,
   CoverageSatisfaction,
   GeneratorWarning,
   ShortfallReport,
@@ -552,6 +553,8 @@ export interface AllocatedCandidateSet {
   readonly shortfallReport: ShortfallReport
   /** Carried forward from CandidateSet unchanged (Solver §12.4). */
   readonly coverageSatisfaction: CoverageSatisfaction
+  /** Carried forward unchanged for Solver/audit visibility (IG-5 amendment). */
+  readonly constraintSnapshot: ConstraintSnapshot
   /**
    * Layered warnings: carried-forward Generator + Ranking warnings plus
    * Solver-emitted warnings (mirrors RankedCandidateSet.warnings composition).
@@ -610,6 +613,7 @@ export type ConstraintSolverResult =
 export type {
   BlueprintSlot,
   CandidateSet,
+  ConstraintSnapshot,
   CoverageSatisfaction,
   GeneratorWarning,
   ShortfallReport,

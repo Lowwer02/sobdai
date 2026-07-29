@@ -39,6 +39,7 @@ import {
   type CandidateSource,
   type CandidateStatistics,
   type ConfidenceLevel,
+  type ConstraintSnapshot,
   type CoverageRequirement,
   type CoverageSatisfaction,
   type DuplicateRuleMetadata,
@@ -55,6 +56,7 @@ import {
   type SlotIndex,
 } from './contracts'
 import { stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -278,6 +280,7 @@ function verifies_candidate_set_fields_are_readonly(): void {
     slotIndex: { slots: new Map() },
     shortfallReport: { entries: [] },
     coverageSatisfaction: { bindings: [] },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: 0,
@@ -339,6 +342,7 @@ function verifies_candidate_set_serializes_deterministically(): void {
     slotIndex: { slots: new Map([['s1', ['Q-000001']]]) },
     shortfallReport: { entries: [] },
     coverageSatisfaction: { bindings: [] },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: 1,
@@ -510,6 +514,20 @@ function verifies_query_plan_carries_no_bank_data(): void {
   }
 }
 
+function verifies_constraint_snapshot_shape_is_read_only_projection(): void {
+  const snapshot: ConstraintSnapshot = buildConstraintSnapshot()
+  assert.equal(snapshot.runUnit, 'blueprint')
+  assert.equal(snapshot.target.sets, 5)
+  assert.ok(snapshot.distributionConstraints.sumPerSet > 0)
+  assert.ok(snapshot.coverageRules.length > 0)
+  assert.ok(snapshot.duplicatePrevention.length > 0)
+  assert.ok(snapshot.loDistribution.targets.LO1 > 0)
+  assert.ok(snapshot.documentRegistry.every((entry) => entry.id.length > 0))
+  assert.ok(!('identity' in snapshot))
+  assert.ok(!('exclusions' in snapshot))
+  assert.ok(!('meta' in snapshot))
+}
+
 // ═══ CandidateStatistics counts ══════════════════════════════════════════
 
 function verifies_candidate_statistics_shape(): void {
@@ -572,6 +590,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   // Reuse + Query Plan
   { name: 'Generator re-exports reader enums (no redefinition)', fn: verifies_generator_reexports_reader_enums },
   { name: 'QueryPlan carries no Bank/Candidate data (§3.3)', fn: verifies_query_plan_carries_no_bank_data },
+  { name: 'ConstraintSnapshot is the approved read-only projection', fn: verifies_constraint_snapshot_shape_is_read_only_projection },
   { name: 'CandidateStatistics shape (counts add up)', fn: verifies_candidate_statistics_shape },
 ]
 

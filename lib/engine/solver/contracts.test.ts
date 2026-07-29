@@ -28,6 +28,7 @@ import type {
   ScoringConfidence,
 } from '../scoring/contracts'
 import { stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import type {
   RankedCandidate,
   RankedCandidateSet,
@@ -177,6 +178,7 @@ function mkCandidateSet(): CandidateSet {
     coverageSatisfaction: {
       bindings: [{ document: 'พ.ร.บ.ทดสอบ 2560', topic: 'หลักการ', satisfyingCodes: ['Q-000001'] }],
     },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: 1,
@@ -259,6 +261,7 @@ function mkRankedCandidateSet(overrides?: Partial<RankedCandidateSet>): RankedCa
     slots: [mkRankedSlot()],
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: candidateSet.warnings,
     meta: {
       specVersion: '1.0',
@@ -382,6 +385,7 @@ function mkAllocatedCandidateSet(overrides?: Partial<AllocatedCandidateSet>): Al
     rankedCandidateSet,
     shortfallReport: rankedCandidateSet.shortfallReport,
     coverageSatisfaction: rankedCandidateSet.coverageSatisfaction,
+    constraintSnapshot: rankedCandidateSet.constraintSnapshot,
     warnings: [],
     meta: {
       specVersion: '1.0',
@@ -551,6 +555,7 @@ function verifies_solver_reuses_upstream_contracts(): void {
   // CandidateSet fields carried forward unchanged (Solver §12.4).
   assert.equal(acs.shortfallReport, acs.rankedCandidateSet.shortfallReport)
   assert.equal(acs.coverageSatisfaction, acs.rankedCandidateSet.coverageSatisfaction)
+  assert.equal(acs.constraintSnapshot, acs.rankedCandidateSet.constraintSnapshot)
   // rankedCandidateSet consumed read-only (§3.3 upstream-immutability).
   assert.equal(acs.rankedCandidateSet, acs.rankedCandidateSet)
   // assignedCandidate is a RankedCandidate (imported type, read-only inherited evaluation).

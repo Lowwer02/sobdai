@@ -50,6 +50,7 @@ import { planQuery } from './query-planner'
 import {
   buildAssemblyRequest,
   buildBankRow,
+  buildConstraintSnapshot,
   buildCoverageRule,
   buildDocument,
   type SyntheticBankRow,
@@ -117,9 +118,16 @@ function expansionFromPool(pool: CandidatePool) {
   })
 }
 
+type CandidateSetEmissionFixtureInput =
+  Omit<CandidateSetEmissionInput, 'constraintSnapshot'> &
+  Partial<Pick<CandidateSetEmissionInput, 'constraintSnapshot'>>
+
 /** Emit + return; convenience. */
-function emit(input: CandidateSetEmissionInput): CandidateSet {
-  return emitCandidateSet(input)
+function emit(input: CandidateSetEmissionFixtureInput): CandidateSet {
+  return emitCandidateSet({
+    ...input,
+    constraintSnapshot: input.constraintSnapshot ?? buildConstraintSnapshot(),
+  })
 }
 
 /** Stable JSON of a CandidateSet's slotIndex ENTRIES (Map → {} under plain
@@ -143,9 +151,11 @@ function coverageSatisfactionJson(cs: CandidateSet): string {
 function verifies_emits_all_candidate_set_fields(): void {
   const ctx = singleDocCtx()
   const pool = poolWith(ctx, [{ code: 'Q-000001' }])
+  const constraintSnapshot = buildConstraintSnapshot()
   const cs = emit({
     expansion: expansionFromPool(pool),
     identity: testIdentity(),
+    constraintSnapshot,
     exclusionsLog: [{ code: 'Q-X', reason: { kind: 'excluded', code: 'Q-X' } }],
   })
   // Every §10.3 field is present and well-typed.
@@ -154,6 +164,7 @@ function verifies_emits_all_candidate_set_fields(): void {
   assert.ok(cs.slotIndex.slots instanceof Map)
   assert.ok(Array.isArray(cs.shortfallReport.entries))
   assert.ok(Array.isArray(cs.coverageSatisfaction.bindings))
+  assert.equal(cs.constraintSnapshot, constraintSnapshot)
   assert.ok(Array.isArray(cs.warnings))
   assert.ok(typeof cs.statistics.totalCandidates, 'number')
   assert.ok(Array.isArray(cs.exclusionsLog))
@@ -582,7 +593,7 @@ function verifies_deterministic_same_input_same_output(): void {
     { code: 'Q-000001' },
     { code: 'Q-000002', overrides: { difficulty: 'Hard' } },
   ])
-  const input: CandidateSetEmissionInput = {
+  const input: CandidateSetEmissionFixtureInput = {
     expansion: expansionFromPool(pool),
     identity: testIdentity(),
     exclusionsLog: [{ code: 'Q-X', reason: { kind: 'excluded', code: 'Q-X' } }],
@@ -604,7 +615,7 @@ function verifies_deterministic_same_input_same_output(): void {
 function verifies_idempotent(): void {
   const ctx = singleDocCtx()
   const pool = poolWith(ctx, [{ code: 'Q-000001' }])
-  const input: CandidateSetEmissionInput = {
+  const input: CandidateSetEmissionFixtureInput = {
     expansion: expansionFromPool(pool),
     identity: testIdentity(),
   }
