@@ -110,6 +110,7 @@ import type {
   CandidateSetIdentity,
   CandidateSetMeta,
   CandidateStatistics,
+  ConstraintSnapshot,
   CoverageSatisfaction,
   ExclusionEntry,
   GeneratorWarning,
@@ -193,6 +194,8 @@ const SLOT_ID_DELIMITER = '\u{0000}'
  *                      generatedAt, bankStateHash). The Generator is clock-free
  *                      and Bank-hash-free, so these are caller-supplied;
  *                      `generatedAt`/`bankStateHash` are nullable per contract.
+ *  - `constraintSnapshot` — read-only AssemblyRequest constraint projection to
+ *                      attach unchanged for Ranking/Solver (IG-5).
  *  - `meta`          — optional override of `generatorVersion` (the specVersion
  *                      is a constant and NOT overridable). When omitted, the
  *                      module constant applies. Useful for staging/audit; the
@@ -206,6 +209,8 @@ export interface CandidateSetEmissionInput {
   readonly exclusionsLog?: readonly ExclusionEntry[]
   /** Runtime-pinned identity (caller-supplied; generatedAt/bankStateHash nullable). */
   readonly identity: CandidateSetIdentity
+  /** Read-only AssemblyRequest constraint projection carried to the Solver. */
+  readonly constraintSnapshot: ConstraintSnapshot
   /** Optional generatorVersion override; specVersion is constant, not overridable. */
   readonly meta?: { readonly generatorVersion?: string }
 }
@@ -467,7 +472,7 @@ function collectWarnings(expansion: PoolExpansionResult): readonly GeneratorWarn
  * @param input.meta          Optional generatorVersion override.
  */
 export function emitCandidateSet(input: CandidateSetEmissionInput): CandidateSet {
-  const { expansion, identity } = input
+  const { expansion, identity, constraintSnapshot } = input
   const pool = expansion.pool
   const candidates = pool.candidates
 
@@ -503,6 +508,7 @@ export function emitCandidateSet(input: CandidateSetEmissionInput): CandidateSet
     slotIndex,
     shortfallReport,
     coverageSatisfaction,
+    constraintSnapshot,
     warnings,
     statistics,
     exclusionsLog,

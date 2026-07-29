@@ -27,6 +27,7 @@ import type {
   ScoringConfidence,
 } from '../scoring/contracts'
 import { stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import type { RankedCandidateSet } from './contracts'
 import { emitRankedCandidateSet } from './emission'
 import { prepareScoreOrdering } from './runtime'
@@ -181,6 +182,7 @@ function mkCandidateSet(codes: readonly string[], warning?: GeneratorWarning): C
         },
       ],
     },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: warning === undefined ? [] : [warning],
     statistics: {
       totalCandidates: codes.length,

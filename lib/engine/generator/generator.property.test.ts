@@ -52,6 +52,7 @@ import { emitCandidateSet } from './candidate-set-emitter'
 import {
   buildAssemblyRequest,
   buildBankRow,
+  buildConstraintSnapshot,
   buildCoverageRule,
   buildDocument,
   type SyntheticBankRow,
@@ -116,6 +117,7 @@ function generate(
       generatedAt: null,
       bankStateHash: null,
     },
+    constraintSnapshot: buildConstraintSnapshot(request),
     exclusionsLog: opts.exclusionsLog,
   })
 

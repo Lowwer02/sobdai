@@ -28,6 +28,7 @@ import type {
   ScoringConfidence,
 } from '../scoring/contracts'
 import { stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import type {
   CandidateRankingResult,
   OrderingKeyDescriptor,
@@ -160,6 +161,7 @@ function mkCandidateSet(): CandidateSet {
     coverageSatisfaction: {
       bindings: [{ document: 'พ.ร.บ.ทดสอบ 2560', topic: 'หลักการ', satisfyingCodes: ['Q-000001'] }],
     },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: 1,
@@ -247,6 +249,7 @@ function mkRankedCandidateSet(overrides?: Partial<RankedCandidateSet>): RankedCa
     slots: [mkRankedSlot()],
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: candidateSet.warnings,
     meta: {
       specVersion: '1.0',
@@ -368,10 +371,12 @@ function verifies_ranked_candidate_set_carries_forward_generator_fields(): void 
     candidateSet: { ...candidateSet, warnings: [generatorWarning] },
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: [generatorWarning],
   })
   assert.equal(rcs.shortfallReport, candidateSet.shortfallReport)
   assert.equal(rcs.coverageSatisfaction, candidateSet.coverageSatisfaction)
+  assert.equal(rcs.constraintSnapshot, candidateSet.constraintSnapshot)
   assert.equal(rcs.warnings[0], generatorWarning)
 }
 
@@ -488,6 +493,7 @@ function verifies_stable_serialization_ignores_key_order(): void {
     warnings: a.warnings,
     meta: a.meta,
     coverageSatisfaction: a.coverageSatisfaction,
+    constraintSnapshot: a.constraintSnapshot,
     shortfallReport: a.shortfallReport,
     slots: a.slots,
     candidateSet: a.candidateSet,

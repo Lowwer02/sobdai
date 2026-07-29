@@ -24,6 +24,7 @@ import {
   type ComponentEvaluationOutput,
 } from './components'
 import { assertOrderInvariant, stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,7 @@ function mkCandidateSet(candidates: readonly Candidate[]): CandidateSet {
         },
       ],
     },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: candidates.length,

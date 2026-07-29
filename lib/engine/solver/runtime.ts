@@ -63,7 +63,7 @@
  * are sorted by Question Code. No hash-map iteration leaks into the output.
  */
 
-import type { BlueprintSlot } from '../generator/contracts'
+import type { BlueprintSlot, ConstraintSnapshot } from '../generator/contracts'
 import type {
   RankedCandidate,
   RankedCandidateSet,
@@ -245,10 +245,15 @@ export interface ConflictRuntimeEntry {
  *
  * `rankedCandidateSet` is held read-only for traceability (Solver §3.3
  * upstream-immutability); it is never modified.
+ *
+ * `constraintSnapshot` is the same read-only reference carried on the consumed
+ * RankedCandidateSet. It is not mutable Solver state.
  */
 export interface AllocationRuntimeState {
   /** Identity of the consumed RankedCandidateSet (read-only reference kept). */
   readonly rankedCandidateSet: RankedCandidateSet
+  /** Read-only Constraint Snapshot surfaced for Solver Stage 3+. */
+  readonly constraintSnapshot: ConstraintSnapshot
   /** One Runtime Slot per Blueprint Slot, in stable slot-id order. */
   readonly slots: readonly SlotRuntimeState[]
   /** Per-Candidate runtime state, keyed by slot id for O(1) lookup. */
@@ -299,6 +304,7 @@ export function initializeAllocationRuntime(
 
   return {
     rankedCandidateSet,
+    constraintSnapshot: rankedCandidateSet.constraintSnapshot,
     slots,
     slotsById,
     candidates,

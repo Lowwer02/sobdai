@@ -26,6 +26,7 @@
 import type {
   BlueprintSlot,
   CandidateSet,
+  ConstraintSnapshot,
   CoverageSatisfaction,
   GeneratorWarning,
   ShortfallReport,
@@ -253,6 +254,8 @@ export interface RankedCandidateSet {
   readonly shortfallReport: ShortfallReport
   /** Carried forward from CandidateSet unchanged (§7.4). */
   readonly coverageSatisfaction: CoverageSatisfaction
+  /** Carried forward from CandidateSet unchanged (§7.4; IG-5 amendment). */
+  readonly constraintSnapshot: ConstraintSnapshot
   /** Generator warnings carried forward plus Ranking-emitted warnings (§7.3). */
   readonly warnings: readonly (GeneratorWarning | RankingWarning)[]
   readonly meta: RankedCandidateSetMeta
@@ -278,4 +281,3 @@ export interface RankingDiagnostic {
 export type CandidateRankingResult =
   | { readonly ok: true; readonly rankedCandidateSet: RankedCandidateSet }
   | { readonly ok: false; readonly fatalDiagnostics: readonly RankingDiagnostic[] }
-

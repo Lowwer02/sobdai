@@ -35,6 +35,7 @@ import type {
   RankedSlot,
 } from '../ranking/contracts'
 import { assertOrderInvariant, stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import {
   considerationOrder,
   getCandidate,
@@ -148,6 +149,7 @@ function mkCandidateSet(): CandidateSet {
     coverageSatisfaction: {
       bindings: [{ document: 'พ.ร.บ.ทดสอบ 2560', topic: 'หลักการ', satisfyingCodes: ['Q-000001'] }],
     },
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: 1,
@@ -228,6 +230,7 @@ function mkRankedCandidateSet(overrides?: Partial<RankedCandidateSet>): RankedCa
     slots: [mkRankedSlot()],
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: candidateSet.warnings,
     meta: { specVersion: '1.0', rankingVersion: '1.0.0', scoringModelVersion: '1.0' },
     ...overrides,
@@ -261,6 +264,7 @@ function mkRankedCandidateSetMulti(
     })),
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: candidateSet.warnings,
     meta: { specVersion: '1.0', rankingVersion: '1.0.0', scoringModelVersion: '1.0' },
   }
@@ -616,6 +620,7 @@ function accepts_empty_ranked_candidate_set(): void {
     slots: [],
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: candidateSet.warnings,
     meta: { specVersion: '1.0', rankingVersion: '1.0.0', scoringModelVersion: '1.0' },
   }
@@ -740,6 +745,7 @@ function holds_ranked_candidate_set_read_only_reference(): void {
   const state = initializeAllocationRuntime(rcs)
   // The consumed RankedCandidateSet is carried read-only for traceability.
   assert.equal(state.rankedCandidateSet, rcs)
+  assert.equal(state.constraintSnapshot, rcs.constraintSnapshot)
 }
 
 // ═══ Scope boundary — Stage 2 produces NO placement decisions ══════════════

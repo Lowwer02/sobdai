@@ -37,6 +37,7 @@ import type {
   RunTarget,
   Tier,
 } from '../../reader/contracts'
+import type { ConstraintSnapshot } from '../../generator/contracts'
 
 // ─── Atomic builders ────────────────────────────────────────────────────────
 // Each builder returns a fresh object — never a shared reference. Tests must
@@ -228,6 +229,28 @@ export function buildAssemblyRequest(
     duplicatePrevention: overrides?.duplicatePrevention ?? duplicatePrevention,
     exclusions: overrides?.exclusions ?? [],
     meta: { specVersion: '1.0' },
+  }
+}
+
+/**
+ * Build the IG-5 Constraint Snapshot by projecting the approved constraint
+ * subset from an AssemblyRequest. The Snapshot deliberately omits identity,
+ * exclusions, meta, and document names.
+ */
+export function buildConstraintSnapshot(
+  source: AssemblyRequest = buildAssemblyRequest()
+): ConstraintSnapshot {
+  return {
+    distributionConstraints: source.distributionConstraints,
+    coverageRules: source.coverageRules,
+    duplicatePrevention: source.duplicatePrevention,
+    loDistribution: source.loDistribution,
+    documentRegistry: source.documentRegistry.map((entry) => ({
+      id: entry.id,
+      tier: entry.tier,
+    })),
+    target: source.target,
+    runUnit: source.runUnit,
   }
 }
 

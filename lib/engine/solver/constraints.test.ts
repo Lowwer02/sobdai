@@ -34,6 +34,7 @@ import type {
   RankedSlot,
 } from '../ranking/contracts'
 import { assertOrderInvariant, stableStringify } from '../shared/testing/determinism'
+import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import {
   initializeAllocationRuntime,
   type AllocationRuntimeState,
@@ -166,6 +167,7 @@ function mkCandidateSet(candidates: Candidate[], bindings?: CandidateSet['covera
     coverageSatisfaction:
       bindings ??
       ({ bindings: [] } as CandidateSet['coverageSatisfaction']),
+    constraintSnapshot: buildConstraintSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: candidates.length,
@@ -239,6 +241,7 @@ function mkRankedCandidateSet(args: {
     slots: rankedSlots,
     shortfallReport: candidateSet.shortfallReport,
     coverageSatisfaction: candidateSet.coverageSatisfaction,
+    constraintSnapshot: candidateSet.constraintSnapshot,
     warnings: candidateSet.warnings,
     meta: { specVersion: '1.0', rankingVersion: '1.0.0', scoringModelVersion: '1.0' },
   }
@@ -310,6 +313,7 @@ function buildRuntimeState(
 
   return {
     rankedCandidateSet: rcs,
+    constraintSnapshot: rcs.constraintSnapshot,
     slots,
     slotsById,
     candidates,

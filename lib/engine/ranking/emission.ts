@@ -81,6 +81,7 @@ export function emitRankedCandidateSet(
     slots,
     shortfallReport: input.candidateSet.shortfallReport,
     coverageSatisfaction: input.candidateSet.coverageSatisfaction,
+    constraintSnapshot: input.candidateSet.constraintSnapshot,
     warnings: input.candidateSet.warnings,
     meta: {
       specVersion: '1.0',
@@ -251,4 +252,3 @@ function componentIdsFromComposite(
 ): readonly ComponentId[] {
   return composite.breakdown.contributions.map((contribution) => contribution.component.componentId)
 }
-
