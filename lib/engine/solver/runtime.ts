@@ -309,7 +309,7 @@ export function initializeAllocationRuntime(
     slotsById,
     candidates,
     candidatesByCode,
-    progress: computeProgress(slots, candidates),
+    progress: deriveAllocationProgress(slots, candidates),
   }
 }
 
@@ -480,7 +480,15 @@ function toCandidateRuntimeState(
 // 6. Allocation progress tracking (Solver §13.2 — derived counts)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function computeProgress(
+/**
+ * Derives allocation progress from one immutable Runtime State snapshot.
+ *
+ * Progress is never independently mutated or accepted from a caller. Runtime
+ * initialization, Allocation State Application, and Allocation Finalization
+ * use this projection after constructing their respective Slot and Candidate
+ * snapshots.
+ */
+export function deriveAllocationProgress(
   slots: readonly SlotRuntimeState[],
   candidates: readonly CandidateRuntimeState[]
 ): AllocationProgress {
@@ -494,11 +502,15 @@ function computeProgress(
     rejectedSlotCount: byState.rejected,
     releasedSlotCount: byState.released,
     totalCandidates: candidates.length,
-    // All placement-stage outcome counts are zero at initialization (Slots are
-    // open, no Candidate reserved/assigned, no conflicts recorded).
-    reservedCandidateCount: 0,
-    assignedCandidateCount: 0,
-    unresolvedConflictCount: 0,
+    reservedCandidateCount: candidates.filter(
+      (candidate) => candidate.reservedSlotId !== null
+    ).length,
+    assignedCandidateCount: candidates.filter(
+      (candidate) => candidate.assignedSlotId !== null
+    ).length,
+    unresolvedConflictCount: slots
+      .flatMap((slot) => slot.conflicts)
+      .filter((conflict) => conflict.resolution === 'unresolved').length,
   }
 }
 

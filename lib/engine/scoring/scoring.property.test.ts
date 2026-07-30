@@ -9,9 +9,9 @@
  *   - Scoring Model Specification v1.0 §5 (Composite), §6 (Confidence),
  *     §7 (Penalties), §8 (Transparency), §10 (Data Contracts).
  *
- * PURPOSE. Verification only. This file composes the already-implemented
- * Scoring runtime stages end-to-end and asserts cross-cutting properties. It
- * introduces no production behavior and modifies no contracts.
+ * PURPOSE. Verification only. This file invokes the production Scoring Runtime
+ * and asserts cross-cutting properties. It introduces no production behavior
+ * and modifies no contracts.
  *
  * RUN: npx jiti lib/engine/scoring/scoring.property.test.ts
  */
@@ -20,37 +20,14 @@ import assert from 'node:assert/strict'
 
 import type { BlueprintSlot, Candidate, CandidateSet } from '../generator/contracts'
 import type { Penalty } from './contracts'
-import { extractSignals } from './signals'
-import { evaluateComponents } from './components'
-import { computeCompositeScores } from './composite'
-import { propagateConfidence } from './confidence'
 import { aggregatePenalties } from './penalties'
-import type { PenaltyAggregationOutput } from './penalties'
+import { runScoring } from './runtime'
 import {
   assertIdempotent,
   assertOrderInvariant,
   stableStringify,
 } from '../shared/testing/determinism'
 import { buildConstraintSnapshot } from '../shared/testing/fixtures'
-
-// ─── Runtime harness ────────────────────────────────────────────────────────
-
-interface ScoringRuntimeOutput {
-  readonly signals: ReturnType<typeof extractSignals>
-  readonly components: ReturnType<typeof evaluateComponents>
-  readonly composites: ReturnType<typeof computeCompositeScores>
-  readonly confidence: ReturnType<typeof propagateConfidence>
-  readonly penalties: PenaltyAggregationOutput
-}
-
-function runScoring(candidateSet: CandidateSet): ScoringRuntimeOutput {
-  const signals = extractSignals(candidateSet)
-  const components = evaluateComponents({ candidateSet, signals })
-  const composites = computeCompositeScores({ components })
-  const confidence = propagateConfidence({ composites })
-  const penalties = aggregatePenalties({ confidence })
-  return { signals, components, composites, confidence, penalties }
-}
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 

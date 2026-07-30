@@ -29,9 +29,7 @@ import type {
 import { stableStringify } from '../shared/testing/determinism'
 import { buildConstraintSnapshot } from '../shared/testing/fixtures'
 import type { RankedCandidateSet } from './contracts'
-import { emitRankedCandidateSet } from './emission'
-import { prepareScoreOrdering } from './runtime'
-import { resolveTies } from './tie-resolution'
+import { runRanking as runProductionRanking } from './runtime'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -204,13 +202,16 @@ function runRanking(
   composites: readonly CompositeScore[],
   candidateSet = mkCandidateSet(composites.map((composite) => composite.questionCode))
 ): RankedCandidateSet {
-  const ordering = prepareScoreOrdering({ composites })
-  const tieResolution = resolveTies({ ordering, maxTieGroupSize: 100 })
-  return emitRankedCandidateSet({
+  const result = runProductionRanking({
     candidateSet,
-    tieResolution,
+    compositeScores: composites,
+    maxTieGroupSize: 100,
     rankingVersion: '1.0.0',
   })
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.fatalDiagnostics))
+  }
+  return result.rankedCandidateSet
 }
 
 function fatalMessage(fn: () => unknown): string {

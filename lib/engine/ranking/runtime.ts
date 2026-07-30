@@ -21,14 +21,22 @@
  *    content, invoke React/UI/API code, use time, randomness, or hidden state.
  */
 
-import type { BlueprintSlot } from '../generator/contracts'
+import type {
+  BlueprintSlot,
+  CandidateSet,
+} from '../generator/contracts'
 import type {
   CompositeScore,
   Penalty,
   RawSignal,
   ScoringConfidenceLevel,
 } from '../scoring/contracts'
-import type { OrderingKeyDescriptor } from './contracts'
+import type {
+  CandidateRankingResult,
+  OrderingKeyDescriptor,
+} from './contracts'
+import { emitRankedCandidateSet } from './emission'
+import { resolveTies } from './tie-resolution'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. Stage input/output contracts
@@ -109,7 +117,75 @@ const SCORE_ORDERING_KEY: OrderingKeyDescriptor = {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 2. Public API — Score Ordering Preparation
+// 2. Production Runtime entry point
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DEFAULT_MAX_TIE_GROUP_SIZE = 100
+const RANKING_VERSION = '1.0.0'
+
+/**
+ * Immutable input to one complete production Ranking execution.
+ *
+ * CandidateSet and CompositeScore remain owned by Generator and Scoring
+ * respectively. Runtime controls are deterministic and do not redefine
+ * Ranking contracts.
+ */
+export interface RankingRuntimeInput {
+  /** Generator-owned CandidateSet carried into RankedCandidateSet emission. */
+  readonly candidateSet: CandidateSet
+
+  /** Scoring-owned Composite Scores to order and rank. */
+  readonly compositeScores: readonly CompositeScore[]
+
+  /**
+   * Maximum permitted size of one tie group.
+   *
+   * Defaults to the established production bound of 100.
+   */
+  readonly maxTieGroupSize?: number
+
+  /**
+   * Ranking implementation version attached to the emitted artifact.
+   *
+   * Defaults to the established Ranking version `1.0.0`.
+   */
+  readonly rankingVersion?: string
+}
+
+/**
+ * Executes the complete production Ranking pipeline.
+ *
+ * Fixed flow:
+ * Score Ordering Preparation → Tie Resolution → RankedCandidateSet Emission.
+ *
+ * Existing Ranking exceptions propagate unchanged. The Runtime performs no
+ * scoring, ordering, tie-breaking, rank assignment, or diagnostic remapping.
+ */
+export function runRanking(
+  input: RankingRuntimeInput
+): CandidateRankingResult {
+  const ordering = prepareScoreOrdering({
+    composites: input.compositeScores,
+  })
+  const tieResolution = resolveTies({
+    ordering,
+    maxTieGroupSize:
+      input.maxTieGroupSize ?? DEFAULT_MAX_TIE_GROUP_SIZE,
+  })
+  const rankedCandidateSet = emitRankedCandidateSet({
+    candidateSet: input.candidateSet,
+    tieResolution,
+    rankingVersion: input.rankingVersion ?? RANKING_VERSION,
+  })
+
+  return {
+    ok: true,
+    rankedCandidateSet,
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. Public API — Score Ordering Preparation
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -387,4 +463,3 @@ function compareNumbersAsc(a: number, b: number): number {
 function compareNumbersDesc(a: number, b: number): number {
   return a === b ? 0 : a > b ? -1 : 1
 }
-
