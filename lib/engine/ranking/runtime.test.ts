@@ -429,12 +429,20 @@ function verifies_runtime_has_no_hidden_state_or_forbidden_dependencies(): void 
   }
 }
 
-function verifies_runtime_does_not_emit_ranked_candidate_set(): void {
-  const source = stripComments(readFileSync(path.join(__dirname, 'runtime.ts'), 'utf8'))
-  assert.ok(!source.includes('RankedCandidateSet'))
-  assert.ok(!source.includes('RankedCandidate'))
-  assert.ok(!source.includes('rank:'))
-  assert.ok(!source.includes('tieBreaker'))
+function verifies_ordering_stage_does_not_emit_or_resolve_ties(): void {
+  const source = stripComments(
+    readFileSync(path.join(__dirname, 'runtime.ts'), 'utf8')
+  )
+  const start = source.indexOf('export function prepareScoreOrdering')
+  const end = source.indexOf('function prepareCandidate', start)
+  const orderingStage = source.slice(start, end)
+
+  assert.ok(start >= 0)
+  assert.ok(end > start)
+  assert.ok(!orderingStage.includes('emitRankedCandidateSet'))
+  assert.ok(!orderingStage.includes('resolveTies'))
+  assert.ok(!orderingStage.includes('rank:'))
+  assert.ok(!orderingStage.includes('tieBreaker'))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -462,7 +470,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'Component questionCode mismatch is Fatal', fn: verifies_component_question_code_mismatch_is_fatal },
   { name: 'duplicate Candidate×slot Composite is Fatal', fn: verifies_duplicate_candidate_slot_is_fatal },
   { name: 'runtime has no hidden state or forbidden dependencies', fn: verifies_runtime_has_no_hidden_state_or_forbidden_dependencies },
-  { name: 'runtime does not emit RankedCandidateSet or tie-breakers', fn: verifies_runtime_does_not_emit_ranked_candidate_set },
+  { name: 'ordering stage does not emit ranks or resolve ties', fn: verifies_ordering_stage_does_not_emit_or_resolve_ties },
 ]
 
 let passed = 0

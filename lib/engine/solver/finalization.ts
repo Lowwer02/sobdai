@@ -22,8 +22,8 @@
  */
 
 import type { AllocationState, SolverDiagnostic, SolverDiagnosticCategory } from './contracts'
+import { deriveAllocationProgress } from './runtime'
 import type {
-  AllocationProgress,
   AllocationRuntimeState,
   CandidateRuntimeState,
   SlotRuntimeState,
@@ -77,7 +77,7 @@ export function finalizeAllocationState(
     slotsById,
     candidates,
     candidatesByCode,
-    progress: computeProgress(slots, candidates),
+    progress: deriveAllocationProgress(slots, candidates),
   }
   const finalizedDiagnostics = finalizationDiagnostics(finalizedAllocationState)
 
@@ -259,29 +259,6 @@ function assertRuntimeFinalizable(runtimeState: AllocationRuntimeState): void {
       assignedCandidates.set(code, slot.slotId)
     }
   }
-}
-
-function computeProgress(
-  slots: readonly SlotRuntimeState[],
-  candidates: readonly CandidateRuntimeState[]
-): AllocationProgress {
-  return {
-    totalSlots: slots.length,
-    openSlotCount: countSlots(slots, 'open'),
-    reservedSlotCount: countSlots(slots, 'reserved'),
-    allocatedSlotCount: countSlots(slots, 'allocated'),
-    lockedSlotCount: countSlots(slots, 'locked'),
-    rejectedSlotCount: countSlots(slots, 'rejected'),
-    releasedSlotCount: countSlots(slots, 'released'),
-    totalCandidates: candidates.length,
-    reservedCandidateCount: candidates.filter((candidate) => candidate.reservedSlotId !== null).length,
-    assignedCandidateCount: candidates.filter((candidate) => candidate.assignedSlotId !== null).length,
-    unresolvedConflictCount: slots.flatMap((slot) => slot.conflicts).filter((c) => c.resolution === 'unresolved').length,
-  }
-}
-
-function countSlots(slots: readonly SlotRuntimeState[], state: AllocationState): number {
-  return slots.filter((slot) => slot.occupancy.state === state).length
 }
 
 function isAssignedState(state: AllocationState): boolean {
