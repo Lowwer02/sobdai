@@ -112,8 +112,8 @@ import type {
 import { InMemoryBankAdapter, runFilters } from './metadata-filters'
 import { discoverCandidates, type DiscoveryContext, type PoolValidationResult } from './discovery'
 import { noopSink, type ObservabilitySink, type CounterEvent } from '../shared/observability'
-import type { SyntheticBankRow } from '../shared/testing/fixtures'
-import type { LearningObjective } from '../reader/contracts'
+import type { BankMetadataRow } from '../shared/question-bank'
+import type { LearningObjective } from '../shared/assessment-vocabulary'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Module constants
@@ -181,7 +181,7 @@ const DEFAULT_BLUEPRINT_PER_SET = 100
  */
 export interface PoolExpansionInput {
   readonly validation: PoolValidationResult
-  readonly supplementalRows: readonly SyntheticBankRow[]
+  readonly supplementalRows: readonly BankMetadataRow[]
   readonly ctx: DiscoveryContext
   readonly options?: ExpansionOptions
 }

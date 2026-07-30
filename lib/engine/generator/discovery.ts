@@ -63,19 +63,22 @@ import type {
   CandidatePool,
   CandidateProvenance,
   CandidateSource,
-  CoverageRuleId,
   FatalDiagnostic,
   GeneratorSeverity,
   QueryPlan,
   QuestionStatus,
   ShortfallEntry,
   ShortfallReport,
-  Tier,
 } from './contracts'
 import { FILTER_EXECUTION_ORDER } from './contracts'
 import type { Cr1DocumentTopicBinding } from './metadata-filters'
-import type { DocumentRegistryEntry, LearningObjective } from '../reader/contracts'
-import type { SyntheticBankRow } from '../shared/testing/fixtures'
+import type {
+  CoverageRuleId,
+  LearningObjective,
+  Tier,
+} from '../shared/assessment-vocabulary'
+import type { DocumentRegistryEntry } from '../reader/contracts'
+import type { BankMetadataRow } from '../shared/question-bank'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Module constants
@@ -122,7 +125,7 @@ const DEFAULT_BLUEPRINT_PER_SET = 100
  * on the success branch) plus the QueryPlan they were filtered against.
  */
 export interface DiscoveryInput {
-  readonly rows: readonly SyntheticBankRow[]
+  readonly rows: readonly BankMetadataRow[]
   readonly plan: QueryPlan
 }
 
@@ -173,7 +176,7 @@ function completenessOf<T>(v: T | null): 'complete' | 'incomplete' {
  * Build the Completeness facet. Per D1: one flag per IG-2 axis. A null axis is
  * FLAGGED 'incomplete', NOT used to drop the Candidate (Maximum Recall, §5.2).
  */
-function buildCompleteness(row: SyntheticBankRow): CandidateCompleteness {
+function buildCompleteness(row: BankMetadataRow): CandidateCompleteness {
   return {
     blueprintType: completenessOf(nullable(row.blueprintType)),
     learningObjective: completenessOf(nullable(row.learningObjective)),
@@ -191,7 +194,7 @@ function buildCompleteness(row: SyntheticBankRow): CandidateCompleteness {
  * The reason string is a stable, machine-derivable label (NOT a ranking score
  * — §5.2 / §5.3). Ranking reads `level` for weighting; `reason` is for audit.
  */
-function buildConfidence(row: SyntheticBankRow): CandidateConfidence {
+function buildConfidence(row: BankMetadataRow): CandidateConfidence {
   const bp = nullable(row.blueprintType)
   const lo = nullable(row.learningObjective)
   const qp = nullable(row.questionPattern)
@@ -218,7 +221,7 @@ function buildConfidence(row: SyntheticBankRow): CandidateConfidence {
  * lookup as a Fatal `document_registry_mismatch`.
  */
 function deriveTier(
-  row: SyntheticBankRow,
+  row: BankMetadataRow,
   registry: readonly DocumentRegistryEntry[]
 ): Tier | null {
   const entry = registry.find((e) => e.name === row.document)
@@ -238,7 +241,7 @@ function deriveTier(
  *    Candidate with its origin read; not the wall clock).
  */
 function buildProvenance(
-  row: SyntheticBankRow,
+  row: BankMetadataRow,
   ctx: DiscoveryContext
 ): { provenance: CandidateProvenance; tierMissing: boolean } {
   // filtersPassed: copy of the frozen order array (frozen as readonly).
@@ -279,7 +282,7 @@ function buildProvenance(
  * carries null pattern/LO is eligible for fewer slots (its Completeness flags
  * the gap; Ranking will weight it lower).
  */
-function computeEligibleSlots(row: SyntheticBankRow, plan: QueryPlan): readonly BlueprintSlot[] {
+function computeEligibleSlots(row: BankMetadataRow, plan: QueryPlan): readonly BlueprintSlot[] {
   const slots: BlueprintSlot[] = []
   const setCount = inferSetCount(plan)
 
@@ -326,7 +329,7 @@ function inferSetCount(plan: QueryPlan): number {
  * therefore satisfy no Candidate either, which is correct.
  */
 function computeCoverageSatisfied(
-  row: SyntheticBankRow,
+  row: BankMetadataRow,
   plan: QueryPlan
 ): readonly CoverageRuleId[] {
   const satisfied: CoverageRuleId[] = []
@@ -381,7 +384,7 @@ function isCr1Binding(b: unknown): b is Cr1DocumentTopicBinding {
  * @param input.ctx   Plan + Document Registry (for Tier derivation).
  */
 export function discoverCandidates(
-  input: { rows: readonly SyntheticBankRow[] } & { ctx: DiscoveryContext }
+  input: { rows: readonly BankMetadataRow[] } & { ctx: DiscoveryContext }
 ): DiscoveryResult {
   const { rows, ctx } = input
   const seen = new Map<string, Candidate>()
@@ -392,7 +395,7 @@ export function discoverCandidates(
     const identity: CandidateIdentity = {
       questionCode: row.questionCode,
       // v1.0 simplification: the Bank exposes no separate UUID on
-      // SyntheticBankRow, so questionId carries the Code. The contract field
+      // BankMetadataRow, so questionId carries the Code. The contract field
       // is preserved for downstream Bank lookups; only the value source is
       // simplified. Documented as a Known Limitation.
       questionId: row.questionCode,
@@ -428,8 +431,8 @@ export function discoverCandidates(
       learningObjective: nullable(row.learningObjective),
       questionPattern: nullable(row.questionPattern),
       section: nullable(row.section),
-      tags: [], // not on SyntheticBankRow v1.0; defaulted empty.
-      category: null, // not on SyntheticBankRow v1.0; defaulted null.
+      tags: [], // not on BankMetadataRow v1.0; defaulted empty.
+      category: null, // not on BankMetadataRow v1.0; defaulted null.
     }
 
     const completeness = buildCompleteness(row)
@@ -458,7 +461,7 @@ export function discoverCandidates(
 }
 
 /** Whether an existing Candidate's metadata matches a (re-read) row. */
-function metadataMatches(meta: CandidateMetadata, row: SyntheticBankRow): boolean {
+function metadataMatches(meta: CandidateMetadata, row: BankMetadataRow): boolean {
   return (
     meta.document === row.document &&
     meta.difficulty === row.difficulty &&
@@ -482,7 +485,7 @@ function duplicateCodeFatal(code: string): FatalDiagnostic {
 }
 
 /** Fatal diagnostic for a Tier derivation failure (D3 — should be unreachable). */
-function tierDerivationFatal(row: SyntheticBankRow): FatalDiagnostic {
+function tierDerivationFatal(row: BankMetadataRow): FatalDiagnostic {
   return {
     category: 'document_registry_mismatch',
     severity: 'Fatal',

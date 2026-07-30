@@ -25,108 +25,37 @@
  * separate concern (E-0, currently paused pending Architecture Amendment).
  */
 
+import type {
+  AssessmentProfile,
+  BlueprintType,
+  CoverageRuleId,
+  Difficulty,
+  DuplicatePreventionId,
+  DuplicatePreventionScope,
+  EnforcementLevel,
+  LearningObjective,
+  QuestionPattern,
+  RunUnit,
+  Tier,
+} from '../shared/assessment-vocabulary'
+
+export type {
+  AssessmentProfile,
+  BlueprintType,
+  CoverageRuleId,
+  Difficulty,
+  DuplicatePreventionId,
+  DuplicatePreventionScope,
+  EnforcementLevel,
+  LearningObjective,
+  QuestionPattern,
+  RunUnit,
+  Tier,
+} from '../shared/assessment-vocabulary'
+
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. Shared Enum Vocabulary (Integration Spec §4.3, layer-independent per §3.4)
+// 1. Reader-owned value vocabulary
 // ═══════════════════════════════════════════════════════════════════════════
-// These enums are the language-independent rule identifiers. Thai display labels
-// live in the Blueprint for Human review; the Engine operates on these enums
-// exclusively (Integration Spec §3.4 Layer Independence Guarantees).
-
-/**
- * Assessment Profile. From Integration Spec §4.3 (`identity.profile`).
- *
- * v1.0 = 'simulation' only. Other profiles (Diagnostic, Weekly Challenge, Final
- * Challenge, AI Adaptive) are deferred per Engine Foundation — adding one is a
- * Profile-additive change, never a redesign.
- */
-export type AssessmentProfile = 'simulation'
-
-/**
- * Tier level assigned to a Document. From Integration Spec §5.2 ("Tier Is a
- * Document Property, Not a Question Property") and §4.3 (`document_registry`
- * entries carry `tier ∈ {1,2,3,4}`).
- *
- * Critical: Tier is DERIVED per Candidate via Document Registry lookup (Candidate
- * Generation §3.3) — never stored on the Question. The Tier constraints
- * (`tier1_floor ≥ 30`, `tier4_ceiling ≤ 25`) aggregate over Documents.
- */
-export type Tier = 1 | 2 | 3 | 4
-
-/**
- * BlueprintType axis. From Integration Spec §5.4. Enum: Memory / Concept /
- * Procedure / Scenario. This is one of the four IG-2 axes the Bank must persist
- * for the Generator's filters and Ranking's Pattern Fit component.
- */
-export type BlueprintType = 'Memory' | 'Concept' | 'Procedure' | 'Scenario'
-
-/**
- * Question Pattern axis. From Integration Spec §5.4 (corrected by IG-2
- * Architecture Amendment D-6). Enum: Positive / Negative / Best Answer /
- * Scenario / Sequence / Matching Concept. This is one of the four IG-2 axes.
- *
- * NOTE 1: distinct from Content Template v2.1's QuestionType enum
- * (MCQ4/MCQ5/True-False/Matching/Ordering/Essay) — QuestionType is Format,
- * not cognitive Pattern (IG-2 Amendment §3).
- *
- * NOTE 2: the sixth value is the TWO-WORD `Matching Concept` (matching
- * Blueprint v3.0 lines 190/201/213 verbatim), NOT the bare `Matching`. The
- * bare form was a transcription error in Integration Spec §5.4 corrected by
- * Amendment D-6. The DB CHECK constraint (migration 027) and Content
- * Template v2.2 both use the two-word form; this contract must match.
- */
-export type QuestionPattern =
-  | 'Positive'
-  | 'Negative'
-  | 'Best Answer'
-  | 'Scenario'
-  | 'Sequence'
-  | 'Matching Concept'
-
-/**
- * Learning Objective identifier. From Integration Spec §4.3 (`lo_distribution`).
- * Blueprint v3.0 declares LO1–LO4 with target % per set and an LO↔BlueprintType
- * correspondence map.
- */
-export type LearningObjective = 'LO1' | 'LO2' | 'LO3' | 'LO4'
-
-/**
- * Difficulty level. From Blueprint v3.0's distribution axes (Document × Difficulty
- * × BlueprintType × Pattern). Matches the Bank's existing `difficulty` column
- * values, which the importer already parses.
- */
-export type Difficulty = 'Easy' | 'Medium' | 'Hard'
-
-/**
- * Coverage Rule enforcement level. From Integration Spec §4.3 (`coverage_rules`
- * entries carry `level ∈ {hard, soft}`).
- *
- * Hard — the Solver must satisfy or report infeasibility. Soft — the Solver
- * optimizes toward but may miss with a Soft Constraint conflict.
- */
-export type EnforcementLevel = 'hard' | 'soft'
-
-/**
- * Coverage Rule identifier. From Integration Spec §3.3 / §4.3. Blueprint v3.0
- * declares CR-1 through CR-5 with bindings and enforcement levels.
- *
- * - CR-1: Mandatory Topic (Document × Topic) pairs must appear in every Set.
- * - CR-3: Topic + Difficulty + Type may not appear in >5 Sets (auto-satisfied
- *         for v3.0's 5 Sets).
- * - CR-5: Section Sweep (requires IG-2 `section`).
- */
-export type CoverageRuleId = 'CR-1' | 'CR-2' | 'CR-3' | 'CR-4' | 'CR-5'
-
-/**
- * Duplicate Prevention Rule identifier. From Integration Spec §3.3 / §4.3.
- * Blueprint v3.0 declares L1–L5 with scope and enforcement level.
- */
-export type DuplicatePreventionId = 'L1' | 'L2' | 'L3' | 'L4' | 'L5'
-
-/**
- * Duplicate Prevention scope. From Integration Spec §4.3 (`duplicate_prevention`
- * entries carry `scope ∈ {within_set, across_set}`).
- */
-export type DuplicatePreventionScope = 'within_set' | 'across_set'
 
 /**
  * Similarity Metric verdict. From Integration Spec §5.5 (Similarity Metric uses
@@ -138,15 +67,6 @@ export type DuplicatePreventionScope = 'within_set' | 'across_set'
  * - 'PASS'  — pair admitted without penalty.
  */
 export type SimilarityVerdict = 'BLOCK' | 'WARN' | 'PASS'
-
-/**
- * The unit one Engine run produces. From Integration Spec §5.1 (Critical
- * Reconciliation: "The Run Unit: `blueprint`, not `exam_set`").
- *
- * v1.0 = 'blueprint' only. One Engine run produces `target.sets` (5) Draft Exam
- Sets that must be CO-ALLOCATED to satisfy cross-Set rules (CR-3, L3, L4, L5).
- */
-export type RunUnit = 'blueprint'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. AssemblyRequest sub-contracts (Integration Spec §4.3)

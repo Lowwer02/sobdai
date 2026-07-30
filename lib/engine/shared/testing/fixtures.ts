@@ -38,6 +38,7 @@ import type {
   Tier,
 } from '../../reader/contracts'
 import type { ConstraintSnapshot } from '../../generator/contracts'
+import type { BankMetadataRow } from '../question-bank'
 
 // ─── Atomic builders ────────────────────────────────────────────────────────
 // Each builder returns a fresh object — never a shared reference. Tests must
@@ -314,8 +315,8 @@ export function buildInconsistentLoDistributionRequest(): AssemblyRequest {
 // the Amendment will eventually pin.
 
 /**
- * Difficulty union, mirrored here so Bank fixtures don't import the Bank's
- * own types (which don't yet exist for the new axes).
+ * Compatibility vocabulary re-exports retained for existing fixture
+ * consumers. Canonical definitions live in shared assessment vocabulary.
  */
 export type { Difficulty, QuestionPattern, BlueprintType, LearningObjective }
 
@@ -328,27 +329,7 @@ export type { Difficulty, QuestionPattern, BlueprintType, LearningObjective }
  * A Bank row with NULL IG-2 axes produces a Candidate with reduced
  * Confidence (Scoring §11 — IG-2 propagation rule).
  */
-export interface SyntheticBankRow {
-  /** Immutable Question Code (migration 026). */
-  questionCode: string
-  /** Existing column (migration 019). */
-  document: string
-  /** Existing column. */
-  difficulty: Difficulty
-  /** Existing column. */
-  subject: string | null
-  /** Existing column. */
-  topic: string | null
-  /** Existing column. */
-  law: string | null
-  /** Existing column. */
-  status: string
-  // IG-2 axes (pending Architecture Amendment / E-0 closure):
-  blueprintType?: BlueprintType | null
-  learningObjective?: LearningObjective | null
-  questionPattern?: QuestionPattern | null
-  section?: string | null
-}
+export type SyntheticBankRow = BankMetadataRow
 
 /**
  * Build a synthetic Bank row with sensible defaults. Override individual

@@ -15,10 +15,10 @@
  * language, spoken by Ranking.
  *
  * VOCABULARY REUSE: enum types (Difficulty, Tier, BlueprintType, QuestionPattern,
- * LearningObjective, etc.) are imported from ../reader/contracts — the FROZEN
- * upstream vocabulary. They are NOT redefined here. Adding a value to any of
- * those enums is a contract change in the upstream file, not here. Same pattern
- * as lib/engine/generator/contracts.ts:34-42.
+ * LearningObjective, etc.) are imported from ../shared/assessment-vocabulary —
+ * the FROZEN canonical vocabulary. They are NOT redefined here. Adding a value
+ * to any of those enums is a contract change in the shared file, not here. Same
+ * pattern as lib/engine/generator/contracts.ts.
  *
  * CASING: camelCase, matching the existing lib/engine/** codebase convention
  * (reader/contracts.ts and generator/contracts.ts use camelCase). The Scoring
@@ -62,7 +62,7 @@ import type {
   LearningObjective,
   QuestionPattern,
   Tier,
-} from '../reader/contracts'
+} from '../shared/assessment-vocabulary'
 import type { BlueprintSlot } from '../generator/contracts'
 
 // ═══════════════════════════════════════════════════════════════════════════
