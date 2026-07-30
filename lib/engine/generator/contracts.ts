@@ -12,9 +12,9 @@
  * effects. The Generator's runtime stages (E-2B+) consume these types.
  *
  * VOCABULARY REUSE: enum types (Difficulty, Tier, BlueprintType, QuestionPattern,
- * LearningObjective, etc.) are imported from ../reader/contracts — the FROZEN
- * upstream vocabulary. They are NOT redefined here. Adding a value to any of
- * those enums is a contract change in the upstream file, not here.
+ * LearningObjective, etc.) are imported from ../shared/assessment-vocabulary —
+ * the FROZEN canonical vocabulary. They are NOT redefined here. Adding a value
+ * to any of those enums is a contract change in the shared file, not here.
  *
  * CASING: camelCase, matching the existing lib/engine/** codebase convention
  * (reader/contracts.ts uses camelCase: specVersion, documentRegistry, etc.).
@@ -33,19 +33,23 @@
 
 import type {
   BlueprintType,
-  CoverageRule,
   CoverageRuleId,
   Difficulty,
+  DuplicatePreventionId,
+  DuplicatePreventionScope,
+  EnforcementLevel,
+  LearningObjective,
+  QuestionPattern,
+  RunUnit,
+  Tier,
+} from '../shared/assessment-vocabulary'
+import type {
+  CoverageRule,
   DistributionConstraints,
   DocumentRegistryEntry,
   DuplicatePreventionRule,
-  EnforcementLevel,
-  LearningObjective,
   LoDistribution,
-  QuestionPattern,
   RunTarget,
-  RunUnit,
-  Tier,
 } from '../reader/contracts'
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -418,8 +422,8 @@ export interface AxisSlot {
  * consumes. The Generator records them so the Solver has the full rule set.
  */
 export interface DuplicateRuleMetadata {
-  readonly ruleId: import('../reader/contracts').DuplicatePreventionId
-  readonly scope: import('../reader/contracts').DuplicatePreventionScope
+  readonly ruleId: DuplicatePreventionId
+  readonly scope: DuplicatePreventionScope
   readonly level: EnforcementLevel
 }
 
@@ -696,4 +700,4 @@ export type {
   LearningObjective,
   QuestionPattern,
   Tier,
-} from '../reader/contracts'
+} from '../shared/assessment-vocabulary'

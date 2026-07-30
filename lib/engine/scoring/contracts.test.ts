@@ -410,12 +410,11 @@ function verifies_no_forbidden_imports_in_contracts_file(): void {
     )
   }
 
-  // The only permitted runtime imports are type-only from reader/generator
-  // vocab and the shared determinism helper. Verify imports are present and
-  // type-only.
+  // The only permitted runtime imports are type-only from shared/generator
+  // vocabulary. Verify imports are present and type-only.
   assert.ok(
-    src.includes("from '../reader/contracts'"),
-    "must import upstream vocab from '../reader/contracts'"
+    src.includes("from '../shared/assessment-vocabulary'"),
+    "must import canonical vocabulary from '../shared/assessment-vocabulary'"
   )
   assert.ok(
     src.includes("from '../generator/contracts'"),
@@ -440,7 +439,7 @@ function verifies_no_duplicate_vocab_definitions(): void {
     const redefinition = new RegExp(`export\\s+type\\s+${t}\\s*=`)
     assert.ok(
       !redefinition.test(src),
-      `${t} must be imported from ../reader/contracts, not redefined (no duplication)`
+      `${t} must be imported from ../shared/assessment-vocabulary, not redefined (no duplication)`
     )
   }
 }

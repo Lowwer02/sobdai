@@ -16,7 +16,7 @@
  *  - Compile-time safety: assigning wrong vocab fails to type-check.
  *  - Filter execution order is normative (FIXED order constant).
  *  - CandidateSet is the immutable output contract.
- *  - Reused vocabulary: Generator re-exports reader enums, doesn't redefine.
+ *  - Reused vocabulary: Generator re-exports shared vocabulary, doesn't redefine.
  */
 
 import assert from 'node:assert/strict'
@@ -480,8 +480,8 @@ function verifies_slot_index_maps_slot_id_to_codes(): void {
 
 // ═══ Reused vocabulary (no redefinition) ══════════════════════════════════
 
-function verifies_generator_reexports_reader_enums(): void {
-  // The Generator must reuse reader/contracts enums, not redefine them.
+function verifies_generator_reexports_shared_vocabulary(): void {
+  // The Generator must reuse canonical shared vocabulary, not redefine it.
   // Verify by checking the imported types are the same union shapes.
   const d: import('./contracts').Difficulty = 'Easy'
   const t: import('./contracts').Tier = 1
@@ -588,7 +588,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'ExclusionEntry code can be null (pre-migration data)', fn: verifies_exclusion_entry_code_can_be_null },
   { name: 'SlotIndex maps slot-id to Question Codes', fn: verifies_slot_index_maps_slot_id_to_codes },
   // Reuse + Query Plan
-  { name: 'Generator re-exports reader enums (no redefinition)', fn: verifies_generator_reexports_reader_enums },
+  { name: 'Generator re-exports shared vocabulary (no redefinition)', fn: verifies_generator_reexports_shared_vocabulary },
   { name: 'QueryPlan carries no Bank/Candidate data (§3.3)', fn: verifies_query_plan_carries_no_bank_data },
   { name: 'ConstraintSnapshot is the approved read-only projection', fn: verifies_constraint_snapshot_shape_is_read_only_projection },
   { name: 'CandidateStatistics shape (counts add up)', fn: verifies_candidate_statistics_shape },

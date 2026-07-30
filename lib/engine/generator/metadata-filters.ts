@@ -45,7 +45,7 @@ import type {
   Difficulty,
   LearningObjective,
   QuestionPattern,
-} from '../reader/contracts'
+} from '../shared/assessment-vocabulary'
 import type {
   CandidateRejectionReason,
   ExclusionEntry,
@@ -55,7 +55,10 @@ import type {
   QuestionStatus,
 } from './contracts'
 import { FILTER_EXECUTION_ORDER } from './contracts'
-import type { SyntheticBankRow } from '../shared/testing/fixtures'
+import type {
+  BankMetadataRow,
+  BankReadAdapter,
+} from '../shared/question-bank'
 import {
   noopSink,
   type CounterEvent,
@@ -74,17 +77,11 @@ import {
  * outside `lib/engine/generator/`) implements `readMetadata()` against the
  * real Bank; tests wrap `buildBankRow(s)` fixtures.
  *
- * The row type is `SyntheticBankRow` (the existing Bank-row shape defined in
- * `shared/testing/fixtures.ts`). The name "Synthetic" reflects that the type
- * originated in the fixture library; it is also the correct production shape —
- * every Bank column it lists exists on the `questions` table (migrations 019 /
- * 026 / 027). E-2C consumes it unchanged rather than redefining a parallel
- * "BankRow" type, which would be the AP-9 (hidden assumptions) anti-pattern.
+ * The row type is the canonical `BankMetadataRow` defined at the shared Engine
+ * boundary. Every listed Bank column exists on the `questions` table
+ * (migrations 019 / 026 / 027).
  */
-export interface BankReadAdapter {
-  /** Initial metadata read before filtering (Stage 2 input). Read-only. */
-  readMetadata(): ReadonlyArray<SyntheticBankRow>
-}
+export type { BankReadAdapter } from '../shared/question-bank'
 
 /**
  * Convenience in-memory adapter for tests and any caller that already holds the
@@ -92,8 +89,8 @@ export interface BankReadAdapter {
  * level); callers must not mutate the array during a run.
  */
 export class InMemoryBankAdapter implements BankReadAdapter {
-  constructor(private readonly rows: ReadonlyArray<SyntheticBankRow>) {}
-  readMetadata(): ReadonlyArray<SyntheticBankRow> {
+  constructor(private readonly rows: ReadonlyArray<BankMetadataRow>) {}
+  readMetadata(): ReadonlyArray<BankMetadataRow> {
     return this.rows
   }
 }
@@ -109,7 +106,7 @@ export class InMemoryBankAdapter implements BankReadAdapter {
  * (F-2.2.2.1 — row-count reduction).
  */
 export interface FilterResult {
-  readonly kept: readonly SyntheticBankRow[]
+  readonly kept: readonly BankMetadataRow[]
   readonly rejected: readonly ExclusionEntry[]
   readonly stats: FilterStats
 }
@@ -133,7 +130,7 @@ export interface FilterStats {
  * no clock, never mutates inputs. Each of the 7 filters below conforms to this.
  */
 export type FilterFn = (
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   plan: QueryPlan
 ) => FilterResult
 
@@ -157,7 +154,7 @@ export interface PerFilterReport {
 export type FilterStageResult =
   | {
       readonly ok: true
-      readonly rows: readonly SyntheticBankRow[]
+      readonly rows: readonly BankMetadataRow[]
       readonly rejectionLog: readonly ExclusionEntry[]
       readonly perFilter: readonly PerFilterReport[]
     }
@@ -200,7 +197,7 @@ const LO_VALUES: ReadonlySet<LearningObjective> = new Set([
 
 /** Build an ExclusionEntry from a row + reason. */
 function exclusion(
-  row: SyntheticBankRow,
+  row: BankMetadataRow,
   reason: CandidateRejectionReason
 ): ExclusionEntry {
   return { code: row.questionCode, reason }
@@ -212,7 +209,7 @@ function statsOf(rowsIn: number, rowsKept: number): FilterStats {
 }
 
 /**
- * Whether a Bank row's IG-2 axis is "absent". Per `SyntheticBankRow`, an absent
+ * Whether a Bank row's IG-2 axis is "absent". Per `BankMetadataRow`, an absent
  * axis appears as `undefined` (the field is optional) OR an explicit `null`.
  * Both are treated as "incomplete" — the row is ADMITTED at filtering
  * (Maximum Recall, §2.3 Invariant #2 + §4.4), and the incompleteness becomes a
@@ -252,7 +249,7 @@ function axisOutOfEnum<T extends string>(
  * `'excluded'` reason kind.
  */
 export function exclusionFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   plan: QueryPlan
 ): FilterResult {
   if (plan.exclusions.length === 0) {
@@ -264,7 +261,7 @@ export function exclusionFilter(
   }
   // Set for O(1) membership; Code strings are short and few.
   const excluded = new Set(plan.exclusions)
-  const kept: SyntheticBankRow[] = []
+  const kept: BankMetadataRow[] = []
   const rejected: ExclusionEntry[] = []
   for (const row of rows) {
     if (excluded.has(row.questionCode)) {
@@ -288,10 +285,10 @@ export function exclusionFilter(
  * (which carries the offending status for audit).
  */
 export function statusFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   _plan: QueryPlan
 ): FilterResult {
-  const kept: SyntheticBankRow[] = []
+  const kept: BankMetadataRow[] = []
   const rejected: ExclusionEntry[] = []
   for (const row of rows) {
     if (row.status === 'Published') {
@@ -301,7 +298,7 @@ export function statusFilter(
         exclusion(row, {
           kind: 'status',
           code: row.questionCode,
-          // SyntheticBankRow.status is a free string; narrow to the union for
+          // BankMetadataRow.status is a free string; narrow to the union for
           // the reason payload. Unknown statuses are still rejected; they
           // surface here as their raw value cast into the narrow type so a
           // Reviewer sees exactly what the Bank held.
@@ -323,7 +320,7 @@ export function statusFilter(
  * extracts `documentRegistry[].name` — see query-planner.ts:129-133); the
  * Document Filter therefore matches `row.document` against NAMES.
  *
- * IMPLEMENTATION NOTE for callers: `SyntheticBankRow.document` defaults to a
+ * IMPLEMENTATION NOTE for callers: `BankMetadataRow.document` defaults to a
  * document ID (e.g. `'LAW-ACT-HED-2562'`). A test or production adapter that
  * wants a row to pass this filter must align `row.document` with a registry
  * entry's NAME, not its id. (The default fixture's first registry entry uses
@@ -331,7 +328,7 @@ export function statusFilter(
  * not a contract.)
  */
 export function documentFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   plan: QueryPlan
 ): FilterResult {
   if (plan.permittedDocuments.length === 0) {
@@ -347,7 +344,7 @@ export function documentFilter(
     return { kept: [], rejected, stats: statsOf(rows.length, 0) }
   }
   const permitted = new Set(plan.permittedDocuments)
-  const kept: SyntheticBankRow[] = []
+  const kept: BankMetadataRow[] = []
   const rejected: ExclusionEntry[] = []
   for (const row of rows) {
     if (permitted.has(row.document)) {
@@ -426,7 +423,7 @@ function isCr1Binding(b: unknown): b is Cr1DocumentTopicBinding {
  * Adding more rule narrowings later is additive — append a `case` below.
  */
 export function coverageFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   plan: QueryPlan
 ): FilterResult {
   // Pre-compute the set of CR-1 (document, topic) pairs across all CR-1
@@ -456,7 +453,7 @@ export function coverageFilter(
     }
   }
 
-  const kept: SyntheticBankRow[] = []
+  const kept: BankMetadataRow[] = []
   const rejected: ExclusionEntry[] = []
   for (const row of rows) {
     const topic = row.topic ?? ''
@@ -491,10 +488,10 @@ export function coverageFilter(
  * exist to fill each slot is Pool Validation's job (§7 / F-2.3 / E-2D).
  */
 export function difficultyFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   _plan: QueryPlan
 ): FilterResult {
-  const kept: SyntheticBankRow[] = []
+  const kept: BankMetadataRow[] = []
   const rejected: ExclusionEntry[] = []
   for (const row of rows) {
     if (DIFFICULTY_VALUES.has(row.difficulty)) {
@@ -542,10 +539,10 @@ export type Ig2FilterOutcome =
  *  - {kind:'result', ...}   — the normal FilterResult (kept/rejected/stats).
  */
 function ig2AxisFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   axis: 'pattern' | 'learning_objective',
   allowed: ReadonlySet<string>,
-  readAxis: (row: SyntheticBankRow) => unknown,
+  readAxis: (row: BankMetadataRow) => unknown,
   reasonKind: 'pattern' | 'learning_objective'
 ): Ig2FilterOutcome {
   // Detect "column entirely absent." If even one row carries a value, the
@@ -565,7 +562,7 @@ function ig2AxisFilter(
     }
   }
 
-  const kept: SyntheticBankRow[] = []
+  const kept: BankMetadataRow[] = []
   const rejected: ExclusionEntry[] = []
   for (const row of rows) {
     const value = readAxis(row)
@@ -608,7 +605,7 @@ function ig2AxisFilter(
  * have no Fatal path and return `FilterResult` directly.
  */
 export function patternFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   _plan: QueryPlan
 ): Ig2FilterOutcome {
   return ig2AxisFilter(
@@ -630,7 +627,7 @@ export function patternFilter(
  * Fatal-with-diagnostic transformation lives in the orchestrator, not here.
  */
 export function learningObjectiveFilter(
-  rows: readonly SyntheticBankRow[],
+  rows: readonly BankMetadataRow[],
   _plan: QueryPlan
 ): Ig2FilterOutcome {
   return ig2AxisFilter(
@@ -715,7 +712,7 @@ export function runFilters(
   plan: QueryPlan,
   sink: ObservabilitySink = noopSink
 ): FilterStageResult {
-  let rows: readonly SyntheticBankRow[] = adapter.readMetadata()
+  let rows: readonly BankMetadataRow[] = adapter.readMetadata()
   const rejectionLog: ExclusionEntry[] = []
   const perFilter: PerFilterReport[] = []
   // A stable run id for observability counters. The Generator is deterministic
