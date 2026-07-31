@@ -522,6 +522,10 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
     seo_description: input.seo_description,
     canonical_url: input.canonical_url,
     og_image_url: input.og_image_url,
+    // CTA box config (JSONB). cleanCtaConfig in lib/news.ts already coerced
+    // this to a CtaConfig | null, so persist it verbatim — null preserves the
+    // legacy "no CTA" state for rows whose cta_config was cleared.
+    cta_config: input.cta_config ?? null,
   }
 
   if (isCreate) {

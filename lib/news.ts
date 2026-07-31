@@ -24,6 +24,78 @@ import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
 
 export type NewsStatus = 'draft' | 'published' | 'archived'
 
+// ─── CTA box (public detail page) ───────────────────────────────────────────
+//
+// Editor-configured "preparation CTA" rendered near the bottom of a news
+// article (between the source section and the related-content section). Stored
+// as a single JSONB column `cta_config` (migration 035); NULL on legacy rows
+// means "no CTA" — the public box renders nothing.
+//
+// The shape is intentionally explicit (not free-form JSON): the admin form
+// edits exactly these fields, and cleanCtaConfig() (below) is the single place
+// that coerces + validates raw input into a CtaConfig. Both buildNewsMetadata-
+// adjacent helpers and the public NewsCtaBox read from the same resolved
+// object, so the editor and the rendered box can never disagree.
+
+/** Where a CTA button points. `internal`/`exam` use a validated Sobdai path;
+ *  `package`/`summary` reference an id already linked to this article via the
+ *  news_packages / news_summaries junctions (the slug is resolved at render). */
+export type CtaDestinationType = 'package' | 'summary' | 'exam' | 'internal'
+
+export interface CtaButton {
+  enabled: boolean
+  label: string
+  type: CtaDestinationType
+  /** For type package/summary: the related item's id (must exist in the
+   *  article's junction rows). null otherwise. */
+  targetId: string | null
+  /** For type exam/internal: a validated internal Sobdai path
+   *  (e.g. /packages, /package/x/exam/y). null otherwise. */
+  href: string | null
+}
+
+export interface CtaConfig {
+  /** Master switch. When false the public box never renders and the admin
+   *  disables the rest of the CTA fields. */
+  enabled: boolean
+  /** If true, the box is hidden when zero buttons resolve to a valid
+   *  destination (prevents an empty CTA box). */
+  hideWhenEmpty: boolean
+  heading: string
+  description: string
+  primary: CtaButton
+  secondary: CtaButton
+}
+
+/**
+ * Defaults applied on CREATE (and whenever an article has no stored CTA). The
+ * box is enabled-by-default in the CMS but, per the frozen backward-compat
+ * rule, stays hidden publicly until at least one valid destination exists
+ * (hideWhenEmpty defaults true). So a freshly created article shows the
+ * configured copy in the editor but renders nothing on the site until the
+ * editor wires a real destination.
+ */
+export const DEFAULT_CTA_CONFIG: CtaConfig = {
+  enabled: true,
+  hideWhenEmpty: true,
+  heading: 'กำลังเตรียมสอบตำแหน่งนี้อยู่หรือไม่?',
+  description: 'อ่านสรุปเนื้อหาและทดลองทำข้อสอบออนไลน์ เพื่อเตรียมตัวก่อนวันสอบกับ Sobdai',
+  primary: {
+    enabled: true,
+    label: 'เริ่มเตรียมสอบ',
+    type: 'package',
+    targetId: null,
+    href: null,
+  },
+  secondary: {
+    enabled: false,
+    label: 'ทดลองทำข้อสอบฟรี',
+    type: 'internal',
+    targetId: null,
+    href: null,
+  },
+}
+
 export interface News {
   id: string
   slug: string
@@ -46,6 +118,7 @@ export interface News {
   og_image_url: string | null
   created_at: string
   updated_at: string
+  cta_config: CtaConfig | null
 }
 
 /**
@@ -69,6 +142,7 @@ export interface NewsInput {
   seo_description: string | null
   canonical_url: string | null
   og_image_url: string | null
+  cta_config: CtaConfig | null
 }
 
 export const NEWS_STATUSES: { value: NewsStatus; label: string }[] = [
@@ -96,6 +170,11 @@ const MAX = {
   seo_description: 320,
   canonical_url: 500,
   og_image_url: 500,
+  // CTA box field caps (mirrored from the spec's recommended maxima).
+  cta_heading: 80,
+  cta_description: 240,
+  cta_button_label: 60,
+  cta_internal_href: 500,
 }
 
 export interface ValidationResult {
@@ -134,6 +213,10 @@ function coerce(raw: any): { input: NewsInput; rawSlug: string | undefined } {
       seo_description: optStr(raw.seo_description, MAX.seo_description),
       canonical_url: optStr(raw.canonical_url, MAX.canonical_url),
       og_image_url: optStr(raw.og_image_url, MAX.og_image_url),
+      // CTA: single coercion entry shared by draft + publish validators. null
+      // (or a non-object payload) → no CTA, so legacy rows + a cleared box
+      // coerce cleanly. cleanCtaConfig never throws.
+      cta_config: cleanCtaConfig(raw.cta_config),
     },
     rawSlug: str(raw.slug),
   }
@@ -447,6 +530,82 @@ function isHttpUrl(s: string): boolean {
     return u.protocol === 'http:' || u.protocol === 'https:'
   } catch {
     return false
+  }
+}
+
+// ─── CTA config shaping (single source for admin form + public box) ─────────
+//
+// Coerces raw input (FormData / Supabase JSONB / a stale cached object) into a
+// valid CtaConfig, OR returns null when the payload is absent / malformed —
+// null means "no CTA" and the public box renders nothing (legacy rows). Never
+// throws: every field is independently coerced so one bad value can't poison
+// the whole object.
+//
+// IMPORTANT: this does NOT validate that a package/summary targetId is actually
+// related to the article — that's a runtime concern resolved at public render
+// (the box reads the live junction set). It also does NOT hard-fail an invalid
+// internal path: cleanCtaConfig keeps the (trimmed) value so the admin form can
+// re-display + flag it; the public box drops a button whose href fails
+// isValidInternalPath at render. Validation that BLOCKS a save lives in the
+// editor's client-side gate (Thai error surfaced there), not here — keeping
+// cleanCtaConfig a pure, total coercion mirroring optStr()/coerceRelations().
+
+/** Valid Sobdai internal paths for a CTA destination. Allows the known public
+ *  section roots and their nested routes; rejects everything else (external
+ *  URLs, '#', bare query strings, etc.). Anchored, no protocol. */
+export function isValidInternalPath(s: string): boolean {
+  const t = s.trim()
+  if (!t.startsWith('/')) return false
+  // Reject anything that smells like a full URL (catches accidental pastes).
+  if (/^https?:\/\//i.test(t)) return false
+  if (t === '#' || t.startsWith('#')) return false
+  // Allow the public section roots the CTA is meant to send traffic into, plus
+  // any path nested under them (slug / exam id / summary slug). One segment +
+  // optional deeper nesting; matches the spec's enumerated allow-list.
+  return /^\/(packages|package|summaries|summary|exams|exam|news)(\/[^\s?#]*)?\/?$/.test(t)
+}
+
+function cleanButton(raw: unknown, fallback: CtaButton): CtaButton {
+  if (!raw || typeof raw !== 'object') return { ...fallback }
+  const b = raw as Record<string, unknown>
+  const type: CtaDestinationType =
+    b.type === 'package' || b.type === 'summary' || b.type === 'exam' || b.type === 'internal'
+      ? b.type
+      : fallback.type
+  // Keep label even if overlong so the form can flag it; trim only.
+  const label = typeof b.label === 'string' ? b.label.trim().slice(0, MAX.cta_button_label) : fallback.label
+  return {
+    enabled: b.enabled !== false, // absent/true → enabled; only explicit false disables
+    label: label || fallback.label,
+    type,
+    // targetId only meaningful for package/summary; clear it for exam/internal.
+    targetId: type === 'package' || type === 'summary'
+      ? (typeof b.targetId === 'string' && b.targetId.trim() ? b.targetId.trim() : null)
+      : null,
+    // href only meaningful for exam/internal; clear it for package/summary.
+    href: type === 'exam' || type === 'internal'
+      ? (typeof b.href === 'string' && b.href.trim() ? b.href.trim().slice(0, MAX.cta_internal_href) : null)
+      : null,
+  }
+}
+
+export function cleanCtaConfig(raw: unknown): CtaConfig | null {
+  // null / non-object → no CTA. This is the legacy-row path: a NULL cta_config
+  // column deserializes to null and is preserved as null through every save.
+  if (!raw || typeof raw !== 'object') return null
+  const c = raw as Record<string, unknown>
+
+  return {
+    enabled: c.enabled !== false, // default true unless explicit false
+    hideWhenEmpty: c.hideWhenEmpty !== false, // default true unless explicit false
+    heading: typeof c.heading === 'string'
+      ? c.heading.trim().slice(0, MAX.cta_heading)
+      : DEFAULT_CTA_CONFIG.heading,
+    description: typeof c.description === 'string'
+      ? c.description.trim().slice(0, MAX.cta_description)
+      : DEFAULT_CTA_CONFIG.description,
+    primary: cleanButton(c.primary, DEFAULT_CTA_CONFIG.primary),
+    secondary: cleanButton(c.secondary, DEFAULT_CTA_CONFIG.secondary),
   }
 }
 

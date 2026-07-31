@@ -16,12 +16,13 @@ import {
 } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { createPageMetadata } from '@/lib/seo'
-import { buildNewsMetadata, buildNewsJsonLd } from '@/lib/news'
+import { buildNewsMetadata, buildNewsJsonLd, type CtaConfig } from '@/lib/news'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import StructuredData from '@/components/StructuredData'
 import PackageCard, { type PackageCardData } from '@/components/PackageCard'
 import ContentCard from '@/components/ContentCard'
+import NewsCtaBox from '@/components/news/NewsCtaBox'
 
 /**
  * Public Government News detail (`/news/[slug]`) — Server Component.
@@ -83,6 +84,11 @@ interface NewsDetailRow {
   canonical_url: string | null
   og_image_url: string | null
   created_at: string | null
+  // JSONB cta_config column (migration 035). The raw row deserializes it as an
+  // opaque object; NewsCtaBox treats null/invalid as "no CTA". Typed loosely
+  // (CtaConfig | null) — cleanCtaConfig already runs on the admin write path,
+  // and the box re-validates every destination at render regardless.
+  cta_config: CtaConfig | null
 }
 
 interface NewsNeighbor {
@@ -128,7 +134,7 @@ const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null
   const { data } = await supabase
     .from('news')
     .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at'
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config'
     )
     .eq('slug', slug)
     .eq('status', 'published')
@@ -638,6 +644,20 @@ export default async function NewsDetailPage({
             </div>
           </section>
         )}
+
+        {/* Preparation CTA box — renders between the article body/source and
+            the related-content section. Reads cta_config from the article row
+            (null on legacy rows → renders nothing) and resolves each button's
+            href against the LIVE related set below, so a removed relation
+            automatically drops its button. The box hides entirely when
+            disabled or when no button resolves. */}
+        <NewsCtaBox
+          config={article.cta_config}
+          newsId={article.id}
+          newsSlug={slug}
+          relatedPackages={related.packages}
+          relatedSummaries={related.summaries}
+        />
 
         {/* Related content — the conversion path (News → Package → Summary).
             Editor-curated via news_packages / news_summaries. Renders NOTHING
