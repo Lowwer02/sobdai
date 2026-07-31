@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation'
 const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
   { href: '/packages', label: 'แพ็กเกจ' },
+  { href: '/news', label: 'ข่าวสาร' },
   { href: '/exams', label: 'แดชบอร์ด' },
   { href: '/downloads', label: 'คลังเนื้อหา' },
 ]
