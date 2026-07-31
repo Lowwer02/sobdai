@@ -1,27 +1,51 @@
 /**
  * lib/engine/index.ts
  * ----------------------------------------------------------------------------
- * Assessment Engine — public barrel.
+ * Assessment Engine — canonical public API.
  *
  * Source of truth: Assessment Engine Runtime API Specification v1.0 §2
  *   ("Why the Engine Exposes Only One Interface") and §2.5 (Orchestration Asymmetry).
  *
  * ENCAPSULATION CONTRACT (Runtime API §2):
- *  - Applications MAY import ONLY from this file (or its sub-paths declared below).
+ *  - Applications MAY import ONLY from this file.
  *  - Applications MUST NOT import from lib/engine/<module>/ internal paths.
  *  - The CI encapsulation gate (Backlog Task T-1.4.3.x) fails the build on violation.
  *
- * Currently exported (Phase: pre-Phase-1; contracts only):
- *  - Error/Warning/ExecutionState vocabulary (Runtime API §6/§7/§8)
- *  - Observability sink interfaces (Runtime API §11)
- *
- * NOT yet exported (pending their Epics):
- *  - runEngine (Runtime API orchestrator — E-1.4)
- *  - Engine Request / Assembly Result types (E-1.4)
- *  - Internal contracts (AssemblyRequest, CandidateSet, RankedCandidateSet,
- *    AllocatedCandidateSet) — these are internal; Applications see summary views
- *    only (Runtime API §5.5 Summary View Principle).
+ * This barrel intentionally owns no contracts or implementation. It exposes the
+ * Runtime-owned request/response boundary and the shared input vocabulary that
+ * Application adapters require. Runtime State, snapshots, pipeline composition,
+ * Stage contracts, and Stage implementations remain private to the Engine.
  */
+
+// Single Engine execution entry point.
+export { runEngine } from './runtime/run-engine'
+
+// Runtime-owned public input, output, dependency, and metadata contracts.
+export type {
+  AssemblyResult,
+  EngineExecutionMetadata,
+  EngineExecutionOptions,
+  EngineRequest,
+  EngineResponse,
+  EngineRuntimeContext,
+  EngineRuntimeDependencies,
+} from './runtime/contracts'
+
+// Shared request and Question Bank input vocabulary required by Engine callers.
+export type {
+  AssessmentProfile,
+  BlueprintType,
+  Difficulty,
+  LearningObjective,
+  QuestionPattern,
+  RunUnit,
+} from './shared/assessment-vocabulary'
+
+// Infrastructure boundary implemented by the Application integration layer.
+export type {
+  BankMetadataRow,
+  BankReadAdapter,
+} from './shared/question-bank'
 
 // Public vocabulary — Applications need these to interpret Assembly Results.
 export type {
@@ -44,13 +68,7 @@ export type {
   ObservabilitySink,
 } from './shared/observability'
 
-// NOTE: The following are intentionally NOT re-exported here:
-//   - Reader contracts (AssemblyRequest, Blueprint AST) — internal; consumed by
-//     Generator only.
-//   - CandidateSet / RankedCandidateSet / AllocatedCandidateSet full contracts —
-//     internal; Applications see summary views via Assembly Result (Runtime API §5).
-//   - runEngine — not yet implemented (E-1.4).
-//
-// When E-1.4 ships, this barrel grows to:
-//   export { runEngine } from './runtime'
-//   export type { EngineRequest, AssemblyResult } from './runtime'
+// Intentionally not exported:
+//   - RuntimeState, RuntimeExecutionSnapshot, or pipeline composition metadata.
+//   - Reader, Generator, Scoring, Ranking, or Solver contracts and implementations.
+//   - Built-in observability sinks and module-level Runtime helpers.
