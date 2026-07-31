@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { Newspaper, SearchX, AlertTriangle, ArrowRight } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import { createPageMetadata } from '@/lib/seo'
 import NewsCard from '@/components/news/NewsCard'
 import NewsPagination, { buildNewsPageHref } from '@/components/news/NewsPagination'
 import NewsListControls from '@/components/news/NewsListControls'
@@ -31,10 +32,19 @@ import NewsListControls from '@/components/news/NewsListControls'
  *     from all rows), so visitors never see a filter option that yields zero
  *     public results.
  *
- * Heading hierarchy: one <h1> in the hero; each card title is an <h2>. No
- * metadata/JSON-LD here (later task) — crawl-friendliness comes from semantic
- * HTML, internal links, and the Link-based pager.
+ * Heading hierarchy: one <h1> in the hero; each card title is an <h2>.
+ * JSON-LD is still out of scope (separate task).
  */
+
+// Static list metadata (no per-row data needed). The canonical is the bare
+// /news path so paginated/search URLs collapse to the hub for indexing,
+// matching how the packages catalog canonicalizes to /packages.
+export const metadata = createPageMetadata({
+  title: 'ข่าวสารจากหน่วยงานราชการ | Sobdai',
+  description:
+    'ประกาศ ข่าวสาร และข้อมูลอัปเดตจากหน่วยงานราชการ เพื่อการเตรียมสอบข้าราชการ — รวบรวมข่าวและประกาศล่าสุดจากทุกกรม',
+  path: '/news',
+})
 
 const PAGE_SIZE = 9
 
