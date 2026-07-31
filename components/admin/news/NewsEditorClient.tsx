@@ -20,11 +20,20 @@ import {
 import { toastEvent } from '@/hooks/useToast'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { createClient } from '@/lib/supabase/client'
-import { createNews, updateNews, publishNews, archiveNews, restoreNews } from '@/app/admin/news/actions'
-import { validateNewsForPublish, type News, type NewsStatus } from '@/lib/news'
+import { createNews, updateNews, publishNews, archiveNews, restoreNews, updateRelations } from '@/app/admin/news/actions'
+import {
+  validateNewsForPublish,
+  DEFAULT_CTA_CONFIG,
+  isValidInternalPath,
+  type News,
+  type NewsStatus,
+  type CtaConfig,
+  type CtaDestinationType,
+} from '@/lib/news'
 import { absoluteUrl } from '@/lib/seo'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import MarkdownEditor from '@/components/admin/news/MarkdownEditor'
+import NewsRelationPicker, { type RelatedItem } from '@/components/admin/news/NewsRelationPicker'
 
 /**
  * Government News — draft editor + publish workflow (Client Component).
@@ -85,7 +94,19 @@ function isInvalidHttpUrl(value: string): boolean {
   }
 }
 
-export default function NewsEditorClient({ article, isEdit }: { article: News | null; isEdit: boolean }) {
+export default function NewsEditorClient({
+  article,
+  isEdit,
+  initialRelatedPackages = [],
+  initialRelatedSummaries = [],
+}: {
+  article: News | null
+  isEdit: boolean
+  /** Pre-related packages (edit page loads these from news_packages). Empty on create. */
+  initialRelatedPackages?: RelatedItem[]
+  /** Pre-related summaries (edit page loads these from news_summaries). Empty on create. */
+  initialRelatedSummaries?: RelatedItem[]
+}) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isLifecyclePending, startLifecycleTransition] = useTransition()
@@ -109,6 +130,21 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
   const [seoDescription, setSeoDescription] = useState(article?.seo_description || '')
   const [canonicalUrl, setCanonicalUrl] = useState(article?.canonical_url || '')
   const [ogImageUrl, setOgImageUrl] = useState(article?.og_image_url || '')
+
+  // Related packages / summaries. Edit-mode only in the UI (a parent news id is
+  // required to attach junction rows), but the state is held unconditionally so
+  // the types stay simple — the section just isn't rendered at create time.
+  const [relatedPackages, setRelatedPackages] = useState<RelatedItem[]>(initialRelatedPackages)
+  const [relatedSummaries, setRelatedSummaries] = useState<RelatedItem[]>(initialRelatedSummaries)
+
+  // CTA box config. Seeded from the stored cta_config (already a clean object,
+  // since cleanCtaConfig ran on read in the action path) or the defaults on
+  // create. Held as a single object + updated via immutable spread helpers so
+  // buildPayload can pass it straight through.
+  const [ctaConfig, setCtaConfig] = useState<CtaConfig>(
+    () => article?.cta_config ?? DEFAULT_CTA_CONFIG
+  )
+  const [ctaError, setCtaError] = useState('')
 
   // Cover image: URL held in state (carried into the payload, not a form field).
   // Create has no row id yet (it's generated server-side), so the storage path
@@ -195,6 +231,52 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
     setPublishErrors({})
   }
 
+  // ─── CTA config helpers ─────────────────────────────────────────────────────
+  // Immutable-spread updaters so the nested CtaConfig stays a single object in
+  // state (one source of truth the payload passes through). Mirrors the nested-
+  // config update() pattern in HomepageSettingsClient. Each change marks the
+  // form dirty + clears a stale CTA error, identical to how cover edits behave.
+  const touchCta = () => {
+    setIsDirty(true)
+    setPublishErrors({})
+    setCtaError('')
+  }
+  const updateCtaField = <K extends keyof CtaConfig>(key: K, value: CtaConfig[K]) => {
+    setCtaConfig(prev => ({ ...prev, [key]: value }))
+    touchCta()
+  }
+  const updateCtaButton = (
+    which: 'primary' | 'secondary',
+    patch: Partial<CtaConfig['primary']>
+  ) => {
+    setCtaConfig(prev => ({ ...prev, [which]: { ...prev[which], ...patch } }))
+    touchCta()
+  }
+
+  /**
+   * Client-side validation of the CTA's internal-path fields. Mirrors the
+   * server's cleanCtaConfig intent but blocks the SAVE with a Thai message so
+   * the admin can't persist a path that would render a broken button
+   * (acceptance Case 6). Package/summary targetId validity is resolved at
+   * public render (not here) because it depends on the live junction set.
+   * Returns true when the CTA is saveable.
+   */
+  const validateCta = (): boolean => {
+    if (!ctaConfig.enabled) return true // disabled → nothing to validate
+    const checkButton = (which: 'primary' | 'secondary'): string | null => {
+      const b = ctaConfig[which]
+      if (!b.enabled) return null
+      if ((b.type === 'exam' || b.type === 'internal') && b.href && !isValidInternalPath(b.href)) {
+        const label = which === 'primary' ? 'ปุ่มหลัก' : 'ปุ่มรอง'
+        return `${label}: พาธภายในไม่ถูกต้อง (ต้องขึ้นต้นด้วย / และเป็นเส้นทาง Sobdai เช่น /packages หรือ /package/slug/exam/id)`
+      }
+      return null
+    }
+    const e = checkButton('primary') || checkButton('secondary') || ''
+    setCtaError(e)
+    return !e
+  }
+
   // ─── Payload (shared by save + publish flows) ───────────────────────────────
   const buildPayload = (): Record<string, unknown> => {
     const payload: Record<string, unknown> = {
@@ -211,6 +293,8 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
       seo_description: seoDescription || null,
       canonical_url: canonicalUrl || null,
       og_image_url: ogImageUrl || null,
+      // CTA config — passed straight through (the object is already clean).
+      cta_config: ctaConfig.enabled ? ctaConfig : null,
     }
 
     if (isEdit && article) {
@@ -232,6 +316,13 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
+    // Client-side CTA path validation BEFORE save (Case 6: invalid internal
+    // path blocks save with a Thai message). Server re-runs cleanCtaConfig as a
+    // backstop; package/summary targetId validity is resolved at render only.
+    if (!validateCta()) {
+      toastEvent('การตั้งค่ากล่องแนะนำยังไม่ถูกต้อง กรุณาตรวจสอบ', 'warning')
+      return
+    }
     const payload = buildPayload()
 
     startTransition(async () => {
@@ -241,7 +332,21 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
       if (!res.success) {
         setError(res.error || 'บันทึกไม่สำเร็จ')
         toastEvent(res.error || 'บันทึกไม่สำเร็จ', 'error')
-      } else if (isEdit) {
+        return
+      }
+      // Edit mode: persist relations AFTER a successful content save. Relations
+      // are a separate delete-then-insert full-replace (mirrors exam_set_questions
+      // + QuestionPicker), so they ride alongside but never abort a content save.
+      if (isEdit && article) {
+        const relRes = await updateRelations(
+          article.id,
+          relatedPackages.map((p, i) => ({ id: p.id, sort_order: i })),
+          relatedSummaries.map((s, i) => ({ id: s.id, sort_order: i }))
+        )
+        if (!relRes.success) {
+          toastEvent(relRes.error || 'บันทึกเนื้อหาที่เกี่ยวข้องไม่สำเร็จ', 'warning')
+          // Content DID save — don't surface as a hard error, just warn.
+        }
         toastEvent('บันทึกเรียบร้อย', 'success')
         setIsDirty(false)
       }
@@ -275,12 +380,23 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
         return
       }
       if (isDirty) {
+        if (!validateCta()) {
+          setPendingGoLive(null)
+          toastEvent('การตั้งค่ากล่องแนะนำยังไม่ถูกต้อง จึงยังเผยแพร่ไม่ได้', 'warning')
+          return
+        }
         const saveRes = await updateNews(article.id, buildPayload())
         if (!saveRes.success) {
           setPendingGoLive(null)
           toastEvent(saveRes.error || 'บันทึกไม่สำเร็จ จึงยังเผยแพร่ไม่ได้', 'error')
           return
         }
+        // Persist relations alongside the unsaved content (same as handleSubmit).
+        await updateRelations(
+          article.id,
+          relatedPackages.map((p, i) => ({ id: p.id, sort_order: i })),
+          relatedSummaries.map((s, i) => ({ id: s.id, sort_order: i }))
+        )
         setIsDirty(false)
       }
       const res = kind === 'publish'
@@ -490,6 +606,229 @@ export default function NewsEditorClient({ article, isEdit }: { article: News | 
                 placeholder="อธิบายรูปปกเพื่อการเข้าถึง"
                 className={inputClass}
               />
+            </div>
+          </div>
+        </section>
+
+        {/* Related packages / summaries — edit mode only (no parent id at create time). */}
+        {isEdit && article && (
+          <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+            <h2 className="text-[#D4AF37] font-bold font-display">เนื้อหาที่เกี่ยวข้อง</h2>
+            <p className="text-xs text-[#A1866B]">
+              แพ็กเกจ/สรุปที่เชื่อมกับข่าวนี้ — จะแสดงท้ายบทความ และสามารถเลือกเป็นปลายทางของกล่องแนะนำด้านล่างได้
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className={labelClass}>แพ็กเกจที่เกี่ยวข้อง</label>
+                <NewsRelationPicker
+                  type="package"
+                  selected={relatedPackages}
+                  onChange={items => {
+                    setRelatedPackages(items)
+                    setIsDirty(true)
+                    setPublishErrors({})
+                  }}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>สรุปเนื้อหาที่เกี่ยวข้อง</label>
+                <NewsRelationPicker
+                  type="summary"
+                  selected={relatedSummaries}
+                  onChange={items => {
+                    setRelatedSummaries(items)
+                    setIsDirty(true)
+                    setPublishErrors({})
+                  }}
+                />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* CTA box — "กล่องแนะนำการเตรียมสอบ". Sits after relations (it can target
+            them) and before SEO. Reuses the same section shell as the others. */}
+        <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+          <h2 className="text-[#D4AF37] font-bold font-display">กล่องแนะนำการเตรียมสอบ</h2>
+
+          {/* Master visibility */}
+          <label className="flex items-center gap-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl cursor-pointer hover:border-[#D4AF37]/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={ctaConfig.enabled}
+              onChange={e => updateCtaField('enabled', e.target.checked)}
+              className="w-4 h-4 accent-[#D4AF37]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[#F5E9D6]">แสดงกล่องแนะนำท้ายข่าว</span>
+              <span className="block text-xs text-[#A1866B]">
+                กล่องนี้จะแสดงท้ายบทความเพื่อพาผู้อ่านไปยังแพ็กเกจ สรุปเนื้อหา หรือข้อสอบที่เกี่ยวข้อง
+              </span>
+            </span>
+          </label>
+
+          {/* Auto-hide */}
+          <label className={`flex items-center gap-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl transition-colors ${ctaConfig.enabled ? 'cursor-pointer hover:border-[#D4AF37]/30' : 'opacity-50 pointer-events-none'}`}>
+            <input
+              type="checkbox"
+              checked={ctaConfig.hideWhenEmpty}
+              onChange={e => updateCtaField('hideWhenEmpty', e.target.checked)}
+              disabled={!ctaConfig.enabled}
+              className="w-4 h-4 accent-[#D4AF37]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[#F5E9D6]">ซ่อนอัตโนมัติเมื่อไม่มีลิงก์ที่ใช้งานได้</span>
+              <span className="block text-xs text-[#A1866B]">
+                หากไม่มีปลายทางที่ใช้ได้ จะไม่แสดงกล่องว่าง
+              </span>
+            </span>
+          </label>
+
+          {/* Heading + description */}
+          <div className={ctaConfig.enabled ? '' : 'opacity-50 pointer-events-none'}>
+            <div className="space-y-4">
+              <div>
+                <label className={labelClass}>หัวข้อกล่อง</label>
+                <input
+                  type="text"
+                  value={ctaConfig.heading}
+                  onChange={e => updateCtaField('heading', e.target.value)}
+                  disabled={!ctaConfig.enabled}
+                  maxLength={80}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>รายละเอียดกล่อง</label>
+                <textarea
+                  value={ctaConfig.description}
+                  onChange={e => updateCtaField('description', e.target.value)}
+                  disabled={!ctaConfig.enabled}
+                  rows={2}
+                  maxLength={240}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Primary + secondary buttons */}
+              {(['primary', 'secondary'] as const).map(which => {
+                const btn = ctaConfig[which]
+                const title = which === 'primary' ? 'ปุ่มหลัก' : 'ปุ่มรอง'
+                return (
+                  <div
+                    key={which}
+                    className="border border-[rgba(255,255,255,0.05)] rounded-xl p-3 space-y-3 bg-[#0F0B07]"
+                  >
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={btn.enabled}
+                        onChange={e => updateCtaButton(which, { enabled: e.target.checked })}
+                        disabled={!ctaConfig.enabled}
+                        className="w-4 h-4 accent-[#D4AF37]"
+                      />
+                      <span className="text-sm font-medium text-[#F5E9D6]">{title}</span>
+                    </label>
+
+                    <div className={btn.enabled ? 'space-y-3' : 'space-y-3 opacity-50 pointer-events-none'}>
+                      <div>
+                        <label className={labelClass}>ข้อความปุ่ม</label>
+                        <input
+                          type="text"
+                          value={btn.label}
+                          onChange={e => updateCtaButton(which, { label: e.target.value })}
+                          disabled={!btn.enabled}
+                          maxLength={60}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>ประเภทปลายทาง</label>
+                        <select
+                          value={btn.type}
+                          onChange={e => {
+                            const type = e.target.value as CtaDestinationType
+                            // Reset the cross-fields when switching type so a stale
+                            // targetId/href from the old type can't leak through.
+                            updateCtaButton(which, { type, targetId: null, href: null })
+                          }}
+                          disabled={!btn.enabled}
+                          className={inputClass}
+                        >
+                          <option value="package">แพ็กเกจที่เกี่ยวข้อง</option>
+                          <option value="summary">สรุปเนื้อหาที่เกี่ยวข้อง</option>
+                          <option value="exam">ข้อสอบ (พาธภายใน)</option>
+                          <option value="internal">ลิงก์ภายในอื่น ๆ</option>
+                        </select>
+                      </div>
+
+                      {/* package / summary → pick from the related set */}
+                      {(btn.type === 'package' || btn.type === 'summary') && (
+                        <div>
+                          <label className={labelClass}>
+                            {btn.type === 'package' ? 'เลือกแพ็กเกจ' : 'เลือกสรุปเนื้อหา'}
+                          </label>
+                          {(() => {
+                            const items = btn.type === 'package' ? relatedPackages : relatedSummaries
+                            if (!isEdit || items.length === 0) {
+                              return (
+                                <p className="text-xs text-[#A1866B] bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl px-3 py-2.5">
+                                  {btn.type === 'package'
+                                    ? 'ยังไม่มีแพ็กเกจที่เกี่ยวข้อง กรุณาเพิ่ม Related Package ก่อน'
+                                    : 'ยังไม่มีสรุปเนื้อหาที่เกี่ยวข้อง กรุณาเพิ่ม Related Summary ก่อน'}
+                                </p>
+                              )
+                            }
+                            return (
+                              <select
+                                value={btn.targetId || ''}
+                                onChange={e => updateCtaButton(which, { targetId: e.target.value || null })}
+                                disabled={!btn.enabled}
+                                className={inputClass}
+                              >
+                                <option value="">— เลือก —</option>
+                                {items.map(it => (
+                                  <option key={it.id} value={it.id}>{it.label}</option>
+                                ))}
+                              </select>
+                            )
+                          })()}
+                        </div>
+                      )}
+
+                      {/* exam / internal → validated path field */}
+                      {(btn.type === 'exam' || btn.type === 'internal') && (
+                        <div>
+                          <label className={labelClass}>พาธภายใน (Internal path)</label>
+                          <input
+                            type="text"
+                            value={btn.href || ''}
+                            onChange={e => updateCtaButton(which, { href: e.target.value })}
+                            disabled={!btn.enabled}
+                            maxLength={500}
+                            placeholder="/packages หรือ /package/example-slug/exam/exam-id"
+                            className={`${inputClass} ${
+                              btn.href && !isValidInternalPath(btn.href) ? 'border-[#EAB308]/50' : ''
+                            }`}
+                          />
+                          {btn.href && !isValidInternalPath(btn.href) && (
+                            <p className="text-[10px] text-[#EAB308] flex items-center gap-1 mt-1">
+                              <AlertTriangle size={11} /> พาธไม่ถูกต้อง (ต้องขึ้นต้นด้วย / และเป็นเส้นทาง Sobdai)
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* CTA validation error (Case 6) */}
+              {ctaError && (
+                <div className="text-sm text-[#EAB308] bg-[#EAB308]/10 border border-[#EAB308]/30 rounded-xl px-4 py-3">
+                  {ctaError}
+                </div>
+              )}
             </div>
           </div>
         </section>

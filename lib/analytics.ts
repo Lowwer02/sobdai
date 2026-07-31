@@ -151,3 +151,31 @@ export function completeExam(
     wrong_answers: wrong,
   })
 }
+
+/**
+ * Track a click on a News CTA box button. Fired immediately before internal
+ * navigation by the tiny client <NewsCtaLink> wrapper. Reuses the existing
+ * SSR-safe pushToDataLayer (no gtag / no GA import). Parameters mirror the
+ * spec's news_cta_click event; optional fields are omitted when absent so the
+ * dataLayer entry stays clean.
+ */
+export function trackCtaClick(params: {
+  news_id: string
+  news_slug: string
+  cta_position: 'primary' | 'secondary'
+  destination_type: 'package' | 'summary' | 'exam' | 'internal'
+  destination_id?: string | null
+  destination_path: string
+  button_label: string
+}): void {
+  pushToDataLayer({
+    event: 'news_cta_click',
+    news_id: params.news_id,
+    news_slug: params.news_slug,
+    cta_position: params.cta_position,
+    destination_type: params.destination_type,
+    ...(params.destination_id ? { destination_id: params.destination_id } : {}),
+    destination_path: params.destination_path,
+    button_label: params.button_label,
+  })
+}
