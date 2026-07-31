@@ -12,8 +12,10 @@
 -- * Idempotent: it may be run repeatedly against a compatible database.
 -- * Backward-compatible: no application table, policy, function, or data is
 --   modified.
--- * Fail-closed: an unexpected schema, FK action, RLS setting, role vocabulary,
---   or migration-history state aborts the transaction with an actionable error.
+-- * Fail-closed: an unexpected schema, FK action, index, RLS setting, or role
+--   vocabulary aborts the transaction with an actionable error.
+-- * Deployment-mode neutral: Supabase CLI history is validated when available,
+--   but missing/incomplete CLI metadata is advisory for SQL Editor deployments.
 --
 -- Important repository audit note
 -- -------------------------------
@@ -87,28 +89,31 @@ begin
             hint = 'Verify the standard Supabase database-role configuration.';
     end if;
 
-    -- The frozen migration sequence starts after 034. Use dynamic SQL so the
-    -- failure is explicit even if the Supabase history schema itself is absent.
+    -- Supabase CLI creates and owns this history table. Dashboard SQL Editor
+    -- execution bypasses it, so migration history is advisory rather than an
+    -- authoritative production-schema prerequisite.
+    --
+    -- Use dynamic SQL only when the table exists so the same migration runs in
+    -- both deployment modes without referencing a missing relation.
     if to_regclass('supabase_migrations.schema_migrations') is null then
-        raise exception using
-            errcode = 'check_violation',
-            message = 'Knowledge Platform preflight failed: Supabase migration history is missing.',
-            hint = 'Verify the target database and its migration history before Batch A.';
-    end if;
+        raise notice
+            'Knowledge Platform preflight: Supabase CLI migration history is unavailable; continuing with authoritative schema validation (SQL Editor mode).';
+    else
+        execute
+            'select exists (
+                select 1
+                from supabase_migrations.schema_migrations
+                where version = ''034''
+            )'
+        into has_migration_034;
 
-    execute
-        'select exists (
-            select 1
-            from supabase_migrations.schema_migrations
-            where version = ''034''
-        )'
-    into has_migration_034;
-
-    if not has_migration_034 then
-        raise exception using
-            errcode = 'check_violation',
-            message = 'Knowledge Platform preflight failed: predecessor migration 034 is not recorded.',
-            hint = 'Reconcile deployed migration history before applying migration 035.';
+        if has_migration_034 then
+            raise notice
+                'Knowledge Platform preflight: Supabase CLI predecessor migration 034 is recorded.';
+        else
+            raise notice
+                'Knowledge Platform preflight: CLI history exists but predecessor 034 is not recorded; continuing because schema validation is authoritative.';
+        end if;
     end if;
 
     -- Required legacy relations. These are the frozen compatibility surface
@@ -258,6 +263,46 @@ begin
     ) then
         raise exception 'Knowledge Platform preflight failed: news_summaries primary key drifted.';
     end if;
+
+    -- Required non-constraint indexes from the audited legacy baseline.
+    -- Primary/unique constraint-backed indexes are already validated above.
+    for expected in
+        select *
+        from (
+            values
+                ('questions_question_code_key', true, false),
+                ('questions_blueprint_type_idx', false, true),
+                ('questions_learning_objective_idx', false, true),
+                ('questions_question_pattern_idx', false, true),
+                ('questions_section_idx', false, true),
+                ('exam_sets_status_idx', false, false),
+                ('news_category_live_idx', false, true),
+                ('news_published_live_idx', false, true),
+                ('news_summaries_summary_id_idx', false, false)
+        ) as required_indexes(index_name, is_unique, is_partial)
+    loop
+        if not exists (
+            select 1
+            from pg_class i
+            join pg_namespace n on n.oid = i.relnamespace
+            join pg_index x on x.indexrelid = i.oid
+            where n.nspname = 'public'
+              and i.relname = expected.index_name
+              and i.relkind = 'i'
+              and x.indisvalid
+              and x.indisready
+              and x.indisunique = expected.is_unique
+              and (x.indpred is not null) = expected.is_partial
+        ) then
+            raise exception using
+                errcode = 'check_violation',
+                message = format(
+                    'Knowledge Platform preflight failed: required index public.%I is missing or invalid.',
+                    expected.index_name
+                ),
+                hint = 'Reconcile the live schema with the frozen current-schema audit.';
+        end if;
+    end loop;
 
     -- Required legacy cascade actions. Later frozen batches change ownership;
     -- Batch A must first prove the audited starting point.
