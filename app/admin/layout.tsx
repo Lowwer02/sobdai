@@ -1,10 +1,11 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles } from 'lucide-react'
 import { getAdminSession } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 import { redirect } from 'next/navigation'
 
 const learningNav = [
+  { name: 'Generate Assessment', href: '/admin/generate', icon: Sparkles, permission: 'content.write' },
   { name: 'Packages', href: '/admin/packages', icon: Package, permission: 'content.read' },
   { name: 'Exam Sets', href: '/admin/exam-sets', icon: CheckSquare, permission: 'content.read' },
   { name: 'Questions', href: '/admin/questions', icon: FileQuestion, permission: 'content.read' },
@@ -132,4 +133,3 @@ export default async function AdminLayout({
     </div>
   )
 }
-

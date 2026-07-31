@@ -25,7 +25,7 @@ export async function deleteExamSetAction(id: string) {
   }
 }
 
-export async function createExamSetAction(data: {
+type CreateExamSetInput = {
   package_id: string
   name: string
   description?: string
@@ -40,9 +40,17 @@ export async function createExamSetAction(data: {
   // Pass undefined/null to leave them unset.
   subject?: string | null
   document?: string | null
-}) {
+}
+
+export async function createExamSetAction(data: CreateExamSetInput) {
+  let createdExamSetId: string | null = null
+
   try {
     const { supabase } = await requirePermission('content.write')
+    const inputError = validateCreateExamSetInput(data)
+    if (inputError) {
+      return { success: false, error: inputError }
+    }
 
     await assertMetadataValues(supabase, {
       subject: data.subject ?? null,
@@ -69,6 +77,7 @@ export async function createExamSetAction(data: {
       .single()
 
     if (insertError) throw insertError
+    createdExamSetId = examSet.id
 
     // 2. Insert Questions if any
     if (data.question_ids && data.question_ids.length > 0) {
@@ -92,9 +101,101 @@ export async function createExamSetAction(data: {
     revalidatePath('/admin/exam-sets')
     revalidatePath('/admin/packages')
     return { success: true, id: examSet.id }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err: unknown) {
+    const error =
+      err instanceof Error && err.message.trim().length > 0
+        ? err.message
+        : 'Exam Set creation failed.'
+
+    // The Exam Set insert and question-junction insert are separate writes in
+    // the existing architecture. Report an inserted draft explicitly when the
+    // second write fails so callers can lock retries and surface recovery.
+    return createdExamSetId
+      ? {
+          success: false,
+          error,
+          id: createdExamSetId,
+          partial: true as const,
+        }
+      : { success: false, error }
   }
+}
+
+function validateCreateExamSetInput(
+  data: CreateExamSetInput
+): string | null {
+  const value: unknown = data
+  if (typeof value !== 'object' || value === null) {
+    return 'Exam Set settings are required.'
+  }
+  if (
+    typeof data.package_id !== 'string' ||
+    data.package_id.trim().length === 0
+  ) {
+    return 'Package is required.'
+  }
+  if (
+    typeof data.name !== 'string' ||
+    data.name.trim().length === 0
+  ) {
+    return 'Exam Set name is required.'
+  }
+  if (data.name.trim().length > 200) {
+    return 'Exam Set names cannot exceed 200 characters.'
+  }
+  if (
+    data.description !== undefined &&
+    (typeof data.description !== 'string' ||
+      data.description.length > 2_000)
+  ) {
+    return 'Exam Set descriptions cannot exceed 2,000 characters.'
+  }
+  if (
+    !Number.isInteger(data.duration_minutes) ||
+    data.duration_minutes < 1
+  ) {
+    return 'Duration must be a positive whole number of minutes.'
+  }
+  if (
+    typeof data.is_sample !== 'boolean' ||
+    !Number.isInteger(data.sort_order) ||
+    !Number.isInteger(data.display_order)
+  ) {
+    return 'Exam Set availability and ordering values are invalid.'
+  }
+  if (
+    !Array.isArray(data.question_ids) ||
+    data.question_ids.length > 1_000 ||
+    data.question_ids.some(
+      (questionId) =>
+        typeof questionId !== 'string' ||
+        questionId.trim().length === 0
+    )
+  ) {
+    return 'Exam Set Question identifiers are invalid.'
+  }
+  if (new Set(data.question_ids).size !== data.question_ids.length) {
+    return 'Exam Set Questions must be unique.'
+  }
+  if (
+    data.exam_type !== undefined &&
+    data.exam_type !== 'document' &&
+    data.exam_type !== 'simulation'
+  ) {
+    return 'Exam Set type is invalid.'
+  }
+  if (
+    (data.subject !== undefined &&
+      data.subject !== null &&
+      typeof data.subject !== 'string') ||
+    (data.document !== undefined &&
+      data.document !== null &&
+      typeof data.document !== 'string')
+  ) {
+    return 'Exam Set metadata is invalid.'
+  }
+
+  return null
 }
 
 export async function updateExamSetAction(id: string, data: {
