@@ -63,18 +63,16 @@ export default function NewsRelationPicker({ type, selected, onChange }: NewsRel
     listNews({ type, q: search, page, limit: PAGE_SIZE })
       .then(res => {
         if (!mounted) return
-        // listNews selects id, slug, cover_image_url, excerpt — map to the
-        // RelatedItem label using the right display column (name for packages,
-        // title for summaries). The action doesn't return name/title today, so
-        // fall back to slug; the admin still sees enough to choose. (listNews
-        // could be extended later without changing this contract.)
+        // listNews returns normalized items for packages/summaries. Map label to
+        // name or title, excerpt to description or topic, cover_image_url to
+        // cover_image_url or logo_url.
         setResults(
-          (res.data ?? []).map(r => ({
+          (res.data ?? []).map((r: any) => ({
             id: r.id,
             slug: r.slug,
-            label: r.slug || r.id,
-            excerpt: r.excerpt,
-            cover_image_url: r.cover_image_url,
+            label: r.name || r.title || r.slug || r.id,
+            excerpt: r.excerpt || r.description || r.topic || null,
+            cover_image_url: r.cover_image_url || r.logo_url || null,
           }))
         )
         setTotalCount(res.count ?? 0)

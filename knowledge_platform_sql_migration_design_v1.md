@@ -7,18 +7,19 @@
 
 # 0. Execution decision
 
-The database change uses six batches:
+Sequential migration numbers are the canonical migration identity. Batch labels are secondary organizational metadata only.
 
-| Batch | Name | Files | Role |
+| Migrations | Batch metadata | Name | Role |
 |---|---|---|---|
-| A | Migration control | 035–036 | Verify the production baseline and install temporary migration bookkeeping |
-| B | Reference Layer | 037–039 | Create ReferenceDocument, versions, and aliases |
-| C | Knowledge/Product expansion | 040–045 | Add Summary root fields, versions, source relations, placements, indexes, and RLS |
-| D | Lossless backfill and tightening | 046–054 | Populate identities, sources, revisions, pointers, placements, aliases, then validate constraints |
-| E | Coexistence and cutover | 055–057 | Add read projections, transactional persistence API, and direct-write restrictions |
-| F | Legacy retirement | 058–060 | Prove cleanup readiness, remove legacy authority, retire migration-only objects |
+| 035–036 | A | Migration control | Verify the production baseline and install temporary migration bookkeeping |
+| 037 | — | Existing production migration | News CTA migration; outside Knowledge Platform batches and retained unchanged |
+| 038–040 | B | Reference Layer | Create ReferenceDocument, versions, and aliases |
+| 041–046 | C | Knowledge/Product expansion | Add Summary root fields, versions, source relations, placements, indexes, and RLS |
+| 047–055 | D | Lossless backfill and tightening | Populate identities, sources, revisions, pointers, placements, aliases, then validate constraints |
+| 056–058 | E | Coexistence and cutover | Add read projections, transactional persistence API, and direct-write restrictions |
+| 059–061 | F | Legacy retirement | Prove cleanup readiness, remove legacy authority, retire migration-only objects |
 
-Files start at `035` because `034_news_storage.sql` is the highest current repository migration. Existing duplicate prefixes `019` and `022` are left unchanged; new files use unique monotonically increasing prefixes.
+Knowledge Platform files start at `035`. Production migration `037_news_cta_config.sql` was added after migrations 035–036 and is retained unchanged in migration history. The remaining Knowledge Platform files are therefore shifted from the former `037–060` range to `038–061`. Existing duplicate prefixes `019` and `022` are left unchanged; all files after production migration 037 use unique monotonically increasing prefixes.
 
 Two execution classes are intentionally distinguished:
 
@@ -29,53 +30,39 @@ Long-running production backfills must not be hidden inside one all-or-nothing S
 
 # 1. Migration file inventory
 
-## Batch A — Migration control
+| Migration | File | Batch metadata | Responsibility |
+|---|---|---|---|
+| 035 | `035_kp_preflight_guards.sql` | A | Verify the production baseline |
+| 036 | `036_kp_migration_control.sql` | A | Install temporary migration bookkeeping |
+| 037 | `037_news_cta_config.sql` | — | Existing production News CTA migration; retained unchanged |
+| 038 | `038_kp_reference_documents.sql` | B | Create stable ReferenceDocument roots |
+| 039 | `039_kp_reference_document_versions.sql` | B | Create immutable source-version storage and lineage |
+| 040 | `040_kp_reference_document_aliases.sql` | B | Create alternate document lookup identities |
+| 041 | `041_kp_summaries_expand.sql` | C | Expand the existing Summary root compatibly |
+| 042 | `042_kp_summary_versions.sql` | C | Create Summary version storage and publishing lineage |
+| 043 | `043_kp_summary_relationships.sql` | C | Create Summary aliases and ReferenceDocument relationships |
+| 044 | `044_kp_package_summaries.sql` | C | Create Package-to-Summary placements |
+| 045 | `045_kp_rls_foundation.sql` | C | Install target-table RLS foundations |
+| 046 | `046_kp_online_indexes.sql` | C | Build online indexes required for reads and backfill |
+| 047 | `047_kp_backfill_summary_identity.sql` | D | Backfill Summary business identity |
+| 048 | `048_kp_backfill_reference_documents_curated.sql` | D | Apply the approved curated ReferenceDocument mapping; conditional data unit |
+| 049 | `049_kp_backfill_initial_summary_versions.sql` | D | Create initial Summary versions from legacy content |
+| 050 | `050_kp_backfill_current_pointers.sql` | D | Establish current published-version pointers |
+| 051 | `051_kp_backfill_package_summaries.sql` | D | Backfill Package-to-Summary placements |
+| 052 | `052_kp_backfill_aliases_curated.sql` | D | Apply approved alias mappings; conditional data unit |
+| 053 | `053_kp_final_unique_indexes.sql` | D | Build final uniqueness enforcement indexes |
+| 054 | `054_kp_validate_constraints.sql` | D | Validate deferred constraints after reconciliation |
+| 055 | `055_kp_enforce_required_identity.sql` | D | Enforce required identity fields |
+| 056 | `056_kp_read_projections.sql` | E | Add compatibility and target read projections |
+| 057 | `057_kp_transactional_persistence_api.sql` | E | Add transactional target persistence API |
+| 058 | `058_kp_restrict_direct_writes.sql` | E | Enforce the approved writer boundary |
+| 059 | `059_kp_cleanup_readiness_guards.sql` | F | Prove cleanup readiness and establish the cleanup gate |
+| 060 | `060_kp_remove_legacy_summary_authority.sql` | F | Remove legacy Summary authority after approval |
+| 061 | `061_kp_retire_migration_compatibility.sql` | F | Retire migration-only compatibility and control objects |
 
-1. `035_kp_preflight_guards.sql`
-2. `036_kp_migration_control.sql`
+Conditional files 048 and 052 receive their final content only from approved production manifests. If a manifest has zero approved rows, the file performs validation only; it never invents ReferenceDocuments or aliases.
 
-## Batch B — Reference Layer
-
-3. `037_kp_reference_documents.sql`
-4. `038_kp_reference_document_versions.sql`
-5. `039_kp_reference_document_aliases.sql`
-
-## Batch C — Knowledge and Product expansion
-
-6. `040_kp_summaries_expand.sql`
-7. `041_kp_summary_versions.sql`
-8. `042_kp_summary_relationships.sql`
-9. `043_kp_package_summaries.sql`
-10. `044_kp_rls_foundation.sql`
-11. `045_kp_online_indexes.sql`
-
-## Batch D — Backfill and constraint tightening
-
-12. `046_kp_backfill_summary_identity.sql`
-13. `047_kp_backfill_reference_documents_curated.sql` — conditional data unit
-14. `048_kp_backfill_initial_summary_versions.sql`
-15. `049_kp_backfill_current_pointers.sql`
-16. `050_kp_backfill_package_summaries.sql`
-17. `051_kp_backfill_aliases_curated.sql` — conditional data unit
-18. `052_kp_final_unique_indexes.sql`
-19. `053_kp_validate_constraints.sql`
-20. `054_kp_enforce_required_identity.sql`
-
-## Batch E — Dual-read and dual-write support
-
-21. `055_kp_read_projections.sql`
-22. `056_kp_transactional_persistence_api.sql`
-23. `057_kp_restrict_direct_writes.sql`
-
-## Batch F — Legacy cleanup
-
-24. `058_kp_cleanup_readiness_guards.sql`
-25. `059_kp_remove_legacy_summary_authority.sql`
-26. `060_kp_retire_migration_compatibility.sql`
-
-Conditional files 047 and 051 receive their final content only from approved production manifests. If a manifest has zero approved rows, the file performs validation only; it never invents ReferenceDocuments or aliases.
-
-# 2. Batch rationale
+# 2. Organizational batch rationale
 
 ## Batch A — Migration control
 
@@ -108,56 +95,57 @@ flowchart TD
     M034["Existing migration 034"]
     M035["035 Preflight"]
     M036["036 Migration control"]
-    M037["037 Reference documents"]
-    M038["038 Reference versions"]
-    M039["039 Reference aliases"]
-    M040["040 Summary expansion"]
-    M041["041 Summary versions"]
-    M042["042 Summary relationships"]
-    M043["043 Package summaries"]
-    M044["044 RLS foundation"]
-    M045["045 Online indexes"]
-    M046["046 Summary identity backfill"]
-    M047["047 Curated references"]
-    M048["048 Initial revisions"]
-    M049["049 Current pointers"]
-    M050["050 Package placements"]
-    M051["051 Curated aliases"]
-    M052["052 Final unique indexes"]
-    M053["053 Constraint validation"]
-    M054["054 Required identity"]
-    M055["055 Read projections"]
+    M037NEWS["037 News CTA (existing production migration)"]
+    M038["038 Reference documents"]
+    M039["039 Reference versions"]
+    M040["040 Reference aliases"]
+    M041["041 Summary expansion"]
+    M042["042 Summary versions"]
+    M043["043 Summary relationships"]
+    M044["044 Package summaries"]
+    M045["045 RLS foundation"]
+    M046["046 Online indexes"]
+    M047["047 Summary identity backfill"]
+    M048["048 Curated references"]
+    M049["049 Initial revisions"]
+    M050["050 Current pointers"]
+    M051["051 Package placements"]
+    M052["052 Curated aliases"]
+    M053["053 Final unique indexes"]
+    M054["054 Constraint validation"]
+    M055["055 Required identity"]
+    M056["056 Read projections"]
     A1["Application deployment: shadow readers"]
-    M056["056 Transactional persistence"]
+    M057["057 Transactional persistence"]
     A2["Application deployment: dual writer"]
-    M057["057 Restrict direct writes"]
+    M058["058 Restrict direct writes"]
     A3["Application cutover by flags"]
-    M058["058 Cleanup guards"]
-    M059["059 Remove legacy authority"]
-    M060["060 Retire compatibility"]
+    M059["059 Cleanup guards"]
+    M060["060 Remove legacy authority"]
+    M061["061 Retire compatibility"]
 
-    M034 --> M035 --> M036
-    M036 --> M037 --> M038 --> M039
-    M036 --> M040 --> M041 --> M042
-    M040 --> M043
-    M041 --> M043
-    M039 --> M044
+    M034 --> M035 --> M036 --> M037NEWS
+    M037NEWS --> M038 --> M039 --> M040
+    M037NEWS --> M041 --> M042 --> M043
+    M041 --> M044
     M042 --> M044
-    M043 --> M044 --> M045
-    M045 --> M046
-    M038 --> M047
+    M040 --> M045
+    M043 --> M045
+    M044 --> M045 --> M046
     M046 --> M047
+    M039 --> M048
     M047 --> M048
-    M041 --> M048 --> M049
-    M043 --> M050
-    M046 --> M050
-    M049 --> M050
-    M046 --> M051
+    M048 --> M049
+    M042 --> M049 --> M050
+    M044 --> M051
+    M047 --> M051
     M050 --> M051
-    M051 --> M052 --> M053 --> M054
-    M054 --> M055 --> A1
-    A1 --> M056 --> A2 --> M057
-    M057 --> A3 --> M058 --> M059 --> M060
+    M047 --> M052
+    M051 --> M052
+    M052 --> M053 --> M054 --> M055
+    M055 --> M056 --> A1
+    A1 --> M057 --> A2 --> M058
+    M058 --> A3 --> M059 --> M060 --> M061
 ```
 
 ## 3.1 Rollback dependency
@@ -189,7 +177,7 @@ The following are forward-only business history:
 - verified ReferenceDocumentVersions;
 - aliases and merge audit;
 - committed dual-write editorial changes;
-- Phase 6 column removal.
+- migration 060 legacy-column removal.
 
 Correction uses compensating data or a later forward migration. These records are not “rolled down.”
 
@@ -224,13 +212,13 @@ Required assertions include the current Summary UUID/package/slug/content/public
 | RLS | No client grants; service-role/operator only |
 | Backfill dependency | Phase 0 manifest/checksum policy |
 | Feature flag | None |
-| Rollback | Leave dormant; remove only in 060 after export |
+| Rollback | Leave dormant; remove only in 061 after export |
 | Lock risk | Low; creates new operational objects |
 | Runtime risk | Low |
 
 This is operational metadata, not a new domain aggregate.
 
-## 037 — `037_kp_reference_documents.sql`
+## 038 — `038_kp_reference_documents.sql`
 
 | Item | Design |
 |---|---|
@@ -240,7 +228,7 @@ This is operational metadata, not a new domain aggregate.
 | Constraints | PK; lifecycle checks; self-successor check; archive/supersession consistency; successor FK initially deferred/not validated if required by executor |
 | Indexes | Code uniqueness may be built on the empty table; lifecycle/type, issuer/status, successor |
 | RLS | Enable immediately with no public policies |
-| Backfill dependency | None; curated rows arrive in 047 |
+| Backfill dependency | None; curated rows arrive in 048 |
 | Feature flag | None |
 | Rollback | Leave empty/dormant |
 | Lock risk | Low; new table |
@@ -248,17 +236,17 @@ This is operational metadata, not a new domain aggregate.
 
 The allocator follows the approved `DOC-…` policy, is gap-tolerant, and contains no mutable document metadata.
 
-## 038 — `038_kp_reference_document_versions.sql`
+## 039 — `039_kp_reference_document_versions.sql`
 
 | Item | Design |
 |---|---|
 | Purpose | Create immutable source-version storage and lineage |
-| Tables affected | New `reference_document_versions`; `reference_documents` successor FK if not completed in 037 |
+| Tables affected | New `reference_document_versions`; `reference_documents` successor FK if not completed in 038 |
 | Columns added | Frozen version label/status/dates/source/storage/checksum/media/supersession/verification/audit fields |
 | Constraints | PK; unique parent/version label; unique parent/ID pair; parent FK; same-parent supersedes FK; status/date/storage/verification checks |
 | Indexes | Parent/status/effective date, supersedes, checksum, verified queue |
 | RLS | Enable immediately with no public policies |
-| Backfill dependency | 037 |
+| Backfill dependency | 038 |
 | Feature flag | None |
 | Rollback | Leave empty/dormant |
 | Lock risk | Low; new table plus brief referenced-table FK lock |
@@ -266,7 +254,7 @@ The allocator follows the approved `DOC-…` policy, is gap-tolerant, and contai
 
 Published/verified immutability protection is installed before any curated data.
 
-## 039 — `039_kp_reference_document_aliases.sql`
+## 040 — `040_kp_reference_document_aliases.sql`
 
 | Item | Design |
 |---|---|
@@ -276,20 +264,20 @@ Published/verified immutability protection is installed before any curated data.
 | Constraints | PK; FK restrict; unique type/normalized value; type/status/retirement checks; direct target only |
 | Indexes | Unique alias lookup; document/status |
 | RLS | Enable immediately with no public policies |
-| Backfill dependency | 037 |
+| Backfill dependency | 038 |
 | Feature flag | None |
 | Rollback | Leave empty/dormant |
 | Lock risk | Low |
 | Runtime risk | Low |
 
-## 040 — `040_kp_summaries_expand.sql`
+## 041 — `041_kp_summaries_expand.sql`
 
 | Item | Design |
 |---|---|
 | Purpose | Expand the existing Summary root while preserving all legacy columns |
 | Tables affected | Existing `summaries`; persistent Summary-code allocation primitive |
 | Columns added | `summary_code`, `canonical_slug`, `canonical_title`, `visibility`, `lifecycle_status`, `current_published_version_id`, create/archive actor fields and archive timestamp as defined by the frozen schema |
-| Constraints | Add status/visibility/archive checks as not-valid where scanning is avoidable; pointer FK waits for 041 |
+| Constraints | Add status/visibility/archive checks as not-valid where scanning is avoidable; pointer FK waits for 042 |
 | Indexes | No large existing-table index in this transactional file |
 | RLS | Existing policies remain; new columns are not yet used publicly |
 | Backfill dependency | None |
@@ -302,7 +290,7 @@ The migration must use a short lock timeout and retry window rather than wait in
 
 The allocator follows the approved `SUM-…` policy, is gap-tolerant, and does not encode Package, Subject, year, title, or slug.
 
-## 041 — `041_kp_summary_versions.sql`
+## 042 — `042_kp_summary_versions.sql`
 
 | Item | Design |
 |---|---|
@@ -312,7 +300,7 @@ The allocator follows the approved `SUM-…` policy, is gap-tolerant, and does n
 | Constraints | PK; unique parent/revision; unique parent/ID; one-open-revision uniqueness; status/content/audit checks; parent FK restrict; same-parent current pointer FK added not-valid/deferred |
 | Indexes | Parent/revision, open-revision partial unique, parent/status, publication queue, checksum |
 | RLS | Enable immediately with no public policy |
-| Backfill dependency | 040 |
+| Backfill dependency | 041 |
 | Feature flag | None |
 | Rollback | Leave empty/dormant |
 | Lock risk | Low for new table; brief lock adding pointer FK to Summaries |
@@ -320,7 +308,7 @@ The allocator follows the approved `SUM-…` policy, is gap-tolerant, and does n
 
 Published-version immutability protection is installed in this file.
 
-## 042 — `042_kp_summary_relationships.sql`
+## 043 — `043_kp_summary_relationships.sql`
 
 | Item | Design |
 |---|---|
@@ -330,7 +318,7 @@ Published-version immutability protection is installed in this file.
 | Constraints | PKs; Summary/ReferenceDocument/Version FKs; same-parent source-version FKs; alias vocabulary/collision guard; pinned/unpinned uniqueness; role checks |
 | Indexes | Alias slug; Summary/status; source order; reverse document/version lookups |
 | RLS | Enable immediately with no public policies |
-| Backfill dependency | 037–041 |
+| Backfill dependency | 038–042 |
 | Feature flag | None |
 | Rollback | Leave empty/dormant |
 | Lock risk | Low; new tables and brief referenced-table locks |
@@ -338,7 +326,7 @@ Published-version immutability protection is installed in this file.
 
 The canonical-slug/alias cross-table collision guard is installed dormant while canonical fields are null.
 
-## 043 — `043_kp_package_summaries.sql`
+## 044 — `044_kp_package_summaries.sql`
 
 | Item | Design |
 |---|---|
@@ -348,13 +336,13 @@ The canonical-slug/alias cross-table collision guard is installed dormant while 
 | Constraints | Composite PK; Package cascade FK; Summary restrict FK; same-parent pinned-version FK; policy/pin and lifecycle checks; Package/legacy-slug uniqueness |
 | Indexes | Package ordered read, reverse Summary, pin lookup, legacy route lookup, release |
 | RLS | Enable immediately with no public policies |
-| Backfill dependency | 040–041 |
+| Backfill dependency | 041–042 |
 | Feature flag | None |
 | Rollback | Leave empty/dormant |
 | Lock risk | Low |
 | Runtime risk | Low |
 
-## 044 — `044_kp_rls_foundation.sql`
+## 045 — `045_kp_rls_foundation.sql`
 
 | Item | Design |
 |---|---|
@@ -363,7 +351,7 @@ The canonical-slug/alias cross-table collision guard is installed dormant while 
 | Columns added | None |
 | Constraints/indexes | None |
 | RLS | Owner/admin/editor mutation through approved paths; staff preview scope; public/entitled base-read rules; no public unrestricted Markdown; migration-control objects remain private |
-| Backfill dependency | Tables 037–043 exist |
+| Backfill dependency | Tables 038–044 exist |
 | Feature flag | Target readers still off |
 | Rollback | Replace policies with deny-all forward policy; do not disable RLS |
 | Lock risk | Brief table locks while policies are created |
@@ -371,7 +359,7 @@ The canonical-slug/alias cross-table collision guard is installed dormant while 
 
 Views/RPCs that need different access are added later; this file does not prematurely expose them.
 
-## 045 — `045_kp_online_indexes.sql`
+## 046 — `046_kp_online_indexes.sql`
 
 | Item | Design |
 |---|---|
@@ -381,7 +369,7 @@ Views/RPCs that need different access are added later; this file does not premat
 | Constraints | None yet |
 | Indexes | Unique-on-non-null `summary_code`, canonical slug, root lifecycle/visibility, classification, current pointer; any required temporary backfill lookup |
 | RLS | None |
-| Backfill dependency | New columns from 040 |
+| Backfill dependency | New columns from 041 |
 | Feature flag | None |
 | Rollback | Unused indexes may be removed later through a separate online operation |
 | Lock risk | Low write-blocking only if built concurrently; brief catalog locks |
@@ -389,7 +377,7 @@ Views/RPCs that need different access are added later; this file does not premat
 
 This file is a non-transactional controlled online unit. If the deployment executor cannot support concurrent construction, it moves to a maintenance window rather than using blocking index creation during normal traffic.
 
-## 046 — `046_kp_backfill_summary_identity.sql`
+## 047 — `047_kp_backfill_summary_identity.sql`
 
 | Item | Design |
 |---|---|
@@ -398,7 +386,7 @@ This file is a non-transactional controlled online unit. If the deployment execu
 | Columns populated | Summary code, canonical slug/title, visibility, lifecycle, creation provenance |
 | Constraints/indexes | Existing nullable unique indexes reject duplicate allocations; no required-column tightening yet |
 | RLS | Service/operator execution; client policies unchanged |
-| Backfill dependency | Frozen code/slug manifest, 036, 040, 045 |
+| Backfill dependency | Frozen code/slug manifest, 036, 041, 046 |
 | Feature flag | All target served-read flags off |
 | Rollback | Rebuild target values only before external use; allocated codes/slugs are never reused |
 | Lock risk | Row locks in bounded batches, no table-wide lock |
@@ -406,7 +394,7 @@ This file is a non-transactional controlled online unit. If the deployment execu
 
 Execution is chunked and resumable. The Summary-code allocator is advanced/reconciled beyond every manifest allocation before new target creation can be enabled. Legacy UUID, title, slug, Package ownership, and Markdown are not changed.
 
-## 047 — `047_kp_backfill_reference_documents_curated.sql`
+## 048 — `048_kp_backfill_reference_documents_curated.sql`
 
 | Item | Design |
 |---|---|
@@ -415,7 +403,7 @@ Execution is chunked and resumable. The Summary-code allocator is advanced/recon
 | Columns populated | Frozen source identity/version/verification/relationship fields |
 | Constraints/indexes | Existing code, alias, parent/version, checksum, and same-parent constraints apply |
 | RLS | Service/operator only |
-| Backfill dependency | Approved source mapping manifest; 037–039, 042, 046 |
+| Backfill dependency | Approved source mapping manifest; 038–040, 043, 047 |
 | Feature flag | Reference admin/public readers off |
 | Rollback | Correct by compensating reviewed migration; verified codes/history are not reused |
 | Lock risk | Row-level inserts and relation locks |
@@ -423,7 +411,7 @@ Execution is chunked and resumable. The Summary-code allocator is advanced/recon
 
 If no mappings are approved, this unit inserts no source facts. Free-text Document remains the compatibility fallback.
 
-## 048 — `048_kp_backfill_initial_summary_versions.sql`
+## 049 — `049_kp_backfill_initial_summary_versions.sql`
 
 | Item | Design |
 |---|---|
@@ -432,7 +420,7 @@ If no mappings are approved, this unit inserts no source facts. Free-text Docume
 | Columns populated | Markdown/checksum, revision number/status, metadata/SEO/read-time snapshots, migration publication provenance, source snapshots |
 | Constraints/indexes | Parent/revision and one-open-revision uniqueness; published-content checks |
 | RLS | Service/operator only |
-| Backfill dependency | 046; 047 for any approved source mappings |
+| Backfill dependency | 047; 048 for any approved source mappings |
 | Feature flag | Target body readers off |
 | Rollback | Target rows can be rebuilt while legacy is authority, but published revision history is retained once accepted |
 | Lock risk | Row-level inserts; parent lookup |
@@ -440,7 +428,7 @@ If no mappings are approved, this unit inserts no source facts. Free-text Docume
 
 Published legacy rows become published revision 1; unpublished rows become draft revision 1. Invalid published rows are quarantined according to the frozen migration truth table.
 
-## 049 — `049_kp_backfill_current_pointers.sql`
+## 050 — `050_kp_backfill_current_pointers.sql`
 
 | Item | Design |
 |---|---|
@@ -449,7 +437,7 @@ Published legacy rows become published revision 1; unpublished rows become draft
 | Columns populated | `current_published_version_id` for valid migrated published Summaries |
 | Constraints/indexes | Same-parent pointer FK and published-status invariant checked per row |
 | RLS | Service/operator only |
-| Backfill dependency | 048 complete and reconciled |
+| Backfill dependency | 049 complete and reconciled |
 | Feature flag | Target reads still shadow/off |
 | Rollback | Pointer can be corrected to the verified revision; do not delete revision |
 | Lock risk | Bounded row updates |
@@ -457,7 +445,7 @@ Published legacy rows become published revision 1; unpublished rows become draft
 
 No pointer is inferred by maximum revision number; it uses the ledger mapping.
 
-## 050 — `050_kp_backfill_package_summaries.sql`
+## 051 — `051_kp_backfill_package_summaries.sql`
 
 | Item | Design |
 |---|---|
@@ -466,13 +454,13 @@ No pointer is inferred by maximum revision number; it uses the ledger mapping.
 | Columns populated | Package/Summary IDs, active/draft status, latest-published policy, order fields, release, exact legacy slug, audit |
 | Constraints/indexes | Composite identity, Package legacy-slug uniqueness, Summary/Package FKs, policy checks |
 | RLS | Service/operator only |
-| Backfill dependency | 046 and 049; legacy Package FK remains authoritative |
+| Backfill dependency | 047 and 050; legacy Package FK remains authoritative |
 | Feature flag | Package target read off/shadow only after completion |
 | Rollback | Ignore/rebuild placements while legacy ownership remains |
 | Lock risk | Row-level inserts and Package/Summary FK checks |
 | Runtime risk | Medium if slug collisions contradict the current composite uniqueness audit |
 
-## 051 — `051_kp_backfill_aliases_curated.sql`
+## 052 — `052_kp_backfill_aliases_curated.sql`
 
 | Item | Design |
 |---|---|
@@ -481,7 +469,7 @@ No pointer is inferred by maximum revision number; it uses the ledger mapping.
 | Columns populated | Alias target/type/status/reason/audit; approved repoint audit |
 | Constraints/indexes | Global alias uniqueness and cross-table collision guard |
 | RLS | Service/operator only |
-| Backfill dependency | 046 and 050; approved alias/merge manifest |
+| Backfill dependency | 047 and 051; approved alias/merge manifest |
 | Feature flag | Canonical route remains off |
 | Rollback | Compensating alias/repoint operation using merge ledger; aliases are not silently deleted/reused |
 | Lock risk | Row-level relation updates |
@@ -489,7 +477,7 @@ No pointer is inferred by maximum revision number; it uses the ledger mapping.
 
 Package-scoped old slugs remain in `package_summaries.legacy_slug`; they are not inserted as global aliases.
 
-## 052 — `052_kp_final_unique_indexes.sql`
+## 053 — `053_kp_final_unique_indexes.sql`
 
 | Item | Design |
 |---|---|
@@ -499,7 +487,7 @@ Package-scoped old slugs remain in `package_summaries.legacy_slug`; they are not
 | Constraints | Prepares unique Package code, Summary code/canonical slug, and final route namespaces for attachment as constraints |
 | Indexes | Concurrent unique Package code; rebuild/confirm final unique root/alias/route indexes; measured reverse indexes |
 | RLS | None |
-| Backfill dependency | 046–051 reconciliation clean; Package code remediation approved |
+| Backfill dependency | 047–052 reconciliation clean; Package code remediation approved |
 | Feature flag | None |
 | Rollback | Keep unused indexes or remove through later concurrent operation |
 | Lock risk | Low blocking if concurrent; brief final catalog lock |
@@ -507,7 +495,7 @@ Package-scoped old slugs remain in `package_summaries.legacy_slug`; they are not
 
 This is another non-transactional controlled online unit.
 
-## 053 — `053_kp_validate_constraints.sql`
+## 054 — `054_kp_validate_constraints.sql`
 
 | Item | Design |
 |---|---|
@@ -515,9 +503,9 @@ This is another non-transactional controlled online unit.
 | Tables affected | `summaries`, new Reference/Knowledge/Product tables, `packages` |
 | Columns added | None |
 | Constraints | Current pointer, same-parent pins/sources, lifecycle/content checks, code/slug uniqueness, Package code uniqueness |
-| Indexes | Reuses 052 indexes; no duplicate rebuild |
+| Indexes | Reuses 053 indexes; no duplicate rebuild |
 | RLS | None |
-| Backfill dependency | Full reconciliation and 052 |
+| Backfill dependency | Full reconciliation and 053 |
 | Feature flag | Shadow reads may remain on; served target reads off |
 | Rollback | Fix violating data and validate forward; do not drop protections during incident |
 | Lock risk | Validation permits normal DML but takes validation locks and scans tables |
@@ -525,7 +513,7 @@ This is another non-transactional controlled online unit.
 
 Validation is split by table/constraint class if Phase 0 size indicates material load.
 
-## 054 — `054_kp_enforce_required_identity.sql`
+## 055 — `055_kp_enforce_required_identity.sql`
 
 | Item | Design |
 |---|---|
@@ -535,7 +523,7 @@ Validation is split by table/constraint class if Phase 0 size indicates material
 | Constraints | Required-column enforcement and business-code immutability |
 | Indexes | Uses validated indexes/checks |
 | RLS | None |
-| Backfill dependency | 053 clean; no pending legacy delta |
+| Backfill dependency | 054 clean; no pending legacy delta |
 | Feature flag | Brief Summary editorial freeze; target served reads still off |
 | Rollback | Forward relaxation possible but normally unnecessary; data values remain |
 | Lock risk | Brief ACCESS EXCLUSIVE locks for required-column metadata changes |
@@ -543,22 +531,22 @@ Validation is split by table/constraint class if Phase 0 size indicates material
 
 Learner reads can remain online, but Summary writers are paused and long transactions are drained.
 
-## 055 — `055_kp_read_projections.sql`
+## 056 — `056_kp_read_projections.sql`
 
 | Item | Design |
 |---|---|
 | Purpose | Add frozen consumer projections for shadow and cutover reads |
 | Tables affected | No domain-table mutation; creates views/functions for Summary Library, Picker, Public Package, Public Summary/resolver, legacy compatibility, News, and Recommendation ContentStore |
 | Columns added | Projection outputs only |
-| Constraints/indexes | Relies on 045/052 indexes |
+| Constraints/indexes | Relies on 046/053 indexes |
 | RLS | Security-invoker/base-RLS by default; narrowly scoped resolver functions; no entitlement-blind public Markdown |
-| Backfill dependency | 054 and reconciliation success |
+| Backfill dependency | 055 and reconciliation success |
 | Feature flag | Enables deployment of `kp_shadow_*`; all served target read flags default off |
 | Rollback | Disable flags; leave projections installed |
 | Lock risk | Low catalog locks |
 | Runtime risk | Medium security/performance risk; query plans and persona tests required |
 
-## 056 — `056_kp_transactional_persistence_api.sql`
+## 057 — `057_kp_transactional_persistence_api.sql`
 
 | Item | Design |
 |---|---|
@@ -567,7 +555,7 @@ Learner reads can remain online, but Summary writers are paused and long transac
 | Columns added | No domain columns; persistence functions and bounded grants |
 | Constraints/indexes | All target invariants remain database-enforced |
 | RLS | Functions use locked search path and least privilege; business permission remains Application Layer plus caller identity; no browser service-role exposure |
-| Backfill dependency | 054; read parity established before flag enable |
+| Backfill dependency | 055; read parity established before flag enable |
 | Feature flag | Installs support for `kp_dual_write_summary` and `kp_dual_write_publish`, both off |
 | Rollback | Keep API dormant; application reverts to legacy actions |
 | Lock risk | Low at install; normal row/aggregate locks at runtime |
@@ -575,7 +563,7 @@ Learner reads can remain online, but Summary writers are paused and long transac
 
 The database API performs atomic persistence, not Recommendation, publishing-readiness, or migration policy design.
 
-## 057 — `057_kp_restrict_direct_writes.sql`
+## 058 — `058_kp_restrict_direct_writes.sql`
 
 | Item | Design |
 |---|---|
@@ -592,7 +580,7 @@ The database API performs atomic persistence, not Recommendation, publishing-rea
 
 Requires a short Summary editorial freeze for policy switch and smoke tests; learner reads stay online.
 
-## 058 — `058_kp_cleanup_readiness_guards.sql`
+## 059 — `059_kp_cleanup_readiness_guards.sql`
 
 | Item | Design |
 |---|---|
@@ -607,7 +595,7 @@ Requires a short Summary editorial freeze for policy switch and smoke tests; lea
 | Lock risk | Brief trigger/policy lock if write fence is installed |
 | Runtime risk | Medium; intentional abort on any dependency |
 
-## 059 — `059_kp_remove_legacy_summary_authority.sql`
+## 060 — `060_kp_remove_legacy_summary_authority.sql`
 
 | Item | Design |
 |---|---|
@@ -617,7 +605,7 @@ Requires a short Summary editorial freeze for policy switch and smoke tests; lea
 | Constraints | Remove legacy Package cascade; change News→Summary behavior to preserve/restrict shared knowledge history; retain target constraints |
 | Indexes | Remove obsolete legacy indexes after dependency verification |
 | RLS | Replace legacy Summary policies with target root/revision/placement policy model |
-| Backfill dependency | 058 passes and full backup/restore rehearsal succeeds |
+| Backfill dependency | 059 passes and full backup/restore rehearsal succeeds |
 | Feature flag | Target authority only; no simple legacy rollback |
 | Rollback | Forward fix or database restore; no down-migration |
 | Lock risk | ACCESS EXCLUSIVE locks on `summaries` and brief locks on dependent relations |
@@ -625,7 +613,7 @@ Requires a short Summary editorial freeze for policy switch and smoke tests; lea
 
 This file requires a maintenance window and full Summary editorial freeze. Learner downtime may still be avoided if traffic is drained briefly and lock acquisition is bounded, but no-downtime is not promised for this destructive step.
 
-## 060 — `060_kp_retire_migration_compatibility.sql`
+## 061 — `061_kp_retire_migration_compatibility.sql`
 
 | Item | Design |
 |---|---|
@@ -634,7 +622,7 @@ This file requires a maintenance window and full Summary editorial freeze. Learn
 | Columns added/removed | Operational objects only |
 | Constraints/indexes | Remove temporary backfill-only indexes after measured confirmation |
 | RLS | Remove obsolete legacy policies/grants; retain final frozen policies |
-| Backfill dependency | 059 stable through final observation period; audit/ledger exported |
+| Backfill dependency | 060 stable through final observation period; audit/ledger exported |
 | Feature flag | Remove stale flags in a corresponding later application deployment |
 | Rollback | Recreate compatibility projection through forward migration if operationally required |
 | Lock risk | Low/brief catalog locks |
@@ -692,7 +680,7 @@ While legacy remains writable:
 - each backfill run records a source `updated_at`/checksum;
 - rows changed after their first pass enter a delta queue;
 - final delta catch-up runs after a short editorial freeze;
-- 054 cannot execute while any ledger unit is pending, failed, or stale;
+- 055 cannot execute while any ledger unit is pending, failed, or stale;
 - Phase 3 shadow reads begin only after the delta watermark reaches the freeze point.
 
 # 6. SQL safety review
@@ -701,11 +689,11 @@ While legacy remains writable:
 
 | Operation | Files | Risk control |
 |---|---|---|
-| Add nullable columns to populated `summaries` | 040 | No rewrite-causing defaults; short lock timeout; retry off-peak |
-| Add/attach constraints on populated tables | 041, 053, 054 | Add unvalidated first where possible; validate separately; attach prebuilt indexes |
-| Enable/alter RLS policies | 044, 057 | Short operation, editorial freeze for write-policy switch |
-| Set required/not-null fields | 054 | Prevalidated equivalent checks; drained writers; short maintenance window |
-| Drop legacy columns/FKs | 059 | Full dependency audit, bounded lock wait, maintenance window |
+| Add nullable columns to populated `summaries` | 041 | No rewrite-causing defaults; short lock timeout; retry off-peak |
+| Add/attach constraints on populated tables | 042, 054, 055 | Add unvalidated first where possible; validate separately; attach prebuilt indexes |
+| Enable/alter RLS policies | 045, 058 | Short operation, editorial freeze for write-policy switch |
+| Set required/not-null fields | 055 | Prevalidated equivalent checks; drained writers; short maintenance window |
+| Drop legacy columns/FKs | 060 | Full dependency audit, bounded lock wait, maintenance window |
 
 Any long-running transaction touching Summaries can delay these locks. Pre-deployment monitoring must identify and drain such sessions; the migration must fail fast rather than queue indefinitely.
 
@@ -735,7 +723,7 @@ The planned nullable additions and later metadata-only cleanup should not requir
 - Add expensive FKs/checks without immediate historical validation where supported.
 - New writes are constrained immediately.
 - Backfill and reconcile.
-- Validate one constraint family at a time in 053.
+- Validate one constraint family at a time in 054.
 - Abort on violation; repair data; resume validation.
 - Do not drop a failing constraint merely to advance the schedule.
 
@@ -757,18 +745,18 @@ Normally online:
 Summary editorial freeze required:
 
 - final delta catch-up;
-- 054 required-column enforcement;
-- 057 direct-write policy switch;
-- 058 cleanup write fence;
-- 059 destructive cleanup.
+- 055 required-column enforcement;
+- 058 direct-write policy switch;
+- 059 cleanup write fence;
+- 060 destructive cleanup.
 
 Maintenance window strongly recommended:
 
-- 054 if populated-table metadata locks cannot meet the normal lock budget;
+- 055 if populated-table metadata locks cannot meet the normal lock budget;
 - any index build that cannot run concurrently;
-- 059 always.
+- 060 always.
 
-Learner downtime is not expected for Batches A–E. Phase 059 may require a short traffic drain even if the application remains technically available.
+Learner downtime is not expected for migrations 035–058. Migration 060 may require a short traffic drain even if the application remains technically available.
 
 # 7. Deployment and feature-flag mapping
 
@@ -780,8 +768,8 @@ Learner downtime is not expected for Batches A–E. Phase 059 may require a shor
 | App D1 | Knows target read projections and shadow comparator; serves legacy |
 | App D2 | Uses transactional persistence API for dual-write; target-only features off |
 | App D3 | Can serve target readers independently and use target writer authority |
-| App D4 | Removes legacy field dependencies; required before 059 |
-| App D5 | Removes migration/compatibility code and stale flags after 060 |
+| App D4 | Removes legacy field dependencies; required before 060 |
+| App D5 | Removes migration/compatibility code and stale flags after 061 |
 
 ## 7.2 Migration-to-flag map
 
@@ -789,30 +777,31 @@ Learner downtime is not expected for Batches A–E. Phase 059 may require a shor
 |---|---|---|---|
 | 035 | D0 | All KP flags off | Correct prerequisite; no flag change |
 | 036 | D0 | All KP flags off | Leave control objects dormant |
-| 037 | D0 | All KP flags off | Leave Reference root table dormant |
-| 038 | D0 | All KP flags off | Leave Reference version table dormant |
-| 039 | D0 | All KP flags off | Leave Reference alias table dormant |
-| 040 | D0 | All KP flags off | Ignore nullable target Summary fields |
-| 041 | D0 | All KP flags off | Leave revision table/pointer dormant |
-| 042 | D0 | All KP flags off | Leave relationship tables dormant |
-| 043 | D0 | All KP flags off | Leave placement table dormant |
-| 044 | D0 | All KP flags off | Replace with deny-all policy if required; do not disable RLS |
-| 045 | D0 | All KP flags off | Keep or remove indexes through later online operation |
-| 046 | D0 | Served target flags off | Legacy remains authority; rebuild target identity |
-| 047 | D0 | Reference reader flags off | Reviewed compensating source correction |
-| 048 | D0 | Target body reads off | Legacy Markdown remains authority |
-| 049 | D0 | Target reads off | Correct pointer; keep revision |
-| 050 | D0 | Package target read off | Rebuild placement from legacy |
-| 051 | D0 | Canonical route off | Reviewed compensating alias/repoint |
-| 052 | D0 | Target reads off | Keep/remove indexes later |
-| 053 | D0 | Shadow may be off/on; served reads off | Repair forward and revalidate |
-| 054 | D0 | Served target reads off; editorial freeze | Relax only by forward migration if required |
-| 055 | D1 | `kp_shadow_*` selectively on; `kp_read_*` off | Disable shadow/target-read flags |
-| 056 | D2 | Dual-write flags initially off, then canary/on | Drain and return to legacy writer if mirror is current |
-| 057 | D2 | Dual-write on; direct legacy UI writes removed | Forward policy restoration plus writer-flag rollback |
-| 058 | D3/D4 | Target authority on; target-only reuse requires explicit go/no-go | Remove fence only through forward change |
-| 059 | D4 | Target-only; legacy rollback unavailable | Forward fix or restore |
-| 060 | D5 | Stale migration flags removed | Recreate compatibility through a forward migration |
+| 037 | D0 | Outside Knowledge Platform flags; existing production News migration | Retain unchanged in production history |
+| 038 | D0 | All KP flags off | Leave Reference root table dormant |
+| 039 | D0 | All KP flags off | Leave Reference version table dormant |
+| 040 | D0 | All KP flags off | Leave Reference alias table dormant |
+| 041 | D0 | All KP flags off | Ignore nullable target Summary fields |
+| 042 | D0 | All KP flags off | Leave revision table/pointer dormant |
+| 043 | D0 | All KP flags off | Leave relationship tables dormant |
+| 044 | D0 | All KP flags off | Leave placement table dormant |
+| 045 | D0 | All KP flags off | Replace with deny-all policy if required; do not disable RLS |
+| 046 | D0 | All KP flags off | Keep or remove indexes through later online operation |
+| 047 | D0 | Served target flags off | Legacy remains authority; rebuild target identity |
+| 048 | D0 | Reference reader flags off | Reviewed compensating source correction |
+| 049 | D0 | Target body reads off | Legacy Markdown remains authority |
+| 050 | D0 | Target reads off | Correct pointer; keep revision |
+| 051 | D0 | Package target read off | Rebuild placement from legacy |
+| 052 | D0 | Canonical route off | Reviewed compensating alias/repoint |
+| 053 | D0 | Target reads off | Keep/remove indexes later |
+| 054 | D0 | Shadow may be off/on; served reads off | Repair forward and revalidate |
+| 055 | D0 | Served target reads off; editorial freeze | Relax only by forward migration if required |
+| 056 | D1 | `kp_shadow_*` selectively on; `kp_read_*` off | Disable shadow/target-read flags |
+| 057 | D2 | Dual-write flags initially off, then canary/on | Drain and return to legacy writer if mirror is current |
+| 058 | D2 | Dual-write on; direct legacy UI writes removed | Forward policy restoration plus writer-flag rollback |
+| 059 | D3/D4 | Target authority on; target-only reuse requires explicit go/no-go | Remove fence only through forward change |
+| 060 | D4 | Target-only; legacy rollback unavailable | Forward fix or restore |
+| 061 | D5 | Stale migration flags removed | Recreate compatibility through a forward migration |
 | Application-only cutover | D3 | Enable admin/count/news/package/summary/recommendation readers in approved order | Flip each consumer flag back |
 
 ## 7.3 Consumer flag order
@@ -841,46 +830,47 @@ Relative timing is used because production size and traffic windows remain Phase
 | Time | Database | Application/operation | Gate |
 |---|---|---|---|
 | T-14 to T-7 | Phase 0 only | Inventory, manifest, restore rehearsal | Schema drift/collisions resolved |
-| T-7 | 035–036 | D0 | Preflight passes |
-| T-7 to T-6 | 037–044 | D0 | Additive schema/RLS tests |
-| T-6 | 045 | D0 | Index health and replica load |
-| T-6 to T-4 | 046–051 | D0; legacy remains authority | Backfill ledger and checksums clean |
-| T-4 | 052–053 | D0 | Unique/constraint validation |
-| T-4 | Final delta then 054 | Brief Summary editorial freeze | Zero pending/stale units |
-| T-3 | 055 + D1 | Shadow reads | Parity soak |
-| T-2 | 056 + D2 | Dual-write canary | Command parity |
-| T-1 | 057 | Short editorial freeze | Unknown writers absent |
+| T-7 | 035–037 already applied | D0 | Migrations 035–036 verification and production migration history pass |
+| T-7 to T-6 | 038–045 | D0 | Additive schema/RLS tests |
+| T-6 | 046 | D0 | Index health and replica load |
+| T-6 to T-4 | 047–052 | D0; legacy remains authority | Backfill ledger and checksums clean |
+| T-4 | 053–054 | D0 | Unique/constraint validation |
+| T-4 | Final delta then 055 | Brief Summary editorial freeze | Zero pending/stale units |
+| T-3 | 056 + D1 | Shadow reads | Parity soak |
+| T-2 | 057 + D2 | Dual-write canary | Command parity |
+| T-1 | 058 | Short editorial freeze | Unknown writers absent |
 | T0 onward | D3, no DB change | Per-consumer cutover | Per-flag canary |
-| T+rollback window | 058 | D4 prepared | Explicit rollback-boundary approval |
-| Approved maintenance | 059 | D4 active | Full backup and dependency-zero proof |
-| Stable cleanup period | 060 + D5 | Remove compatibility | Final audit export |
+| T+rollback window | 059 | D4 prepared | Explicit rollback-boundary approval |
+| Approved maintenance | 060 | D4 active | Full backup and dependency-zero proof |
+| Stable cleanup period | 061 + D5 | Remove compatibility | Final audit export |
 
 The rollback window duration is an operational approval, not hard-coded by this design.
 
 # 9. Rollback matrix
 
-| File/range | Classification | Rollback method | Data consequence |
+| Migration number(s) | Classification | Rollback method | Data consequence |
 |---|---|---|---|
 | 035 | Retryable guard | Correct prerequisite | None |
 | 036 | Additive | Leave ledger dormant | None |
-| 037–045 | Additive | Disable target access; leave objects | None to legacy |
-| 046 | Compensating/forward | Rebuild target identity from manifest | Codes/slugs not reused |
-| 047 | Reviewed forward data | Compensating reviewed correction | Verification history retained |
-| 048 | Forward content history | Rebuild only before acceptance; never mutate accepted published revision | Revisions retained |
-| 049 | Correctable pointer | Point to verified published revision | Revision history unchanged |
-| 050 | Correctable placement | Rebuild while legacy FK remains | Legacy routes remain authoritative |
-| 051 | Reviewed forward alias/merge | Compensating repoint/retire | Aliases/audit retained |
-| 052–054 | Constraint tightening | Forward relaxation only if necessary; normally leave | Target data unchanged |
-| 055 | Additive | Disable shadow/target read flags | None |
-| 056 | Additive API | Disable writer flags after drain | Committed business edits retained |
-| 057 | Policy boundary | Forward policy restoration, then writer rollback | Requires current legacy mirror |
-| 058 | Cleanup gate | Forward removal of fence before 059 | None if cleanup not started |
-| 059 | Destructive forward-only | Forward fix or database restore | Simple legacy rollback ends |
-| 060 | Cleanup | Recreate compatibility through forward migration | Domain data unchanged |
+| 037 | Existing production migration outside Knowledge Platform | Retain unchanged; no Knowledge Platform rollback action | News CTA production state retained |
+| 038–046 | Additive | Disable target access; leave objects | None to legacy |
+| 047 | Compensating/forward | Rebuild target identity from manifest | Codes/slugs not reused |
+| 048 | Reviewed forward data | Compensating reviewed correction | Verification history retained |
+| 049 | Forward content history | Rebuild only before acceptance; never mutate accepted published revision | Revisions retained |
+| 050 | Correctable pointer | Point to verified published revision | Revision history unchanged |
+| 051 | Correctable placement | Rebuild while legacy FK remains | Legacy routes remain authoritative |
+| 052 | Reviewed forward alias/merge | Compensating repoint/retire | Aliases/audit retained |
+| 053–055 | Constraint tightening | Forward relaxation only if necessary; normally leave | Target data unchanged |
+| 056 | Additive | Disable shadow/target read flags | None |
+| 057 | Additive API | Disable writer flags after drain | Committed business edits retained |
+| 058 | Policy boundary | Forward policy restoration, then writer rollback | Requires current legacy mirror |
+| 059 | Cleanup gate | Forward removal of fence before 060 | None if cleanup not started |
+| 060 | Destructive forward-only | Forward fix or database restore | Simple legacy rollback ends |
+| 061 | Cleanup | Recreate compatibility through forward migration | Domain data unchanged |
 
 # 10. Deployment checklist
 
-## 10.1 Before any migration
+## 10.1 Before migration 035
 
 - [ ] Frozen documents and this design approved.
 - [ ] Live schema matches 035 prerequisites.
@@ -892,14 +882,14 @@ The rollback window duration is an operational approval, not hard-coded by this 
 - [ ] Migration owner, DBA/operator, app owner, SEO reviewer, and rollback commander named.
 - [ ] Lock, statement, batch, and retry thresholds approved.
 
-## 10.2 Before additive schema
+## 10.2 Before migrations 038–046 — additive schema
 
 - [ ] D0 proven tolerant of added nullable fields/tables.
 - [ ] RLS tests prepared before any target policy is exposed.
 - [ ] Long transactions monitored.
 - [ ] PostgREST schema-cache refresh procedure ready.
 
-## 10.3 Before backfill
+## 10.3 Before migrations 047–052 — backfill
 
 - [ ] Code and canonical-slug manifests frozen.
 - [ ] Markdown checksum algorithm frozen and independently tested.
@@ -908,16 +898,16 @@ The rollback window duration is an operational approval, not hard-coded by this 
 - [ ] Batch interruption/resume tested.
 - [ ] New legacy writes/deltas observable.
 
-## 10.4 Before constraint tightening
+## 10.4 Before migrations 053–055 — constraint tightening
 
 - [ ] One root/revision/placement result per legacy Summary.
 - [ ] Zero unexplained checksum, pointer, status, order, or route mismatches.
 - [ ] Package code duplicates resolved.
 - [ ] Canonical and alias namespaces collision-free.
 - [ ] Final delta queue empty.
-- [ ] Editorial freeze active for 054.
+- [ ] Editorial freeze active for 055.
 
-## 10.5 Before dual read/write
+## 10.5 Before migrations 056–058 — dual read/write
 
 - [ ] D1/D2 deployed with flags default-off.
 - [ ] Shadow telemetry contains digests, not Markdown.
@@ -927,7 +917,7 @@ The rollback window duration is an operational approval, not hard-coded by this 
 - [ ] Central cache invalidation resolves Package slugs, legacy/canonical Summary URLs, and News impact.
 - [ ] Unknown/direct writers removed or onboarded.
 
-## 10.6 Before application cutover
+## 10.6 Before application-only cutover after migration 058
 
 - [ ] Required shadow soak has zero unexplained mismatches.
 - [ ] Per-consumer rollback rehearsed.
@@ -936,14 +926,14 @@ The rollback window duration is an operational approval, not hard-coded by this 
 - [ ] Assessment regression suite passes unchanged.
 - [ ] Summary remains noindex and Package canonical behavior remains stable.
 
-## 10.7 Before cleanup
+## 10.7 Before migrations 059–061 — cleanup
 
 - [ ] Rollback window formally closed.
 - [ ] Target-only state explicitly approved.
 - [ ] D4 contains no legacy field access.
 - [ ] Production query/write telemetry shows zero legacy dependency.
 - [ ] All legacy URLs and aliases resolve through target.
-- [ ] Free-text Document removal is either independently complete or omitted from 059.
+- [ ] Free-text Document removal is either independently complete or omitted from 060.
 - [ ] Package deletion test preserves shared Summary.
 - [ ] Fresh backup and restore rehearsal completed.
 - [ ] Maintenance/editorial freeze announced.
@@ -953,14 +943,14 @@ The rollback window duration is an operational approval, not hard-coded by this 
 
 This SQL Migration Design may be frozen when reviewers approve:
 
-- the 035–060 file inventory and naming;
+- the 035–061 file inventory and naming;
 - controlled-online treatment of concurrent indexes and backfills;
 - exact FK-safe backfill order;
 - conditional curated source/alias units;
 - constraint validation before required-column enforcement;
 - dormant read/write APIs before flag enablement;
-- the 057 single-writer enforcement point;
-- the Phase 059 destructive rollback boundary;
+- the 058 single-writer enforcement point;
+- the Phase 060 destructive rollback boundary;
 - lock-risk and maintenance classifications;
 - application deployment and feature-flag choreography.
 

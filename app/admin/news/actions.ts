@@ -402,10 +402,14 @@ export async function listNews(
 
   // Search the right table based on type. Empty q returns the first page of
   // items so the picker has something to show immediately.
-  const table = params.type === 'summary' ? 'summaries' : 'packages'
-  const labelColumn = table === 'packages' ? 'name' : 'title'
+  const isSummary = params.type === 'summary'
+  const table = isSummary ? 'summaries' : 'packages'
+  const labelColumn = isSummary ? 'title' : 'name'
+  const selectCols = isSummary
+    ? 'id, slug, title, topic'
+    : 'id, slug, name, description, cover_image_url, logo_url'
 
-  let query = supabase.from(table).select('id, slug, cover_image_url, excerpt', { count: 'exact' })
+  let query = supabase.from(table).select(selectCols, { count: 'exact' })
 
   if (params.q && params.q.trim()) {
     // ilike for case-insensitive contains; packages.name / summaries.title
@@ -419,7 +423,18 @@ export async function listNews(
     console.error('listNews picker error:', error)
     return { data: [], count: null }
   }
-  return { data: data || [], count }
+
+  const normalized = (data || []).map((row: any) => ({
+    id: row.id,
+    slug: row.slug,
+    name: isSummary ? row.title : row.name,
+    title: isSummary ? row.title : row.name,
+    description: isSummary ? row.topic : row.description,
+    excerpt: isSummary ? row.topic : row.description,
+    cover_image_url: row.cover_image_url || row.logo_url || null,
+  }))
+
+  return { data: normalized, count }
 }
 
 // ─── RELATIONS ──────────────────────────────────────────────────────────────
