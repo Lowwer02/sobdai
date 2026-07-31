@@ -16,6 +16,10 @@ export type PublicRoute = {
 export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
   { path: '/packages', changeFrequency: 'daily', priority: 0.9 },
+  // News hub — a frequently-updated catalog of published articles, same tier as
+  // /packages. Individual article URLs (/news/[slug]) are added dynamically by
+  // app/sitemap.ts; only the hub lives in the static list.
+  { path: '/news', changeFrequency: 'daily', priority: 0.9 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/downloads', changeFrequency: 'monthly', priority: 0.5 },
@@ -27,6 +31,29 @@ export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
 export function absoluteUrl(path = '/'): string {
   if (path.startsWith('http://') || path.startsWith('https://')) return path
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+/**
+ * Canonical schema.org Organization object for Sobdai — the single source of
+ * truth for the site's publisher identity. Built from the existing SITE_*
+ * constants + the brand logo (/public/logo.png, the asset the nav already
+ * treats as the site logo). Reuse this for `publisher` / `author` /
+ * `sourceOrganization` in any JSON-LD schema; do not redefine it elsewhere.
+ *
+ * No Organization schema pre-existed in the repo (only a WebSite schema in
+ * app/layout.tsx), so this is the canonical definition requested by the
+ * structured-data task — placed in the SEO infra module so future schemas
+ * (Article, Course, Product…) share one publisher object.
+ */
+export const SITE_ORGANIZATION: Record<string, unknown> = {
+  '@type': 'Organization',
+  '@id': `${SITE_URL}/#organization`,
+  name: SITE_NAME,
+  url: SITE_URL,
+  logo: {
+    '@type': 'ImageObject',
+    url: absoluteUrl('/logo.png'),
+  },
 }
 
 export function createPageMetadata({

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { absoluteUrl, createPageMetadata } from '@/lib/seo'
+import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
 
 /**
  * Government News — types + server-side validation (single contract).
@@ -233,27 +233,56 @@ export function generateSlug(text: string): string {
     .trim()
 }
 
-// ─── metadata (public detail page) ──────────────────────────────────────────
+// ─── metadata + structured data (public detail page) ────────────────────────
 
 /**
- * Build the Next.js Metadata for a public news article, applying the frozen
- * fallback rules. This is the single place those rules live — both the public
- * detail page and any future consumer resolve metadata through it.
+ * Resolve the SEO-critical fields for a public news article, applying the
+ * frozen fallback rules. This is the SINGLE place those rules live —
+ * buildNewsMetadata (Next Metadata) and buildNewsJsonLd (schema.org) both read
+ * from here, so the <head> metadata and the JSON-LD can never disagree and the
+ * fallback logic is never duplicated.
  *
  * Fallback chain (each field falls back only when the editor left it blank):
  *   title        : seo_title → news.title
- *   description  : seo_description → excerpt → (helper default SITE_DESCRIPTION)
+ *   description  : seo_description → excerpt → (omitted; helper supplies a default)
  *   canonical    : canonical_url  → absolute public URL /news/<slug>
- *   og image     : og_image_url   → cover_image_url → (helper default OG image)
- *
- * The helper delegates the canonical/OG/Twitter shape to createPageMetadata()
- * so the output stays consistent with every other Sobdai page — no duplicated
- * SEO logic. Article type + published/modified times are surfaced so search
- * engines and social previews treat this as dated content.
- *
- * Accepts a partial row (any object with the relevant fields); the public page
- * passes its fetched row. `path` overrides the canonical path for the rare case
- * the caller needs a non-default route.
+ *   image        : og_image_url   → cover_image_url → (omitted; helper supplies a default)
+ */
+export function resolveNewsSeo(
+  article: {
+    slug: string
+    title: string
+    excerpt?: string | null
+    cover_image_url?: string | null
+    seo_title?: string | null
+    seo_description?: string | null
+    canonical_url?: string | null
+    og_image_url?: string | null
+  }
+): {
+  title: string
+  description: string | undefined
+  canonical: string
+  image: string | undefined
+} {
+  const publicPath = `/news/${article.slug}`
+  return {
+    title: article.seo_title?.trim() || article.title,
+    description: article.seo_description?.trim() || article.excerpt?.trim() || undefined,
+    // canonical_url may already be absolute; absoluteUrl() passes http(s) through.
+    canonical: article.canonical_url?.trim()
+      ? absoluteUrl(article.canonical_url.trim())
+      : absoluteUrl(publicPath),
+    image: article.og_image_url?.trim() || article.cover_image_url?.trim() || undefined,
+  }
+}
+
+/**
+ * Build the Next.js Metadata for a public news article. Fallback rules come
+ * from resolveNewsSeo(); the canonical/OG/Twitter shape is delegated to
+ * createPageMetadata() so the output stays consistent with every other Sobdai
+ * page. Article type + published/modified times are surfaced so search engines
+ * and social previews treat this as dated content.
  */
 export function buildNewsMetadata(
   article: {
@@ -270,17 +299,7 @@ export function buildNewsMetadata(
   },
   opts: { noindex?: boolean } = {}
 ): Metadata {
-  const publicPath = `/news/${article.slug}`
-
-  // Fallbacks (blank editor field → the natural public value).
-  const title = article.seo_title?.trim() || article.title
-  const description =
-    article.seo_description?.trim() || article.excerpt?.trim() || undefined
-  // canonical_url may already be absolute; absoluteUrl() passes http(s) through.
-  const canonical = article.canonical_url?.trim()
-    ? absoluteUrl(article.canonical_url.trim())
-    : absoluteUrl(publicPath)
-  const image = article.og_image_url?.trim() || article.cover_image_url?.trim() || undefined
+  const { title, description, canonical, image } = resolveNewsSeo(article)
 
   return createPageMetadata({
     title,
@@ -294,6 +313,74 @@ export function buildNewsMetadata(
     ...(article.updated_at ? { modifiedTime: article.updated_at } : {}),
     ...(opts.noindex ? { noindex: true } : {}),
   })
+}
+
+/**
+ * Build the schema.org NewsArticle JSON-LD object for a public news article.
+ * Renders via the existing StructuredData component (which calls createJsonLd).
+ *
+ * Field sourcing (no duplicated fallback logic):
+ *   headline / description / image / url  ← resolveNewsSeo() (same rules as Metadata)
+ *   datePublished / dateModified           ← published_at / updated_at
+ *   articleSection                          ← category
+ *   keywords                                ← tags
+ *   publisher / author                      ← SITE_ORGANIZATION (the canonical
+ *                                            Sobdai Organization; also used as
+ *                                            author — see note below)
+ *   mainEntityOfPage                        ← canonical URL
+ *
+ * Author note: the news model stores only an opaque author_id UUID with no
+ * display name and the CMS IA deliberately excludes an author/publisher split.
+ * For org-authored government news the publisher (Sobdai) is also the correct
+ * author, so we reuse SITE_ORGANIZATION for both — valid per schema.org and
+ * consistent with the IA decision.
+ */
+export function buildNewsJsonLd(
+  article: {
+    slug: string
+    title: string
+    excerpt?: string | null
+    cover_image_url?: string | null
+    cover_image_alt?: string | null
+    category?: string | null
+    tags?: string[] | null
+    seo_title?: string | null
+    seo_description?: string | null
+    canonical_url?: string | null
+    og_image_url?: string | null
+    published_at?: string | null
+    updated_at?: string | null
+  }
+): Record<string, unknown> {
+  const { title, description, canonical, image } = resolveNewsSeo(article)
+
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: title,
+    ...(description ? { description } : {}),
+    image: image ? [image] : [],
+    datePublished: article.published_at || undefined,
+    dateModified: article.updated_at || article.published_at || undefined,
+    author: SITE_ORGANIZATION,
+    publisher: SITE_ORGANIZATION,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': canonical,
+    },
+    url: canonical,
+    ...(article.category ? { articleSection: article.category } : {}),
+    ...(Array.isArray(article.tags) && article.tags.length > 0
+      ? { keywords: article.tags.join(', ') }
+      : {}),
+  }
+
+  // Drop any keys whose value is undefined so the JSON-LD stays clean.
+  for (const key of Object.keys(jsonLd)) {
+    if (jsonLd[key] === undefined) delete jsonLd[key]
+  }
+
+  return jsonLd
 }
 
 function isValidSlug(s: string): boolean {
