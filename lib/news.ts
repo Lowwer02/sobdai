@@ -1,3 +1,6 @@
+import type { Metadata } from 'next'
+import { absoluteUrl, createPageMetadata } from '@/lib/seo'
+
 /**
  * Government News — types + server-side validation (single contract).
  *
@@ -15,7 +18,8 @@
  *                              action returns errors and leaves status unchanged.
  *
  * No DB, no `'use server'`. Hand-written coercion (no zod — matches the rest
- * of the codebase).
+ * of the codebase). The metadata helper reuses lib/seo.ts infrastructure
+ * (createPageMetadata / absoluteUrl) — it adds NO parallel SEO system.
  */
 
 export type NewsStatus = 'draft' | 'published' | 'archived'
@@ -227,6 +231,69 @@ export function generateSlug(text: string): string {
     .replace(/\s+/g, '-') // collapse whitespace to single dashes
     .replace(/-+/g, '-') // collapse repeated dashes
     .trim()
+}
+
+// ─── metadata (public detail page) ──────────────────────────────────────────
+
+/**
+ * Build the Next.js Metadata for a public news article, applying the frozen
+ * fallback rules. This is the single place those rules live — both the public
+ * detail page and any future consumer resolve metadata through it.
+ *
+ * Fallback chain (each field falls back only when the editor left it blank):
+ *   title        : seo_title → news.title
+ *   description  : seo_description → excerpt → (helper default SITE_DESCRIPTION)
+ *   canonical    : canonical_url  → absolute public URL /news/<slug>
+ *   og image     : og_image_url   → cover_image_url → (helper default OG image)
+ *
+ * The helper delegates the canonical/OG/Twitter shape to createPageMetadata()
+ * so the output stays consistent with every other Sobdai page — no duplicated
+ * SEO logic. Article type + published/modified times are surfaced so search
+ * engines and social previews treat this as dated content.
+ *
+ * Accepts a partial row (any object with the relevant fields); the public page
+ * passes its fetched row. `path` overrides the canonical path for the rare case
+ * the caller needs a non-default route.
+ */
+export function buildNewsMetadata(
+  article: {
+    slug: string
+    title: string
+    excerpt?: string | null
+    cover_image_url?: string | null
+    seo_title?: string | null
+    seo_description?: string | null
+    canonical_url?: string | null
+    og_image_url?: string | null
+    published_at?: string | null
+    updated_at?: string | null
+  },
+  opts: { noindex?: boolean } = {}
+): Metadata {
+  const publicPath = `/news/${article.slug}`
+
+  // Fallbacks (blank editor field → the natural public value).
+  const title = article.seo_title?.trim() || article.title
+  const description =
+    article.seo_description?.trim() || article.excerpt?.trim() || undefined
+  // canonical_url may already be absolute; absoluteUrl() passes http(s) through.
+  const canonical = article.canonical_url?.trim()
+    ? absoluteUrl(article.canonical_url.trim())
+    : absoluteUrl(publicPath)
+  const image = article.og_image_url?.trim() || article.cover_image_url?.trim() || undefined
+
+  return createPageMetadata({
+    title,
+    ...(description ? { description } : {}),
+    // Pass the canonical as a path-shaped value; absoluteUrl is idempotent on
+    // full URLs, and createPageMetadata routes `path` through it again — safe.
+    path: canonical,
+    ...(image ? { image } : {}),
+    type: 'article',
+    ...(article.published_at ? { publishedTime: article.published_at } : {}),
+    ...(article.updated_at ? { modifiedTime: article.updated_at } : {}),
+    ...(opts.noindex ? { noindex: true } : {}),
+  })
 }
 
 function isValidSlug(s: string): boolean {

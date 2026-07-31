@@ -35,15 +35,40 @@ export function createPageMetadata({
   path = '/',
   image = DEFAULT_OG_IMAGE,
   noindex = false,
+  type = 'website',
+  publishedTime,
+  modifiedTime,
 }: {
   title: string
   description?: string
   path?: string
   image?: string
   noindex?: boolean
+  /**
+   * OpenGraph object type. 'article' is the right value for dated, authored
+   * content (news, blog posts); it enables article:published_time /
+   * article:modified_time in the OG output. Defaults to 'website' (the
+   * previous behaviour) so existing callers are unchanged.
+   */
+  type?: 'website' | 'article'
+  /** ISO 8601 timestamp; rendered as article:published_time. Ignored unless type='article'. */
+  publishedTime?: string
+  /** ISO 8601 timestamp; rendered as article:modified_time. Ignored unless type='article'. */
+  modifiedTime?: string
 }): Metadata {
   const url = absoluteUrl(path)
   const imageUrl = absoluteUrl(image)
+
+  // Article-only OG fields. Spread conditionally so a 'website' page never
+  // emits article:* meta (which would mis-signal content type to crawlers).
+  const articleFields =
+    type === 'article'
+      ? {
+          type: 'article' as const,
+          ...(publishedTime ? { publishedTime } : {}),
+          ...(modifiedTime ? { modifiedTime } : {}),
+        }
+      : { type: 'website' as const }
 
   return {
     title,
@@ -65,7 +90,7 @@ export function createPageMetadata({
         },
       ],
       locale: 'th_TH',
-      type: 'website',
+      ...articleFields,
     },
     twitter: {
       card: 'summary_large_image',

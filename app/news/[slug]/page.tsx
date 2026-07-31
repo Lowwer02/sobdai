@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
+import { cache } from 'react'
+import type { Metadata } from 'next'
 import {
   ChevronRight,
   Calendar,
@@ -13,6 +15,8 @@ import {
   Tag as TagIcon,
 } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import { createPageMetadata } from '@/lib/seo'
+import { buildNewsMetadata } from '@/lib/news'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 
 /**
@@ -38,11 +42,18 @@ import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
  *     call revalidatePath('/news/[slug]') on change, so a publish revalidates
  *     immediately while a steady-state page stays cheaply cached.
  *
- * SEO STRUCTURE (prepared for a later metadata/JSON-LD task)
+ * METADATA
+ *   - generateMetadata() resolves the article via the same cached fetch as the
+ *     page body (React cache() dedupes the supabase round-trip — the JS client
+ *     isn't auto-memoized like fetch). Fallback rules live in buildNewsMetadata
+ *     (lib/news.ts); on a miss we return noindex metadata rather than throw
+ *     (matches the app/package/[slug] convention). JSON-LD is a separate task.
+ *
+ * SEO STRUCTURE
  *   - Single <h1> = article title (mirrors the list page owning its own <h1>).
  *   - Semantic <article> + <header> + <time datetime>. Category/tags as a
  *     real list. Breadcrumb is a semantic <nav aria-label="breadcrumb"> with a
- *     structured itemlist. No metadata/JSON-LD exported yet (task scope).
+ *     structured itemlist.
  */
 
 export const revalidate = 300
@@ -63,6 +74,10 @@ interface NewsDetailRow {
   source_name: string | null
   source_url: string | null
   source_date: string | null
+  seo_title: string | null
+  seo_description: string | null
+  canonical_url: string | null
+  og_image_url: string | null
   created_at: string | null
 }
 
@@ -98,27 +113,61 @@ function isUpdatedAfterPublished(
   return updatedAt.slice(0, 10) > publishedAt.slice(0, 10)
 }
 
+/**
+ * Cached published-article fetch, shared by generateMetadata + the page body.
+ * React cache() dedupes within a single request so the supabase JS client (not
+ * auto-memoized like fetch) isn't queried twice per page load. Published-only
+ * double guard: RLS + explicit .eq('status','published').
+ */
+const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null> => {
+  const supabase = createAnonServerClient()
+  const { data } = await supabase
+    .from('news')
+    .select(
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at'
+    )
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle()
+  return data as NewsDetailRow | null
+})
+
+// ─── Metadata ───────────────────────────────────────────────────────────────
+
+/**
+ * Per-article metadata with fallback rules (buildNewsMetadata). On a miss we
+ * return noindex metadata rather than throw — matches app/package/[slug]'s
+ * convention (a 404 page still needs valid <head> metadata).
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const article = await getNewsForRoute(slug)
+
+  if (!article) {
+    return createPageMetadata({
+      title: 'ไม่พบข่าว | Sobdai',
+      path: `/news/${slug}`,
+      noindex: true,
+    })
+  }
+
+  return buildNewsMetadata(article)
+}
+
 export default async function NewsDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const supabase = createAnonServerClient()
-
-  // --- Current article (published only) ---
-  const { data: raw } = await supabase
-    .from('news')
-    .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, created_at'
-    )
-    .eq('slug', slug)
-    .eq('status', 'published') // second guard alongside RLS
-    .maybeSingle()
-
-  const article = raw as NewsDetailRow | null
+  const article = await getNewsForRoute(slug)
   // Missing or not published → 404 (custom not-found page).
   if (!article) notFound()
+  const supabase = createAnonServerClient()
 
   // --- Prev / Next (older / newer) by the same ordering chain as the list ---
   // PostgREST can't return "neighbours of a row" directly, so follow the
