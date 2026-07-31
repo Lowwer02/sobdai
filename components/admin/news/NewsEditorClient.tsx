@@ -769,13 +769,28 @@ export default function NewsEditorClient({
                             {btn.type === 'package' ? 'เลือกแพ็กเกจ' : 'เลือกสรุปเนื้อหา'}
                           </label>
                           {(() => {
+                            if (!isEdit) {
+                              return (
+                                <>
+                                  <select
+                                    disabled
+                                    className={`${inputClass} opacity-50 cursor-not-allowed`}
+                                  >
+                                    <option value="">— เลือก —</option>
+                                  </select>
+                                  <p className="text-xs text-[#A1866B] mt-1.5">
+                                    กรุณาสร้างข่าวก่อน จากนั้นเปิดหน้าแก้ไขเพื่อเพิ่มเนื้อหาที่เกี่ยวข้อง
+                                  </p>
+                                </>
+                              )
+                            }
                             const items = btn.type === 'package' ? relatedPackages : relatedSummaries
-                            if (!isEdit || items.length === 0) {
+                            if (items.length === 0) {
                               return (
                                 <p className="text-xs text-[#A1866B] bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl px-3 py-2.5">
                                   {btn.type === 'package'
-                                    ? 'ยังไม่มีแพ็กเกจที่เกี่ยวข้อง กรุณาเพิ่ม Related Package ก่อน'
-                                    : 'ยังไม่มีสรุปเนื้อหาที่เกี่ยวข้อง กรุณาเพิ่ม Related Summary ก่อน'}
+                                    ? 'ยังไม่มีแพ็กเกจที่เกี่ยวข้อง กรุณาเพิ่ม Related Package ด้านบนก่อน'
+                                    : 'ยังไม่มีสรุปเนื้อหาที่เกี่ยวข้อง กรุณาเพิ่ม Related Summary ด้านบนก่อน'}
                                 </p>
                               )
                             }
