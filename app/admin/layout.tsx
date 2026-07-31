@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper } from 'lucide-react'
 import { getAdminSession } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 import { redirect } from 'next/navigation'
@@ -21,6 +21,11 @@ const managementNav = [
   { name: 'Homepage', href: '/admin/homepage', icon: Home, permission: 'content.write' },
   { name: 'Support', href: '/admin/support', icon: Heart, permission: 'support.manage' },
   { name: 'Promotions', href: '/admin/promotions', icon: Megaphone, permission: 'content.write' },
+  // Editorial publishing item: government news has a draft→publish→archive
+  // lifecycle, grouping with Promotions/Homepage. permission 'content.read'
+  // matches the /admin/news list-page gate (write actions gate separately on
+  // content.write), mirroring how Packages sits at content.read.
+  { name: 'News', href: '/admin/news', icon: Newspaper, permission: 'content.read' },
 ]
 
 export default async function AdminLayout({
