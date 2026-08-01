@@ -6,23 +6,25 @@ import { trackNewsShareClick } from '@/lib/analytics'
 interface NewsShareButtonsProps {
   newsId: string
   newsSlug: string
+  newsTitle: string
 }
 
-export default function NewsShareButtons({ newsId, newsSlug }: NewsShareButtonsProps) {
+export default function NewsShareButtons({ newsId, newsSlug, newsTitle }: NewsShareButtonsProps) {
   const articleUrl = absoluteUrl(`/news/${newsSlug}`)
   const encodedUrl = encodeURIComponent(articleUrl)
+  const encodedTitle = encodeURIComponent(newsTitle)
 
   const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`
-  const lineShareUrl = `https://social-plugins.line.me/lineit/share?url=${encodedUrl}`
+  const lineShareUrl = `https://social-plugins.line.me/lineit/share?url=${encodedUrl}&text=${encodedTitle}`
 
-  const handleShareClick = (platform: 'facebook' | 'line', destinationUrl: string) => {
+  const handleShareClick = (platform: 'facebook' | 'line') => {
     try {
       trackNewsShareClick({
         news_id: newsId,
         news_slug: newsSlug,
         platform,
         share_location: 'article_header',
-        destination_url: destinationUrl,
+        destination_url: articleUrl,
       })
     } catch {
       // Analytics failure must not block sharing
@@ -41,7 +43,7 @@ export default function NewsShareButtons({ newsId, newsSlug }: NewsShareButtonsP
           target="_blank"
           rel="noopener noreferrer"
           aria-label="แชร์ข่าวนี้ไปยัง Facebook"
-          onClick={() => handleShareClick('facebook', facebookShareUrl)}
+          onClick={() => handleShareClick('facebook')}
           className={btnClass}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -54,7 +56,7 @@ export default function NewsShareButtons({ newsId, newsSlug }: NewsShareButtonsP
           target="_blank"
           rel="noopener noreferrer"
           aria-label="แชร์ข่าวนี้ไปยัง LINE"
-          onClick={() => handleShareClick('line', lineShareUrl)}
+          onClick={() => handleShareClick('line')}
           className={btnClass}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
