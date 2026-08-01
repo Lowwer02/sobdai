@@ -438,26 +438,31 @@ export default function NewsEditorClient({
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <Link
-        href="/admin/news"
-        className="text-[#A1866B] hover:text-[#F5E9D6] flex items-center gap-2 text-sm"
-      >
-        <ArrowLeft size={16} /> กลับไปหน้ารายการ
-      </Link>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Link
+          href="/admin/news"
+          className="text-[#A1866B] hover:text-[#F5E9D6] inline-flex items-center gap-2 text-sm"
+        >
+          <ArrowLeft size={16} /> กลับไปหน้ารายการ
+        </Link>
 
-      <h1 className="text-3xl font-bold font-display text-[#F5E9D6]">
-        {isEdit ? 'แก้ไขข่าว' : 'สร้างข่าวใหม่'}
-      </h1>
+        <h1 className="text-3xl font-bold font-display text-[#F5E9D6]">
+          {isEdit ? 'แก้ไขข่าว' : 'สร้างข่าวใหม่'}
+        </h1>
+      </div>
 
-      <form
-        onSubmit={handleSubmit}
-        onChange={() => {
-          setIsDirty(true)
-          setPublishErrors({}) // editing invalidates the stale readiness summary
-        }}
-        className="space-y-6"
-      >
+      <div className="flex flex-col lg:flex-row lg:items-start gap-8">
+        <div className="flex-1 max-w-3xl min-w-0">
+          <form
+            id="news-form"
+            onSubmit={handleSubmit}
+            onChange={() => {
+              setIsDirty(true)
+              setPublishErrors({}) // editing invalidates the stale readiness summary
+            }}
+            className="space-y-6"
+          >
         {/* Core content */}
         <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
           <h2 className="text-[#D4AF37] font-bold font-display">เนื้อหา</h2>
@@ -1097,24 +1102,65 @@ export default function NewsEditorClient({
           </button>
         </div>
       </form>
-
-      {/* Publish / Restore confirmation */}
-      <ConfirmDialog
-        isOpen={pendingGoLive !== null}
-        onClose={() => setPendingGoLive(null)}
-        onConfirm={confirmGoLive}
-        title={pendingGoLive === 'publish' ? 'ยืนยันการเผยแพร่' : 'ยืนยันการกู้คืน'}
-        description={
-          pendingGoLive === 'publish' ? (
-            <>คุณแน่ใจหรือไม่? ข่าวนี้จะปรากฏบนเว็บไซต์สาธารณะทันที</>
-          ) : (
-            <>คุณแน่ใจหรือไม่? ข่าวนี้จะถูกกู้คืนและปรากฏบนเว็บไซต์สาธารณะ</>
-          )
-        }
-        confirmText="ยืนยัน"
-        cancelText="ยกเลิก"
-        isLoading={isLifecyclePending}
-      />
     </div>
+
+    {/* Desktop Sticky Right Action Panel */}
+    <aside className="hidden lg:block w-64 shrink-0 sticky top-6 self-start space-y-4">
+      <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-5 space-y-4 shadow-xl">
+        <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">
+          {isEdit ? 'การจัดการข่าว' : 'สร้างข่าวใหม่'}
+        </h3>
+
+        <button
+          type="submit"
+          form="news-form"
+          disabled={isPending}
+          className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] disabled:opacity-50 text-[#1A140E] font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg"
+        >
+          {isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {isEdit ? 'บันทึก' : 'สร้าง'}
+        </button>
+
+        {isPending ? (
+          <p className="text-xs text-[#A1866B] flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" /> กำลังบันทึก...
+          </p>
+        ) : isDirty ? (
+          <p className="text-xs text-[#D4AF37] flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />
+            ยังไม่ได้บันทึกการเปลี่ยนแปลง
+          </p>
+        ) : null}
+
+        <div className="pt-3 border-t border-[rgba(255,255,255,0.05)]">
+          <Link
+            href="/admin/news"
+            className="w-full text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] px-3 py-2 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+          >
+            <ArrowLeft size={16} /> กลับไปหน้ารายการ
+          </Link>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  {/* Publish / Restore confirmation */}
+  <ConfirmDialog
+    isOpen={pendingGoLive !== null}
+    onClose={() => setPendingGoLive(null)}
+    onConfirm={confirmGoLive}
+    title={pendingGoLive === 'publish' ? 'ยืนยันการเผยแพร่' : 'ยืนยันการกู้คืน'}
+    description={
+      pendingGoLive === 'publish' ? (
+        <>คุณแน่ใจหรือไม่? ข่าวนี้จะปรากฏบนเว็บไซต์สาธารณะทันที</>
+      ) : (
+        <>คุณแน่ใจหรือไม่? ข่าวนี้จะถูกกู้คืนและปรากฏบนเว็บไซต์สาธารณะ</>
+      )
+    }
+    confirmText="ยืนยัน"
+    cancelText="ยกเลิก"
+    isLoading={isLifecyclePending}
+  />
+</div>
   )
 }

@@ -50,7 +50,7 @@ export default async function AdminLayout({
     <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex flex-col md:flex-row font-sans">
       
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-[#1A140E] border-r border-[#D4AF37]/20 flex flex-col md:min-h-screen">
+      <aside className="w-full md:w-64 bg-[#1A140E] border-r border-[#D4AF37]/20 flex flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto shrink-0">
         <div className="p-6 border-b border-[#D4AF37]/20">
           <Link href="/" className="flex items-center gap-2 text-[#D4AF37] font-display font-bold text-xl drop-shadow-[0_0_10px_rgba(212,175,55,0.5)]">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
