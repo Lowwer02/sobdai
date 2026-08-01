@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, ArrowRight } from 'lucide-react'
+import type { GpExamRequirement } from '@/lib/news'
+import GpExamRequirementBadge from './GpExamRequirementBadge'
 
 /**
  * Public News card (Server Component).
@@ -27,6 +29,9 @@ export interface NewsCardData {
   cover_image_alt: string | null
   category: string | null
   published_at: string | null
+  /** ภาค ก. requirement (tri-state). Optional so a list query that hasn't been
+   *  updated to select it still type-checks; treated as 'unspecified' when absent. */
+  gp_exam_requirement?: GpExamRequirement
 }
 
 interface NewsCardProps {
@@ -138,11 +143,14 @@ export default function NewsCard({ article, index = 0 }: NewsCardProps) {
             flex: 1,
           }}
         >
-          {/* Published date */}
+          {/* Published date + (optionally) the ภาค ก. requirement badge. The
+              badge renders nothing when unspecified, so the metadata row stays
+              exactly as before for non-recruitment / unspecified cards. */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
+              flexWrap: 'wrap',
               gap: '6px',
               marginBottom: '8px',
               fontSize: '12px',
@@ -151,6 +159,9 @@ export default function NewsCard({ article, index = 0 }: NewsCardProps) {
           >
             <Calendar size={12} aria-hidden />
             <time dateTime={article.published_at || undefined}>{dateLabel}</time>
+            {article.gp_exam_requirement && (
+              <GpExamRequirementBadge value={article.gp_exam_requirement} />
+            )}
           </div>
 
           {/* Title */}

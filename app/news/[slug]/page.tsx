@@ -16,13 +16,14 @@ import {
 } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { createPageMetadata } from '@/lib/seo'
-import { buildNewsMetadata, buildNewsJsonLd, type CtaConfig } from '@/lib/news'
+import { buildNewsMetadata, buildNewsJsonLd, type CtaConfig, type GpExamRequirement } from '@/lib/news'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import StructuredData from '@/components/StructuredData'
 import PackageCard, { type PackageCardData } from '@/components/PackageCard'
 import ContentCard from '@/components/ContentCard'
 import NewsCtaBox from '@/components/news/NewsCtaBox'
+import GpExamRequirementBadge from '@/components/news/GpExamRequirementBadge'
 
 /**
  * Public Government News detail (`/news/[slug]`) — Server Component.
@@ -89,6 +90,9 @@ interface NewsDetailRow {
   // (CtaConfig | null) — cleanCtaConfig already runs on the admin write path,
   // and the box re-validates every destination at render regardless.
   cta_config: CtaConfig | null
+  // ภาค ก. requirement (tri-state). Coerced to 'unspecified' by the contract
+  // when absent, but the column has a DB default so it's always present on live rows.
+  gp_exam_requirement: GpExamRequirement
 }
 
 interface NewsNeighbor {
@@ -134,7 +138,7 @@ const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null
   const { data } = await supabase
     .from('news')
     .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config'
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement'
     )
     .eq('slug', slug)
     .eq('status', 'published')
@@ -540,6 +544,16 @@ export default async function NewsDetailPage({
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Edit3 size={14} aria-hidden />
                 <span>อัปเดตเมื่อ <time dateTime={article.updated_at || undefined}>{updatedLabel}</time></span>
+              </span>
+            )}
+            {/* ภาค ก. requirement — badge when required/not_required; muted inline
+                note when unspecified (the box/card show nothing in that case). */}
+            {(article.gp_exam_requirement === 'required' ||
+              article.gp_exam_requirement === 'not_required') ? (
+              <GpExamRequirementBadge value={article.gp_exam_requirement} />
+            ) : (
+              <span style={{ fontStyle: 'italic' }}>
+                โปรดตรวจสอบเงื่อนไขภาค ก. จากประกาศต้นฉบับ
               </span>
             )}
           </div>
