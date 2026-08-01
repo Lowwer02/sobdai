@@ -452,7 +452,7 @@ export default function NewsEditorClient({
         </h1>
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-start gap-8">
+      <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1 max-w-3xl min-w-0">
           <form
             id="news-form"
@@ -1105,8 +1105,8 @@ export default function NewsEditorClient({
     </div>
 
     {/* Desktop Sticky Right Action Panel */}
-    <aside className="hidden lg:block w-64 shrink-0 sticky top-6 self-start space-y-4">
-      <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-5 space-y-4 shadow-xl">
+    <aside className="hidden lg:block w-64 shrink-0">
+      <div className="sticky top-6 space-y-4 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-5 shadow-xl">
         <h3 className="text-xs font-bold text-[#A1866B] uppercase tracking-wider">
           {isEdit ? 'การจัดการข่าว' : 'สร้างข่าวใหม่'}
         </h3>
