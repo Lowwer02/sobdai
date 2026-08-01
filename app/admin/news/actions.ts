@@ -541,6 +541,8 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
     // this to a CtaConfig | null, so persist it verbatim — null preserves the
     // legacy "no CTA" state for rows whose cta_config was cleared.
     cta_config: input.cta_config ?? null,
+    // ภาค ก. requirement — always a legal tri-state value after coercion.
+    gp_exam_requirement: input.gp_exam_requirement,
   }
 
   if (isCreate) {

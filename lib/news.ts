@@ -24,6 +24,34 @@ import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
 
 export type NewsStatus = 'draft' | 'published' | 'archived'
 
+/**
+ * Whether applicants must have passed ภาค ก. (the ก.พ. exam). A tri-state, NOT
+ * a boolean, so "the announcement is silent" is a first-class value distinct
+ * from required/not_required. Stored as `news.gp_exam_requirement` text with a
+ * DB CHECK (migration 041). `unspecified` is the safe fallback: legacy rows
+ * default to it, unknown input coerces to it, and only recruitment-category
+ * articles are gated on it at publish time.
+ */
+export type GpExamRequirement = 'required' | 'not_required' | 'unspecified'
+
+/** The category value that REQUIRES an explicit ก.พ. answer before publishing.
+ *  Mirrors the spec exactly — other categories may publish as 'unspecified'. */
+const RECRUITMENT_CATEGORY = 'เปิดรับสมัครสอบ'
+
+/** Human label for each value, surfaced on the public card/detail + admin
+ *  error summary. Single source so the CMS, badge, and gate never disagree. */
+export const GP_EXAM_REQUIREMENT_LABELS: Record<GpExamRequirement, string> = {
+  required: 'ต้องผ่าน ก.พ.',
+  not_required: 'ไม่ต้องผ่าน ก.พ.',
+  unspecified: 'ไม่ระบุ / ตรวจสอบจากประกาศ',
+}
+
+/** Coerce arbitrary input into a legal value; anything unknown → unspecified
+ *  (never throws). Mirrors the total-coercion style of optStr/coerceRelations. */
+export function coerceGpExamRequirement(v: unknown): GpExamRequirement {
+  return v === 'required' || v === 'not_required' ? v : 'unspecified'
+}
+
 // ─── CTA box (public detail page) ───────────────────────────────────────────
 //
 // Editor-configured "preparation CTA" rendered near the bottom of a news
@@ -119,6 +147,7 @@ export interface News {
   created_at: string
   updated_at: string
   cta_config: CtaConfig | null
+  gp_exam_requirement: GpExamRequirement
 }
 
 /**
@@ -143,6 +172,7 @@ export interface NewsInput {
   canonical_url: string | null
   og_image_url: string | null
   cta_config: CtaConfig | null
+  gp_exam_requirement: GpExamRequirement
 }
 
 export const NEWS_STATUSES: { value: NewsStatus; label: string }[] = [
@@ -217,6 +247,8 @@ function coerce(raw: any): { input: NewsInput; rawSlug: string | undefined } {
       // (or a non-object payload) → no CTA, so legacy rows + a cleared box
       // coerce cleanly. cleanCtaConfig never throws.
       cta_config: cleanCtaConfig(raw.cta_config),
+      // ภาค ก. requirement: unknown/absent → unspecified (safe default).
+      gp_exam_requirement: coerceGpExamRequirement(raw.gp_exam_requirement),
     },
     rawSlug: str(raw.slug),
   }
@@ -275,6 +307,14 @@ export function validateNewsForPublish(raw: any): ValidationResult {
 
   // --- taxonomy
   if (!input.category) errors.category = 'ต้องระบุหมวดหมู่'
+
+  // --- ภาค ก. requirement gate — ONLY recruitment announcements are forced to
+  // state it explicitly. Other categories may publish as 'unspecified'. Per the
+  // frozen rule, this is the one tri-state decision a recruitment ad must not
+  // leave ambiguous (callers/public-servants need to know before applying).
+  if (input.category === RECRUITMENT_CATEGORY && input.gp_exam_requirement === 'unspecified') {
+    errors.gp_exam_requirement = 'กรุณาระบุว่าต้องผ่าน ก.พ. หรือไม่ก่อนเผยแพร่'
+  }
 
   // --- source group: if any field is set, all three must be present (accuracy)
   const hasSource = input.source_name || input.source_url || input.source_date

@@ -25,10 +25,13 @@ import {
   validateNewsForPublish,
   DEFAULT_CTA_CONFIG,
   isValidInternalPath,
+  coerceGpExamRequirement,
+  GP_EXAM_REQUIREMENT_LABELS,
   type News,
   type NewsStatus,
   type CtaConfig,
   type CtaDestinationType,
+  type GpExamRequirement,
 } from '@/lib/news'
 import { absoluteUrl } from '@/lib/seo'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -123,6 +126,11 @@ export default function NewsEditorClient({
   const [bodyMarkdown, setBodyMarkdown] = useState(article?.body_markdown || '')
   const [category, setCategory] = useState(article?.category || '')
   const [tags, setTags] = useState((article?.tags ?? []).join(', '))
+  // ภาค ก. requirement. Seeded from the stored value (coerced for safety — an
+  // old/unknown value becomes 'unspecified'); defaults to 'unspecified' on create.
+  const [gpExamRequirement, setGpExamRequirement] = useState<GpExamRequirement>(
+    () => coerceGpExamRequirement(article?.gp_exam_requirement)
+  )
 
   // SEO group (foundation). Held in state so edits persist; on CREATE omitted
   // values correctly coerce to null in toInsertPayload.
@@ -178,6 +186,7 @@ export default function NewsEditorClient({
     cover_image_url: 'รูปปก',
     cover_image_alt: 'คำอธิบายรูป',
     category: 'หมวดหมู่',
+    gp_exam_requirement: 'ข้อกำหนดภาค ก.',
     source_name: 'ชื่อแหล่งข้อมูล',
     source_url: 'URL แหล่งข้อมูล',
     source_date: 'วันที่แหล่งข้อมูล',
@@ -286,6 +295,8 @@ export default function NewsEditorClient({
       body_markdown: bodyMarkdown || null,
       category: category || null,
       tags, // parseTags in lib/news.ts splits commas + dedupes + caps at 8
+      // ภาค ก. requirement — the state already holds a legal tri-state value.
+      gp_exam_requirement: gpExamRequirement,
       cover_image_url: coverImageUrl || null,
       cover_image_alt: coverImageAlt || null,
       // SEO group — now owned by this editor's SEO panel.
@@ -536,6 +547,32 @@ export default function NewsEditorClient({
               />
               <p className="text-[10px] text-[#A1866B] mt-1">สูงสุด 8 แท็ก (คั่นด้วยจุลภาค)</p>
             </div>
+          </div>
+
+          {/* ข้อกำหนดภาค ก. — tri-state, not a boolean. Sits with taxonomy because
+              it's a classification of the announcement. Recruitment (เปิดรับสมัครสอบ)
+              articles are forced to a non-unspecified value at publish time; the
+              gate itself lives in validateNewsForPublish (lib/news.ts). */}
+          <div>
+            <label className={labelClass}>ข้อกำหนดภาค ก.</label>
+            <select
+              value={gpExamRequirement}
+              onChange={e => {
+                setGpExamRequirement(coerceGpExamRequirement(e.target.value))
+                setIsDirty(true)
+                setPublishErrors({})
+              }}
+              className={inputClass}
+            >
+              {(Object.keys(GP_EXAM_REQUIREMENT_LABELS) as GpExamRequirement[]).map(v => (
+                <option key={v} value={v}>
+                  {GP_EXAM_REQUIREMENT_LABELS[v]}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-[#A1866B] mt-1">
+              ระบุว่าผู้สมัครต้องมีผลสอบผ่านภาค ก. หรือไม่ โดยยึดตามประกาศต้นฉบับ
+            </p>
           </div>
         </section>
 
