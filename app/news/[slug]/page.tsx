@@ -560,7 +560,7 @@ export default async function NewsDetailPage({
           </div>
 
           {/* Share buttons */}
-          <NewsShareButtons newsId={article.id} newsSlug={article.slug} />
+          <NewsShareButtons newsId={article.id} newsSlug={article.slug} newsTitle={article.title} />
         </header>
 
         {/* Cover image */}
