@@ -179,3 +179,23 @@ export function trackCtaClick(params: {
     button_label: params.button_label,
   })
 }
+
+/**
+ * Track a click on a News share button (Facebook or LINE).
+ */
+export function trackNewsShareClick(params: {
+  news_id: string
+  news_slug: string
+  platform: 'facebook' | 'line'
+  share_location: 'article_header'
+  destination_url: string
+}): void {
+  pushToDataLayer({
+    event: 'news_share_click',
+    news_id: params.news_id,
+    news_slug: params.news_slug,
+    platform: params.platform,
+    share_location: params.share_location,
+    destination_url: params.destination_url,
+  })
+}

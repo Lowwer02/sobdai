@@ -24,6 +24,7 @@ import PackageCard, { type PackageCardData } from '@/components/PackageCard'
 import ContentCard from '@/components/ContentCard'
 import NewsCtaBox from '@/components/news/NewsCtaBox'
 import GpExamRequirementBadge from '@/components/news/GpExamRequirementBadge'
+import NewsShareButtons from '@/components/news/NewsShareButtons'
 
 /**
  * Public Government News detail (`/news/[slug]`) — Server Component.
@@ -557,6 +558,9 @@ export default async function NewsDetailPage({
               </span>
             )}
           </div>
+
+          {/* Share buttons */}
+          <NewsShareButtons newsId={article.id} newsSlug={article.slug} />
         </header>
 
         {/* Cover image */}
