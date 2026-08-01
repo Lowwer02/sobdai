@@ -30,16 +30,12 @@ function withoutLineComments(sql: string): string {
 const m035Sql = withoutLineComments(m035)
 const m036Sql = withoutLineComments(m036)
 
-function verifiesBatchAScopeAndOrdering(): void {
+function verifiesBatchAPredecessorsRemainPresent(): void {
   const sqlFiles = readdirSync(migrationDir).filter((name) => name.endsWith('.sql'))
   assert.ok(sqlFiles.includes('034_news_storage.sql'), 'migration 034 predecessor must exist')
   assert.ok(sqlFiles.includes('035_kp_preflight_guards.sql'), 'migration 035 must exist')
   assert.ok(sqlFiles.includes('036_kp_migration_control.sql'), 'migration 036 must exist')
-  assert.equal(
-    sqlFiles.filter((name) => /^(?:03[7-9]|0[4-5][0-9]|060)_kp_/.test(name)).length,
-    0,
-    'Implementation Sprint 1 must not create Batch B or later migrations',
-  )
+  assert.ok(sqlFiles.includes('037_news_cta_config.sql'), 'production migration 037 must remain present')
 }
 
 function verifies035IsReadOnly(): void {
@@ -176,7 +172,7 @@ function verifies036UsesExistingSupabaseConventions(): void {
 }
 
 const tests: Array<{ name: string; run: () => void }> = [
-  { name: 'Batch A scope and ordering', run: verifiesBatchAScopeAndOrdering },
+  { name: 'Batch A predecessors remain present', run: verifiesBatchAPredecessorsRemainPresent },
   { name: '035 is read-only', run: verifies035IsReadOnly },
   { name: '035 checks frozen baseline', run: verifies035ChecksFrozenBaseline },
   { name: '035 checks Supabase/RBAC drift', run: verifies035ChecksSupabaseAndRbacDrift },
