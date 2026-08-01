@@ -187,7 +187,7 @@ export function trackNewsShareClick(params: {
   news_id: string
   news_slug: string
   platform: 'facebook' | 'line'
-  share_location: 'article_header'
+  share_location: 'article_header' | 'article_footer'
   destination_url: string
 }): void {
   pushToDataLayer({

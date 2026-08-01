@@ -7,9 +7,15 @@ interface NewsShareButtonsProps {
   newsId: string
   newsSlug: string
   newsTitle: string
+  shareLocation?: 'article_header' | 'article_footer'
 }
 
-export default function NewsShareButtons({ newsId, newsSlug, newsTitle }: NewsShareButtonsProps) {
+export default function NewsShareButtons({
+  newsId,
+  newsSlug,
+  newsTitle,
+  shareLocation = 'article_header',
+}: NewsShareButtonsProps) {
   const articleUrl = absoluteUrl(`/news/${newsSlug}`)
   const encodedUrl = encodeURIComponent(articleUrl)
   const encodedTitle = encodeURIComponent(newsTitle)
@@ -23,7 +29,7 @@ export default function NewsShareButtons({ newsId, newsSlug, newsTitle }: NewsSh
         news_id: newsId,
         news_slug: newsSlug,
         platform,
-        share_location: 'article_header',
+        share_location: shareLocation,
         destination_url: articleUrl,
       })
     } catch {
