@@ -2,47 +2,32 @@ import { GP_EXAM_REQUIREMENT_LABELS, type GpExamRequirement } from '@/lib/news'
 
 /**
  * Compact badge for the ภาค ก. (ก.พ.) exam requirement — reused by the News
- * Card and the News Detail page so the two surfaces can never disagree.
+ * Card and the News Detail page so the two surfaces stay consistent.
  *
- * Rendering rules (frozen):
- *   required     → gold badge (the load-bearing answer applicants look for)
- *   not_required → muted outline badge (still informative, deliberately quiet)
- *   unspecified  → renders NOTHING on cards; on detail the caller shows a muted
- *                  inline note instead (this component returns null here so the
- *                  "no badge when unspecified" card rule is enforced centrally)
- *
- * Reuses the existing Sobdai gold token (`#D4AF37`, the same literal the news
- * detail page uses for its focus rings / badges) — no new design system.
+ * Visual design:
+ *   - Both 'required' ("ต้องผ่าน ก.พ.") and 'not_required' ("ไม่ต้องผ่าน ก.พ.")
+ *     use Sobdai's premium gold badge styling (`badge badge-gold`), inheriting
+ *     the configured Supermarket font, gold text, dark translucent gold background,
+ *     and gold border.
+ *   - 'unspecified' renders nothing.
  */
 export default function GpExamRequirementBadge({
   value,
+  className,
 }: {
   value: GpExamRequirement
+  className?: string
 }) {
-  // unspecified never renders a badge — the detail page handles its own muted
-  // note, and the card shows nothing.
   if (value === 'unspecified') return null
-
-  const isRequired = value === 'required'
 
   return (
     <span
-      className={isRequired ? 'badge badge-gold' : undefined}
-      style={
-        isRequired
-          ? undefined
-          : {
-              display: 'inline-flex',
-              alignItems: 'center',
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.10)',
-              borderRadius: '999px',
-              padding: '3px 10px',
-            }
-      }
+      className={`badge badge-gold shrink-0 ${className || ''}`.trim()}
+      style={{
+        lineHeight: 1.2,
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+      }}
     >
       {GP_EXAM_REQUIREMENT_LABELS[value]}
     </span>

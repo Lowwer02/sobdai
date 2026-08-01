@@ -143,22 +143,22 @@ export default function NewsCard({ article, index = 0 }: NewsCardProps) {
             flex: 1,
           }}
         >
-          {/* Published date + (optionally) the ภาค ก. requirement badge. The
-              badge renders nothing when unspecified, so the metadata row stays
-              exactly as before for non-recruitment / unspecified cards. */}
+          {/* Published date + ภาค ก. requirement badge */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: '6px',
+              gap: '6px 10px',
               marginBottom: '8px',
               fontSize: '12px',
               color: 'var(--text-muted)',
             }}
           >
-            <Calendar size={12} aria-hidden />
-            <time dateTime={article.published_at || undefined}>{dateLabel}</time>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={12} aria-hidden />
+              <time dateTime={article.published_at || undefined}>{dateLabel}</time>
+            </div>
             {article.gp_exam_requirement && (
               <GpExamRequirementBadge value={article.gp_exam_requirement} />
             )}
