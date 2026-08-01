@@ -471,18 +471,10 @@ export default async function NewsDetailPage({
         <header style={{ marginBottom: 28 }}>
           {/* Category + tags */}
           {(article.category || tags.length > 0) && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 16,
-              }}
-            >
+            <div className="flex flex-wrap items-center gap-2 mb-4 max-w-full">
               {article.category && (
                 <span
-                  className="badge badge-gold"
+                  className="badge badge-gold shrink-0 max-w-full text-xs"
                   style={{ fontSize: 11, padding: '3px 10px', letterSpacing: '0.03em' }}
                 >
                   {article.category}
@@ -491,20 +483,18 @@ export default async function NewsDetailPage({
               {tags.map(tag => (
                 <span
                   key={tag}
+                  className="inline-flex items-center gap-1 text-xs shrink-0 max-w-full"
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    fontSize: 11,
                     padding: '3px 10px',
                     borderRadius: 999,
                     border: '1px solid var(--border)',
                     backgroundColor: 'transparent',
                     color: 'var(--text-secondary)',
+                    fontSize: 11,
                   }}
                 >
-                  <TagIcon size={10} aria-hidden />
-                  {tag}
+                  <TagIcon size={10} className="shrink-0" aria-hidden />
+                  <span style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{tag}</span>
                 </span>
               ))}
             </div>
@@ -560,7 +550,7 @@ export default async function NewsDetailPage({
           </div>
 
           {/* Share buttons */}
-          <NewsShareButtons newsId={article.id} newsSlug={article.slug} newsTitle={article.title} />
+          <NewsShareButtons newsId={article.id} newsSlug={article.slug} newsTitle={article.title} shareLocation="article_header" />
         </header>
 
         {/* Cover image */}
@@ -662,6 +652,16 @@ export default async function NewsDetailPage({
             </div>
           </section>
         )}
+
+        {/* Footer Share section */}
+        <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+          <NewsShareButtons
+            newsId={article.id}
+            newsSlug={slug}
+            newsTitle={article.title}
+            shareLocation="article_footer"
+          />
+        </div>
 
         {/* Preparation CTA box — renders between the article body/source and
             the related-content section. Reads cta_config from the article row
@@ -832,14 +832,15 @@ export default async function NewsDetailPage({
                       ข่าวก่อนหน้า
                     </span>
                     <span
+                      className="line-clamp-2 sm:line-clamp-3 break-words text-sm font-semibold text-[var(--text-primary)]"
                       style={{
-                        display: 'block',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.4,
                       }}
                     >
                       {older.title}
@@ -879,14 +880,15 @@ export default async function NewsDetailPage({
                       ข่าวถัดไป
                     </span>
                     <span
+                      className="line-clamp-2 sm:line-clamp-3 break-words text-sm font-semibold text-[var(--text-primary)]"
                       style={{
-                        display: 'block',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.4,
                       }}
                     >
                       {newer.title}
