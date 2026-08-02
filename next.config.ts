@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
     // lucide-react ships many named exports; this keeps imports tree-shaken
     // and avoids pulling the whole icon set into bundles.
     optimizePackageImports: ["lucide-react"],
+    // Enables the `forbidden()` (and `unauthorized()`) auth interrupts from
+    // `next/navigation`, used by the admin staff boundary in app/admin/layout.tsx.
+    // Required by Next.js for forbidden() to render the app/forbidden.tsx UI.
+    authInterrupts: true,
   },
 };
 
