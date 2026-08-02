@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
+import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import type { NewsCardData } from '@/components/news/NewsCard'
 
 /**
  * Government News — types + server-side validation (single contract).
@@ -686,4 +688,34 @@ export function coerceRelations(
     if (out.length >= MAX_RELATED) break
   }
   return out
+}
+
+/**
+ * Fetch latest published news for the homepage news strip.
+ * Server-side only via cookie-free anon client.
+ */
+export async function getLatestNews(limit: number): Promise<NewsCardData[]> {
+  const safeLimit = Math.min(Math.max(1, Math.floor(limit) || 3), 6)
+  try {
+    const supabase = createAnonServerClient()
+    const nowIso = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('news')
+      .select('id, slug, title, excerpt, cover_image_url, cover_image_alt, category, published_at, gp_exam_requirement')
+      .eq('status', 'published')
+      .lte('published_at', nowIso)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(safeLimit)
+
+    if (error) {
+      console.error('getLatestNews query failed:', error)
+      return []
+    }
+    return (data ?? []) as NewsCardData[]
+  } catch (err) {
+    console.error('getLatestNews failed:', err)
+    return []
+  }
 }

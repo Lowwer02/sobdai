@@ -15,6 +15,10 @@ import type { HeroSearchChip } from '@/components/HeroPackageSearch'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 import { createPageMetadata } from '@/lib/seo'
+import { getLatestNews } from '@/lib/news'
+import type { NewsCardData } from '@/components/news/NewsCard'
+import HomepageNewsCard from '@/components/news/HomepageNewsCard'
+import HomepageNewsViewAllLink from '@/components/news/HomepageNewsViewAllLink'
 
 // Homepage shows public package data + homepage settings that change
 // infrequently. Cache server-side (ISR) and revalidate every 5 minutes.
@@ -136,10 +140,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   // Read all homepage config in one server call (ISR-cached).
   const settings = await getHomepageSettings()
+  const { hero, cta, sections, package_explorer, latest_news } = settings
 
   let livePackages: PackageCardData[] = []
   let homepagePromotions: HomepagePromotion[] = []
   let heroSearchChips: HeroSearchChip[] = []
+  let latestNews: NewsCardData[] = []
 
   try {
     const supabase = createAnonServerClient()
@@ -178,18 +184,18 @@ export default async function Home() {
       .eq('is_published', true)
       .order('created_at', { ascending: false })
 
-    // Run featured-packages and promotions in parallel — both are independent
-    // reads, so one batch saves a round-trip. Promotion fetch is isolated in
-    // its own try/catch below so a promotion failure can never break packages.
-    const [featuredResult, promotionsResult, chipPackagesResult] = await Promise.all([
+    // Run featured-packages, promotions, chip-packages, and latest news in parallel.
+    const [featuredResult, promotionsResult, chipPackagesResult, latestNewsResult] = await Promise.all([
       featuredQuery,
       getHomepagePromotions(),
       chipPackagesQuery,
+      sections.news ? getLatestNews(latest_news.limit) : Promise.resolve([]),
     ])
 
     featuredData = featuredResult.data || []
     homepagePromotions = promotionsResult
     heroSearchChips = buildHeroSearchChips(chipPackagesResult.data || [])
+    latestNews = latestNewsResult
 
     // BUSINESS RULE: the homepage renders ONLY packages where
     // is_published = true AND featured_homepage = true. No exceptions.
@@ -207,10 +213,9 @@ export default async function Home() {
       }))
     }
   } catch (error) {
-    console.error('Failed to fetch packages:', error)
+    console.error('Failed to fetch packages or news:', error)
   }
 
-  const { hero, cta, sections, package_explorer } = settings
   const topPromotion = homepagePromotions[0] ?? null
   const remainingPromotions = homepagePromotions.slice(1)
 
@@ -372,6 +377,65 @@ export default async function Home() {
               <p style={{ color: 'var(--text-muted)', maxWidth: '400px' }}>{package_explorer.empty_description}</p>
             </div>
           )}
+        </section>
+      )}
+
+      {/* ===================== Latest News ===================== */}
+      {sections.news && latestNews.length > 0 && (
+        <section
+          id="news"
+          style={{
+            padding: '40px 20px 80px',
+            maxWidth: '1100px',
+            margin: '0 auto',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              flexWrap: 'wrap',
+              gap: '16px',
+              marginBottom: '32px',
+            }}
+          >
+            <div>
+              <h2
+                className="font-display"
+                style={{
+                  fontSize: 'clamp(22px, 3.5vw, 32px)',
+                  marginBottom: '6px',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {latest_news.title}
+              </h2>
+              {latest_news.subtitle && (
+                <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
+                  {latest_news.subtitle}
+                </p>
+              )}
+            </div>
+            <HomepageNewsViewAllLink label={latest_news.cta_label} />
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+              gap: '20px',
+            }}
+          >
+            {latestNews.map((article, i) => (
+              <HomepageNewsCard
+                key={article.id}
+                article={article}
+                index={i}
+                position={i + 1}
+              />
+            ))}
+          </div>
         </section>
       )}
 

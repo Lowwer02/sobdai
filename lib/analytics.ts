@@ -199,3 +199,40 @@ export function trackNewsShareClick(params: {
     destination_url: params.destination_url,
   })
 }
+
+/**
+ * Track a click on a Homepage Latest News card.
+ */
+export function trackHomepageNewsClick(params: {
+  news_id: string
+  news_slug: string
+  news_title: string
+  position: number
+  section_location: string
+  destination_url: string
+}): void {
+  pushToDataLayer({
+    event: 'homepage_news_click',
+    news_id: params.news_id,
+    news_slug: params.news_slug,
+    news_title: params.news_title,
+    position: params.position,
+    section_location: params.section_location,
+    destination_url: params.destination_url,
+  })
+}
+
+/**
+ * Track a click on the "View All" link in the Homepage Latest News section header.
+ */
+export function trackHomepageNewsViewAllClick(params: {
+  section_location: string
+  destination_url: string
+}): void {
+  pushToDataLayer({
+    event: 'homepage_news_view_all_click',
+    section_location: params.section_location,
+    destination_url: params.destination_url,
+  })
+}
+
