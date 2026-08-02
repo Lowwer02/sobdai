@@ -33,6 +33,7 @@ export async function saveHomepageSettings(raw: any) {
   const mergedExtendedConfig = {
     ...existingExt,
     package_explorer: clean.package_explorer,
+    latest_news: clean.latest_news,
     footer: clean.footer,
     support: clean.support,
   }

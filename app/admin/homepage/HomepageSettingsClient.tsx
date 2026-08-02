@@ -19,6 +19,11 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const inputClass = 'w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] text-[#F5E9D6] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#D4AF37]/50 transition-colors'
 
+/** Display labels for section keys. Unknown keys fall back to their raw value. */
+const SECTION_LABELS: Record<string, string> = {
+  news: 'ข่าวล่าสุด',
+}
+
 function CtaEditor({ value, onChange }: { value: CtaButton; onChange: (v: CtaButton) => void }) {
   return (
     <div className="space-y-3 p-4 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)]">
@@ -131,7 +136,7 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
           {(Object.keys(settings.sections) as (keyof typeof settings.sections)[]).map(key => (
             <label key={key} className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(212,175,55,0.3)] transition-colors">
               <input type="checkbox" checked={settings.sections[key]} onChange={e => update({ sections: { ...settings.sections, [key]: e.target.checked } })} className="w-4 h-4 accent-[#D4AF37]" />
-              <span className="text-sm text-[#F5E9D6] capitalize">{key}</span>
+              <span className="text-sm text-[#F5E9D6] capitalize">{SECTION_LABELS[key] ?? key}</span>
             </label>
           ))}
         </div>
@@ -154,6 +159,30 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
         </Field>
         <Field label="Empty State Description">
           <textarea className={inputClass} rows={2} value={settings.package_explorer.empty_description} onChange={e => update({ package_explorer: { ...settings.package_explorer, empty_description: e.target.value } })} />
+        </Field>
+      </section>
+
+      {/* ─── Latest News ─── */}
+      <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-3">
+        <h2 className="text-[#D4AF37] font-bold font-display">Latest News</h2>
+        <p className="text-[11px] text-[#A1866B]">
+          แสดงข่าวราชการล่าสุดบนหน้าแรก (ระหว่าง Package Explorer และ How It Works) — เปิด/ปิดการแสดงผลได้ที่การ์ด Section Visibility
+        </p>
+        <Field label="หัวข้อ">
+          <input className={inputClass} value={settings.latest_news.title} onChange={e => update({ latest_news: { ...settings.latest_news, title: e.target.value } })} />
+        </Field>
+        <Field label="คำอธิบาย" hint="เว้นว่างได้">
+          <textarea className={inputClass} rows={2} value={settings.latest_news.subtitle} onChange={e => update({ latest_news: { ...settings.latest_news, subtitle: e.target.value } })} />
+        </Field>
+        <Field label="ข้อความปุ่ม">
+          <input className={inputClass} value={settings.latest_news.cta_label} onChange={e => update({ latest_news: { ...settings.latest_news, cta_label: e.target.value } })} />
+        </Field>
+        <Field label="จำนวนข่าวที่แสดง" hint="ตัวเลข 1–6">
+          <select className={inputClass} value={settings.latest_news.limit} onChange={e => update({ latest_news: { ...settings.latest_news, limit: Number(e.target.value) } })}>
+            {[1, 2, 3, 4, 5, 6].map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </Field>
       </section>
 

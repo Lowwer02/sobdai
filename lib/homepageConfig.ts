@@ -75,9 +75,24 @@ export interface HomepageCta {
 export interface HomepageSections {
   hero: boolean
   featured: boolean
+  /** Latest News strip (added 047). Sits between Package Explorer and How It Works. */
+  news: boolean
   features: boolean
   howto: boolean
   cta: boolean
+}
+
+/**
+ * Latest News section configuration. Stored under extended_config.latest_news in
+ * the DB JSONB column (mirrors package_explorer/footer/support). Public section
+ * is added in a later phase; this layer just owns typing/defaults/validation.
+ */
+export interface LatestNewsSettings {
+  title: string
+  subtitle: string
+  cta_label: string
+  /** How many published news cards to show. Integer 1–6. Default 3. */
+  limit: number
 }
 
 export interface HomepageSeo {
@@ -117,6 +132,8 @@ export interface HomepageSettings {
   sections: HomepageSections
   seo: HomepageSeo
   package_explorer: PackageExplorerSettings
+  /** Latest News section (added 047). Stored under extended_config.latest_news. */
+  latest_news: LatestNewsSettings
   footer: FooterSettings
   /** Phase 1 moves Features + HowTo copy into config (admin-editable text). */
   features: FeatureItem[]
@@ -182,6 +199,7 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
   sections: {
     hero: true,
     featured: true,
+    news: true,
     features: true,
     howto: true,
     cta: true,
@@ -197,6 +215,12 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     cta_label: 'ดูเส้นทางเตรียมสอบทั้งหมด',
     empty_title: 'กำลังเตรียมชุดข้อสอบใหม่',
     empty_description: 'ทีมงานกำลังอัปเดตคลังข้อสอบและสรุปเนื้อหาสำหรับปีล่าสุด กลับมาเช็คใหม่เร็วๆ นี้นะครับ',
+  },
+  latest_news: {
+    title: 'ข่าวสอบราชการล่าสุด',
+    subtitle: 'ติดตามข่าวเปิดรับสมัคร กำหนดการสอบ และประกาศสำคัญ',
+    cta_label: 'ดูข่าวทั้งหมด',
+    limit: 3,
   },
   footer: {
     social_links: [
@@ -298,6 +322,16 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     (typeof r.package_explorer === 'object' && r.package_explorer !== null)
       ? r.package_explorer
       : ((typeof extRaw.package_explorer === 'object' && extRaw.package_explorer !== null) ? extRaw.package_explorer : {})
+  // latest_news: admin client sends it top-level; DB stores it under extended_config.
+  const latestNewsRaw =
+    (typeof r.latest_news === 'object' && r.latest_news !== null)
+      ? r.latest_news
+      : ((typeof extRaw.latest_news === 'object' && extRaw.latest_news !== null) ? extRaw.latest_news : {})
+  // limit must be an integer in [1,6]; anything else falls back to the default.
+  const lnLimitRaw = Number(latestNewsRaw.limit)
+  const latestNewsLimit = Number.isInteger(lnLimitRaw) && lnLimitRaw >= 1 && lnLimitRaw <= 6
+    ? lnLimitRaw
+    : d.latest_news.limit
   const footerRaw =
     (typeof r.footer === 'object' && r.footer !== null)
       ? r.footer
@@ -379,6 +413,7 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     sections: {
       hero: sRaw.hero === false ? false : true,
       featured: sRaw.featured === false ? false : true,
+      news: sRaw.news === false ? false : true,
       features: sRaw.features === false ? false : true,
       howto: sRaw.howto === false ? false : true,
       cta: sRaw.cta === false ? false : true,
@@ -394,6 +429,15 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
       cta_label: cleanString(packageExplorerRaw.cta_label, d.package_explorer.cta_label, 80),
       empty_title: cleanString(packageExplorerRaw.empty_title, d.package_explorer.empty_title, 120),
       empty_description: cleanString(packageExplorerRaw.empty_description, d.package_explorer.empty_description, 300),
+    },
+    latest_news: {
+      // title + cta_label required (fallback if empty); subtitle may be empty.
+      title: cleanString(latestNewsRaw.title, d.latest_news.title, 120),
+      subtitle: typeof latestNewsRaw.subtitle === 'string'
+        ? latestNewsRaw.subtitle.slice(0, 300)
+        : d.latest_news.subtitle,
+      cta_label: cleanString(latestNewsRaw.cta_label, d.latest_news.cta_label, 80),
+      limit: latestNewsLimit,
     },
     footer: {
       social_links,
