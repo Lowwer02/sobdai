@@ -15,8 +15,57 @@ type SitemapEntry = MetadataRoute.Sitemap[number]
  * Failures degrade to an empty list rather than failing the whole sitemap build.
  */
 async function getDynamicRoutes(): Promise<SitemapEntry[]> {
-  return [...(await getNewsRoutes())]
+  const [news, packages] = await Promise.all([
+    getNewsRoutes(),
+    getPackageRoutes(),
+  ])
+  return [...news, ...packages]
 }
+
+/**
+ * Published packages → /package/[slug]. Mirrors the public catalog query's scope
+ * (anon client, is_published = true) and ordering so indexable package pages are included.
+ */
+async function getPackageRoutes(): Promise<SitemapEntry[]> {
+  try {
+    const supabase = createAnonServerClient()
+    const { data, error } = await supabase
+      .from('packages')
+      .select('slug, updated_at, created_at')
+      .eq('is_published', true)
+      .order('updated_at', { ascending: false })
+
+    if (error || !data) return []
+
+    const rows = data as unknown as {
+      slug: string | null
+      updated_at: string | null
+      created_at: string | null
+    }[]
+
+    const seenUrls = new Set<string>()
+    const entries: SitemapEntry[] = []
+
+    for (const row of rows) {
+      if (!row.slug || !row.slug.trim()) continue
+      const cleanSlug = row.slug.trim()
+      const url = absoluteUrl(`/package/${cleanSlug}`)
+      if (seenUrls.has(url)) continue
+      seenUrls.add(url)
+      entries.push({
+        url,
+        lastModified: new Date(row.updated_at || row.created_at || new Date()),
+        changeFrequency: 'weekly',
+        priority: 0.8,
+      })
+    }
+
+    return entries
+  } catch {
+    return []
+  }
+}
+
 
 /**
  * Published news articles → /news/[slug]. Mirrors the public list query's scope

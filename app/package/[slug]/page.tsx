@@ -7,7 +7,8 @@ import { applyContentOrdering } from '@/lib/contentOrdering'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { createPageMetadata } from '@/lib/seo'
+import { createPageMetadata, buildBreadcrumbJsonLd } from '@/lib/seo'
+import StructuredData from '@/components/StructuredData'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -137,9 +138,18 @@ export default async function PackagePage({ params }: PageProps) {
   const isPurchased = Boolean((order as any)?.data)
   const supportConfig = homepageSettings.support
 
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: 'หน้าแรก', path: '/' },
+    { name: 'แพ็กเกจ', path: '/packages' },
+    { name: pkg.name, path: `/package/${pkg.slug}` },
+  ])
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <PackageClient pkg={pkg} examSets={examSetsData} summaries={summaries?.data || []} isPurchased={isPurchased} supportConfig={supportConfig} />
-    </Suspense>
+    <>
+      <StructuredData data={breadcrumbJsonLd} />
+      <Suspense fallback={<div>Loading...</div>}>
+        <PackageClient pkg={pkg} examSets={examSetsData} summaries={summaries?.data || []} isPurchased={isPurchased} supportConfig={supportConfig} />
+      </Suspense>
+    </>
   )
 }
