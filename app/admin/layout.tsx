@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper } from 'lucide-react'
-import { getAdminSession } from '@/lib/auth/server-protect'
+import { requireStaff } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
-import { redirect } from 'next/navigation'
 
 const learningNav = [
   { name: 'Generate Assessment', href: '/admin/generate', icon: Sparkles, permission: 'content.write' },
@@ -33,15 +32,14 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  let profile = null
-  try {
-    const session = await getAdminSession()
-    profile = session.profile
-  } catch {
-    redirect('/admin')
-  }
-
-  const role = profile?.role || 'user'
+  // Staff boundary — the Single Source of Truth for entering /admin.
+  // requireStaff() authenticates the session AND verifies the profile role is
+  // staff (owner / admin / editor / support). A normal `user` is rejected with
+  // forbidden() (app/forbidden.tsx, HTTP 403) before any admin page renders.
+  // This protects every /admin/* route by default, so a page that forgets a
+  // per-route requirePermission() still cannot leak to non-staff.
+  const { profile } = await requireStaff()
+  const role = profile.role
 
   const filteredLearningNav = learningNav.filter(item => hasPermission(role, item.permission as any))
   const filteredManagementNav = managementNav.filter(item => hasPermission(role, item.permission as any))

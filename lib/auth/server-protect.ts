@@ -3,13 +3,25 @@ import { hasPermission, Permission, Role } from './rbac'
 import { forbidden, redirect } from 'next/navigation'
 
 /**
- * Returns the current user and profile data, or redirects if unauthorized.
- * Used for API routes and Server Actions.
+ * Roles permitted to enter the Admin Panel at all. A normal `user` is NOT
+ * staff and must be blocked at the admin staff boundary (app/admin/layout.tsx).
+ * This is the Single Source of Truth for "who may be inside /admin".
+ */
+export const STAFF_ROLES: readonly Role[] = ['owner', 'admin', 'editor', 'support']
+
+/**
+ * Returns the current user and profile data, or redirects to /login if not
+ * authenticated.
+ *
+ * NOTE: This performs AUTHENTICATION only — it verifies a session exists. It
+ * does NOT check the profile role. Callers that need authorization must also
+ * call requirePermission() (granular) or requireStaff() (staff boundary).
+ * The name is historical; think of it as requireAuthenticatedSession().
  */
 export async function getAdminSession() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/admin')
+  if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -17,7 +29,28 @@ export async function getAdminSession() {
     .eq('id', user.id)
     .single()
 
-  if (!profile) redirect('/admin')
+  if (!profile) redirect('/login')
+
+  return { user, profile, supabase }
+}
+
+/**
+ * Staff boundary — the Single Source of Truth for entering the Admin Panel.
+ *
+ * Authenticates the session, loads the profile, and verifies the role is one of
+ * STAFF_ROLES (owner / admin / editor / support). A normal authenticated `user`
+ * is rejected with forbidden() (renders app/forbidden.tsx, HTTP 403) rather than
+ * being allowed through. An unauthenticated request is redirected to /login.
+ *
+ * Use this in the admin layout to protect the entire /admin/* section by
+ * default, independent of per-page requirePermission() checks.
+ */
+export async function requireStaff() {
+  const { user, profile, supabase } = await getAdminSession()
+
+  if (!STAFF_ROLES.includes(profile.role as Role)) {
+    forbidden()
+  }
 
   return { user, profile, supabase }
 }
