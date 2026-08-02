@@ -37,6 +37,7 @@ export interface NewsCardData {
 interface NewsCardProps {
   article: NewsCardData
   index?: number
+  onClick?: () => void
 }
 
 /** Thai-locale date string (matches the admin list's fmtDate convention). */
@@ -53,7 +54,7 @@ function formatDate(s: string | null): string {
   }
 }
 
-export default function NewsCard({ article, index = 0 }: NewsCardProps) {
+export default function NewsCard({ article, index = 0, onClick }: NewsCardProps) {
   const href = `/news/${article.slug}`
   const dateLabel = formatDate(article.published_at)
   const category = article.category || null
@@ -63,6 +64,7 @@ export default function NewsCard({ article, index = 0 }: NewsCardProps) {
       href={href}
       style={{ textDecoration: 'none', display: 'flex', height: '100%' }}
       aria-label={article.title}
+      onClick={onClick}
     >
       <article
         className="card group"
