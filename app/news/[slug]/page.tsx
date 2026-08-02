@@ -15,7 +15,7 @@ import {
   Tag as TagIcon,
 } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
-import { createPageMetadata } from '@/lib/seo'
+import { createPageMetadata, buildBreadcrumbJsonLd } from '@/lib/seo'
 import { buildNewsMetadata, buildNewsJsonLd, type CtaConfig, type GpExamRequirement } from '@/lib/news'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
@@ -415,11 +415,17 @@ export default async function NewsDetailPage({
   // in the page body per Next's JSON-LD guide (StructuredData handles the
   // <script type="application/ld+json"> tag + createJsonLd sanitization).
   const jsonLd = buildNewsJsonLd(article)
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: 'หน้าแรก', path: '/' },
+    { name: 'ข่าวสาร', path: '/news' },
+    { name: article.title, path: article.canonical_url || `/news/${article.slug}` },
+  ])
 
   return (
     <div style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
       <article style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 80px' }}>
         <StructuredData data={jsonLd} />
+        <StructuredData data={breadcrumbJsonLd} />
         {/* Breadcrumb */}
         <nav
           aria-label="breadcrumb"
