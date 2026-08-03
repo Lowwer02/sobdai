@@ -69,6 +69,7 @@ interface NewsRow {
   category: string | null
   published_at: string | null
   gp_exam_requirement?: import('@/lib/news').GpExamRequirement
+  application_deadline?: string | null
 }
 
 export default async function NewsListPage({
@@ -99,7 +100,7 @@ export default async function NewsListPage({
     let query: any = supabase
       .from('news')
       .select(
-        'id, slug, title, excerpt, cover_image_url, cover_image_alt, category, published_at, created_at, updated_at, gp_exam_requirement',
+        'id, slug, title, excerpt, cover_image_url, cover_image_alt, category, published_at, created_at, updated_at, gp_exam_requirement, application_deadline',
         { count: 'exact' }
       )
       .eq('status', 'published')
