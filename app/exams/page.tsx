@@ -1,11 +1,12 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
-import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
+import ContinueLearningCard, { ContinueLearningEmpty } from '@/components/exams/ContinueLearningCard'
+import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestResultCard'
+import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
 
@@ -17,19 +18,20 @@ export const metadata: Metadata = createPageMetadata({
 })
 
 /**
- * My Exam Dashboard (Phase 0).
+ * My Exam Dashboard (Phase 1B).
  *
- * Replaces the previous catalog duplicate with a personal dashboard scoped to
- * the logged-in user's purchased packages. Three render states:
+ * Personal learner dashboard scoped to the logged-in user's purchased packages.
+ * Three render states:
  *   1. Guest (not logged in)       -> empty state with login / explore CTAs
  *   2. Logged in, owns nothing     -> empty state with "browse packages" CTA
- *   3. Logged in, owns packages    -> Continue Learning + My Packages grid
+ *   3. Logged in, owns packages    -> Continue Learning + Latest Result +
+ *                                     My Packages grid (+ future placeholders)
  *
- * Sections that require future schema (exam_attempts / bookmarks / etc.) are
- * rendered as explicit "เร็ว ๆ นี้" placeholders — no fake data, per spec.
- *
- * Pure Server Component: no client JS added. Reuses PackageCard, the orders
- * query pattern from /orders, and the getPackagePublicCounts RPC.
+ * Real data sections (Phase 1B):
+ *   - ทำต่อ        ← in-progress assessment_sessions (status = 'in_progress')
+ *   - ผลสอบล่าสุด   ← the latest completed exam_attempt (immutable Outcome)
+ * No fake data. Pure Server Component: no client JS added. Reuses PackageCard,
+ * the /orders query pattern, and the getPackagePublicCounts RPC.
  */
 export default async function ExamDashboardPage() {
   const supabase = await createClient()
@@ -75,11 +77,23 @@ export default async function ExamDashboardPage() {
   }
 
   // --- Logged in, owns packages --------------------------------------------
-  // Enrich with public counts (total_questions / total_exam_sets) via the
-  // existing RPC — same pattern as the homepage.
+  // Enrich with public counts (total_questions / total_exam_sets + a per-exam-set
+  // question-count map) via the existing RPC — same pattern as the homepage.
+  // The exam_set_counts map is reused below for Continue Learning progress totals
+  // so the dashboard never fetches question rows itself.
   let enriched: PackageCardData[] = []
+  let examSetQuestionCounts: Record<string, number> = {}
   try {
     const counts = await getPackagePublicCounts(ownedPackages.map((p) => p.id))
+    // Merge per-exam-set counts across all owned packages into one map.
+    for (const pkgId of Object.keys(counts)) {
+      const setCounts = counts[pkgId]?.exam_set_counts
+      if (setCounts) {
+        for (const [setId, q] of Object.entries(setCounts)) {
+          examSetQuestionCounts[setId] = Number(q) || 0
+        }
+      }
+    }
     enriched = ownedPackages.map((pkg) => ({
       id: pkg.id,
       slug: pkg.slug,
@@ -112,9 +126,16 @@ export default async function ExamDashboardPage() {
     }))
   }
 
-  // Continue Learning = first few owned packages (no progress data in Phase 0,
-  // so we surface entries into purchased packages).
-  const continueLearning = enriched.slice(0, 3)
+  // --- Real dashboard sections (Continue Learning + Latest Result) ----------
+  // Non-critical reads: a query failure degrades to an empty state but the
+  // package grid always renders. Scoped to owned packages so only currently
+  // accessible progress is surfaced.
+  const { activeSessions, latestResult } = await getDashboardData({
+    userId: user.id,
+    ownedPackageIds: enriched.map((p) => p.id),
+    examSetQuestionCounts,
+  })
+
   const allPackages = enriched
 
   return (
@@ -141,26 +162,10 @@ export default async function ExamDashboardPage() {
           </p>
         </header>
 
-        {/* ---------- Continue Learning ---------- */}
+        {/* ---------- Continue Learning (real in-progress sessions) ---------- */}
         <section style={{ marginBottom: '48px' }}>
           <SectionTitle>ทำต่อ</SectionTitle>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '16px',
-            }}
-          >
-            {continueLearning.map((pkg, i) => (
-              <PackageCard key={pkg.id} pkg={pkg} index={i} />
-            ))}
-          </div>
-        </section>
-
-        {/* ---------- My Packages (full list) ---------- */}
-        {allPackages.length > continueLearning.length && (
-          <section style={{ marginBottom: '48px' }}>
-            <SectionTitle>แพ็กเกจของฉัน</SectionTitle>
+          {activeSessions.length > 0 ? (
             <div
               style={{
                 display: 'grid',
@@ -168,12 +173,40 @@ export default async function ExamDashboardPage() {
                 gap: '16px',
               }}
             >
-              {allPackages.map((pkg, i) => (
-                <PackageCard key={pkg.id} pkg={pkg} index={i} />
+              {activeSessions.map((session) => (
+                <ContinueLearningCard key={session.sessionId} session={session} />
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <ContinueLearningEmpty firstOwnedPackageSlug={allPackages[0]?.slug} />
+          )}
+        </section>
+
+        {/* ---------- Latest Result (real latest completed attempt) ---------- */}
+        <section style={{ marginBottom: '48px' }}>
+          <SectionTitle>ผลสอบล่าสุด</SectionTitle>
+          {latestResult ? (
+            <LatestResultCard result={latestResult} />
+          ) : (
+            <LatestResultEmpty />
+          )}
+        </section>
+
+        {/* ---------- My Packages (always show all owned) ---------- */}
+        <section style={{ marginBottom: '48px' }}>
+          <SectionTitle>แพ็กเกจของฉัน</SectionTitle>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '16px',
+            }}
+          >
+            {allPackages.map((pkg, i) => (
+              <PackageCard key={pkg.id} pkg={pkg} index={i} />
+            ))}
+          </div>
+        </section>
 
         {/* ---------- Placeholder sections (future phases) ---------- */}
         <div
@@ -183,10 +216,6 @@ export default async function ExamDashboardPage() {
             gap: '16px',
           }}
         >
-          <PlaceholderCard title="ผลสอบล่าสุด">
-            เมื่อระบบบันทึกผลสอบถูกพัฒนา
-            คุณจะสามารถดูผลสอบย้อนหลังได้ที่นี่
-          </PlaceholderCard>
           <PlaceholderCard title="สถิติการเรียน">
             ค่าเฉลี่ย คะแนนสูงสุด และจำนวนครั้งที่ทำ
             จะแสดงที่นี่ในอนาคต
@@ -208,7 +237,7 @@ export default async function ExamDashboardPage() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Sub-components (kept local — Phase-0 only, not worth a shared file yet)    */
+/* Sub-components (kept local — not worth a shared file yet)                  */
 /* -------------------------------------------------------------------------- */
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
