@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { Calendar, ArrowRight } from 'lucide-react'
 import type { GpExamRequirement } from '@/lib/news'
 import GpExamRequirementBadge from './GpExamRequirementBadge'
+import RecruitmentStatusBadge from './RecruitmentStatusBadge'
 
 /**
  * Public News card (Server Component).
@@ -32,6 +33,8 @@ export interface NewsCardData {
   /** ภาค ก. requirement (tri-state). Optional so a list query that hasn't been
    *  updated to select it still type-checks; treated as 'unspecified' when absent. */
   gp_exam_requirement?: GpExamRequirement
+  application_deadline?: string | null
+  hide_from_homepage_when_expired?: boolean
 }
 
 interface NewsCardProps {
@@ -164,6 +167,7 @@ export default function NewsCard({ article, index = 0, onClick }: NewsCardProps)
             {article.gp_exam_requirement && (
               <GpExamRequirementBadge value={article.gp_exam_requirement} />
             )}
+            <RecruitmentStatusBadge deadline={article.application_deadline} />
           </div>
 
           {/* Title */}

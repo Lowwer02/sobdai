@@ -24,6 +24,7 @@ import PackageCard, { type PackageCardData } from '@/components/PackageCard'
 import ContentCard from '@/components/ContentCard'
 import NewsCtaBox from '@/components/news/NewsCtaBox'
 import GpExamRequirementBadge from '@/components/news/GpExamRequirementBadge'
+import RecruitmentStatusBadge from '@/components/news/RecruitmentStatusBadge'
 import NewsShareButtons from '@/components/news/NewsShareButtons'
 
 /**
@@ -94,6 +95,7 @@ interface NewsDetailRow {
   // ภาค ก. requirement (tri-state). Coerced to 'unspecified' by the contract
   // when absent, but the column has a DB default so it's always present on live rows.
   gp_exam_requirement: GpExamRequirement
+  application_deadline?: string | null
 }
 
 interface NewsNeighbor {
@@ -139,7 +141,7 @@ const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null
   const { data } = await supabase
     .from('news')
     .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement'
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline'
     )
     .eq('slug', slug)
     .eq('status', 'published')
@@ -553,6 +555,7 @@ export default async function NewsDetailPage({
                 โปรดตรวจสอบเงื่อนไขภาค ก. จากประกาศต้นฉบับ
               </span>
             )}
+            <RecruitmentStatusBadge deadline={article.application_deadline} />
           </div>
 
           {/* Share buttons */}
