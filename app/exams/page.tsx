@@ -6,7 +6,10 @@ import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
 import ContinueLearningCard, { ContinueLearningEmpty } from '@/components/exams/ContinueLearningCard'
 import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestResultCard'
+import LearningStats, { LearningStatsEmpty } from '@/components/exams/LearningStats'
+import WeakTopics, { WeakTopicsEmpty, WeakTopicsAllGood } from '@/components/exams/WeakTopics'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
+import { getLearnerAnalytics } from '@/lib/assessment/learner-analytics'
 import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
 
@@ -136,6 +139,20 @@ export default async function ExamDashboardPage() {
     examSetQuestionCounts,
   })
 
+  // --- Learning Statistics + Weak Topics (Phase 1D) ------------------------
+  // One bounded query (latest ≤20 completed attempts) feeds BOTH sections.
+  // Non-critical: on any failure the analytics layer returns a safe empty
+  // payload, so the dashboard's other sections still render. Reuses the same
+  // owned-package scoping as getDashboardData. The optional Weak Topics CTA
+  // reuses the latestResult attempt id when one is already available — no extra
+  // query is performed for this feature.
+  const learnerAnalytics = await getLearnerAnalytics({
+    userId: user.id,
+    ownedPackageIds: enriched.map((p) => p.id),
+  })
+  const hasCompletedAttempts = learnerAnalytics.statistics.attempts > 0
+  const reviewAttemptId = latestResult?.attemptId ?? null
+
   const allPackages = enriched
 
   return (
@@ -192,6 +209,28 @@ export default async function ExamDashboardPage() {
           )}
         </section>
 
+        {/* ---------- Learning Statistics (Phase 1D — recent window) ---------- */}
+        <section style={{ marginBottom: '48px' }}>
+          <SectionTitle>สถิติการเรียน</SectionTitle>
+          {hasCompletedAttempts ? (
+            <LearningStats statistics={learnerAnalytics.statistics} />
+          ) : (
+            <LearningStatsEmpty />
+          )}
+        </section>
+
+        {/* ---------- Weak Topics (Phase 1D — recent window) ---------- */}
+        <section style={{ marginBottom: '48px' }}>
+          <SectionTitle>หัวข้อที่ควรทบทวน</SectionTitle>
+          {!hasCompletedAttempts ? (
+            <WeakTopicsEmpty />
+          ) : learnerAnalytics.weakTopics.length > 0 ? (
+            <WeakTopics topics={learnerAnalytics.weakTopics} reviewAttemptId={reviewAttemptId} />
+          ) : (
+            <WeakTopicsAllGood />
+          )}
+        </section>
+
         {/* ---------- My Packages (always show all owned) ---------- */}
         <section style={{ marginBottom: '48px' }}>
           <SectionTitle>แพ็กเกจของฉัน</SectionTitle>
@@ -216,14 +255,6 @@ export default async function ExamDashboardPage() {
             gap: '16px',
           }}
         >
-          <PlaceholderCard title="สถิติการเรียน">
-            ค่าเฉลี่ย คะแนนสูงสุด และจำนวนครั้งที่ทำ
-            จะแสดงที่นี่ในอนาคต
-          </PlaceholderCard>
-          <PlaceholderCard title="หัวข้อที่ควรทบทวน">
-            ระบบจะวิเคราะห์หัวข้อที่คุณทำได้น้อย
-            เพื่อแนะนำการทบทวน
-          </PlaceholderCard>
           <PlaceholderCard title="ข้อสอบที่บันทึกไว้">
             ข้อสอบที่คุณคั่นไว้จะปรากฏที่นี่
           </PlaceholderCard>
