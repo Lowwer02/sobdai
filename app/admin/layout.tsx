@@ -25,6 +25,7 @@ const managementNav = [
   // matches the /admin/news list-page gate (write actions gate separately on
   // content.write), mirroring how Packages sits at content.read.
   { name: 'News', href: '/admin/news', icon: Newspaper, permission: 'content.read' },
+  { name: 'Articles', href: '/admin/articles', icon: FileText, permission: 'content.read' },
 ]
 
 export default async function AdminLayout({
