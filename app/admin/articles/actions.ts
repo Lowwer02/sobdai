@@ -10,6 +10,17 @@ import {
   Article,
 } from '@/lib/articles'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export interface RelatedPackageItem {
+  id: string
+  name: string
+  slug: string
+  current_price: number | null
+  is_published: boolean
+  cover_image_url: string | null
+}
+
 function formatErrors(errors: Record<string, string>): string {
   return Object.values(errors).join(' • ')
 }
@@ -20,6 +31,14 @@ function isUniqueViolation(error: any): boolean {
     error.code === '23505' ||
     (typeof error.message === 'string' && error.message.includes('unique constraint'))
   )
+}
+
+function sanitizePostgrestSearch(input: string): string {
+  return input
+    .trim()
+    .slice(0, 100)
+    .replace(/[\(\),\.\\%_]/g, ' ')
+    .trim()
 }
 
 function getManagedCoverPath(url: string | null | undefined): string | null {
@@ -51,7 +70,6 @@ async function removeManagedCoverIfUnused(supabase: any, url: string | null | un
   const path = getManagedCoverPath(url)
   if (!path) return
   try {
-    // Shared-cover protection: do not delete if another article still references the same cover
     const { count, error: countError } = await supabase
       .from('articles')
       .select('id', { count: 'exact', head: true })
@@ -128,8 +146,6 @@ export async function updateArticle(
   if (fetchError) return { success: false, error: fetchError.message }
   if (!existing) return { success: false, error: 'ไม่พบบทความ หรือคุณไม่มีสิทธิ์' }
 
-  // Status-aware update validation:
-  // Server forces status and published_at from existing stored row regardless of raw input
   const currentStatus = existing.status as ArticleStatus
   const candidate = {
     ...raw,
@@ -157,7 +173,6 @@ export async function updateArticle(
     return { success: false, error: formatErrors(errors) }
   }
 
-  // Update payload excludes status, published_at, created_by
   const payload: Record<string, unknown> = {
     slug: clean.slug,
     title: clean.title,
@@ -173,7 +188,6 @@ export async function updateArticle(
     og_image_url: clean.og_image_url,
   }
 
-  // Atomic update guard with status matching
   const { error, data } = await supabase
     .from('articles')
     .update(payload)
@@ -191,7 +205,6 @@ export async function updateArticle(
     return { success: false, error: 'แก้ไขไม่สำเร็จ สถานะปัจจุบันของบทความอาจถูกเปลี่ยนไปแล้ว กรุณารีโหลดหน้าใหม่' }
   }
 
-  // Managed Cover Cleanup: if cover URL changed, delete old managed cover if no longer used
   if (existing.cover_image_url && existing.cover_image_url !== clean.cover_image_url) {
     await removeManagedCoverIfUnused(supabase, existing.cover_image_url)
   }
@@ -236,7 +249,6 @@ export async function publishArticle(id: string): Promise<{ success: boolean; er
     published_at: publishTimestamp,
   }
 
-  // Atomic update with status guard
   const { error, data } = await supabase
     .from('articles')
     .update(patch)
@@ -272,7 +284,6 @@ export async function archiveArticle(id: string): Promise<{ success: boolean; er
     return { success: false, error: 'สามารถจัดเก็บได้เฉพาะบทความที่เผยแพร่แล้วเท่านั้น' }
   }
 
-  // Atomic update with status guard
   const { error, data } = await supabase
     .from('articles')
     .update({ status: 'archived' })
@@ -308,7 +319,6 @@ export async function restoreArticle(id: string): Promise<{ success: boolean; er
     return { success: false, error: 'สามารถกู้คืนได้เฉพาะบทความที่ถูกจัดเก็บแล้วเท่านั้น' }
   }
 
-  // Atomic update with status guard (restores to draft)
   const { error, data } = await supabase
     .from('articles')
     .update({ status: 'draft' })
@@ -347,7 +357,6 @@ export async function deleteArticle(id: string): Promise<{ success: boolean; err
     }
   }
 
-  // Atomic delete with status guard
   const { error, data } = await supabase
     .from('articles')
     .delete()
@@ -360,7 +369,6 @@ export async function deleteArticle(id: string): Promise<{ success: boolean; err
     return { success: false, error: 'ลบไม่สำเร็จ สถานะปัจจุบันของบทความอาจถูกเปลี่ยนไปแล้ว หรือไม่สามารถลบบทความนี้ได้' }
   }
 
-  // Managed cover cleanup after successful delete
   if (existing.cover_image_url) {
     await removeManagedCoverIfUnused(supabase, existing.cover_image_url)
   }
@@ -396,7 +404,6 @@ export async function uploadArticleCover(
     return { success: false, error: 'ไม่พบไฟล์ที่ต้องการอัปโหลด หรือไฟล์ว่างเปล่า' }
   }
 
-  // 4MB cap
   if (file.size > 4 * 1024 * 1024) {
     return { success: false, error: 'ขนาดไฟล์เกิน 4 MB' }
   }
@@ -432,4 +439,192 @@ export async function uploadArticleCover(
   const { data } = supabase.storage.from('article-assets').getPublicUrl(path)
 
   return { success: true, url: data.publicUrl }
+}
+
+// ─── ARTICLE - PACKAGE RELATIONS ────────────────────────────────────────────
+
+export async function getArticlePackageRelations(
+  articleId: string
+): Promise<{ success: boolean; data: RelatedPackageItem[]; error?: string }> {
+  const { supabase } = await requirePermission('content.read')
+
+  if (!articleId || !UUID_REGEX.test(articleId)) {
+    return { success: false, data: [], error: 'รหัสบทความไม่ถูกต้อง' }
+  }
+
+  const { data, error } = await supabase
+    .from('article_packages')
+    .select('sort_order, packages(id, name, slug, current_price, is_published, cover_image_url, logo_url)')
+    .eq('article_id', articleId)
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching article package relations:', error.message)
+    return { success: false, data: [], error: 'ไม่สามารถโหลดข้อมูลแพ็กเกจที่เกี่ยวข้องได้' }
+  }
+
+  const items = (data || [])
+    .map((row: any) => {
+      const pkg = row.packages
+      if (!pkg) return null
+      return {
+        id: pkg.id,
+        name: pkg.name,
+        slug: pkg.slug,
+        current_price: pkg.current_price,
+        is_published: pkg.is_published,
+        cover_image_url: pkg.cover_image_url || pkg.logo_url || null,
+      }
+    })
+    .filter((item): item is RelatedPackageItem => item !== null)
+
+  return { success: true, data: items }
+}
+
+export async function getAvailableArticlePackages(
+  search?: string
+): Promise<{ success: boolean; data: RelatedPackageItem[]; error?: string }> {
+  const { supabase } = await requirePermission('content.read')
+
+  let query = supabase
+    .from('packages')
+    .select('id, name, slug, current_price, is_published, cover_image_url, logo_url')
+
+  if (search && search.trim()) {
+    const cleaned = sanitizePostgrestSearch(search)
+    if (cleaned) {
+      query = query.or(`name.ilike.%${cleaned}%,slug.ilike.%${cleaned}%`)
+    }
+  }
+
+  query = query.order('name', { ascending: true }).limit(20)
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching available packages:', error.message)
+    return { success: false, data: [], error: 'ไม่สามารถโหลดรายการแพ็กเกจได้' }
+  }
+
+  const items = (data || []).map((pkg: any) => ({
+    id: pkg.id,
+    name: pkg.name,
+    slug: pkg.slug,
+    current_price: pkg.current_price,
+    is_published: pkg.is_published,
+    cover_image_url: pkg.cover_image_url || pkg.logo_url || null,
+  }))
+
+  return { success: true, data: items }
+}
+
+export async function updateArticlePackageRelations(
+  articleId: string,
+  packageIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  const { supabase } = await requirePermission('content.write')
+
+  if (!articleId || !UUID_REGEX.test(articleId)) {
+    return { success: false, error: 'รหัสบทความไม่ถูกต้อง' }
+  }
+
+  if (!Array.isArray(packageIds)) {
+    return { success: false, error: 'รูปแบบข้อมูลแพ็กเกจไม่ถูกต้อง' }
+  }
+
+  for (const pkgId of packageIds) {
+    if (typeof pkgId !== 'string' || !UUID_REGEX.test(pkgId)) {
+      return { success: false, error: 'พบรหัสแพ็กเกจที่มีรูปแบบไม่ถูกต้อง' }
+    }
+  }
+
+  const { data: existingArticle, error: articleErr } = await supabase
+    .from('articles')
+    .select('id')
+    .eq('id', articleId)
+    .maybeSingle()
+
+  if (articleErr) {
+    console.error('Error fetching parent article:', articleErr.message)
+    return { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบบทความ' }
+  }
+  if (!existingArticle) return { success: false, error: 'ไม่พบบทความ หรือคุณไม่มีสิทธิ์' }
+
+  const uniquePkgIds = Array.from(new Set(packageIds))
+
+  // Verify all selected package IDs exist
+  if (uniquePkgIds.length > 0) {
+    const { data: validPkgs, error: pkgFetchErr } = await supabase
+      .from('packages')
+      .select('id')
+      .in('id', uniquePkgIds)
+
+    if (pkgFetchErr) {
+      console.error('Error validating selected package IDs:', pkgFetchErr.message)
+      return { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบแพ็กเกจที่เลือก' }
+    }
+    if (!validPkgs || validPkgs.length !== uniquePkgIds.length) {
+      return { success: false, error: 'พบแพ็กเกจที่ไม่ถูกต้องหรือถูกลบไปแล้ว' }
+    }
+  }
+
+  // Fetch current stored relations for this article
+  const { data: currentRows, error: currentFetchErr } = await supabase
+    .from('article_packages')
+    .select('package_id')
+    .eq('article_id', articleId)
+
+  if (currentFetchErr) {
+    console.error('Error fetching current article_packages relations:', currentFetchErr.message)
+    return { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบความสัมพันธ์แพ็กเกจเดิม' }
+  }
+
+  const currentPackageIds = (currentRows || []).map((r: any) => r.package_id)
+  const removedIds = currentPackageIds.filter((id: string) => !uniquePkgIds.includes(id))
+
+  if (uniquePkgIds.length > 0) {
+    const desiredRows = uniquePkgIds.map((pkgId, index) => ({
+      article_id: articleId,
+      package_id: pkgId,
+      sort_order: index,
+    }))
+
+    // Non-destructive reconciliation: 1. Upsert desired rows first
+    const { error: upsertErr } = await supabase
+      .from('article_packages')
+      .upsert(desiredRows, { onConflict: 'article_id,package_id' })
+
+    if (upsertErr) {
+      console.error('Error upserting article_packages relations:', upsertErr.message)
+      return { success: false, error: 'ไม่สามารถบันทึกแพ็กเกจที่เกี่ยวข้องได้' }
+    }
+
+    // 2. Delete only removedIds after successful upsert
+    if (removedIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from('article_packages')
+        .delete()
+        .eq('article_id', articleId)
+        .in('package_id', removedIds)
+
+      if (delErr) {
+        console.error('Error removing unselected package relations:', delErr.message)
+        return { success: false, error: 'ไม่สามารถลบแพ็กเกจที่ไม่ต้องการออกจากรายการได้' }
+      }
+    }
+  } else {
+    // If desired list is empty, delete all relations for this article only
+    const { error: delErr } = await supabase
+      .from('article_packages')
+      .delete()
+      .eq('article_id', articleId)
+
+    if (delErr) {
+      console.error('Error clearing article_packages relations:', delErr.message)
+      return { success: false, error: 'ไม่สามารถลบรายการแพ็กเกจทั้งหมดได้' }
+    }
+  }
+
+  revalidatePath('/admin/articles')
+  revalidatePath(`/admin/articles/${articleId}/edit`)
+  return { success: true }
 }
