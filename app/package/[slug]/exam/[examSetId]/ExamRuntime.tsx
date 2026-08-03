@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw } from 'lucide-react'
 import DownloadShareButton from '@/components/share/DownloadShareButton'
@@ -8,6 +8,13 @@ import { computeOutcome } from '@/lib/assessment/outcome'
 import { normalizeMode } from '@/lib/assessment/types'
 import type { AssessmentOutcome } from '@/lib/assessment/types'
 import { persistOutcome } from '@/app/assessment/actions'
+import {
+  getOrCreateMyAssessmentSession,
+  saveMyAssessmentSession,
+  completeMyAssessmentSession,
+  clampIndex,
+} from '@/app/assessment/session-actions'
+import type { SessionSnapshot } from '@/lib/assessment/session-types'
 import type { ExamSet } from '@/lib/types'
 import { completeExam, startExam, submitExam } from '@/lib/analytics'
 
@@ -64,6 +71,26 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // generated, never mutated.)
   const [outcome, setOutcome] = useState<AssessmentOutcome | null>(null)
 
+  // ── Phase 1A: Assessment Session (resume / autosave) ─────────────────────
+  // `sessionId` is null until getOrCreate resolves (or forever if the Session
+  // API fails — the Runtime then runs purely in-memory, as before).
+  // `sessionReady` gates answering until the first hydrate completes so a
+  // resumed answer set is never overwritten by the empty initial state.
+  // `submittingRef` prevents double submit (ref, not state, so it is visible
+  // inside the async submit handler synchronously).
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionReady, setSessionReady] = useState(false)
+  const submittingRef = useRef(false)
+  // Tracks the last values we persisted, so the autosave effect can skip a
+  // no-op save (e.g. an answer toggled and then toggled back within the debounce
+  // window) and so the periodic timer checkpoint only writes when time moved.
+  const lastSavedRef = useRef<{ answers: string; flagged: string; currentIndex: number; timeUsedSeconds: number }>({
+    answers: '{}',
+    flagged: '{}',
+    currentIndex: 0,
+    timeUsedSeconds: 0,
+  })
+
   // Reset expanded state when question changes
   useEffect(() => {
     setIsExplanationExpanded(false)
@@ -88,10 +115,176 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   const [timeRemaining, setTimeRemaining] = useState(initialTime)
   const [timeUsed, setTimeUsed] = useState(0)
 
+  // Mirror of `timeRemaining` kept in a ref so `doSave` can read the current
+  // remaining time WITHOUT depending on `timeRemaining` itself. Without this,
+  // `doSave`'s identity would change every second (countdown ticks), which
+  // resets the 1000ms debounce and the 60s checkpoint interval on every tick —
+  // defeating both. The ref is read inside doSave; doSave stays stable. Declared
+  // here (after initialTime) so it can be seeded with the same starting value.
+  const timeRemainingRef = useRef(initialTime)
+  // Keep it in sync with the countdown state across every tick.
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining
+  }, [timeRemaining])
+
   // Weak Topic Analysis
   const [weakTopics, setWeakTopics] = useState<{name: string, count: number, type: string}[]>([])
 
   const q = questions[currentIndex]
+
+  // ── Phase 1A: hydrate the resume snapshot on mount ───────────────────────
+  // One-shot: ask the server for this user's active session for this exam set
+  // + mode. If one exists, restore answers/flagged/position; for simulation,
+  // restore the timer from the persisted time_used_seconds checkpoint. If the
+  // API fails, carry on in-memory (the exam must never crash because resume
+  // failed). Runs once per mount.
+  useEffect(() => {
+    let cancelled = false
+    async function hydrate() {
+      const examSetId = String(examSet?.id ?? '')
+      const packageId = String(pkg?.id ?? '')
+      if (!examSetId || !packageId) {
+        setSessionReady(true)
+        return
+      }
+      try {
+        const res = await getOrCreateMyAssessmentSession({
+          examSetId,
+          packageId,
+          mode: assessmentMode,
+        })
+        if (cancelled) return
+        if (res.success && res.data) {
+          const snap: SessionSnapshot = res.data
+          setSessionId(snap.id)
+          // Hydrate answers (coerce to the ChoiceLetter union; anything not
+          // A/B/C/D is dropped by the server validator, so the cast is safe).
+          const restoredAnswers: Record<string, ChoiceLetter> = {}
+          for (const [qid, letter] of Object.entries(snap.answers ?? {})) {
+            if (letter === 'A' || letter === 'B' || letter === 'C' || letter === 'D') {
+              restoredAnswers[qid] = letter
+            }
+          }
+          setAnswers(restoredAnswers)
+          setFlagged({ ...(snap.flagged ?? {}) })
+          const clamped = clampIndex(snap.currentIndex ?? 0, questions.length)
+          setCurrentIndex(clamped)
+          // Simulation only: restore the timer from the checkpoint so a refresh
+          // never resets to full time (Case 4). Practice is untimed regardless.
+          if (!isPractice) {
+            const used = Math.max(0, Math.trunc(snap.timeUsedSeconds ?? 0))
+            const restoredRemaining = Math.max(0, initialTime - used)
+            setTimeRemaining(restoredRemaining)
+          }
+          // Seed lastSavedRef so the first autosave doesn't re-write the
+          // just-hydrated identical values.
+          lastSavedRef.current = {
+            answers: JSON.stringify(restoredAnswers),
+            flagged: JSON.stringify(snap.flagged ?? {}),
+            currentIndex: clamped,
+            timeUsedSeconds: snap.timeUsedSeconds ?? 0,
+          }
+        } else if (!res.success && res.error && res.error !== 'Unauthorized') {
+          // Soft-fail: log without disturbing the user. 'Unauthorized' is
+          // expected for logged-out preview and is intentionally silent.
+          console.warn('Assessment session resume skipped:', res.error)
+        }
+      } catch (err) {
+        if (!cancelled) console.warn('Assessment session resume failed:', err)
+      } finally {
+        if (!cancelled) setSessionReady(true)
+      }
+    }
+    hydrate()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Phase 1A: debounced autosave ─────────────────────────────────────────
+  // Saves when answers, flagged, or currentIndex change — NOT every second.
+  // A 1000ms debounce collapses rapid interactions into one write. The timer
+  // is intentionally excluded from the dependency list so the countdown never
+  // triggers a write; instead a separate periodic checkpoint (below) persists
+  // time_used_seconds for simulation mode every ~60s.
+  //
+  // `doSave` reads the live remaining time from `timeRemainingRef.current`
+  // (NOT from `timeRemaining` state). This keeps doSave's identity stable
+  // across every 1s countdown tick — otherwise the debounce setTimeout and the
+  // 60s checkpoint setInterval would be torn down and rebuilt every second,
+  // and we'd write to the DB every second. doSave only changes when the
+  // genuinely relevant inputs change (answers/flagged/currentIndex/session).
+  const doSave = useCallback(async (opts?: { force?: boolean }) => {
+    const id = sessionId
+    if (!id) return // no session (API failed) → in-memory only
+    const answersJson = JSON.stringify(answers)
+    const flaggedJson = JSON.stringify(flagged)
+    const used = Math.max(0, initialTime - Math.max(0, timeRemainingRef.current))
+    const prev = lastSavedRef.current
+    if (!opts?.force) {
+      // Skip if nothing relevant changed.
+      if (
+        answersJson === prev.answers &&
+        flaggedJson === prev.flagged &&
+        currentIndex === prev.currentIndex &&
+        used === prev.timeUsedSeconds
+      ) {
+        return
+      }
+    }
+    const res = await saveMyAssessmentSession({
+      sessionId: id,
+      answers,
+      flagged,
+      currentIndex,
+      timeUsedSeconds: used,
+    })
+    if (res.success) {
+      lastSavedRef.current = {
+        answers: answersJson,
+        flagged: flaggedJson,
+        currentIndex,
+        timeUsedSeconds: used,
+      }
+    } else if (res.error && res.error !== 'Unauthorized') {
+      // Autosave failures are non-fatal: the Runtime keeps working in-memory.
+      console.warn('Assessment session autosave failed:', res.error)
+    }
+  }, [sessionId, answers, flagged, currentIndex, initialTime])
+
+  useEffect(() => {
+    if (!sessionReady || !sessionId) return
+    if (status !== 'IN_PROGRESS') return
+    const t = setTimeout(() => { doSave() }, 1000)
+    return () => clearTimeout(t)
+  }, [answers, flagged, currentIndex, sessionReady, sessionId, status, doSave])
+
+  // Simulation-only periodic time checkpoint (>= 60s). Persists the elapsed
+  // time so a mid-exam refresh restores the timer close to the last checkpoint
+  // (Case 4). Practice is untimed and skips this entirely.
+  useEffect(() => {
+    if (!sessionReady || !sessionId) return
+    if (isPractice) return
+    if (status !== 'IN_PROGRESS') return
+    const interval = setInterval(() => { doSave() }, 60000)
+    return () => clearInterval(interval)
+  }, [sessionReady, sessionId, isPractice, status, doSave])
+
+  // Best-effort flush when the learner navigates away. We do NOT rely on this
+  // succeeding (browsers may drop async work in beforeunload); the debounced
+  // autosave + 60s checkpoint are the durable path. This just narrows the
+  // window of unsaved progress on tab close / route change.
+  useEffect(() => {
+    function onBeforeUnload() {
+      if (sessionId && status === 'IN_PROGRESS') {
+        // Fire-and-forget; navigator.sendBeacon would not carry cookies/JSON
+        // cleanly for a server action, so we issue a normal fetch-style save
+        // and accept it may not complete.
+        doSave({ force: true })
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [sessionId, status, doSave])
 
   // Timer Effect — runs ONLY for summative (simulation/mock) attempts.
   // Practice Assessments are untimed by Product Philosophy (Part II §10.1:
@@ -130,6 +323,9 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // Answer selection
   const handleSelect = (letter: ChoiceLetter) => {
     if (status !== 'IN_PROGRESS') return
+    // Block answering until the first hydrate completes, so a resumed answer
+    // set is never clobbered by an empty initial render.
+    if (!sessionReady) return
     setAnswers(prev => ({ ...prev, [q.id]: letter }))
     // Auto next on answer (only for non-practice modes)
     if (!isPractice && currentIndex < questions.length - 1) {
@@ -147,6 +343,13 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   }
 
   const handleForceSubmit = () => {
+    // ── Double-submit guard ─────────────────────────────────────────────────
+    // A ref (not state) so the guard is honored synchronously even when the
+    // timer-driven auto-submit and a user click race. computeOutcome and
+    // persistOutcome each run at most once per attempt.
+    if (submittingRef.current) return
+    submittingRef.current = true
+
     // ── Outcome trigger (Constitution AI-004: One Attempt → One Outcome) ──
     // The Runtime computes the Outcome once at submission via the pure
     // boundary in lib/assessment/outcome.ts, then transitions to REVIEW and
@@ -174,15 +377,35 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     completeExam(examSet.id, result.score, result.score, result.total - result.score)
 
     // ── Epic 2: persist the Outcome as official learning history. ──────────
-    // Best-effort and fire-and-forget: the result screen renders from the
-    // in-memory `result` object regardless of whether persistence succeeds,
-    // so a DB/RLS/network failure cannot break the learner's experience.
-    // Errors are logged server-side by persistOutcome; we swallow them here.
+    // Best-effort: the result screen renders from the in-memory `result`
+    // object regardless of whether persistence succeeds, so a DB/RLS/network
+    // failure cannot break the learner's experience. Errors are logged
+    // server-side by persistOutcome; we swallow them here.
     // (Constitution AI-004/005: one Attempt → one immutable Outcome, stored
     // once. Part IV §26: Persistence stores; Runtime continues independently.)
-    persistOutcome(result).catch((err) => {
-      console.error('Assessment Outcome persistence failed:', err)
-    })
+    //
+    // Phase 1A: ONLY when persistOutcome succeeds AND returns an id do we
+    // close the assessment session and link it to the Outcome. If persistence
+    // fails, the session stays in_progress (Case 6) so the learner could
+    // resume; the result screen still shows because it reads from `result`.
+    persistOutcome(result)
+      .then(async (persisted) => {
+        if (persisted.success && persisted.id && sessionId) {
+          // Best-effort session close. If THIS call fails we log and proceed —
+          // the result screen already rendered from the in-memory Outcome, and
+          // a stranded in_progress session simply remains resumable.
+          const closed = await completeMyAssessmentSession({
+            sessionId,
+            outcomeAttemptId: persisted.id,
+          })
+          if (!closed.success && closed.error && closed.error !== 'Unauthorized') {
+            console.warn('Assessment session close failed:', closed.error)
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Assessment Outcome persistence failed:', err)
+      })
   }
 
   // ── Derived display values (read from the Outcome when present) ──────────
@@ -542,7 +765,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
         
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href={status === 'REVIEW' ? '#' : `/package/${pkg.slug}`} onClick={(e) => { if (status === 'IN_PROGRESS' && !confirm('คุณต้องการออกจากข้อสอบใช่หรือไม่? การทำข้อสอบจะไม่ถูกบันทึก')) e.preventDefault(); if (status === 'REVIEW') { e.preventDefault(); setCurrentIndex(-1); } }} className="text-[#A1866B] hover:text-[#D4AF37] transition-colors p-2 -ml-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
+            <Link href={status === 'REVIEW' ? '#' : `/package/${pkg.slug}`} onClick={(e) => { if (status === 'IN_PROGRESS' && !confirm('ความคืบหน้าที่บันทึกล่าสุดจะถูกเก็บไว้ คุณต้องการออกจากข้อสอบใช่หรือไม่?')) e.preventDefault(); if (status === 'REVIEW') { e.preventDefault(); setCurrentIndex(-1); } }} className="text-[#A1866B] hover:text-[#D4AF37] transition-colors p-2 -ml-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
               <ChevronLeft size={20} />
             </Link>
             <div>
