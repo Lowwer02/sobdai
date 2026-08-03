@@ -22,7 +22,12 @@ export default function LatestResultCard({ result }: { result: DashboardLatestRe
   // this way via a generated column).
   const wrong = Math.max(0, total - correct)
   const answered = Math.max(0, result.answeredCount)
+  // Unanswered = total − answered, clamped at 0.
+  const unanswered = Math.max(0, total - answered)
   const accuracy = Math.max(0, Math.min(100, Math.round(result.accuracy ?? safePercent(correct, total))))
+  // Whether the review CTA should point to incorrect-review (any wrong or
+  // unanswered) vs. view-all (a perfect, fully-answered attempt).
+  const hasReviewable = wrong > 0 || unanswered > 0
 
   return (
     <div
@@ -148,9 +153,43 @@ export default function LatestResultCard({ result }: { result: DashboardLatestRe
 
       {/* CTAs */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+        {/* Review CTA (Phase 1C). When there are wrong OR unanswered questions,
+            invite the learner to review them; otherwise offer to view all
+            answers. Avoids overcrowding on mobile by keeping this compact. */}
+        {hasReviewable ? (
+          <Link
+            href={`/exams/attempts/${result.attemptId}?view=incorrect`}
+            className="btn-primary"
+            style={{
+              display: 'inline-block',
+              textAlign: 'center',
+              textDecoration: 'none',
+              padding: '10px 18px',
+              fontSize: '14px',
+            }}
+            aria-label={`ทบทวนข้อผิด ${result.examSetName}`}
+          >
+            ทบทวนข้อผิด
+          </Link>
+        ) : (
+          <Link
+            href={`/exams/attempts/${result.attemptId}?view=all`}
+            className="btn-primary"
+            style={{
+              display: 'inline-block',
+              textAlign: 'center',
+              textDecoration: 'none',
+              padding: '10px 18px',
+              fontSize: '14px',
+            }}
+            aria-label={`ดูคำตอบทั้งหมด ${result.examSetName}`}
+          >
+            ดูคำตอบทั้งหมด
+          </Link>
+        )}
         <Link
           href={retryUrl}
-          className="btn-primary"
+          className="btn-outline"
           style={{
             display: 'inline-block',
             textAlign: 'center',
