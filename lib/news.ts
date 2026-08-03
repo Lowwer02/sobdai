@@ -150,6 +150,10 @@ export interface News {
   updated_at: string
   cta_config: CtaConfig | null
   gp_exam_requirement: GpExamRequirement
+  application_deadline: string | null
+  homepage_featured: boolean
+  homepage_featured_order: number | null
+  hide_from_homepage_when_expired: boolean
 }
 
 /**
@@ -175,6 +179,10 @@ export interface NewsInput {
   og_image_url: string | null
   cta_config: CtaConfig | null
   gp_exam_requirement: GpExamRequirement
+  application_deadline: string | null
+  homepage_featured: boolean
+  homepage_featured_order: number | null
+  hide_from_homepage_when_expired: boolean
 }
 
 export const NEWS_STATUSES: { value: NewsStatus; label: string }[] = [
@@ -251,6 +259,11 @@ function coerce(raw: any): { input: NewsInput; rawSlug: string | undefined } {
       cta_config: cleanCtaConfig(raw.cta_config),
       // ภาค ก. requirement: unknown/absent → unspecified (safe default).
       gp_exam_requirement: coerceGpExamRequirement(raw.gp_exam_requirement),
+      // Application deadline & homepage pinning normalization (Task 2)
+      application_deadline: parseApplicationDeadline(raw.application_deadline),
+      homepage_featured: raw.homepage_featured === true,
+      homepage_featured_order: parsePositiveInteger(raw.homepage_featured_order),
+      hide_from_homepage_when_expired: raw.hide_from_homepage_when_expired !== false,
     },
     rawSlug: str(raw.slug),
   }
@@ -514,6 +527,77 @@ function isValidSlug(s: string): boolean {
 }
 
 // ─── coercion helpers ───────────────────────────────────────────────────────
+
+/**
+ * Validate a calendar date in YYYY-MM-DD format strictly without timezone shifts.
+ * Rejects invalid dates such as 2026-02-30, 2026-04-31, 2026-02-29 (non-leap), 31-08-2026, or non-strings.
+ */
+export function isValidDateOnly(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const s = value.trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+
+  const [yStr, mStr, dStr] = s.split('-')
+  const y = parseInt(yStr, 10)
+  const m = parseInt(mStr, 10)
+  const d = parseInt(dStr, 10)
+
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false
+
+  const isLeap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+  const maxDaysInMonth = [0, 31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+  return d <= maxDaysInMonth[m]
+}
+
+/**
+ * Parse an application deadline date string (YYYY-MM-DD). Returns null for invalid/absent input.
+ */
+export function parseApplicationDeadline(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const s = value.trim()
+  return isValidDateOnly(s) ? s : null
+}
+
+/**
+ * Derive the current date string in Thailand timezone (Asia/Bangkok) formatted as YYYY-MM-DD.
+ */
+export function getThailandDateString(dateObj: Date = new Date()): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = formatter.formatToParts(dateObj)
+  const year = parts.find((p) => p.type === 'year')?.value ?? ''
+  const month = parts.find((p) => p.type === 'month')?.value ?? ''
+  const day = parts.find((p) => p.type === 'day')?.value ?? ''
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Check if a recruitment application deadline is expired relative to Thailand current date.
+ * A deadline of 2026-08-31 remains open throughout 31 August and becomes expired on 2026-09-01.
+ */
+export function isApplicationExpired(
+  deadline: string | null,
+  todayStr: string = getThailandDateString()
+): boolean {
+  if (!deadline || !isValidDateOnly(deadline)) return false
+  return todayStr > deadline
+}
+
+/**
+ * Parse positive integer for homepage featured priority order (1, 2, 3...).
+ * Returns null for 0, negative, decimals, NaN, empty strings, or non-numeric input.
+ */
+export function parsePositiveInteger(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  if (!Number.isInteger(n) || n <= 0) return null
+  return n
+}
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined

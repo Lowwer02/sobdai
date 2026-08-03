@@ -139,6 +139,16 @@ export default function NewsEditorClient({
   const [canonicalUrl, setCanonicalUrl] = useState(article?.canonical_url || '')
   const [ogImageUrl, setOgImageUrl] = useState(article?.og_image_url || '')
 
+  // Homepage Featured & Application Deadline (Task 4)
+  const [applicationDeadline, setApplicationDeadline] = useState(article?.application_deadline || '')
+  const [homepageFeatured, setHomepageFeatured] = useState(article?.homepage_featured ?? false)
+  const [homepageFeaturedOrder, setHomepageFeaturedOrder] = useState<string>(
+    article?.homepage_featured_order != null ? String(article.homepage_featured_order) : ''
+  )
+  const [hideFromHomepageWhenExpired, setHideFromHomepageWhenExpired] = useState(
+    article?.hide_from_homepage_when_expired ?? true
+  )
+
   // Related packages / summaries. Edit-mode only in the UI (a parent news id is
   // required to attach junction rows), but the state is held unconditionally so
   // the types stay simple — the section just isn't rendered at create time.
@@ -306,6 +316,11 @@ export default function NewsEditorClient({
       og_image_url: ogImageUrl || null,
       // CTA config — passed straight through (the object is already clean).
       cta_config: ctaConfig.enabled ? ctaConfig : null,
+      // Homepage Featured News & Application Deadline (Task 4)
+      application_deadline: applicationDeadline.trim() || null,
+      homepage_featured: homepageFeatured,
+      homepage_featured_order: homepageFeaturedOrder.trim() !== '' ? Number(homepageFeaturedOrder) : null,
+      hide_from_homepage_when_expired: hideFromHomepageWhenExpired,
     }
 
     if (isEdit && article) {
@@ -578,6 +593,95 @@ export default function NewsEditorClient({
             <p className="text-[10px] text-[#A1866B] mt-1">
               ระบุว่าผู้สมัครต้องมีผลสอบผ่านภาค ก. หรือไม่ โดยยึดตามประกาศต้นฉบับ
             </p>
+          </div>
+        </section>
+
+        {/* Homepage & Recruitment Deadline */}
+        <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+          <h2 className="text-[#D4AF37] font-bold font-display">การแสดงผลหน้าแรกและวันรับสมัคร</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* วันปิดรับสมัคร */}
+            <div>
+              <label className={labelClass}>วันปิดรับสมัคร</label>
+              <input
+                type="date"
+                value={applicationDeadline}
+                onChange={e => {
+                  setApplicationDeadline(e.target.value)
+                  setIsDirty(true)
+                  setPublishErrors({})
+                }}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-[#A1866B] mt-1">
+                ข่าวจะถือว่ายังเปิดรับสมัครตลอดวันดังกล่าวตามเวลาไทย
+              </p>
+            </div>
+
+            {/* ลำดับปักหมุด */}
+            <div>
+              <label className={labelClass}>ลำดับปักหมุด</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={homepageFeaturedOrder}
+                disabled={!homepageFeatured}
+                onChange={e => {
+                  setHomepageFeaturedOrder(e.target.value)
+                  setIsDirty(true)
+                  setPublishErrors({})
+                }}
+                placeholder="เช่น 1, 2, 3"
+                className={`${inputClass} ${!homepageFeatured ? 'opacity-50 cursor-not-allowed' : ''}`}
+              />
+              <p className="text-[10px] text-[#A1866B] mt-1">
+                ตัวเลขน้อยจะแสดงก่อน เช่น 1 ก่อน 2
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+            {/* ปักหมุดบนหน้าแรก */}
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={homepageFeatured}
+                onChange={e => {
+                  setHomepageFeatured(e.target.checked)
+                  setIsDirty(true)
+                  setPublishErrors({})
+                }}
+                className="w-4 h-4 rounded border-[rgba(255,255,255,0.15)] bg-[#0F0B07] text-[#D4AF37] focus:ring-0 focus:ring-offset-0 cursor-pointer accent-[#D4AF37]"
+              />
+              <div>
+                <span className="text-sm text-[#F5E9D6] font-medium block">ปักหมุดบนหน้าแรก</span>
+                <span className="text-[11px] text-[#A1866B] block">
+                  ข่าวที่ปักหมุดจะแสดงก่อนข่าวล่าสุดทั่วไป
+                </span>
+              </div>
+            </label>
+
+            {/* ซ่อนจากหน้าแรกเมื่อหมดเขต */}
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideFromHomepageWhenExpired}
+                onChange={e => {
+                  setHideFromHomepageWhenExpired(e.target.checked)
+                  setIsDirty(true)
+                  setPublishErrors({})
+                }}
+                className="w-4 h-4 rounded border-[rgba(255,255,255,0.15)] bg-[#0F0B07] text-[#D4AF37] focus:ring-0 focus:ring-offset-0 cursor-pointer accent-[#D4AF37]"
+              />
+              <div>
+                <span className="text-sm text-[#F5E9D6] font-medium block">ซ่อนจากหน้าแรกเมื่อหมดเขต</span>
+                <span className="text-[11px] text-[#A1866B] block">
+                  ข่าวยังเปิดอ่านได้ตามปกติ แต่จะถูกนำออกจากหน้าแรกอัตโนมัติ
+                </span>
+              </div>
+            </label>
           </div>
         </section>
 
