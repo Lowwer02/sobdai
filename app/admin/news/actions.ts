@@ -543,6 +543,11 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
     cta_config: input.cta_config ?? null,
     // ภาค ก. requirement — always a legal tri-state value after coercion.
     gp_exam_requirement: input.gp_exam_requirement,
+    // Application deadline & homepage pinning (Task 3)
+    application_deadline: input.application_deadline,
+    homepage_featured: input.homepage_featured,
+    homepage_featured_order: input.homepage_featured_order,
+    hide_from_homepage_when_expired: input.hide_from_homepage_when_expired,
   }
 
   if (isCreate) {
