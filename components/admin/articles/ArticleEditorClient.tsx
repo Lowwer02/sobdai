@@ -26,6 +26,7 @@ import {
   archiveArticle,
   restoreArticle,
   uploadArticleCover,
+  type RelatedPackageItem,
 } from '@/app/admin/articles/actions'
 import {
   validateArticleForPublish,
@@ -35,13 +36,16 @@ import {
 } from '@/lib/articles'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import ArticleMarkdownEditor from '@/components/admin/articles/ArticleMarkdownEditor'
+import ArticlePackagePicker from '@/components/admin/articles/ArticlePackagePicker'
 
 export default function ArticleEditorClient({
   article,
   isEdit,
+  initialPackageRelations = [],
 }: {
   article: Article | null
   isEdit: boolean
+  initialPackageRelations?: RelatedPackageItem[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -426,6 +430,12 @@ export default function ArticleEditorClient({
 
         {/* Sidebar Controls (Right 1 col) */}
         <div className="space-y-6">
+          {/* Related Packages Picker */}
+          <ArticlePackagePicker
+            articleId={article?.id || null}
+            initialRelations={initialPackageRelations}
+          />
+
           {/* Cover Upload Box */}
           <div className="bg-[#1A140E] border border-[#D4AF37]/20 p-4 sm:p-6 rounded-xl space-y-4">
             <h2 className="text-base font-bold text-[#F5E9D6] border-b border-[#D4AF37]/10 pb-3 flex items-center gap-2">

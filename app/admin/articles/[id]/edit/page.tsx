@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth/server-protect'
-import { getArticleById } from '@/app/admin/articles/actions'
+import { getArticleById, getArticlePackageRelations } from '@/app/admin/articles/actions'
 import ArticleEditorClient from '@/components/admin/articles/ArticleEditorClient'
 
 export default async function EditArticlePage({
@@ -16,5 +16,16 @@ export default async function EditArticlePage({
     notFound()
   }
 
-  return <ArticleEditorClient article={article} isEdit={true} />
+  const relRes = await getArticlePackageRelations(id)
+  if (!relRes.success) {
+    throw new Error(relRes.error || 'ไม่สามารถโหลดข้อมูลแพ็กเกจที่เกี่ยวข้องได้')
+  }
+
+  return (
+    <ArticleEditorClient
+      article={article}
+      isEdit={true}
+      initialPackageRelations={relRes.data}
+    />
+  )
 }
