@@ -23,10 +23,19 @@ Knowledge Platform files start at `035`. Production migration `037_news_cta_conf
 
 Two execution classes are intentionally distinguished:
 
-- **Versioned transactional migrations:** ordinary DDL and short data-finalization units applied through the standard migration history.
-- **Controlled online units:** concurrent indexes and chunked backfill execution. They are version-controlled and recorded in the migration ledger, but must run through an executor that permits multiple commits or non-transactional index construction.
+- **Versioned transactional migrations:** ordinary DDL, approved standard index builds, and short data-finalization units applied through the standard migration history.
+- **Controlled online units:** concurrent indexes that meet the Concurrent Index Policy below and chunked backfill execution. They are version-controlled and recorded in the migration ledger, but must run through an executor that permits multiple commits or non-transactional index construction.
 
 Long-running production backfills must not be hidden inside one all-or-nothing Supabase migration transaction.
+
+**Approved production reconciliation:** the frozen migration 046 index
+responsibility is implemented by production migration
+`048_kp_online_indexes.sql` after unrelated production migrations consumed the
+intervening identities. Production migration 048 is classified as a
+**Standard Transactional Index Migration**, intentionally deployable through
+the Supabase SQL Editor transaction workflow. References to migration 046
+below retain the frozen responsibility identifier rather than renumbering
+later frozen responsibilities.
 
 # 1. Migration file inventory
 
@@ -43,7 +52,7 @@ Long-running production backfills must not be hidden inside one all-or-nothing S
 | 043 | `043_kp_summary_relationships.sql` | C | Create Summary aliases and ReferenceDocument relationships |
 | 044 | `044_kp_package_summaries.sql` | C | Create Package-to-Summary placements |
 | 045 | `045_kp_rls_foundation.sql` | C | Install target-table RLS foundations |
-| 046 | `046_kp_online_indexes.sql` | C | Build online indexes required for reads and backfill |
+| 046 | `046_kp_online_indexes.sql` (production `048_kp_online_indexes.sql`) | C | Build standard transactional indexes required for reads and backfill |
 | 047 | `047_kp_backfill_summary_identity.sql` | D | Backfill Summary business identity |
 | 048 | `048_kp_backfill_reference_documents_curated.sql` | D | Apply the approved curated ReferenceDocument mapping; conditional data unit |
 | 049 | `049_kp_backfill_initial_summary_versions.sql` | D | Create initial Summary versions from legacy content |
@@ -104,7 +113,7 @@ flowchart TD
     M043["043 Summary relationships"]
     M044["044 Package summaries"]
     M045["045 RLS foundation"]
-    M046["046 Online indexes"]
+    M046["046 responsibility / production 048 Standard indexes"]
     M047["047 Summary identity backfill"]
     M048["048 Curated references"]
     M049["049 Initial revisions"]
@@ -359,23 +368,28 @@ The canonical-slug/alias cross-table collision guard is installed dormant while 
 
 Views/RPCs that need different access are added later; this file does not prematurely expose them.
 
-## 046 — `046_kp_online_indexes.sql`
+## 046 responsibility — production `048_kp_online_indexes.sql`
 
 | Item | Design |
 |---|---|
-| Purpose | Build indexes on the existing populated Summary table without long write blocking |
+| Purpose | Build required indexes on the existing populated Summary table through the standard transactional deployment workflow |
 | Tables affected | `summaries`; optionally supporting existing Package lookup |
 | Columns added | None |
 | Constraints | None yet |
-| Indexes | Unique-on-non-null `summary_code`, canonical slug, root lifecycle/visibility, classification, current pointer; any required temporary backfill lookup |
+| Indexes | Standard unique-on-non-null `summary_code`, canonical slug, root lifecycle/visibility, classification, current pointer; any required temporary backfill lookup |
 | RLS | None |
 | Backfill dependency | New columns from 041 |
 | Feature flag | None |
-| Rollback | Unused indexes may be removed later through a separate online operation |
-| Lock risk | Low write-blocking only if built concurrently; brief catalog locks |
-| Runtime risk | Medium I/O/WAL/replica load proportional to live Summary size |
+| Rollback | Transaction rollback on deployment failure; unused indexes may be removed later through a policy-compliant forward operation |
+| Lock risk | Brief write blocking while the five indexes build; accepted for the verified small production Summary table, with lock acquisition bounded by the migration lock timeout |
+| Runtime risk | Low at the approved current production scale; reassess before future populated-table index migrations |
 
-This file is a non-transactional controlled online unit. If the deployment executor cannot support concurrent construction, it moves to a maintenance window rather than using blocking index creation during normal traffic.
+Production migration 048 is a Standard Transactional Index Migration. It uses
+ordinary `CREATE INDEX` statements so the preflight, five index builds,
+assertions, comments, and schema-cache notification execute atomically through
+Supabase SQL Editor. This exception is approved from measured current-scale and
+operational-workflow facts; it does not waive the Concurrent Index Policy for
+future migrations.
 
 ## 047 — `047_kp_backfill_summary_identity.sql`
 
@@ -712,11 +726,41 @@ The planned nullable additions and later metadata-only cleanup should not requir
 ## 6.3 Large indexes
 
 - New-table indexes are built while tables are empty.
-- Existing populated-table indexes use concurrent construction.
+- Existing populated-table indexes follow the Concurrent Index Policy below.
+- Approved standard builds run transactionally in a controlled low-traffic deployment window.
 - Concurrent index failures can leave invalid index artifacts; the operator runbook detects and removes/retries them through a controlled forward operation.
 - Indexes are built one at a time or within measured I/O limits.
 - Replica lag, WAL growth, CPU, disk, and query latency are monitored.
-- The migration executor must explicitly support non-transactional concurrent index operations.
+- A migration classified as concurrent must use an executor that explicitly supports non-transactional concurrent index operations.
+
+### 6.3.1 Concurrent Index Policy
+
+Index execution mode is selected from measured production facts at the time the
+migration is approved; future scale targets alone do not force a current
+migration into the concurrent execution class.
+
+- Standard transactional `CREATE INDEX` is the default when the target table
+  is below both 100,000 rows and 250 MB, the measured or rehearsed build stays
+  within a five-second write-lock budget, and a controlled low-traffic
+  deployment window is available.
+- Tables from 100,000 to 1,000,000 rows or from 250 MB to 1 GB require a
+  production-like rehearsal. Use `CREATE INDEX CONCURRENTLY` when the measured
+  build is expected to exceed the approved write-lock budget.
+- `CREATE INDEX CONCURRENTLY` is required when any target table exceeds
+  1,000,000 rows or 1 GB, when an index build is expected to block writes for
+  more than ten seconds, or when continuous-write/availability requirements do
+  not permit the measured standard-build lock.
+- Every future populated-table index migration records row count, total table
+  size, write rate, rehearsed duration, lock budget, chosen execution class,
+  executor, verification, and rollback procedure in its review evidence.
+- Concurrent migrations remain non-transactional controlled online units and
+  require the dedicated operational procedure. Standard migrations remain
+  atomic and deployable through the normal Supabase SQL Editor workflow.
+
+Production migration 048 satisfies the standard-migration criteria and is the
+approved standard transactional case. Migration 053 retains its frozen
+concurrent classification unless a separate architecture review approves a
+change using then-current production measurements.
 
 ## 6.4 Foreign-key and check validation
 
@@ -753,7 +797,7 @@ Summary editorial freeze required:
 Maintenance window strongly recommended:
 
 - 055 if populated-table metadata locks cannot meet the normal lock budget;
-- any index build that cannot run concurrently;
+- any standard index build whose measured blocking cannot meet the approved lock budget;
 - 060 always.
 
 Learner downtime is not expected for migrations 035–058. Migration 060 may require a short traffic drain even if the application remains technically available.
@@ -786,7 +830,7 @@ Learner downtime is not expected for migrations 035–058. Migration 060 may req
 | 043 | D0 | All KP flags off | Leave relationship tables dormant |
 | 044 | D0 | All KP flags off | Leave placement table dormant |
 | 045 | D0 | All KP flags off | Replace with deny-all policy if required; do not disable RLS |
-| 046 | D0 | All KP flags off | Keep or remove indexes through later online operation |
+| 046 | D0 | All KP flags off | Keep indexes or remove them through a later policy-compliant operation |
 | 047 | D0 | Served target flags off | Legacy remains authority; rebuild target identity |
 | 048 | D0 | Reference reader flags off | Reviewed compensating source correction |
 | 049 | D0 | Target body reads off | Legacy Markdown remains authority |
@@ -877,7 +921,7 @@ The rollback window duration is an operational approval, not hard-coded by this 
 - [ ] Production counts, size, slug/code collision, checksum, and writer inventories complete.
 - [ ] Existing duplicate migration prefixes are understood; new versions are unique.
 - [ ] Supabase PostgreSQL version and migration transaction behavior confirmed.
-- [ ] Non-transactional concurrent-index executor rehearsed.
+- [ ] Non-transactional concurrent-index executor rehearsed before any migration classified as concurrent.
 - [ ] PITR/backup verified and restore rehearsed.
 - [ ] Migration owner, DBA/operator, app owner, SEO reviewer, and rollback commander named.
 - [ ] Lock, statement, batch, and retry thresholds approved.
@@ -944,7 +988,7 @@ The rollback window duration is an operational approval, not hard-coded by this 
 This SQL Migration Design may be frozen when reviewers approve:
 
 - the 035–061 file inventory and naming;
-- controlled-online treatment of concurrent indexes and backfills;
+- policy-based treatment of standard and concurrent index builds, plus controlled-online backfills;
 - exact FK-safe backfill order;
 - conditional curated source/alias units;
 - constraint validation before required-column enforcement;
