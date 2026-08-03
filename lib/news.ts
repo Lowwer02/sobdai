@@ -776,6 +776,9 @@ export function coerceRelations(
 
 /**
  * Fetch latest published news for the homepage news strip.
+ * Features pinned news first (ordered by homepage_featured_order asc),
+ * then fills remaining slots with newest unpinned news. Excludes expired
+ * recruitment news when hide_from_homepage_when_expired is true.
  * Server-side only via cookie-free anon client.
  */
 export async function getLatestNews(limit: number): Promise<NewsCardData[]> {
@@ -783,21 +786,75 @@ export async function getLatestNews(limit: number): Promise<NewsCardData[]> {
   try {
     const supabase = createAnonServerClient()
     const nowIso = new Date().toISOString()
-    const { data, error } = await supabase
+    const todayStr = getThailandDateString()
+    const fields =
+      'id, slug, title, excerpt, cover_image_url, cover_image_alt, category, published_at, gp_exam_requirement, application_deadline, homepage_featured, homepage_featured_order, hide_from_homepage_when_expired'
+
+    const filterEligibility = (items: any[]): any[] => {
+      return items.filter((item) => {
+        if (item.hide_from_homepage_when_expired === false) return true
+        if (!item.application_deadline) return true
+        return !isApplicationExpired(item.application_deadline, todayStr)
+      })
+    }
+
+    // 1. Query pinned news
+    const { data: pinnedRaw, error: pinnedError } = await supabase
       .from('news')
-      .select('id, slug, title, excerpt, cover_image_url, cover_image_alt, category, published_at, gp_exam_requirement')
+      .select(fields)
       .eq('status', 'published')
+      .not('published_at', 'is', null)
       .lte('published_at', nowIso)
+      .eq('homepage_featured', true)
+      .or(`hide_from_homepage_when_expired.eq.false,application_deadline.is.null,application_deadline.gte.${todayStr}`)
+      .order('homepage_featured_order', { ascending: true, nullsFirst: false })
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(safeLimit)
 
-    if (error) {
-      console.error('getLatestNews query failed:', error)
+    if (pinnedError) {
+      console.error('getLatestNews pinned query failed:', pinnedError)
       return []
     }
-    return (data ?? []) as NewsCardData[]
+
+    const pinned = filterEligibility(pinnedRaw ?? []).slice(0, safeLimit)
+
+    // If pinned news fills the limit, return immediately
+    if (pinned.length >= safeLimit) {
+      return pinned as NewsCardData[]
+    }
+
+    // 2. Query unpinned news to fill remaining slots
+    const needed = safeLimit - pinned.length
+    const pinnedIds = pinned.map((p: any) => p.id)
+
+    let unpinnedQuery = supabase
+      .from('news')
+      .select(fields)
+      .eq('status', 'published')
+      .not('published_at', 'is', null)
+      .lte('published_at', nowIso)
+      .eq('homepage_featured', false)
+      .or(`hide_from_homepage_when_expired.eq.false,application_deadline.is.null,application_deadline.gte.${todayStr}`)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(needed)
+
+    if (pinnedIds.length > 0) {
+      unpinnedQuery = unpinnedQuery.not('id', 'in', `(${pinnedIds.join(',')})`)
+    }
+
+    const { data: unpinnedRaw, error: unpinnedError } = await unpinnedQuery
+    if (unpinnedError) {
+      console.error('getLatestNews unpinned query failed:', unpinnedError)
+      return pinned as NewsCardData[]
+    }
+
+    const unpinned = filterEligibility(unpinnedRaw ?? []).slice(0, needed)
+
+    return [...pinned, ...unpinned] as NewsCardData[]
   } catch (err) {
     console.error('getLatestNews failed:', err)
     return []

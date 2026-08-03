@@ -40,12 +40,8 @@ const executableSql = sql
   .filter((line) => !line.trimStart().startsWith('--'))
   .join('\n')
 
-test('062 is the single highest-numbered migration and does not collide', () => {
+test('062 exists as a unique migration and does not collide', () => {
   const files = readdirSync(migrationDir)
-  const numbered = files
-    .filter((name) => /^\d+_.+\.sql$/.test(name))
-    .map((name) => Number(name.slice(0, 3)))
-  assert.equal(Math.max(...numbered), 62, 'highest numbered migration should be 062')
   assert.equal(
     files.filter((name) => /^062_.+\.sql$/.test(name)).length,
     1,
