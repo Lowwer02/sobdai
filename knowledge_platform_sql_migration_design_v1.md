@@ -499,15 +499,17 @@ Package-scoped old slugs remain in `package_summaries.legacy_slug`; they are not
 | Tables affected | `packages`, `summaries`, aliases and any backfilled large relation |
 | Columns added | None |
 | Constraints | Prepares unique Package code, Summary code/canonical slug, and final route namespaces for attachment as constraints |
-| Indexes | Concurrent unique Package code; rebuild/confirm final unique root/alias/route indexes; measured reverse indexes |
+| Indexes | Standard transactional unique Package code; rebuild/confirm final unique root/alias/route indexes; measured reverse indexes |
 | RLS | None |
 | Backfill dependency | 047–052 reconciliation clean; Package code remediation approved |
 | Feature flag | None |
-| Rollback | Keep unused indexes or remove through later concurrent operation |
-| Lock risk | Low blocking if concurrent; brief final catalog lock |
-| Runtime risk | Medium/high I/O and failure risk if any duplicate remains |
+| Rollback | Transaction rollback on deployment failure; unused indexes may be removed later through a policy-compliant forward operation |
+| Lock risk | Brief write blocking during an approved low-traffic transaction; lock acquisition is bounded by the migration lock timeout |
+| Runtime risk | Low at the approved current production scale; duplicate or drift conditions remain fail-closed |
 
-This is another non-transactional controlled online unit.
+This is a Standard Transactional Index Migration, intentionally deployable through
+the normal Supabase SQL Editor transaction workflow. The current-scale exception
+does not waive the Concurrent Index Policy for future populated-table indexes.
 
 ## 054 — `054_kp_validate_constraints.sql`
 
@@ -757,10 +759,11 @@ migration into the concurrent execution class.
   require the dedicated operational procedure. Standard migrations remain
   atomic and deployable through the normal Supabase SQL Editor workflow.
 
-Production migration 048 satisfies the standard-migration criteria and is the
-approved standard transactional case. Migration 053 retains its frozen
-concurrent classification unless a separate architecture review approves a
-change using then-current production measurements.
+Production migrations 048 and 055 satisfy the standard-migration criteria and
+are approved Standard Transactional Index Migrations for the current Sobdai
+scale and Supabase SQL Editor workflow. This approval does not waive the
+Concurrent Index Policy for future populated-table index migrations; each one
+requires current measurements and an explicit execution-class decision.
 
 ## 6.4 Foreign-key and check validation
 
