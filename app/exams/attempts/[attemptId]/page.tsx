@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getAttemptReview, normalizeView, filterSummary } from '@/lib/assessment/attempt-review-data'
+import { fetchBookmarkStateMap } from '@/lib/assessment/saved-questions-data'
 import AttemptReviewSummary from '@/components/exams/AttemptReviewSummary'
 import AttemptQuestionReviewCard from '@/components/exams/AttemptQuestionReviewCard'
 import { createPageMetadata } from '@/lib/seo'
@@ -61,6 +62,14 @@ export default async function AttemptReviewPage({
   // Filter server-side from the validated historical summary.
   const filtered = filterSummary(data.summary, view)
 
+  // ── Phase 1F: bookmark state for every displayed question in ONE bounded
+  //    query (no per-question lookup). Scoped to this attempt's exam set. The
+  //    fetch is non-critical: on any failure it returns a map where every
+  //    question is not-bookmarked, so the review page still renders and
+  //    bookmarking still works (optimistically on click).
+  const displayedQuestionIds = filtered.map((e) => e.questionId)
+  const bookmarkState = await fetchBookmarkStateMap(user.id, data.examSetId, displayedQuestionIds)
+
   // Retry URL preserving the attempt's mode.
   const isPractice = data.mode === 'practice'
   const retryUrl = `/package/${data.packageSlug}/exam/${data.examSetId}?mode=${isPractice ? 'practice' : 'mock'}`
@@ -112,6 +121,11 @@ export default async function AttemptReviewPage({
                 order={data.summary.indexOf(entry) + 1}
                 entry={entry}
                 content={data.questionsById[entry.questionId]}
+                examSetId={data.examSetId}
+                packageId={data.packageId}
+                attemptId={data.attemptId}
+                bookmarked={bookmarkState[entry.questionId]?.isBookmarked ?? false}
+                bookmarkId={bookmarkState[entry.questionId]?.bookmarkId ?? null}
               />
             ))}
           </div>

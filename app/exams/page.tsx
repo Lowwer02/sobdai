@@ -9,7 +9,9 @@ import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestRe
 import LearningStats, { LearningStatsEmpty } from '@/components/exams/LearningStats'
 import WeakTopics, { WeakTopicsEmpty, WeakTopicsAllGood } from '@/components/exams/WeakTopics'
 import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/ActivityTimeline'
+import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQuestions'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
+import { fetchSavedQuestionCards } from '@/lib/assessment/saved-questions-data'
 import { getLearnerAnalytics } from '@/lib/assessment/learner-analytics'
 import { getTimeline } from '@/lib/assessment/activity-timeline'
 import type { Metadata } from 'next'
@@ -168,6 +170,15 @@ export default async function ExamDashboardPage() {
     examSetQuestionCounts,
   })
 
+  // --- Saved Questions (Phase 1F) ------------------------------------------
+  // One bounded query (newest ≤6 bookmarks) with batched relations, scoped to
+  // currently-owned packages. Non-critical: on any failure the layer returns
+  // an empty list, so the dashboard's other sections still render.
+  const savedQuestions = await fetchSavedQuestionCards({
+    userId: user.id,
+    ownedPackageIds: enriched.map((p) => p.id),
+  })
+
   const allPackages = enriched
 
   return (
@@ -272,18 +283,15 @@ export default async function ExamDashboardPage() {
           )}
         </section>
 
-        {/* ---------- Placeholder sections (future phases) ---------- */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          <PlaceholderCard title="ข้อสอบที่บันทึกไว้">
-            ข้อสอบที่คุณคั่นไว้จะปรากฏที่นี่
-          </PlaceholderCard>
-        </div>
+        {/* ---------- Saved Questions (Phase 1F — newest bookmarks) ---------- */}
+        <section style={{ marginBottom: '48px' }}>
+          <SectionTitle>ข้อสอบที่บันทึกไว้</SectionTitle>
+          {savedQuestions.length > 0 ? (
+            <SavedQuestions items={savedQuestions} />
+          ) : (
+            <SavedQuestionsEmpty />
+          )}
+        </section>
       </div>
     </div>
   )
@@ -306,47 +314,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     >
       {children}
     </h2>
-  )
-}
-
-function PlaceholderCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div
-      className="card"
-      style={{
-        padding: '24px',
-        opacity: 0.85,
-      }}
-    >
-      <div
-        style={{
-          fontSize: '11px',
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--gold-muted)',
-          marginBottom: '12px',
-        }}
-      >
-        {title}
-      </div>
-      <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '12px' }}>
-        {children}
-      </div>
-      <span
-        style={{
-          display: 'inline-block',
-          fontSize: '11px',
-          fontWeight: 600,
-          color: 'var(--gold-muted)',
-          border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
-          borderRadius: '999px',
-          padding: '3px 10px',
-        }}
-      >
-        เร็ว ๆ นี้
-      </span>
-    </div>
   )
 }
 
