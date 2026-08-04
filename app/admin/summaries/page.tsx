@@ -26,7 +26,7 @@ export default async function SummariesPage({
 
   let query = supabase
     .from('summaries')
-    .select('id, title, slug, subject, document, law, topic, sort_order, is_published, updated_at, packages!inner(name)', { count: 'exact' })
+    .select('id, title, slug, subject, document, law, topic, sort_order, is_published, updated_at, packages!summaries_package_id_fkey(name)', { count: 'exact' })
 
   if (search) {
     query = query.ilike('title', `%${search}%`)
