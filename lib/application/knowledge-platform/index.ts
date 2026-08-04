@@ -9,6 +9,19 @@ export {
   parseSummaryLibraryQueryParams,
 } from './summary-library-query'
 
+export {
+  SUMMARY_LIBRARY_COMPARE_SELECTION_LIMIT,
+  setSummaryLibraryPageSelection,
+  toggleSummaryLibrarySelection,
+  validateSummaryLibraryComparisonSelection,
+} from './summary-library-selection'
+
+export type {
+  SummaryLibraryComparisonSelectionError,
+  SummaryLibraryComparisonSelectionResult,
+  SummaryLibrarySelectionCandidate,
+} from './summary-library-selection'
+
 export type {
   ApproveRevisionCommand,
   AttachSummaryToPackageCommand,
@@ -34,6 +47,7 @@ export type {
   SummaryLibraryQuery,
   SummaryLibraryQueryRequest,
   SummaryLibraryReadRepository,
+  SummaryLibrarySelectionReference,
   SummaryLibrarySort,
   SummaryLibrarySortDirection,
   SummaryLibrarySortKey,

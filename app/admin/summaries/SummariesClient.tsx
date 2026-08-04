@@ -2,10 +2,11 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback, useEffect, useRef } from 'react'
-import { Search, Loader2, ChevronLeft, ChevronRight, Plus, Eye, EyeOff, Edit, Trash2, UploadCloud, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react'
+import { Search, Plus, UploadCloud, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react'
 import Link from 'next/link'
 import { toggleSummaryPublish, deleteSummary } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import SummaryLibraryTable, { type SummaryLibraryTableRow } from '@/components/admin/SummaryLibraryTable'
 import { toastEvent } from '@/hooks/useToast'
 import { getSubjectDropdownOptions, getSubjectLabel, isUnassignedSubject, UNASSIGNED_SUBJECT } from '@/lib/subjects'
 
@@ -197,6 +198,26 @@ export default function SummariesClient({
     setActingOnId(null)
   }
 
+  const libraryRows: SummaryLibraryTableRow[] = summaries.map((summary) => ({
+    id: summary.id,
+    title: summary.title,
+    slug: summary.slug ?? null,
+    packageName: summary.package_name ?? null,
+    subject: summary.subject ?? null,
+    document: summary.document ?? null,
+    topic: summary.topic ?? null,
+    sortOrder: summary.sort_order ?? null,
+    isPublished: Boolean(summary.is_published),
+    selection: {
+      summaryId: summary.id,
+      // Legacy rows do not carry a Knowledge Platform revision reference yet.
+      // Keep this null rather than deriving a false revision identity.
+      revisionId: null,
+      isAvailable: true,
+      isAuthorized: true,
+    },
+  }))
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -363,132 +384,16 @@ export default function SummariesClient({
           </div>
         )}
 
-        {/* Loading Overlay */}
-        {isPending && (
-          <div className="absolute inset-0 bg-[#1A140E]/50 backdrop-blur-sm z-10 flex items-center justify-center">
-            <Loader2 className="animate-spin text-[#D4AF37]" size={32} />
-          </div>
-        )}
-
-        {/* Table */}
-        <div className="overflow-x-auto min-h-[400px] relative">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
-                <th className="p-4 font-medium w-12 text-center">Order</th>
-                <th className="p-4 font-medium">Title & Slug</th>
-                <th className="p-4 font-medium">Package</th>
-                <th className="p-4 font-medium">Subject / Document</th>
-                <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
-              {summaries.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
-                    No summaries found.
-                  </td>
-                </tr>
-              ) : summaries.map((summary) => (
-                <tr key={summary.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
-                  <td className="p-4 text-[#A1866B] text-sm text-center">
-                    {summary.sort_order}
-                  </td>
-                  <td className="p-4">
-                    <div className="text-[#F5E9D6] font-medium text-sm">{summary.title}</div>
-                    <div className="text-[#A1866B] text-xs mt-0.5">/{summary.slug}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-[#F5E9D6] text-sm truncate max-w-[200px]">{summary.package_name}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-col gap-1">
-                      {isUnassignedSubject(summary.subject) ? (
-                        <span className="text-[#A1866B]/60 text-xs italic">ยังไม่กำหนด Subject</span>
-                      ) : (
-                        <span className="text-[#F5E9D6] text-xs px-2 py-1 bg-[#D4AF37]/10 rounded-lg border border-[#D4AF37]/20 whitespace-nowrap w-max">
-                          {getSubjectLabel(summary.subject)}
-                        </span>
-                      )}
-                      {summary.document ? (
-                        <span className="text-[#A1866B] text-[11px] truncate max-w-[180px]" title={summary.document}>
-                          {summary.document}
-                        </span>
-                      ) : (
-                        <span className="text-[#A1866B]/40 text-[10px] italic">ไม่มี Document</span>
-                      )}
-                      {summary.topic && (
-                        <span className="text-[#A1866B] text-[10px] uppercase font-bold tracking-wider">
-                          {summary.topic}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <button type="submit" 
-                      onClick={() => handleTogglePublish(summary.id, summary.is_published)}
-                      disabled={actingOnId === summary.id}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border transition-colors disabled:opacity-50 ${
-                        summary.is_published 
-                          ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/30 hover:bg-[#22C55E]/20' 
-                          : 'bg-[rgba(255,255,255,0.05)] text-[#A1866B] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)]'
-                      }`}
-                    >
-                      {actingOnId === summary.id ? <Loader2 size={12} className="animate-spin" /> : 
-                        summary.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
-                      {summary.is_published ? 'Published' : 'Draft'}
-                    </button>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link 
-                        href={`/admin/summaries/${summary.id}/edit`}
-                        className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10"
-                        title="Edit"
-                      >
-                        <Edit size={16} />
-                      </Link>
-                      <button type="button" 
-                        onClick={() => setDeleteModal({ isOpen: true, summaryId: summary.id })}
-                        disabled={actingOnId === summary.id}
-                        className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 disabled:opacity-50"
-                        title="Delete"
-                      >
-                        {actingOnId === summary.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-[rgba(255,255,255,0.05)] flex items-center justify-between">
-            <div className="text-sm text-[#A1866B]">
-              Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" 
-                onClick={() => updateParams({ page: String(currentPage - 1) })}
-                disabled={currentPage <= 1 || isPending}
-                className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button type="button" 
-                onClick={() => updateParams({ page: String(currentPage + 1) })}
-                disabled={currentPage >= totalPages || isPending}
-                className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+        <SummaryLibraryTable
+          rows={libraryRows}
+          totalPages={totalPages}
+          currentPage={currentPage}
+          isPending={isPending}
+          actingOnId={actingOnId}
+          onPageChange={(nextPage) => updateParams({ page: String(nextPage) })}
+          onTogglePublish={handleTogglePublish}
+          onRequestDelete={(summaryId) => setDeleteModal({ isOpen: true, summaryId })}
+        />
       </div>
 
       <ConfirmDialog
