@@ -8,8 +8,10 @@ import ContinueLearningCard, { ContinueLearningEmpty } from '@/components/exams/
 import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestResultCard'
 import LearningStats, { LearningStatsEmpty } from '@/components/exams/LearningStats'
 import WeakTopics, { WeakTopicsEmpty, WeakTopicsAllGood } from '@/components/exams/WeakTopics'
+import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/ActivityTimeline'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import { getLearnerAnalytics } from '@/lib/assessment/learner-analytics'
+import { getTimeline } from '@/lib/assessment/activity-timeline'
 import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
 
@@ -153,6 +155,19 @@ export default async function ExamDashboardPage() {
   const hasCompletedAttempts = learnerAnalytics.statistics.attempts > 0
   const reviewAttemptId = latestResult?.attemptId ?? null
 
+  // --- Activity Timeline (Phase 1E) ----------------------------------------
+  // Two bounded queries (latest 10 completed attempts + latest 5 active
+  // sessions), merged newest-first into at most 10 items. Non-critical: on any
+  // failure the timeline layer returns an empty list, so the dashboard's other
+  // sections still render. Reuses the same owned-package scoping and the
+  // exam-set count map already built for the package grid (no N+1, no extra
+  // count query).
+  const timeline = await getTimeline({
+    userId: user.id,
+    ownedPackageIds: enriched.map((p) => p.id),
+    examSetQuestionCounts,
+  })
+
   const allPackages = enriched
 
   return (
@@ -247,6 +262,16 @@ export default async function ExamDashboardPage() {
           </div>
         </section>
 
+        {/* ---------- Activity Timeline (Phase 1E — recent activity) ---------- */}
+        <section style={{ marginBottom: '48px' }}>
+          <SectionTitle>ไทม์ไลน์กิจกรรม</SectionTitle>
+          {timeline.length > 0 ? (
+            <ActivityTimeline events={timeline} />
+          ) : (
+            <ActivityTimelineEmpty />
+          )}
+        </section>
+
         {/* ---------- Placeholder sections (future phases) ---------- */}
         <div
           style={{
@@ -257,9 +282,6 @@ export default async function ExamDashboardPage() {
         >
           <PlaceholderCard title="ข้อสอบที่บันทึกไว้">
             ข้อสอบที่คุณคั่นไว้จะปรากฏที่นี่
-          </PlaceholderCard>
-          <PlaceholderCard title="ไทม์ไลน์กิจกรรม">
-            ประวัติการเรียนและการทำข้อสอบล่าสุด
           </PlaceholderCard>
         </div>
       </div>
