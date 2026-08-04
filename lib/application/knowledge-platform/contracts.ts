@@ -108,6 +108,18 @@ export interface SummaryLibraryPage {
   readonly totalPages: number
 }
 
+/**
+ * Stable references carried by Summary Library selection state.
+ *
+ * The Summary identity remains stable across revisions. A nullable revision
+ * reference keeps the hybrid legacy adapter honest until a migrated row has a
+ * Knowledge Platform revision available.
+ */
+export interface SummaryLibrarySelectionReference {
+  readonly summaryId: UUID
+  readonly revisionId: UUID | null
+}
+
 export interface SummaryVersion {
   readonly id: UUID
   readonly summaryId: UUID
