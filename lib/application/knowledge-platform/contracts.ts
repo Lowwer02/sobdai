@@ -64,6 +64,50 @@ export interface SummaryLibraryItem {
   readonly sourceDocumentCount: number
 }
 
+export type SummaryLibrarySortKey =
+  | 'updatedAt'
+  | 'canonicalTitle'
+  | 'summaryCode'
+  | 'lifecycleStatus'
+  | 'currentRevisionNumber'
+
+export type SummaryLibrarySortDirection = 'asc' | 'desc'
+
+export interface SummaryLibrarySort {
+  readonly key: SummaryLibrarySortKey
+  readonly direction: SummaryLibrarySortDirection
+}
+
+/**
+ * Transport-neutral request for the Summary Library read model.
+ *
+ * All fields are optional at the boundary so URL/query-string consumers can
+ * omit empty filters. The Application query normalizes this shape before it
+ * reaches a repository.
+ */
+export interface SummaryLibraryQueryRequest {
+  readonly search?: string | null
+  readonly subject?: string | null
+  readonly topic?: string | null
+  readonly law?: string | null
+  readonly lifecycleStatus?: SummaryLifecycleStatus | null
+  readonly visibility?: SummaryVisibility | null
+  readonly hasPublishedRevision?: boolean | null
+  readonly hasPackages?: boolean | null
+  readonly hasSources?: boolean | null
+  readonly sort?: SummaryLibrarySort | null
+  readonly page?: number | null
+  readonly pageSize?: number | null
+}
+
+export interface SummaryLibraryPage {
+  readonly items: readonly SummaryLibraryItem[]
+  readonly page: number
+  readonly pageSize: number
+  readonly totalItems: number
+  readonly totalPages: number
+}
+
 export interface SummaryVersion {
   readonly id: UUID
   readonly summaryId: UUID
@@ -267,6 +311,13 @@ export interface SummarySourceRepository {
 
 export interface SummaryLibraryReadRepository {
   list(): Promise<readonly SummaryLibraryItem[]>
+  /**
+   * Optional during the hybrid transition so the F4.1 list contract remains
+   * source-compatible. Target-backed repositories should implement this
+   * method to translate the normalized request into indexed projection
+   * predicates and server-side pagination.
+   */
+  search?(request: SummaryLibraryQueryRequest): Promise<SummaryLibraryPage>
 }
 
 export interface KnowledgePlatformRepositories {
@@ -326,4 +377,5 @@ export interface SummaryQuery {
 
 export interface SummaryLibraryQuery {
   list(): Promise<readonly SummaryLibraryItem[]>
+  search(request?: SummaryLibraryQueryRequest): Promise<SummaryLibraryPage>
 }

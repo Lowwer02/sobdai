@@ -1,4 +1,13 @@
-export { SummaryLibraryQueryService } from './summary-library-query'
+export {
+  SUMMARY_LIBRARY_DEFAULT_PAGE_SIZE,
+  SUMMARY_LIBRARY_MAX_PAGE,
+  SUMMARY_LIBRARY_MAX_PAGE_SIZE,
+  SUMMARY_LIBRARY_MAX_SEARCH_LENGTH,
+  SUMMARY_LIBRARY_SORT_KEYS,
+  SummaryLibraryQueryService,
+  normalizeSummaryLibraryQuery,
+  parseSummaryLibraryQueryParams,
+} from './summary-library-query'
 
 export type {
   ApproveRevisionCommand,
@@ -21,8 +30,13 @@ export type {
   SubmitRevisionForReviewCommand,
   Summary,
   SummaryLibraryItem,
+  SummaryLibraryPage,
   SummaryLibraryQuery,
+  SummaryLibraryQueryRequest,
   SummaryLibraryReadRepository,
+  SummaryLibrarySort,
+  SummaryLibrarySortDirection,
+  SummaryLibrarySortKey,
   SummaryAction,
   SummaryApplicationDependencies,
   SummaryAuthorization,

@@ -2,6 +2,7 @@ import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import SummariesClient from './SummariesClient'
 import { UNASSIGNED_SUBJECT } from '@/lib/subjects'
 import { applyContentOrdering } from '@/lib/contentOrdering'
+import { parseSummaryLibraryQueryParams } from '@/lib/application/knowledge-platform'
 
 export default async function SummariesPage({
   searchParams,
@@ -12,12 +13,20 @@ export default async function SummariesPage({
 
   const params = await searchParams
 
-  const page = typeof params.page === 'string' ? parseInt(params.page) : 1
-  const search = typeof params.q === 'string' ? params.q : ''
+  const libraryQuery = parseSummaryLibraryQueryParams(params)
+  const page = libraryQuery.page
+  const search = libraryQuery.search ?? ''
   const packageFilter = typeof params.package === 'string' ? params.package : ''
   const statusFilter = typeof params.status === 'string' ? params.status : ''
   const subjectFilter = typeof params.subject === 'string' ? params.subject : ''
   const documentFilter = typeof params.document === 'string' ? params.document : ''
+
+  const legacySortKey = libraryQuery.sort.key === 'canonicalTitle' || libraryQuery.sort.key === 'updatedAt'
+    ? libraryQuery.sort.key
+    : 'updatedAt'
+  const legacySortDirection = legacySortKey === libraryQuery.sort.key
+    ? libraryQuery.sort.direction
+    : 'desc'
 
   const limit = 15
   const from = (page - 1) * limit
@@ -54,7 +63,21 @@ export default async function SummariesPage({
     }
   }
 
-  query = applyContentOrdering(query).range(from, to)
+  if (libraryQuery.sort.key === 'canonicalTitle') {
+    query = query
+      .order('title', { ascending: libraryQuery.sort.direction === 'asc' })
+      .order('id', { ascending: true })
+  } else if (libraryQuery.sort.key === 'updatedAt' && libraryQuery.sort.direction === 'asc') {
+    query = query
+      .order('updated_at', { ascending: true })
+      .order('id', { ascending: true })
+  } else {
+    // Preserve the legacy Summary Bank ordering for the default descending
+    // update sort and for target-only sort keys during the hybrid phase.
+    query = applyContentOrdering(query)
+  }
+
+  query = query.range(from, to)
 
   const { data: rawSummaries, count } = await query
 
@@ -85,6 +108,8 @@ export default async function SummariesPage({
       subjectFilter={subjectFilter}
       documentFilter={documentFilter}
       uniqueDocuments={uniqueDocuments}
+      sortKey={legacySortKey}
+      sortDirection={legacySortDirection}
     />
   )
 }
