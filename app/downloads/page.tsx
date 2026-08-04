@@ -3,8 +3,8 @@ import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = createPageMetadata({
-  title: 'คลังเนื้อหา | Sobdai',
-  description: 'เตรียมพบกับสื่อการเรียนรูปแบบใหม่ที่จะช่วยให้การเตรียมสอบมีประสิทธิภาพมากยิ่งขึ้น',
+  title: 'คลังสื่อการเรียน | Sobdai',
+  description: 'รวมสรุปเนื้อหา PDF Mind Map Cheat Sheet Infographic และ Flash Card สำหรับใช้ทบทวนและเตรียมสอบ',
   path: '/downloads',
 })
 
@@ -120,7 +120,7 @@ export default function DownloadsPage() {
               backgroundClip: 'text',
             }}
           >
-            คลังเนื้อหา
+            คลังสื่อการเรียน
           </h1>
           <p
             style={{
@@ -131,7 +131,7 @@ export default function DownloadsPage() {
               margin: '0 auto',
             }}
           >
-            เตรียมพบกับสื่อการเรียนรูปแบบใหม่ที่จะช่วยให้การเตรียมสอบมีประสิทธิภาพมากยิ่งขึ้น
+            รวมสรุปเนื้อหา PDF Mind Map Cheat Sheet Infographic และ Flash Card สำหรับใช้ทบทวนและเตรียมสอบ
           </p>
         </div>
       </section>

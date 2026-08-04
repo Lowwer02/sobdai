@@ -12,7 +12,8 @@ const NAV_LINKS = [
   { href: '/packages', label: 'แพ็กเกจ' },
   { href: '/news', label: 'ข่าวสาร' },
   { href: '/exams', label: 'แดชบอร์ด' },
-  { href: '/downloads', label: 'คลังเนื้อหา' },
+  { href: '/articles', label: 'บทความ' },
+  { href: '/downloads', label: 'คลังสื่อการเรียน' },
 ]
 
 interface MobileNavProps {
