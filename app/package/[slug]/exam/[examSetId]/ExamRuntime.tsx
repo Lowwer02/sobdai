@@ -130,7 +130,17 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // Weak Topic Analysis
   const [weakTopics, setWeakTopics] = useState<{name: string, count: number, type: string}[]>([])
 
-  const q = questions[currentIndex]
+  // ── Safe question-state boundary ──────────────────────────────────────────
+  // Derive `q` from a clamped index so an out-of-range `currentIndex` (stale
+  // session restore, empty question set, or the -1 REVIEW overview sentinel)
+  // never produces an undefined dereference. The REVIEW overview (currentIndex
+  // === -1) is handled by an early-return below; for that case `q` is null.
+  const safeIndex = (status === 'REVIEW' && currentIndex === -1)
+    ? -1
+    : clampIndex(currentIndex, questions.length)
+  const q = safeIndex >= 0 && safeIndex < questions.length
+    ? questions[safeIndex]
+    : null
 
   // ── Phase 1A: hydrate the resume snapshot on mount ───────────────────────
   // One-shot: ask the server for this user's active session for this exam set
@@ -317,12 +327,14 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
   }
   const toggleFlag = () => {
+    if (!q) return
     setFlagged(prev => ({ ...prev, [q.id]: !prev[q.id] }))
   }
 
   // Answer selection
   const handleSelect = (letter: ChoiceLetter) => {
     if (status !== 'IN_PROGRESS') return
+    if (!q) return
     // Block answering until the first hydrate completes, so a resumed answer
     // set is never clobbered by an empty initial render.
     if (!sessionReady) return
@@ -428,7 +440,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (status === 'IN_PROGRESS') {
+      if (status === 'IN_PROGRESS' && q) {
         if (e.key === 'ArrowRight') goNext()
         if (e.key === 'ArrowLeft') goPrev()
         if (['1','2','3','4'].includes(e.key)) {
@@ -481,6 +493,9 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
 
   // Choice rendering helper
   const renderChoice = (letter: ChoiceLetter, text: string) => {
+    // Guard: renderChoice is only called after the `if (!q)` early return, but
+    // TypeScript cannot infer that across closures. Return null defensively.
+    if (!q) return null
     const isSelected = answers[q.id] === letter
     const isAnsweredInPractice = isPractice && !!answers[q.id]
     const isReview = status === 'REVIEW' || isAnsweredInPractice
@@ -544,6 +559,7 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // Practice Mode Immediate Feedback
   const renderPracticeFeedback = () => {
     if (!isPractice) return null
+    if (!q) return null
     const isAnswered = !!answers[q.id]
     if (!isAnswered) return null
     const isCorrect = answers[q.id] === q.correct_answer
@@ -751,6 +767,29 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
     )
   }
 
+  // ── Empty-questions safety boundary ──────────────────────────────────────
+  // If the question set is empty (all hidden by RLS, or questions removed
+  // since the session was created), render a safe fallback instead of crashing.
+  // Also guards the REVIEW→question transition if `q` is null (currentIndex
+  // === -1 is handled by the overview above; any other null-q is a boundary
+  // case that must not crash).
+  if (!q) {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-[#F5E9D6] mb-3">ไม่พบข้อสอบที่ต้องการ</h2>
+          <p className="text-[#A1866B] mb-6 text-sm">ข้อสอบในชุดนี้อาจยังไม่พร้อมใช้งาน หรือมีการเปลี่ยนแปลงข้อมูล กรุณาลองใหม่อีกครั้ง</p>
+          <Link href={`/package/${pkg.slug}`} className="block w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors">
+            กลับไปหน้าแพ็กเกจ
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   // MAIN RUNTIME & REVIEW VIEW
   return (
     <div className="min-h-screen pb-32 lg:pb-24 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
@@ -782,8 +821,8 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
               </div>
             ) : (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#A1866B] text-sm font-bold">
-                <CheckCircle size={14} className={answers[q.id] === q.correct_answer ? "text-green-500" : "text-red-500"} />
-                <span className="hidden sm:inline">{answers[q.id] === q.correct_answer ? 'ตอบถูก' : 'ตอบผิด'}</span>
+                <CheckCircle size={14} className={q && answers[q.id] === q.correct_answer ? "text-green-500" : "text-red-500"} />
+                <span className="hidden sm:inline">{q && answers[q.id] === q.correct_answer ? 'ตอบถูก' : 'ตอบผิด'}</span>
               </div>
             )}
             
@@ -895,16 +934,16 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
               <button type="button"
                 onClick={handleRequestSubmit}
-                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${isPractice && !answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
-                disabled={isPractice && !answers[q.id]}
+                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${isPractice && (!q || !answers[q.id]) ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
+                disabled={isPractice && (!q || !answers[q.id])}
               >
                 {isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}
               </button>
             ) : status === 'IN_PROGRESS' && isPractice ? (
               <button type="button" 
                 onClick={goNext} 
-                disabled={!answers[q.id]}
-                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${!answers[q.id] ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)]' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] shadow-[0_4px_15px_rgba(212,175,55,0.3)]'}`}
+                disabled={!q || !answers[q.id]}
+                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(!q || !answers[q.id]) ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)]' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] shadow-[0_4px_15px_rgba(212,175,55,0.3)]'}`}
               >
                 <span className="hidden sm:inline">ข้อถัดไป</span>
                 <ChevronRight size={18} className="sm:hidden" />
@@ -946,20 +985,20 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
               <button type="button"
                 onClick={handleRequestSubmit}
-                disabled={isPractice && !answers[q.id]}
-                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${isPractice && !answers[q.id] ? 'border-[rgba(255,255,255,0.1)] text-[#A1866B] opacity-50 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+                disabled={isPractice && (!q || !answers[q.id])}
+                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${isPractice && (!q || !answers[q.id]) ? 'border-[rgba(255,255,255,0.1)] text-[#A1866B] opacity-50 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
               >
                 <span>{isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}</span>
-                <CheckCircle size={18} className={isPractice && !answers[q.id] ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+                <CheckCircle size={18} className={isPractice && (!q || !answers[q.id]) ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
               </button>
             ) : (
               <button type="button"
                 onClick={goNext}
-                disabled={isPractice ? !answers[q.id] : currentIndex === questions.length - 1}
-                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(isPractice ? !answers[q.id] : currentIndex === questions.length - 1) ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
+                disabled={isPractice ? (!q || !answers[q.id]) : currentIndex === questions.length - 1}
+                className={`group flex items-center gap-3 font-medium px-6 py-2.5 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(isPractice ? (!q || !answers[q.id]) : currentIndex === questions.length - 1) ? 'border-transparent text-[#A1866B] opacity-30 cursor-not-allowed' : 'border-[rgba(255,255,255,0.1)] text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)]'}`}
               >
                 <span>ข้อถัดไป</span>
-                <ChevronRight size={18} className={(isPractice ? !answers[q.id] : currentIndex === questions.length - 1) ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
+                <ChevronRight size={18} className={(isPractice ? (!q || !answers[q.id]) : currentIndex === questions.length - 1) ? "" : "text-[#A1866B] group-hover:text-[#F5E9D6] transition-colors"} />
               </button>
             )}
           </div>
