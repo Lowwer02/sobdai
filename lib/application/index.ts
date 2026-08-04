@@ -16,3 +16,35 @@ export type {
 } from './assessment-engine-service'
 
 export { GenerateAssessmentAction } from './generate-assessment-action'
+
+export {
+  SummaryLibraryQueryService,
+} from './knowledge-platform'
+
+export type {
+  ApproveRevisionCommand,
+  AttachSummaryToPackageCommand,
+  CreateRevisionCommand,
+  CreateSummaryCommand,
+  DetachSummaryFromPackageCommand,
+  KnowledgePlatformRepositories,
+  KnowledgePlatformUnitOfWork,
+  MarkdownProcessor,
+  PackageSummary,
+  PackageSummaryRepository,
+  PublishRevisionCommand,
+  RetireRevisionCommand,
+  SubmitRevisionForReviewCommand,
+  Summary,
+  SummaryAction,
+  SummaryApplicationDependencies,
+  SummaryLibraryItem,
+  SummaryLibraryQuery,
+  SummaryLibraryReadRepository,
+  SummaryAuthorization,
+  SummaryQuery,
+  SummaryRepository,
+  SummarySourceRepository,
+  SummaryVersion,
+  SummaryVersionRepository,
+} from './knowledge-platform'
