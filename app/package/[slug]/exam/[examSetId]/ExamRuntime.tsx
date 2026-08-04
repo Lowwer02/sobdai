@@ -50,7 +50,7 @@ interface ExamRuntimeProps {
   mode?: string
 }
 
-export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRuntimeProps) {
+export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mode }: ExamRuntimeProps) {
   // ── Assessment domain boundary ─────────────────────────────────────────
   // Epic 1 (Assessment Runtime) introduces the Outcome boundary. The runtime
   // delegates verdict/scoring computation to lib/assessment/outcome.ts and
@@ -59,6 +59,22 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // The Outcome is the Runtime → downstream handoff (Constitution AI-004).
   const assessmentMode = normalizeMode(mode)
   const isPractice = assessmentMode === 'practice'
+
+  // ── Normalize questions prop ──────────────────────────────────────────
+  // PostgREST embedded relations may return a single object (many-to-one) or
+  // an array (one-to-many), depending on FK cardinality and schema cache
+  // state. The server page.tsx maps `item.questions` and filters nulls, but
+  // if the relation returns arrays, the outer array ends up as
+  // [[Question], [Question], ...] instead of [Question, Question, ...].
+  // Normalize defensively so the Runtime always operates on a flat Question[].
+  const questions = useMemo(() => {
+    if (!Array.isArray(rawQuestions)) return []
+    return rawQuestions.flatMap((item: any) => {
+      if (Array.isArray(item)) return item.filter((q: any) => q && typeof q === 'object' && q.id)
+      if (item && typeof item === 'object' && item.id) return [item]
+      return []
+    }) as Question[]
+  }, [rawQuestions])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, ChoiceLetter>>({})
@@ -774,6 +790,20 @@ export default function ExamRuntime({ pkg, examSet, questions, mode }: ExamRunti
   // === -1 is handled by the overview above; any other null-q is a boundary
   // case that must not crash).
   if (!q) {
+    // Diagnostic: log exact state when the fallback triggers so production
+    // root cause can be identified. No private data is logged.
+    console.error('[ExamRuntime] invalid question state', {
+      questionsIsArray: Array.isArray(questions),
+      questionsLength: Array.isArray(questions) ? questions.length : null,
+      rawQuestionsIsArray: Array.isArray(rawQuestions),
+      rawQuestionsLength: Array.isArray(rawQuestions) ? rawQuestions.length : null,
+      firstQuestionIsArray: Array.isArray(rawQuestions?.[0]),
+      firstQuestionHasId: Boolean(rawQuestions?.[0]?.id),
+      currentIndex,
+      safeIndex,
+      status,
+      sessionReady,
+    })
     return (
       <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
         <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
