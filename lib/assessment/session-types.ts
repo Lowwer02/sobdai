@@ -170,13 +170,30 @@ export function validateNonNegativeInt(
 }
 
 /**
- * Clamp an index into the valid question range. Used by the Runtime on resume
- * so a stale (e.g. since-edited) current_index never reads past the end of the
- * live question list. Pure.
+ * Clamp an index into the valid question range. Used by the Runtime both on
+ * resume AND during render so a stale (e.g. since-edited) current_index never
+ * reads past the end of the live question list, and a non-finite or fractional
+ * index never yields an undefined element. Pure and SYNCHRONOUS — it must
+ * never be async or return a Promise, because the Runtime calls it during
+ * render. (Importing it through a 'use server' module turns it into a server
+ * action reference and makes the return value a Promise; always import this
+ * directly from session-types.)
+ *
+ *   clampIndex(0, 40)    => 0
+ *   clampIndex(-1, 40)   => 0
+ *   clampIndex(99, 40)   => 39
+ *   clampIndex(0, 0)     => 0
+ *   clampIndex(NaN, 40)  => 0
+ *   clampIndex(1.5, 40)  => 1
  */
 export function clampIndex(index: number, questionCount: number): number {
   if (questionCount <= 0) return 0
-  if (index < 0) return 0
-  if (index >= questionCount) return questionCount - 1
-  return index
+  if (!Number.isFinite(index)) return 0
+
+  const normalizedIndex = Math.trunc(index)
+
+  if (normalizedIndex < 0) return 0
+  if (normalizedIndex >= questionCount) return questionCount - 1
+
+  return normalizedIndex
 }

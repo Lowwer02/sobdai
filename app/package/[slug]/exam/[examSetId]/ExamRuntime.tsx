@@ -12,8 +12,8 @@ import {
   getOrCreateMyAssessmentSession,
   saveMyAssessmentSession,
   completeMyAssessmentSession,
-  clampIndex,
 } from '@/app/assessment/session-actions'
+import { clampIndex } from '@/lib/assessment/session-types'
 import type { SessionSnapshot } from '@/lib/assessment/session-types'
 import type { ExamSet } from '@/lib/types'
 import { completeExam, startExam, submitExam } from '@/lib/analytics'
@@ -790,20 +790,6 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
   // === -1 is handled by the overview above; any other null-q is a boundary
   // case that must not crash).
   if (!q) {
-    // Diagnostic: log exact state when the fallback triggers so production
-    // root cause can be identified. No private data is logged.
-    console.error('[ExamRuntime] invalid question state', {
-      questionsIsArray: Array.isArray(questions),
-      questionsLength: Array.isArray(questions) ? questions.length : null,
-      rawQuestionsIsArray: Array.isArray(rawQuestions),
-      rawQuestionsLength: Array.isArray(rawQuestions) ? rawQuestions.length : null,
-      firstQuestionIsArray: Array.isArray(rawQuestions?.[0]),
-      firstQuestionHasId: Boolean(rawQuestions?.[0]?.id),
-      currentIndex,
-      safeIndex,
-      status,
-      sessionReady,
-    })
     return (
       <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
         <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
