@@ -1,9 +1,4 @@
-export { SummaryApplicationService } from './summary-application-service'
 export { SummaryLibraryQueryService } from './summary-library-query'
-export {
-  SummaryApplicationError,
-  type SummaryApplicationErrorCode,
-} from './validation'
 
 export type {
   ApproveRevisionCommand,

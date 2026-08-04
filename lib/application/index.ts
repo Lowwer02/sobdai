@@ -18,8 +18,6 @@ export type {
 export { GenerateAssessmentAction } from './generate-assessment-action'
 
 export {
-  SummaryApplicationError,
-  SummaryApplicationService,
   SummaryLibraryQueryService,
 } from './knowledge-platform'
 
@@ -40,7 +38,6 @@ export type {
   Summary,
   SummaryAction,
   SummaryApplicationDependencies,
-  SummaryApplicationErrorCode,
   SummaryLibraryItem,
   SummaryLibraryQuery,
   SummaryLibraryReadRepository,
