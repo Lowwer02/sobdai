@@ -2,18 +2,22 @@ import type {
   ReviewSummaryEntry,
   ReviewQuestionContent,
 } from '@/lib/assessment/attempt-review-data'
+import QuestionBookmarkButton from '@/components/exams/QuestionBookmarkButton'
 
 /**
- * One reviewed question. Pure Server Component.
+ * One reviewed question. Server Component shell with one minimal client island
+ * (the bookmark toggle).
  *
  * Shows the historical question order, current question text/choices/explanation
  * when available, the learner's selected answer, the historical correct-answer
  * letter, and a correct/incorrect/unanswered state. Selected vs correct are
  * distinguished with BOTH color and text/icon labels (never color alone).
  *
- * Read-only: no editing controls. Historical result is authoritative — the
- * current question row only contributes display content. When the row is
- * missing/unavailable a safe fallback is rendered without crashing.
+ * Read-only apart from the Phase 1F bookmark control. Historical result is
+ * authoritative — the current question row only contributes display content.
+ * When the row is missing/unavailable a safe fallback is rendered without
+ * crashing, and the bookmark control is hidden (there is no question to
+ * bookmark).
  *
  * No unsafe HTML: all text is rendered as plain React children.
  */
@@ -21,11 +25,26 @@ export default function AttemptQuestionReviewCard({
   order,
   entry,
   content,
+  examSetId,
+  packageId,
+  attemptId,
+  bookmarked,
+  bookmarkId,
 }: {
   /** 1-based display number (historical order from the answer summary). */
   order: number
   entry: ReviewSummaryEntry
   content?: ReviewQuestionContent
+  /** Exam-set context for the bookmark (one per question+exam_set). */
+  examSetId: string
+  /** Package context for the bookmark (access scoping). */
+  packageId: string
+  /** Optional provenance: the attempt this review is from (nullable server-side). */
+  attemptId?: string | null
+  /** Initial bookmark state from the server-rendered state map. */
+  bookmarked: boolean
+  /** Initial bookmark id when already bookmarked, else null. */
+  bookmarkId: string | null
 }) {
   const selected = entry.selected
   const correct = entry.correct
@@ -236,6 +255,20 @@ export default function AttemptQuestionReviewCard({
         >
           * เนื้อหาข้อสอบอาจมีการปรับปรุงหลังจากที่คุณทำข้อสอบ ผลของคุณยังคงเดิมตามที่บันทึกไว้
         </div>
+      )}
+
+      {/* Phase 1F: bookmark toggle. Rendered only when there is a live question
+          row to bookmark (the fallback block has no question to save). The
+          single client island on this otherwise server-rendered card. */}
+      {available && (
+        <QuestionBookmarkButton
+          questionId={entry.questionId}
+          examSetId={examSetId}
+          packageId={packageId}
+          initialBookmarked={bookmarked}
+          initialBookmarkId={bookmarkId}
+          sourceAttemptId={attemptId ?? null}
+        />
       )}
     </div>
   )
