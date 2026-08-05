@@ -17,14 +17,44 @@ import type { WeakTopicGroup } from '@/lib/assessment/learner-analytics'
 export default function WeakTopics({
   topics,
   reviewAttemptId,
+  /**
+   * Phase 2A: the package selector rendered in the section header. Owned by the
+   * page (which resolves scope + options server-side) and passed in as an
+   * already-built React node so this component stays presentational.
+   */
+  selector,
+  /**
+   * Caption under the title. Differs by scope:
+   *   - all-packages: 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้ง' (unchanged)
+   *   - package scope: 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้งในแพ็กเกจนี้'
+   */
+  caption = 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้ง',
+  /**
+   * Phase 2A: scoped empty state. When a package is selected but has no
+   * completed attempts, render this copy instead of the generic empty card.
+   * Rendered by the page (which knows the scope); null = use the normal
+   * topics list / all-good branch below.
+   */
+  scopedEmpty = null,
+  /**
+   * Review CTA label. Differs by scope:
+   *   - all-packages: 'ทบทวนข้อผิด' (unchanged)
+   *   - package scope: 'ทบทวนข้อผิดในแพ็กเกจนี้'
+   */
+  reviewCtaLabel = 'ทบทวนข้อผิด',
 }: {
   topics: WeakTopicGroup[]
   /**
-   * Attempt id for the latest completed attempt, when the dashboard already
-   * supplies one (from the Latest Result query). Used solely for an optional
-   * "ทบทวนข้อผิด" CTA — no extra query is performed for this feature.
+   * Attempt id the review CTA points at. For the all-packages scope this is the
+   * global latestResult.attemptId (unchanged behavior). For a package scope this
+   * is the selected package's own latest attempt id (scopedLatestAttemptId),
+   * guaranteed to belong to that package. null → suppress the CTA.
    */
   reviewAttemptId?: string | null
+  selector?: React.ReactNode
+  caption?: string
+  scopedEmpty?: React.ReactNode
+  reviewCtaLabel?: string
 }) {
   return (
     <div className="card" style={{ padding: '24px' }}>
@@ -42,35 +72,49 @@ export default function WeakTopics({
           หัวข้อที่ควรทบทวน
         </div>
         <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-          คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้ง
+          {caption}
         </p>
       </div>
 
-      {/* Topic list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {topics.map((t) => (
-          <WeakTopicRow key={`${t.labelKind}:${t.label}`} topic={t} />
-        ))}
-      </div>
-
-      {/* Optional CTA — only when the dashboard already has a latest attempt id */}
-      {reviewAttemptId ? (
-        <div style={{ marginTop: '18px' }}>
-          <Link
-            href={`/exams/attempts/${reviewAttemptId}?view=incorrect`}
-            className="btn-outline"
-            style={{
-              display: 'inline-block',
-              textAlign: 'center',
-              textDecoration: 'none',
-              padding: '8px 16px',
-              fontSize: '13px',
-            }}
-          >
-            ทบทวนข้อผิด
-          </Link>
+      {/* Phase 2A: package selector (one row, mobile-friendly). */}
+      {selector ? (
+        <div style={{ marginBottom: '18px' }}>
+          {selector}
         </div>
       ) : null}
+
+      {/* Scoped empty state takes precedence when the page supplies it. */}
+      {scopedEmpty ? (
+        scopedEmpty
+      ) : (
+        <>
+          {/* Topic list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {topics.map((t) => (
+              <WeakTopicRow key={`${t.labelKind}:${t.label}`} topic={t} />
+            ))}
+          </div>
+
+          {/* Optional CTA — only when a valid review attempt id is available. */}
+          {reviewAttemptId ? (
+            <div style={{ marginTop: '18px' }}>
+              <Link
+                href={`/exams/attempts/${reviewAttemptId}?view=incorrect`}
+                className="btn-outline"
+                style={{
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                }}
+              >
+                {reviewCtaLabel}
+              </Link>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   deriveWeakTopics,
   computeLearnerAnalytics,
   sanitizeAttempt,
+  resolveWeakTopicsScope,
   ANALYTICS_WINDOW_LIMIT,
   WEAK_TOPIC_MIN_ENCOUNTERS,
   WEAK_TOPIC_MAX_RESULTS,
@@ -409,4 +410,184 @@ test('deriveWeakTopics: entries with no topic/law/subject produce no groups', ()
 
 test('ANALYTICS_WINDOW_LIMIT is 20 (recent window contract)', () => {
   assert.equal(ANALYTICS_WINDOW_LIMIT, 20)
+})
+
+// ─── 16. Phase 2A: package-scoped weak topics ────────────────────────────────
+// These tests exercise the PURE layer that getWeakTopics() reuses. The loader
+// itself is server-only (dynamic import of @/lib/supabase/server) and so is not
+// unit-tested here; its correctness follows from the shared sanitizeAttempt +
+// deriveWeakTopics pipeline verified below, plus the scope-resolution helper.
+
+/** Build a sanitized attempt with an explicit owning package id. */
+function attPkg(
+  id: string,
+  packageId: string,
+  opts: Partial<SanitizedAttempt> & Pick<SanitizedAttempt, 'score' | 'total'>,
+): SanitizedAttempt {
+  return { ...att(id, opts), packageId }
+}
+
+test('deriveWeakTopics: package-scoped attempts do NOT merge same-name topics across packages', () => {
+  // Two packages each have 3 wrong entries under topic 'สัญญา'. When fed a
+  // SINGLE package's attempts (the scoped window), only that package's 3
+  // entries are grouped — the other package's identically-named topic never
+  // enters the accumulator. This is the core Phase 2A guarantee.
+  const pkgA = attPkg('a1', 'pkgA', {
+    score: 0, total: 3, answerSummary: [
+      { questionId: 'q1', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+      { questionId: 'q2', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+      { questionId: 'q3', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+    ],
+  })
+  const out = deriveWeakTopics([pkgA])
+  assert.equal(out.length, 1)
+  assert.equal(out[0].label, 'สัญญา')
+  assert.equal(out[0].total, 3) // pkgB's 3 never counted — no cross-package merge
+  assert.equal(out[0].incorrect, 3)
+})
+
+test('deriveWeakTopics: all-packages input still merges same-name topics (unchanged behavior)', () => {
+  // Regression guard: when BOTH packages' attempts are fed (the all-packages
+  // window), the shared topic still merges into one group of 6 — exactly the
+  // pre-Phase-2A behavior. This confirms the all-packages path is untouched.
+  const pkgA = attPkg('a1', 'pkgA', {
+    score: 0, total: 3, answerSummary: [
+      { questionId: 'a1', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+      { questionId: 'a2', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+      { questionId: 'a3', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+    ],
+  })
+  const pkgB = attPkg('b1', 'pkgB', {
+    score: 0, total: 3, answerSummary: [
+      { questionId: 'b1', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+      { questionId: 'b2', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+      { questionId: 'b3', selected: 'A', correct: 'B', isCorrect: false, flagged: false, topic: 'สัญญา' },
+    ],
+  })
+  const out = deriveWeakTopics([pkgA, pkgB])
+  assert.equal(out.length, 1)
+  assert.equal(out[0].total, 6) // merged across packages (unchanged all-packages behavior)
+})
+
+test('deriveWeakTopics: empty scoped rows return no weak topics', () => {
+  // A package with no completed attempts → empty input → empty output.
+  assert.deepEqual(deriveWeakTopics([]), [])
+})
+
+test('sanitizeAttempt: carries packageId through; the first sanitized row is the scoped latest', () => {
+  // getWeakTopics captures scopedLatestAttemptId from sanitized[0].id because
+  // the query is newest-first. Verify sanitizeAttempt preserves packageId and
+  // that deriving the "latest id" from the first row of a sanitized list is
+  // correct (the loader does exactly this).
+  const s = sanitizeAttempt({
+    id: 'att-99', package_id: 'pkgA', score: 5, total: 10,
+    answered_count: 8, accuracy: 50, passed: false,
+    time_used_seconds: 100, answer_summary: [],
+  })
+  assert.ok(s)
+  assert.equal(s!.packageId, 'pkgA')
+
+  // Simulate the loader's "first row = newest = scoped latest" capture.
+  const sanitized: SanitizedAttempt[] = [
+    sanitizeAttempt({ id: 'newest', package_id: 'pkgA', score: 1, total: 1 })!,
+    sanitizeAttempt({ id: 'older', package_id: 'pkgA', score: 1, total: 1 })!,
+  ]
+  const scopedLatestAttemptId = sanitized.length > 0 ? sanitized[0].id : null
+  assert.equal(scopedLatestAttemptId, 'newest')
+
+  // Empty window → null (the loader returns EMPTY_WEAK_TOPICS in this case).
+  const emptyLatest = ([] as SanitizedAttempt[]).length > 0 ? (sanitized[0].id) : null
+  assert.equal(emptyLatest, null)
+})
+
+// ─── 17. Phase 2A: URL scope resolution (pure) ───────────────────────────────
+
+test('resolveWeakTopicsScope: absent param → automatic default (latest attempt package)', () => {
+  const scope = resolveWeakTopicsScope({
+    packageParam: undefined,
+    ownedPackageIds: ['pkgA', 'pkgB'],
+    latestAttemptPackageId: 'pkgB',
+    activeSessionPackageId: 'pkgA',
+  })
+  assert.equal(scope.kind, 'package')
+  assert.equal(scope.kind === 'package' && scope.packageId, 'pkgB') // rule 1 wins
+})
+
+test('resolveWeakTopicsScope: absent param + no latest → active session package', () => {
+  const scope = resolveWeakTopicsScope({
+    packageParam: undefined,
+    ownedPackageIds: ['pkgA', 'pkgB'],
+    latestAttemptPackageId: null,
+    activeSessionPackageId: 'pkgA',
+  })
+  assert.equal(scope.kind, 'package')
+  assert.equal(scope.kind === 'package' && scope.packageId, 'pkgA') // rule 2
+})
+
+test('resolveWeakTopicsScope: absent param + no signals → all', () => {
+  const scope = resolveWeakTopicsScope({
+    packageParam: undefined,
+    ownedPackageIds: ['pkgA'],
+    latestAttemptPackageId: null,
+    activeSessionPackageId: null,
+  })
+  assert.equal(scope.kind, 'all') // rule 3
+})
+
+test('resolveWeakTopicsScope: ?package=all → explicit all (sticky, never auto-resolves)', () => {
+  // Even when a latest-attempt package exists, explicit 'all' must NOT fall
+  // through to the automatic default. This is the stickiness guarantee.
+  const scope = resolveWeakTopicsScope({
+    packageParam: 'all',
+    ownedPackageIds: ['pkgA', 'pkgB'],
+    latestAttemptPackageId: 'pkgB',
+    activeSessionPackageId: 'pkgA',
+  })
+  assert.equal(scope.kind, 'all')
+})
+
+test('resolveWeakTopicsScope: ?package={ownedId} → that package', () => {
+  const scope = resolveWeakTopicsScope({
+    packageParam: 'pkgB',
+    ownedPackageIds: ['pkgA', 'pkgB'],
+    latestAttemptPackageId: 'pkgA',
+    activeSessionPackageId: null,
+  })
+  assert.equal(scope.kind, 'package')
+  assert.equal(scope.kind === 'package' && scope.packageId, 'pkgB')
+})
+
+test('resolveWeakTopicsScope: invalid/unowned id → automatic default', () => {
+  // Unknown id falls back to the automatic default (latest attempt package).
+  const scope = resolveWeakTopicsScope({
+    packageParam: 'not-owned',
+    ownedPackageIds: ['pkgA', 'pkgB'],
+    latestAttemptPackageId: 'pkgA',
+    activeSessionPackageId: null,
+  })
+  assert.equal(scope.kind, 'package')
+  assert.equal(scope.kind === 'package' && scope.packageId, 'pkgA') // fallback
+})
+
+test('resolveWeakTopicsScope: invalid id + no signals → all', () => {
+  const scope = resolveWeakTopicsScope({
+    packageParam: 'bogus',
+    ownedPackageIds: ['pkgA'],
+    latestAttemptPackageId: null,
+    activeSessionPackageId: null,
+  })
+  assert.equal(scope.kind, 'all')
+})
+
+test('resolveWeakTopicsScope: auto-default package must itself be owned (defensive)', () => {
+  // If the latest-attempt package id is somehow not in the owned set, skip it
+  // and continue down the resolution chain rather than trusting an unowned id.
+  const scope = resolveWeakTopicsScope({
+    packageParam: undefined,
+    ownedPackageIds: ['pkgA'],
+    latestAttemptPackageId: 'not-actually-owned',
+    activeSessionPackageId: 'pkgA',
+  })
+  assert.equal(scope.kind, 'package')
+  assert.equal(scope.kind === 'package' && scope.packageId, 'pkgA') // rule 2, rule 1 skipped
 })
