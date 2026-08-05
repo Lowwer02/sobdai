@@ -9,6 +9,7 @@ import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestRe
 import LearningStats, { LearningStatsEmpty } from '@/components/exams/LearningStats'
 import WeakTopics, { WeakTopicsEmpty, WeakTopicsAllGood } from '@/components/exams/WeakTopics'
 import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/ActivityTimeline'
+import RecommendedActions from '@/components/exams/RecommendedActions'
 import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQuestions'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import { fetchSavedQuestionCards } from '@/lib/assessment/saved-questions-data'
@@ -234,6 +235,14 @@ export default async function ExamDashboardPage() {
             <LatestResultEmpty />
           )}
         </section>
+
+        {/* ---------- Recommended Actions (Phase 1G — adaptive study) ----------
+            Async Server Component wrapped in its own Suspense boundary (inside
+            RecommendedActions) with a null fallback, so the dashboard NEVER
+            waits on the recommendation pipeline (heavier: ≤200 attempts +
+            summary lookups). Recommendations stream in once resolved; any
+            failure degrades to null and the rest of /exams is unaffected. */}
+        <RecommendedActions />
 
         {/* ---------- Learning Statistics (Phase 1D — recent window) ---------- */}
         <section style={{ marginBottom: '48px' }}>
