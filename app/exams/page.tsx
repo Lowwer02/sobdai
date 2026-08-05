@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
@@ -12,9 +13,15 @@ import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/Acti
 import RecommendedActions from '@/components/exams/RecommendedActions'
 import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQuestions'
 import MobileShowMore from '@/components/exams/MobileShowMore'
+import PackageScopeSelector from '@/components/exams/PackageScopeSelector'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import { fetchSavedQuestionCards } from '@/lib/assessment/saved-questions-data'
-import { getLearnerAnalytics } from '@/lib/assessment/learner-analytics'
+import {
+  getLearnerAnalytics,
+  getWeakTopics,
+  resolveWeakTopicsScope,
+  type WeakTopicsScope,
+} from '@/lib/assessment/learner-analytics'
 import { getTimeline } from '@/lib/assessment/activity-timeline'
 import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
@@ -45,7 +52,11 @@ const MOBILE_PACKAGES_PREVIEW = 2
  * No fake data. Pure Server Component: no client JS added. Reuses PackageCard,
  * the /orders query pattern, and the getPackagePublicCounts RPC.
  */
-export default async function ExamDashboardPage() {
+export default async function ExamDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -148,19 +159,88 @@ export default async function ExamDashboardPage() {
     examSetQuestionCounts,
   })
 
-  // --- Learning Statistics + Weak Topics (Phase 1D) ------------------------
-  // One bounded query (latest ≤20 completed attempts) feeds BOTH sections.
-  // Non-critical: on any failure the analytics layer returns a safe empty
-  // payload, so the dashboard's other sections still render. Reuses the same
-  // owned-package scoping as getDashboardData. The optional Weak Topics CTA
-  // reuses the latestResult attempt id when one is already available — no extra
-  // query is performed for this feature.
-  const learnerAnalytics = await getLearnerAnalytics({
-    userId: user.id,
-    ownedPackageIds: enriched.map((p) => p.id),
+  // --- Learning Statistics + Weak Topics (Phase 1D / Phase 2A) -------------
+  // Learning Statistics is ALWAYS all-packages (unchanged). Weak Topics is the
+  // ONLY section scoped by the package selector (Phase 2A).
+  //
+  // Scope resolution (three-valued URL semantics, see resolveWeakTopicsScope):
+  //   ?package=all              → explicit all-packages weak topics (sticky)
+  //   ?package={ownedId}        → scope weak topics to that package
+  //   (absent / invalid / unowned) → automatic default:
+  //      1. latest completed attempt's package (latestResult.packageId)
+  //      2. otherwise most recently active session's package
+  //      3. otherwise 'all'
+  const ownedPackageIds = enriched.map((p) => p.id)
+  const params = await searchParams
+  const rawPackageParam = typeof params.package === 'string' ? params.package : undefined
+  const weakTopicsScope: WeakTopicsScope = resolveWeakTopicsScope({
+    packageParam: rawPackageParam,
+    ownedPackageIds,
+    latestAttemptPackageId: latestResult?.packageId ?? null,
+    activeSessionPackageId: activeSessions[0]?.packageId ?? null,
   })
+  const isScopedPackage = weakTopicsScope.kind === 'package'
+
+  // Data fetching strategy:
+  //  - Statistics always come from the all-packages getLearnerAnalytics query.
+  //  - When the scope resolves to 'all', REUSE that same query's weakTopics —
+  //    no additional analytics query for the all-packages case.
+  //  - When the scope resolves to a package, run getWeakTopics (one bounded
+  //    ≤20-row, index-served query) IN PARALLEL with statistics.
+  //    getWeakTopics reuses the exact same sanitize + deriveWeakTopics pipeline.
+  let learnerAnalytics
+  let weakTopicsResult
+  if (isScopedPackage) {
+    ;[learnerAnalytics, weakTopicsResult] = await Promise.all([
+      getLearnerAnalytics({ userId: user.id, ownedPackageIds }),
+      getWeakTopics({
+        userId: user.id,
+        ownedPackageIds,
+        packageId: weakTopicsScope.packageId,
+      }),
+    ])
+  } else {
+    // 'all' scope: single query; reuse its weakTopics (no second analytics call).
+    learnerAnalytics = await getLearnerAnalytics({ userId: user.id, ownedPackageIds })
+    weakTopicsResult = null
+  }
+
   const hasCompletedAttempts = learnerAnalytics.statistics.attempts > 0
-  const reviewAttemptId = latestResult?.attemptId ?? null
+
+  // Resolve the Weak Topics display values from the chosen scope.
+  //  - weakTopicsList: scoped list (package) or the all-packages list.
+  //  - weakTopicsReviewAttemptId: the CTA target. For a package scope this is
+  //    the selected package's OWN latest attempt id (scopedLatestAttemptId),
+  //    guaranteed to belong to that package; null when the package has no
+  //    completed attempts → the CTA is suppressed. For 'all', keep the existing
+  //    behavior of pointing at the global latestResult attempt id.
+  const weakTopicsList =
+    isScopedPackage && weakTopicsResult
+      ? weakTopicsResult.weakTopics
+      : learnerAnalytics.weakTopics
+  const weakTopicsReviewAttemptId = isScopedPackage
+    ? (weakTopicsResult?.scopedLatestAttemptId ?? null)
+    : (latestResult?.attemptId ?? null)
+  const weakTopicsCaption = isScopedPackage
+    ? 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้งในแพ็กเกจนี้'
+    : 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้ง'
+  const weakTopicsReviewCtaLabel = isScopedPackage
+    ? 'ทบทวนข้อผิดในแพ็กเกจนี้'
+    : 'ทบทวนข้อผิด'
+  // Whether the selected package has zero completed attempts (scoped empty state).
+  const scopedPackageIsEmpty =
+    isScopedPackage && weakTopicsResult !== null && weakTopicsResult.scopedLatestAttemptId === null
+  // Whether the selected package has attempts but no weak topics surfaced.
+  const scopedPackageAllGood =
+    isScopedPackage && !scopedPackageIsEmpty && weakTopicsList.length === 0
+
+  // The selector's current value reflects the RESOLVED scope (so the control
+  // shows the auto-defaulted package too, not just an explicit URL value).
+  const selectorValue = isScopedPackage ? weakTopicsScope.packageId : 'all'
+  const selectorOptions = enriched.map((p) => ({
+    id: p.id,
+    label: p.positions?.name || p.organizations?.name || `ปี ${p.exam_year}`,
+  }))
 
   // --- Activity Timeline (Phase 1E) ----------------------------------------
   // Two bounded queries (latest 10 completed attempts + latest 5 active
@@ -264,15 +344,64 @@ export default async function ExamDashboardPage() {
           )}
         </section>
 
-        {/* ---------- Weak Topics (Phase 1D — recent window) ---------- */}
+        {/* ---------- Weak Topics (Phase 1D / Phase 2A — package-scoped) -------
+            ONLY this section is scoped by the package selector. The selector is
+            rendered inside the card (above the topic list). Branch logic:
+              - no completed attempts anywhere (all-packages) → WeakTopicsEmpty
+                (no selector: nothing to scope yet)
+              - a package is selected but has no completed attempts → render the
+                card WITH the selector + a scoped empty-state node
+              - otherwise → render the card WITH the selector + the topic list
+                (or the all-good state when the scope has attempts but no weak
+                topics) */}
         <section style={{ marginBottom: '48px' }}>
           <SectionTitle>หัวข้อที่ควรทบทวน</SectionTitle>
           {!hasCompletedAttempts ? (
             <WeakTopicsEmpty />
-          ) : learnerAnalytics.weakTopics.length > 0 ? (
-            <WeakTopics topics={learnerAnalytics.weakTopics} reviewAttemptId={reviewAttemptId} />
           ) : (
-            <WeakTopicsAllGood />
+            <WeakTopics
+              topics={weakTopicsList}
+              reviewAttemptId={weakTopicsReviewAttemptId}
+              caption={weakTopicsCaption}
+              reviewCtaLabel={weakTopicsReviewCtaLabel}
+              selector={
+                <Suspense fallback={null}>
+                  <PackageScopeSelector
+                    options={selectorOptions}
+                    value={selectorValue}
+                  />
+                </Suspense>
+              }
+              scopedEmpty={
+                scopedPackageIsEmpty ? (
+                  <p
+                    style={{
+                      fontSize: '13px',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1.6,
+                      margin: 0,
+                      textAlign: 'center',
+                      padding: '8px 0',
+                    }}
+                  >
+                    ยังไม่มีผลสอบในแพ็กเกจนี้ เริ่มทำข้อสอบเพื่อให้ระบบวิเคราะห์หัวข้อที่ควรทบทวน
+                  </p>
+                ) : scopedPackageAllGood ? (
+                  <p
+                    style={{
+                      fontSize: '13px',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1.6,
+                      margin: 0,
+                      textAlign: 'center',
+                      padding: '8px 0',
+                    }}
+                  >
+                    ยังไม่พบหัวข้อที่ควรทบทวนเป็นพิเศษในแพ็กเกจนี้
+                  </p>
+                ) : null
+              }
+            />
           )}
         </section>
 

@@ -88,6 +88,14 @@ export interface SanitizedAttempt {
   timeUsedSeconds: number
   /** The raw, untrusted answer_summary JSONB — validated defensively later. */
   answerSummary: unknown
+  /**
+   * Owning package id of the attempt (Phase 2A). Optional for backward
+   * compatibility: the all-packages statistics path ignores it, and the pure
+   * weak-topic derivation does not use it (scoping happens at the query layer).
+   * Captured only so the scoped weak-topic loader can expose the newest
+   * scoped attempt id without an extra query.
+   */
+  packageId?: string
 }
 
 /**
@@ -104,9 +112,11 @@ export function sanitizeAttempt(raw: {
   passed?: unknown
   time_used_seconds?: unknown
   answer_summary?: unknown
+  package_id?: unknown
 }): SanitizedAttempt | null {
   if (!raw || typeof raw.id !== 'string' || !raw.id) return null
   const total = sanitizeNonNegInt(raw.total)
+  const packageId = typeof raw.package_id === 'string' ? raw.package_id : undefined
   return {
     id: raw.id,
     total,
@@ -116,6 +126,7 @@ export function sanitizeAttempt(raw: {
     passed: raw.passed === true,
     timeUsedSeconds: sanitizeNonNegInt(raw.time_used_seconds),
     answerSummary: raw.answer_summary,
+    ...(packageId ? { packageId } : {}),
   }
 }
 
@@ -344,6 +355,7 @@ export function computeLearnerAnalytics(
 /** Raw row shape from the bounded analytics query. */
 interface AnalyticsAttemptRow {
   id: string
+  package_id: string
   score: number
   total: number
   answered_count: number
@@ -393,7 +405,7 @@ export async function getLearnerAnalytics(
     const { data, error } = await supabase
       .from('exam_attempts')
       .select(`
-        id, score, total, answered_count, accuracy, passed,
+        id, package_id, score, total, answered_count, accuracy, passed,
         time_used_seconds, answer_summary, completed_at, created_at
       `)
       .eq('user_id', input.userId)
@@ -422,5 +434,202 @@ export async function getLearnerAnalytics(
   } catch (err: any) {
     console.error('getLearnerAnalytics: unexpected error:', err?.message ?? err)
     return { ...EMPTY_LEARNER_ANALYTICS }
+  }
+}
+
+// ─── Phase 2A: package-scoped weak topics ────────────────────────────────────
+// ONLY the "หัวข้อที่ควรทบทวน" section is package-scoped. Learning Statistics
+// stays all-packages (served by getLearnerAnalytics above, unchanged). This
+// loader runs a SEPARATE bounded query solely for weak topics so the two
+// sections can have different latest-20 windows without互相干扰. It reuses the
+// SAME pure sanitize + deriveWeakTopics logic — no aggregation duplication.
+
+// ─── Scope resolution (pure) ─────────────────────────────────────────────────
+
+/**
+ * The resolved Weak-Topics scope, produced by {@link resolveWeakTopicsScope}.
+ *
+ * Three-valued so the page can distinguish "user hasn't chosen" from "user
+ * explicitly chose all-packages" — the URL param must be sticky for `all`.
+ *  - 'all'      → all-packages weak topics (reuse learnerAnalytics.weakTopics).
+ *  - {packageId}→ scope to one owned package (call getWeakTopics).
+ */
+export type WeakTopicsScope = { kind: 'all' } | { kind: 'package'; packageId: string }
+
+/** Inputs to scope resolution — all already-loaded dashboard data (no query). */
+export interface ResolveWeakTopicsScopeInput {
+  /** Raw `?package=` value from the URL: absent → undefined. */
+  packageParam: string | undefined
+  /** Owned package ids (the allow-list for validation). */
+  ownedPackageIds: string[]
+  /**
+   * Default-package resolution inputs (all already on the dashboard):
+   *  1. latest completed attempt's package id
+   *  2. most recently active session's package id
+   *  3. otherwise → 'all'
+   * (Option "first owned package with attempts" is intentionally NOT here: it
+   *  would require knowing which package has attempts, which is itself scoped
+   *  data. The two free, already-loaded signals cover the common cases.)
+   */
+  latestAttemptPackageId: string | null | undefined
+  activeSessionPackageId: string | null | undefined
+}
+
+/**
+ * Resolve the Weak-Topics scope from the URL param + already-loaded dashboard
+ * data. Pure (no I/O) so it is unit-testable and deterministic.
+ *
+ * Rules:
+ *  - packageParam === 'all'           → { kind: 'all' } (explicit; sticky)
+ *  - packageParam is an owned id      → { kind: 'package', packageId }
+ *  - packageParam absent/invalid/unowned → run the automatic default:
+ *      latestAttemptPackageId → activeSessionPackageId → { kind: 'all' }
+ *    The auto-resolved package must itself be owned (defensive).
+ *
+ * Note: an explicit `all` never falls through to the automatic default, so
+ * choosing "ภาพรวมทุกแพ็กเกจ" stays put and does not reactivate auto-selection.
+ */
+export function resolveWeakTopicsScope(
+  input: ResolveWeakTopicsScopeInput,
+): WeakTopicsScope {
+  const owned = input.ownedPackageIds
+
+  // Explicit all-packages overview — sticky (never re-resolves).
+  if (input.packageParam === 'all') return { kind: 'all' }
+
+  // Explicit owned package selection.
+  if (
+    typeof input.packageParam === 'string' &&
+    input.packageParam.length > 0 &&
+    owned.includes(input.packageParam)
+  ) {
+    return { kind: 'package', packageId: input.packageParam }
+  }
+
+  // Absent / invalid / unowned → automatic default.
+  if (input.latestAttemptPackageId && owned.includes(input.latestAttemptPackageId)) {
+    return { kind: 'package', packageId: input.latestAttemptPackageId }
+  }
+  if (input.activeSessionPackageId && owned.includes(input.activeSessionPackageId)) {
+    return { kind: 'package', packageId: input.activeSessionPackageId }
+  }
+  return { kind: 'all' }
+}
+
+/** Result of the package-scoped weak-topic loader. */
+export interface WeakTopicsResult {
+  /** Derived weak topics for the resolved scope (≤ WEAK_TOPIC_MAX_RESULTS). */
+  weakTopics: WeakTopicGroup[]
+  /**
+   * The newest completed attempt id within the resolved scope (the first row,
+   * since the query is ordered newest-first). Used by the scoped "ทบทวนข้อผิดใน
+   * แพ็กเกจนี้" CTA so it always points at an attempt that belongs to the
+   * selected package. null when the scope has no completed attempts.
+   */
+  scopedLatestAttemptId: string | null
+}
+
+/** The safe empty fallback (no attempts / query failure). */
+export const EMPTY_WEAK_TOPICS: WeakTopicsResult = {
+  weakTopics: [],
+  scopedLatestAttemptId: null,
+}
+
+export interface WeakTopicsInput {
+  /** Authenticated user id (resolved by the caller from the session). */
+  userId: string
+  /** Owned package ids (resolved by the caller from completed orders). */
+  ownedPackageIds: string[]
+  /**
+   * Optional single package to scope to. The caller MUST have already validated
+   * that this id is a member of ownedPackageIds (defensive double-check below).
+   * When omitted/invalid, the all-packages filter (ownedPackageIds) is used.
+   */
+  packageId?: string | null
+}
+
+/**
+ * Fetch the latest ≤20 completed attempts for the resolved scope and derive
+ * weak topics. The scope is ONE owned package when `packageId` is supplied and
+ * owned, otherwise all owned packages.
+ *
+ * This is a SEPARATE query from getLearnerAnalytics: the all-packages Learning
+ * Statistics must keep its own accurate latest-20 window, so weak topics cannot
+ * ride on that same query when a package is selected. When the scope resolves to
+ * `all`, the caller should reuse learnerAnalytics.weakTopics instead of calling
+ * this (avoids a redundant query); this loader exists for the package-scoped
+ * case and is also safe to call for `all` if ever needed.
+ *
+ * Query plan: index-served for the scoped case via exam_attempts_package_idx
+ * (package_id, created_at desc). Latest-20 window preserved in both scopes.
+ * Reuses sanitizeAttempt + deriveWeakTopics verbatim (no logic duplication).
+ * Captures scopedLatestAttemptId from the first sanitized row (newest-first).
+ *
+ * Non-critical: on any failure returns EMPTY_WEAK_TOPICS so the dashboard still
+ * renders. Never throws. Never exposes raw Supabase errors.
+ */
+export async function getWeakTopics(
+  input: WeakTopicsInput,
+): Promise<WeakTopicsResult> {
+  if (!input.userId || input.ownedPackageIds.length === 0) {
+    return { ...EMPTY_WEAK_TOPICS }
+  }
+  // Defensive: only honor a packageId that the caller actually owns. Anything
+  // else (invalid, unowned, empty) falls back to the all-packages scope.
+  const scopedPackageId =
+    input.packageId && input.ownedPackageIds.includes(input.packageId)
+      ? input.packageId
+      : null
+
+  try {
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = await createClient()
+
+    let query = supabase
+      .from('exam_attempts')
+      .select(`
+        id, package_id, score, total, answered_count, accuracy, passed,
+        time_used_seconds, answer_summary, completed_at, created_at
+      `)
+      .eq('user_id', input.userId)
+      .order('completed_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(ANALYTICS_WINDOW_LIMIT)
+
+    // Branch the package filter: single-package scope vs all-owned-packages.
+    // `.eq` is index-served by exam_attempts_package_idx; `.in` matches the
+    // existing getLearnerAnalytics all-packages behavior exactly.
+    query = scopedPackageId
+      ? query.eq('package_id', scopedPackageId)
+      : query.in('package_id', input.ownedPackageIds)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('getWeakTopics: query failed:', error.message)
+      return { ...EMPTY_WEAK_TOPICS }
+    }
+    if (!data || data.length === 0) {
+      return { ...EMPTY_WEAK_TOPICS }
+    }
+
+    // Reuse the exact same sanitize + derive pipeline as the all-packages path.
+    const sanitized: SanitizedAttempt[] = []
+    for (const raw of data as unknown as AnalyticsAttemptRow[]) {
+      const s = sanitizeAttempt(raw)
+      if (s) sanitized.push(s)
+    }
+
+    // The query is newest-first, so the first sanitized row is the scope's
+    // latest completed attempt — the correct target for the scoped review CTA.
+    const scopedLatestAttemptId = sanitized.length > 0 ? sanitized[0].id : null
+
+    return {
+      weakTopics: deriveWeakTopics(sanitized),
+      scopedLatestAttemptId,
+    }
+  } catch (err: any) {
+    console.error('getWeakTopics: unexpected error:', err?.message ?? err)
+    return { ...EMPTY_WEAK_TOPICS }
   }
 }
