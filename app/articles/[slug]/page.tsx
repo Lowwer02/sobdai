@@ -1,8 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
-import { getPublishedArticleBySlug } from '@/lib/articles-public'
+import {
+  getPublishedArticleBySlug,
+  getPublishedArticleRelatedPackages,
+} from '@/lib/articles-public'
 import ArticleDetail from '@/components/articles/ArticleDetail'
+import ArticleRelatedPackages from '@/components/articles/ArticleRelatedPackages'
 
 export const revalidate = 300
 
@@ -42,9 +46,16 @@ export default async function ArticleDetailPage({
     notFound()
   }
 
+  const article = res.data
+  const packagesRes = await getPublishedArticleRelatedPackages(article.id)
+
   return (
     <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
-      <ArticleDetail article={res.data} />
+      <ArticleDetail article={article} />
+      <ArticleRelatedPackages
+        packages={packagesRes.success ? packagesRes.data : []}
+        error={!packagesRes.success ? packagesRes.error : undefined}
+      />
     </main>
   )
 }
