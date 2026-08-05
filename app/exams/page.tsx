@@ -237,10 +237,7 @@ export default async function ExamDashboardPage({
   // The selector's current value reflects the RESOLVED scope (so the control
   // shows the auto-defaulted package too, not just an explicit URL value).
   const selectorValue = isScopedPackage ? weakTopicsScope.packageId : 'all'
-  const selectorOptions = enriched.map((p) => ({
-    id: p.id,
-    label: p.positions?.name || p.organizations?.name || `ปี ${p.exam_year}`,
-  }))
+  const selectorOptions = buildPackageScopeOptions(enriched)
 
   // --- Activity Timeline (Phase 1E) ----------------------------------------
   // Two bounded queries (latest 10 completed attempts + latest 5 active
@@ -481,6 +478,79 @@ export default async function ExamDashboardPage({
 /* -------------------------------------------------------------------------- */
 /* Sub-components (kept local — not worth a shared file yet)                  */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Build the package-scope selector options with unambiguous labels (Phase 2A
+ * UX refinement). Reuses ONLY fields already loaded for the package grid — no
+ * new query.
+ *
+ * Label fallback ladder (per spec):
+ *   1. {organization} — {position}            (preferred)
+ *   2. {position}                              (when organization is missing)
+ *   3. a short package-name fallback            (when position is missing)
+ *   4. 'แพ็กเกจสอบ'                            (last resort; never a UUID)
+ *
+ * Duplicate disambiguation: when two or more owned packages share the SAME
+ * base label, append the exam year '(ปี {year})' to each duplicate so the
+ * learner can tell them apart. The year is NOT appended to every package —
+ * only to packages whose base label collides with another owned package.
+ *
+ * Pure & defensive. Never throws. Never exposes ids.
+ */
+function buildPackageScopeOptions(
+  packages: PackageCardData[],
+): { id: string; label: string }[] {
+  // Step 1 — base label per package (with the fallback ladder).
+  const withBase = packages.map((p) => {
+    const org = p.organizations?.name?.trim() || ''
+    const pos = p.positions?.name?.trim() || ''
+    let base: string
+    if (org && pos) {
+      base = `${org} — ${pos}`
+    } else if (pos) {
+      base = pos
+    } else if (org) {
+      // Position missing but org present — use a short package-name fallback
+      // derived from description if available, else the org alone.
+      const desc = p.description?.trim() || ''
+      base = shortPackageName(desc) || org
+    } else {
+      // Neither org nor position — last-resort safe fallback (never a UUID).
+      const desc = p.description?.trim() || ''
+      base = shortPackageName(desc) || 'แพ็กเกจสอบ'
+    }
+    return { id: p.id, base, year: p.exam_year ?? '' }
+  })
+
+  // Step 2 — detect duplicate base labels; append the year to each colliding
+  // package so they are distinguishable. Packages with a unique base keep the
+  // clean label (no unnecessary year).
+  const baseCounts = new Map<string, number>()
+  for (const item of withBase) {
+    baseCounts.set(item.base, (baseCounts.get(item.base) ?? 0) + 1)
+  }
+
+  return withBase.map((item) => {
+    const isDuplicate = (baseCounts.get(item.base) ?? 0) > 1
+    const label = isDuplicate && item.year ? `${item.base} (ปี ${item.year})` : item.base
+    return { id: item.id, label }
+  })
+}
+
+/**
+ * Reduce a long package description to a short, selector-friendly name. Trims
+ * to the first sentence/line and clamps length so the `<select>` option never
+ * overflows on mobile. Returns '' when the description is empty/whitespace.
+ * Pure.
+ */
+function shortPackageName(description: string): string {
+  const trimmed = description.trim()
+  if (!trimmed) return ''
+  // Take the first line, then clamp to a reasonable selector width.
+  const firstLine = trimmed.split(/\n|\.|\u0E53/)[0].trim() // newline | dot | Thai digit zero
+  const clamped = firstLine.length > 60 ? `${firstLine.slice(0, 59)}…` : firstLine
+  return clamped
+}
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
