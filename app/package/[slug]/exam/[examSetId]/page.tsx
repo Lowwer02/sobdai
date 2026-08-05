@@ -5,6 +5,7 @@ import { Lock, Clock, FileText, ChevronRight, Activity, Zap } from 'lucide-react
 import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import { createPageMetadata } from '@/lib/seo'
+import { fetchBookmarkStateMap } from '@/lib/assessment/saved-questions-data'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, examSetId: string }> }) {
   const { slug, examSetId } = await params
@@ -173,6 +174,16 @@ export default async function ExamSetPage({
   // Map to flat array and filter out nulls (hidden by RLS)
   const questions = esq.map((item: any) => item.questions).filter(Boolean)
 
+  // Phase 1F: load initial saved-question state for this exam set.
+  // One bounded query (question_id IN (...)), non-throwing — on any error it
+  // returns an all-not-bookmarked map so the review still renders and the
+  // bookmark button still works optimistically at click time. Skipped for
+  // logged-out users (page redirects above, but guard defensively).
+  const questionIds = questions.map((q: any) => q.id).filter(Boolean)
+  const bookmarkState = user
+    ? await fetchBookmarkStateMap(user.id, examSetId, questionIds)
+    : {}
+
   if (questions.length === 0) {
     return (
       <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
@@ -318,11 +329,12 @@ export default async function ExamSetPage({
 
   // If mode is selected, render Runtime (Current logic)
   return (
-    <ExamRuntime 
-      pkg={pkg} 
-      examSet={examSet} 
-      questions={questions} 
+    <ExamRuntime
+      pkg={pkg}
+      examSet={examSet}
+      questions={questions}
       mode={mode}
+      bookmarkState={bookmarkState}
     />
   )
 }

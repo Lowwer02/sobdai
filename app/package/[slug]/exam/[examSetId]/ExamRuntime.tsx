@@ -15,8 +15,11 @@ import {
 } from '@/app/assessment/session-actions'
 import { clampIndex } from '@/lib/assessment/session-types'
 import type { SessionSnapshot } from '@/lib/assessment/session-types'
+import type { BookmarkStateMap } from '@/lib/assessment/saved-questions-data'
+import type { QuestionBookmarkState } from '@/lib/assessment/saved-questions-data'
 import type { ExamSet } from '@/lib/types'
 import { completeExam, startExam, submitExam } from '@/lib/analytics'
+import QuestionBookmarkButton from '@/components/exams/QuestionBookmarkButton'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -48,9 +51,11 @@ interface ExamRuntimeProps {
   examSet: ExamSet
   questions: Question[]
   mode?: string
+  /** Phase 1F: server-rendered saved-question state (questionId → bookmark). */
+  bookmarkState?: BookmarkStateMap
 }
 
-export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mode }: ExamRuntimeProps) {
+export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mode, bookmarkState = {} }: ExamRuntimeProps) {
   // ── Assessment domain boundary ─────────────────────────────────────────
   // Epic 1 (Assessment Runtime) introduces the Outcome boundary. The runtime
   // delegates verdict/scoring computation to lib/assessment/outcome.ts and
@@ -96,6 +101,37 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
   // inside the async submit handler synchronously).
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
+  // Phase 1F: the persisted DB attempt id, captured once persistOutcome
+  // resolves after submit. Used as sourceAttemptId provenance when saving a
+  // reviewed question. Null until persistence succeeds (a persisted failure
+  // leaves it null — the bookmark still saves, just without provenance).
+  const [persistedAttemptId, setPersistedAttemptId] = useState<string | null>(null)
+
+  // Phase 1F: mutable bookmark map owned by ExamRuntime. The server-provided
+  // `bookmarkState` prop is a snapshot taken at page render; only the CURRENT
+  // question's QuestionBookmarkButton is mounted at a time, and React discards
+  // its local state on unmount. To preserve the latest toggle across navigate-
+  // away-and-back, ExamRuntime keeps this map, seeds it once from the snapshot,
+  // and updates it from the button's success callback. Each button reads its
+  // `initial` values from here, so a remount reflects the most recent state.
+  const [bookmarkRuntime, setBookmarkRuntime] = useState<Record<string, QuestionBookmarkState>>(() => bookmarkState)
+
+  // Phase 1F: success-only handler the bookmark button calls after the server
+  // confirms a save/remove. Updates ONLY this question's entry so the latest
+  // state survives the button's unmount when the learner navigates questions.
+  const handleBookmarkChange = useCallback(
+    (questionId: string, next: { isBookmarked: boolean; bookmarkId: string | null }) => {
+      setBookmarkRuntime((prev) => ({
+        ...prev,
+        [questionId]: {
+          questionId,
+          isBookmarked: next.isBookmarked,
+          bookmarkId: next.bookmarkId,
+        },
+      }))
+    },
+    [],
+  )
   const submittingRef = useRef(false)
   // Tracks the last values we persisted, so the autosave effect can skip a
   // no-op save (e.g. an answer toggled and then toggled back within the debounce
@@ -418,6 +454,12 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
     // resume; the result screen still shows because it reads from `result`.
     persistOutcome(result)
       .then(async (persisted) => {
+        if (persisted.success && persisted.id) {
+          // Phase 1F: surface the persisted attempt id so the bookmark control
+          // can record provenance. Kept independent of the session-close block
+          // below so a missing/stranded session still yields provenance.
+          setPersistedAttemptId(persisted.id)
+        }
         if (persisted.success && persisted.id && sessionId) {
           // Best-effort session close. If THIS call fails we log and proceed —
           // the result screen already rendered from the in-memory Outcome, and
@@ -921,6 +963,28 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
                 </div>
               </div>
             )}
+
+            {/* Phase 1F: Saved Questions control.
+                Only the current question's button is mounted at a time, and
+                React discards its local state on unmount — so `key` alone can
+                NOT carry a toggle across navigate-away-and-back. The initial
+                values below read from `bookmarkRuntime` (ExamRuntime-owned,
+                seeded from the server snapshot), which ExamRuntime updates via
+                `handleBookmarkChange` on every confirmed save/remove. Thus a
+                remount reflects the latest state, not the stale server map.
+                `key={q.id}` keeps instances per-question so X and Y never share
+                state. No duplicate bookmark logic — reuses QuestionBookmarkButton
+                + the Phase 1F server actions. */}
+            <QuestionBookmarkButton
+              key={q.id}
+              questionId={q.id}
+              examSetId={String(examSet?.id ?? '')}
+              packageId={String(pkg?.id ?? '')}
+              initialBookmarked={bookmarkRuntime[q.id]?.isBookmarked ?? false}
+              initialBookmarkId={bookmarkRuntime[q.id]?.bookmarkId ?? null}
+              sourceAttemptId={persistedAttemptId}
+              onBookmarkChange={(next) => handleBookmarkChange(q.id, next)}
+            />
           </div>
         )}
 

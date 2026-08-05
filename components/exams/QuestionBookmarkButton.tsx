@@ -32,6 +32,17 @@ interface QuestionBookmarkButtonProps {
   initialBookmarkId: string | null
   /** Optional provenance; passed through to the save action when creating. */
   sourceAttemptId?: string | null
+  /**
+   * Success-only callback fired AFTER the server action confirms a state
+   * change. The parent uses this to keep its own bookmark map in sync so the
+   * latest state survives when this button is unmounted and later remounted
+   * (e.g. navigating between reviewed questions in ExamRuntime, where only the
+   * current question's button is mounted at a time). Never called on failure.
+   */
+  onBookmarkChange?: (state: {
+    isBookmarked: boolean
+    bookmarkId: string | null
+  }) => void
 }
 
 export default function QuestionBookmarkButton({
@@ -41,6 +52,7 @@ export default function QuestionBookmarkButton({
   initialBookmarked,
   initialBookmarkId,
   sourceAttemptId,
+  onBookmarkChange,
 }: QuestionBookmarkButtonProps) {
   const [isPending, startTransition] = useTransition()
   const [bookmarked, setBookmarked] = useState(initialBookmarked)
@@ -65,6 +77,10 @@ export default function QuestionBookmarkButton({
         if (res.success && res.data) {
           setBookmarked(true)
           setBookmarkId(res.data.bookmarkId ?? null)
+          onBookmarkChange?.({
+            isBookmarked: true,
+            bookmarkId: res.data.bookmarkId ?? null,
+          })
         } else {
           setErrorMsg(res.error || 'ไม่สามารถบันทึกข้อนี้ได้')
         }
@@ -80,6 +96,7 @@ export default function QuestionBookmarkButton({
         if (res.success) {
           setBookmarked(false)
           setBookmarkId(null)
+          onBookmarkChange?.({ isBookmarked: false, bookmarkId: null })
         } else {
           setErrorMsg(res.error || 'ไม่สามารถยกเลิกการบันทึกได้')
         }
@@ -93,6 +110,7 @@ export default function QuestionBookmarkButton({
     examSetId,
     packageId,
     sourceAttemptId,
+    onBookmarkChange,
   ])
 
   // Accessible label reflects the current + pending state.
