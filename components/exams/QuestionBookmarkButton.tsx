@@ -114,22 +114,36 @@ export default function QuestionBookmarkButton({
   ])
 
   // Accessible label reflects the current + pending state.
+  // Visible copy is kept short so the control fits in the question header on
+  // desktop and on a second row on mobile. The accessible name (title +
+  // aria-label) carries the full intent. This is distinct from the active-exam
+  // "ปักหมุด" flag (a temporary in-attempt marker) — Saved Questions is a
+  // persistent, post-submit bookmark for later review.
   const label = isPending
     ? bookmarked
-      ? 'กำลังยกเลิกการบันทึก…'
+      ? 'กำลังยกเลิก…'
       : 'กำลังบันทึก…'
     : bookmarked
-      ? 'ยกเลิกการบันทึก'
-      : 'บันทึกข้อนี้'
+      ? 'บันทึกไว้แล้ว'
+      : 'บันทึกไว้ทบทวน'
+
+  const ariaLabel = isPending
+    ? bookmarked
+      ? 'กำลังยกเลิก…'
+      : 'กำลังบันทึก…'
+    : bookmarked
+      ? 'ยกเลิกการบันทึกข้อนี้'
+      : 'บันทึกข้อนี้ไว้ทบทวนภายหลัง'
 
   return (
-    <div style={{ marginTop: '14px' }}>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
       <button
         type="button"
         onClick={handleClick}
         disabled={isPending}
         aria-pressed={bookmarked}
-        aria-label={label}
+        aria-label={ariaLabel}
+        title={ariaLabel}
         className={bookmarked ? 'btn-outline' : 'btn-primary'}
         style={{
           display: 'inline-flex',
@@ -145,18 +159,14 @@ export default function QuestionBookmarkButton({
         {label}
       </button>
       {errorMsg && (
-        <div
+        <span
           role="alert"
-          style={{
-            marginTop: '6px',
-            fontSize: '12px',
-            color: '#ef4444',
-          }}
+          style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}
         >
           {errorMsg}
-        </div>
+        </span>
       )}
-    </div>
+    </span>
   )
 }
 
