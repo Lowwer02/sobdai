@@ -5,12 +5,64 @@ import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import {
   getPublishedArticleBySlug,
   getPublishedArticleRelatedPackages,
+  type PublicArticleDetail,
 } from '@/lib/articles-public'
-import { createPageMetadata, absoluteUrl, SITE_DESCRIPTION, DEFAULT_OG_IMAGE } from '@/lib/seo'
+import {
+  createPageMetadata,
+  absoluteUrl,
+  SITE_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  SITE_ORGANIZATION,
+  buildBreadcrumbJsonLd,
+} from '@/lib/seo'
 import ArticleDetail from '@/components/articles/ArticleDetail'
 import ArticleRelatedPackages from '@/components/articles/ArticleRelatedPackages'
+import StructuredData from '@/components/StructuredData'
 
 export const revalidate = 300
+
+function buildArticleJsonLd(article: PublicArticleDetail): Record<string, unknown> {
+  const canonicalUrl = absoluteUrl(article.canonical_url || `/articles/${article.slug}`)
+  const description = article.seo_description || article.excerpt || SITE_DESCRIPTION
+
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    description,
+    url: canonicalUrl,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': canonicalUrl,
+    },
+    inLanguage: 'th-TH',
+    author: SITE_ORGANIZATION,
+    publisher: SITE_ORGANIZATION,
+  }
+
+  if (article.cover_image_url) {
+    jsonLd.image = [absoluteUrl(article.cover_image_url)]
+  }
+
+  if (article.published_at) {
+    jsonLd.datePublished = article.published_at
+  }
+
+  const dateModified = article.updated_at || article.published_at
+  if (dateModified) {
+    jsonLd.dateModified = dateModified
+  }
+
+  if (article.category) {
+    jsonLd.articleSection = article.category
+  }
+
+  if (Array.isArray(article.tags) && article.tags.length > 0) {
+    jsonLd.keywords = article.tags.join(', ')
+  }
+
+  return jsonLd
+}
 
 export async function generateMetadata({
   params,
@@ -110,8 +162,17 @@ export default async function ArticleDetailPage({
   const article = res.data
   const packagesRes = await getPublishedArticleRelatedPackages(article.id)
 
+  const articleJsonLd = buildArticleJsonLd(article)
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: 'หน้าแรก', path: '/' },
+    { name: 'บทความ', path: '/articles' },
+    { name: article.title, path: `/articles/${article.slug}` },
+  ])
+
   return (
     <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <StructuredData data={articleJsonLd} />
+      <StructuredData data={breadcrumbJsonLd} />
       <ArticleDetail article={article} />
       <ArticleRelatedPackages
         packages={packagesRes.success ? packagesRes.data : []}
