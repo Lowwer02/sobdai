@@ -900,7 +900,7 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
         
         {/* Question Area */}
         <div className="mb-8">
-          <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
               <span className="inline-block px-3 py-1 rounded-md bg-[#1A140E] text-[#A1866B] text-xs font-bold border border-[rgba(255,255,255,0.05)]">
                 ข้อที่ {currentIndex + 1}
@@ -911,17 +911,51 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
                 </span>
               )}
             </div>
-            {status === 'IN_PROGRESS' && (
-              <button type="button" 
+
+            {/* Right-aligned per-question actions.
+                - Active exam (IN_PROGRESS): the "ปักหมุดไว้ทบทวน" flag — a
+                  temporary in-attempt marker. Untouched by this change.
+                - Review (REVIEW): the Phase 1F "บันทึกไว้ทบทวน" bookmark — a
+                  persistent saved question for later. The two never render at
+                  the same time, so they share this slot cleanly. On desktop the
+                  bookmark sits inline-right beside the question number; on
+                  narrow screens `flex-wrap` + `w-full` drop it to its own
+                  right-aligned row so the header never overflows. */}
+            {status === 'IN_PROGRESS' ? (
+              <button type="button"
                 onClick={toggleFlag}
                 className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-md border transition-colors ${flagged[q.id] ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500' : 'bg-transparent border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]'}`}
               >
                 <Flag size={12} className={flagged[q.id] ? 'fill-yellow-500' : ''} />
                 {flagged[q.id] ? 'ปักหมุดแล้ว' : 'ปักหมุดไว้ทบทวน'}
               </button>
+            ) : (
+              <div className="w-full sm:w-auto sm:ml-auto flex sm:inline-flex justify-end">
+                {/* Phase 1F: only the current question's button is mounted at a
+                    time, and React discards its local state on unmount — so
+                    `key` alone can NOT carry a toggle across navigate-away-and-
+                    back. The initial values read from `bookmarkRuntime`
+                    (ExamRuntime-owned, seeded from the server snapshot), which
+                    ExamRuntime updates via `handleBookmarkChange` on every
+                    confirmed save/remove. Thus a remount reflects the latest
+                    state, not the stale server map. `key={q.id}` keeps
+                    instances per-question so X and Y never share state. No
+                    duplicate bookmark logic — reuses QuestionBookmarkButton +
+                    the Phase 1F server actions. */}
+                <QuestionBookmarkButton
+                  key={q.id}
+                  questionId={q.id}
+                  examSetId={String(examSet?.id ?? '')}
+                  packageId={String(pkg?.id ?? '')}
+                  initialBookmarked={bookmarkRuntime[q.id]?.isBookmarked ?? false}
+                  initialBookmarkId={bookmarkRuntime[q.id]?.bookmarkId ?? null}
+                  sourceAttemptId={persistedAttemptId}
+                  onBookmarkChange={(next) => handleBookmarkChange(q.id, next)}
+                />
+              </div>
             )}
           </div>
-          
+
           <h2 className="text-xl md:text-2xl leading-relaxed font-medium text-[#F5E9D6]">
             {q.content}
           </h2>
@@ -963,28 +997,6 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
                 </div>
               </div>
             )}
-
-            {/* Phase 1F: Saved Questions control.
-                Only the current question's button is mounted at a time, and
-                React discards its local state on unmount — so `key` alone can
-                NOT carry a toggle across navigate-away-and-back. The initial
-                values below read from `bookmarkRuntime` (ExamRuntime-owned,
-                seeded from the server snapshot), which ExamRuntime updates via
-                `handleBookmarkChange` on every confirmed save/remove. Thus a
-                remount reflects the latest state, not the stale server map.
-                `key={q.id}` keeps instances per-question so X and Y never share
-                state. No duplicate bookmark logic — reuses QuestionBookmarkButton
-                + the Phase 1F server actions. */}
-            <QuestionBookmarkButton
-              key={q.id}
-              questionId={q.id}
-              examSetId={String(examSet?.id ?? '')}
-              packageId={String(pkg?.id ?? '')}
-              initialBookmarked={bookmarkRuntime[q.id]?.isBookmarked ?? false}
-              initialBookmarkId={bookmarkRuntime[q.id]?.bookmarkId ?? null}
-              sourceAttemptId={persistedAttemptId}
-              onBookmarkChange={(next) => handleBookmarkChange(q.id, next)}
-            />
           </div>
         )}
 
