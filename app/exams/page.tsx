@@ -75,7 +75,7 @@ export default async function ExamDashboardPage({
       packages (
         id, slug, exam_year, current_price, original_price, difficulty,
         description, logo_url, is_published,
-        organizations ( name, logo_url ),
+        organizations ( name, short_name, logo_url ),
         positions ( name )
       )
     `)
@@ -485,15 +485,17 @@ export default async function ExamDashboardPage({
  * new query.
  *
  * Label fallback ladder (per spec):
- *   1. {organization} — {position}            (preferred)
- *   2. {position}                              (when organization is missing)
- *   3. a short package-name fallback            (when position is missing)
- *   4. 'แพ็กเกจสอบ'                            (last resort; never a UUID)
+ *   1. {orgAbbreviation} — {position}          (preferred; e.g. "สตง. — …")
+ *   2. {orgFullName} — {position}              (when no abbreviation)
+ *   3. {position}                              (when organization is missing)
+ *   4. a short package-name fallback            (when position is missing)
+ *   5. 'แพ็กเกจสอบ'                            (last resort; never a UUID)
  *
- * Duplicate disambiguation: when two or more owned packages share the SAME
- * base label, append the exam year '(ปี {year})' to each duplicate so the
- * learner can tell them apart. The year is NOT appended to every package —
- * only to packages whose base label collides with another owned package.
+ * Empty/whitespace-only abbreviations are treated as missing (fall through to
+ * the full name). Duplicate disambiguation: when two or more owned packages
+ * share the SAME base label, append the exam year '(ปี {year})' to each
+ * duplicate so the learner can tell them apart. The year is NOT appended to
+ * every package — only to packages whose base label collides with another.
  *
  * Pure & defensive. Never throws. Never exposes ids.
  */
@@ -502,7 +504,9 @@ function buildPackageScopeOptions(
 ): { id: string; label: string }[] {
   // Step 1 — base label per package (with the fallback ladder).
   const withBase = packages.map((p) => {
-    const org = p.organizations?.name?.trim() || ''
+    const orgAbbr = p.organizations?.short_name?.trim() || ''
+    const orgFull = p.organizations?.name?.trim() || ''
+    const org = orgAbbr || orgFull // abbreviation preferred, else full name
     const pos = p.positions?.name?.trim() || ''
     let base: string
     if (org && pos) {
