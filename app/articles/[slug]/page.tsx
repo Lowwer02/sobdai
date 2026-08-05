@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
@@ -5,10 +6,70 @@ import {
   getPublishedArticleBySlug,
   getPublishedArticleRelatedPackages,
 } from '@/lib/articles-public'
+import { createPageMetadata, absoluteUrl, SITE_DESCRIPTION, DEFAULT_OG_IMAGE } from '@/lib/seo'
 import ArticleDetail from '@/components/articles/ArticleDetail'
 import ArticleRelatedPackages from '@/components/articles/ArticleRelatedPackages'
 
 export const revalidate = 300
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const res = await getPublishedArticleBySlug(slug)
+
+  if (!res.success || !res.data) {
+    return createPageMetadata({
+      title: 'บทความไม่พบ | Sobdai',
+      description: 'ไม่พบบทความที่คุณต้องการ หรือบทความยังไม่ถูกเผยแพร่',
+      path: `/articles/${encodeURIComponent(slug || '')}`,
+      noindex: true,
+    })
+  }
+
+  const article = res.data
+  const title = article.seo_title || article.title
+  const description = article.seo_description || article.excerpt || SITE_DESCRIPTION
+  const canonicalPath = article.canonical_url || `/articles/${article.slug}`
+  const image = article.og_image_url || article.cover_image_url
+  const imageAlt = article.cover_image_alt || article.title
+  const fullImageUrl = absoluteUrl(image || DEFAULT_OG_IMAGE)
+
+  const baseMeta = createPageMetadata({
+    title: `${title} | Sobdai`,
+    description,
+    path: canonicalPath,
+    ...(image ? { image } : {}),
+    type: 'article',
+    publishedTime: article.published_at || undefined,
+    modifiedTime: article.updated_at || undefined,
+  })
+
+  return {
+    ...baseMeta,
+    openGraph: {
+      ...baseMeta.openGraph,
+      type: 'article',
+      images: [
+        {
+          url: fullImageUrl,
+          width: 1200,
+          height: 630,
+          alt: imageAlt,
+        },
+      ],
+      tags: Array.isArray(article.tags) ? article.tags : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | Sobdai`,
+      description,
+      images: [fullImageUrl],
+    },
+  }
+}
 
 export default async function ArticleDetailPage({
   params,
