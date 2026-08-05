@@ -11,6 +11,7 @@ import WeakTopics, { WeakTopicsEmpty, WeakTopicsAllGood } from '@/components/exa
 import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/ActivityTimeline'
 import RecommendedActions from '@/components/exams/RecommendedActions'
 import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQuestions'
+import MobileShowMore from '@/components/exams/MobileShowMore'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import { fetchSavedQuestionCards } from '@/lib/assessment/saved-questions-data'
 import { getLearnerAnalytics } from '@/lib/assessment/learner-analytics'
@@ -24,6 +25,9 @@ export const metadata: Metadata = createPageMetadata({
   path: '/exams',
   noindex: true,
 })
+
+/** Mobile preview count for the "แพ็กเกจของฉัน" grid (desktop shows all). */
+const MOBILE_PACKAGES_PREVIEW = 2
 
 /**
  * My Exam Dashboard (Phase 1B).
@@ -217,9 +221,15 @@ export default async function ExamDashboardPage() {
                 gap: '16px',
               }}
             >
-              {activeSessions.map((session) => (
-                <ContinueLearningCard key={session.sessionId} session={session} />
-              ))}
+              <MobileShowMore
+                mobileLimit={1}
+                moreLabel="ดูข้อสอบที่กำลังทำทั้งหมด ({total})"
+                lessLabel="แสดงน้อยลง"
+              >
+                {activeSessions.map((session) => (
+                  <ContinueLearningCard key={session.sessionId} session={session} />
+                ))}
+              </MobileShowMore>
             </div>
           ) : (
             <ContinueLearningEmpty firstOwnedPackageSlug={allPackages[0]?.slug} />
@@ -266,7 +276,12 @@ export default async function ExamDashboardPage() {
           )}
         </section>
 
-        {/* ---------- My Packages (always show all owned) ---------- */}
+        {/* ---------- My Packages (always show all on desktop; 2 on mobile) ----
+            Desktop renders every owned package (unchanged behavior). Mobile
+            previews the first 2 cards; when more exist, a "ดูแพ็กเกจทั้งหมด"
+            link replaces the rest and navigates to the existing /my-packages
+            route (no inline expand, no new route). Pure CSS gating via
+            `hidden md:block` — no client JS. */}
         <section style={{ marginBottom: '48px' }}>
           <SectionTitle>แพ็กเกจของฉัน</SectionTitle>
           <div
@@ -276,10 +291,38 @@ export default async function ExamDashboardPage() {
               gap: '16px',
             }}
           >
-            {allPackages.map((pkg, i) => (
-              <PackageCard key={pkg.id} pkg={pkg} index={i} />
-            ))}
+            {allPackages.map((pkg, i) =>
+              i < MOBILE_PACKAGES_PREVIEW ? (
+                <PackageCard key={pkg.id} pkg={pkg} index={i} />
+              ) : (
+                // Beyond the mobile preview: hidden on mobile, a normal grid
+                // item on desktop (md:block lets the card fill its grid cell).
+                <div key={pkg.id} className="hidden md:block">
+                  <PackageCard pkg={pkg} index={i} />
+                </div>
+              ),
+            )}
           </div>
+
+          {/* Mobile-only "ดูแพ็กเกจทั้งหมด" → existing /my-packages route.
+              Shown only when there are more packages than the mobile preview. */}
+          {allPackages.length > MOBILE_PACKAGES_PREVIEW ? (
+            <div className="block md:hidden" style={{ marginTop: '14px' }}>
+              <Link
+                href="/my-packages"
+                className="btn-outline"
+                style={{
+                  display: 'block',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  padding: '10px 16px',
+                  fontSize: '14px',
+                }}
+              >
+                ดูแพ็กเกจทั้งหมด
+              </Link>
+            </div>
+          ) : null}
         </section>
 
         {/* ---------- Activity Timeline (Phase 1E — recent activity) ---------- */}
