@@ -1,22 +1,49 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import type { TimelineEvent } from '@/lib/assessment/activity-timeline'
-import { formatThaiDateTime } from '@/lib/assessment/dashboard-data'
 
 /**
  * Activity Timeline section (Phase 1E) — "ไทม์ไลน์กิจกรรม".
  *
- * Pure Server Component. Renders the learner's recent activity (completed
- * exams + active-session progress saves) as a newest-first vertical list.
- * Each row is a semantic link:
+ * Renders the learner's recent activity (completed exams + active-session
+ * progress saves) as a newest-first vertical list. Each row is a semantic link:
  *   - completed  → /exams/attempts/{id}?view=incorrect (or ?view=all when perfect)
  *   - progress   → /package/{slug}/exam/{examSetId}?mode=practice|mock
  *
+ * Client component: the dashboard's mobile progressive-disclosure feature needs a
+ * local expand/collapse toggle here (an <ol> cannot legally host a generic
+ * <div>-based island like MobileShowMore). State is a single boolean — no
+ * fetching, no auth, no viewport/window JS. Responsive reveal is pure CSS
+ * (`hidden md:list-item` keeps every item visible on desktop).
+ *
+ * Date formatting is an inline, dependency-free copy of
+ * lib/assessment/dashboard-data.ts `formatThaiDateTime` (Buddhist-Era,
+ * Asia/Bangkok) — the shared helper lives in a server-only module (it imports
+ * createClient from next/headers) and so cannot be imported into a client
+ * bundle. The two implementations stay byte-identical in output.
+ *
  * Accessibility: each event is a labeled link with a descriptive Thai
- * aria-label; meaning is conveyed by text labels, not color alone. No client
- * JS. Uses the project's design tokens (.card, CSS variables) for consistency
- * with the rest of the dashboard.
+ * aria-label; meaning is conveyed by text labels, not color alone. The
+ * "ดูกิจกรรมเพิ่มเติม" toggle is a real <button type="button"> with
+ * aria-expanded reflecting the current state.
  */
-export default function ActivityTimeline({ events }: { events: TimelineEvent[] }) {
+
+/** Mobile preview count before the "ดูกิจกรรมเพิ่มเติม" toggle. */
+const MOBILE_TIMELINE_PREVIEW = 4
+
+export default function ActivityTimeline({
+  events,
+}: {
+  events: TimelineEvent[]
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  const total = events.length
+  const hasExtra = total > MOBILE_TIMELINE_PREVIEW
+  const remaining = hasExtra ? total - MOBILE_TIMELINE_PREVIEW : 0
+
   return (
     <div className="card" style={{ padding: '24px' }}>
       <div style={{ marginBottom: '18px' }}>
@@ -41,33 +68,100 @@ export default function ActivityTimeline({ events }: { events: TimelineEvent[] }
           flexDirection: 'column',
         }}
       >
-        {events.map((event, i) => (
+        {events.map((event, i) => {
           // A 1px gold connector between items gives the "timeline" feel
           // without adding DOM noise; the last item has no connector.
-          <li
-            key={`${event.kind}:${event.id}`}
+          const isLast = i === total - 1
+          // Items beyond the mobile preview are hidden on mobile until the user
+          // expands; `md:list-item` restores them on desktop in every state.
+          const isExtra = i >= MOBILE_TIMELINE_PREVIEW
+          const isHiddenOnMobile = isExtra && !expanded
+
+          // Mobile preview boundary. When collapsed and there are more events
+          // than the preview, the last *visible* mobile item (index
+          // MOBILE_TIMELINE_PREVIEW - 1) must behave like a true tail on mobile:
+          // no connector, no inter-row bottom spacing — otherwise it draws a
+          // dangling line + gap toward the hidden rows below. On desktop every
+          // item is visible, so this never affects desktop. When expanded, the
+          // `isLast` rule alone is correct again.
+          const isMobileBoundary =
+            hasExtra && !expanded && i === MOBILE_TIMELINE_PREVIEW - 1
+
+          // Bottom spacing between rows is expressed as Tailwind classes (NOT an
+          // inline style) so it can vary responsively without fighting inline
+          // specificity:
+          //   - normal row           → pb-4 (16px) on all viewports
+          //   - true last row        → no padding (0 on all viewports)
+          //   - mobile boundary row  → pb-0 md:pb-4: 0 on mobile (it's the tail
+          //                            there), restored to 16px at md (where it's
+          //                            a mid-list row again)
+          const paddingBottomClass = isLast
+            ? ''
+            : isMobileBoundary
+              ? 'pb-0 md:pb-4'
+              : 'pb-4'
+
+          const liClass =
+            [
+              isHiddenOnMobile ? 'hidden md:list-item' : '',
+              paddingBottomClass,
+            ]
+              .filter(Boolean)
+              .join(' ') || undefined
+
+          return (
+            <li
+              key={`${event.kind}:${event.id}`}
+              className={liClass}
+              style={{ position: 'relative' }}
+            >
+              {/* The connector sits between every non-last item. For the mobile
+                  boundary item we keep the <span> in the DOM but hide it on
+                  mobile via `hidden md:block`, so desktop stays byte-identical
+                  while mobile loses the dangling line toward hidden rows. */}
+              {!isLast ? (
+                <span
+                  aria-hidden="true"
+                  className={isMobileBoundary ? 'hidden md:block' : undefined}
+                  style={{
+                    position: 'absolute',
+                    left: '11px',
+                    top: '24px',
+                    bottom: '0',
+                    width: '2px',
+                    background: 'rgba(212,175,55,0.18)',
+                  }}
+                />
+              ) : null}
+              <TimelineRow event={event} />
+            </li>
+          )
+        })}
+      </ol>
+
+      {/* Mobile-only "ดูกิจกรรมเพิ่มเติม ({n})" toggle. Hidden on desktop. */}
+      {hasExtra ? (
+        <div className="block md:hidden" style={{ marginTop: '16px' }}>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+            className="btn-outline"
             style={{
-              position: 'relative',
-              paddingBottom: i < events.length - 1 ? '16px' : 0,
+              display: 'block',
+              width: '100%',
+              textAlign: 'center',
+              textDecoration: 'none',
+              padding: '10px 16px',
+              fontSize: '14px',
             }}
           >
-            {i < events.length - 1 ? (
-              <span
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  left: '11px',
-                  top: '24px',
-                  bottom: '0',
-                  width: '2px',
-                  background: 'rgba(212,175,55,0.18)',
-                }}
-              />
-            ) : null}
-            <TimelineRow event={event} />
-          </li>
-        ))}
-      </ol>
+            {expanded
+              ? 'แสดงน้อยลง'
+              : `ดูกิจกรรมเพิ่มเติม (${remaining})`}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -206,6 +300,26 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
  */
 function perfectResult(e: TimelineEvent): boolean {
   return e.total > 0 && e.score >= e.total
+}
+
+/**
+ * Client-safe copy of lib/assessment/dashboard-data.ts `formatThaiDateTime`.
+ * Same Buddhist-Era / Asia-Bangkok formatting, never throws, never returns NaN.
+ * Kept here (not imported) because the shared helper sits in a server-only
+ * module (it imports createClient from next/headers).
+ */
+function formatThaiDateTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return new Intl.DateTimeFormat('th-TH', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Bangkok',
+    }).format(d)
+  } catch {
+    return ''
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { SavedQuestionCard } from '@/lib/assessment/saved-questions-data'
 import { formatThaiDateTime } from '@/lib/assessment/dashboard-data'
+import MobileShowMore from '@/components/exams/MobileShowMore'
 
 /**
  * Saved Questions (Phase 1F) — the dashboard "ข้อสอบที่บันทึกไว้" section.
@@ -18,9 +19,20 @@ import { formatThaiDateTime } from '@/lib/assessment/dashboard-data'
  *   - "ดูทั้งหมด" is intentionally NOT shown (no supported list page ships in
  *     this phase).
  *
+ * Mobile progressive disclosure: the first MOBILE_PREVIEW cards are always
+ * visible; any extra cards are wrapped by MobileShowMore, which hides them on
+ * mobile behind a "ดูข้อที่บันทึกเพิ่มเติม ({n})" toggle and renders them via
+ * display:contents on desktop so the grid layout is byte-identical there. This
+ * component stays a Server Component; only the small MobileShowMore island has
+ * client state.
+ *
  * Empty state: "ยังไม่มีข้อสอบที่บันทึกไว้" with supporting copy explaining the
  * learner can bookmark from the result-review page.
  */
+
+/** Mobile preview count before the "ดูข้อที่บันทึกเพิ่มเติม" toggle. */
+const MOBILE_PREVIEW = 2
+
 export default function SavedQuestions({ items }: { items: SavedQuestionCard[] }) {
   if (items.length === 0) {
     return <SavedQuestionsEmpty />
@@ -34,9 +46,15 @@ export default function SavedQuestions({ items }: { items: SavedQuestionCard[] }
         gap: '16px',
       }}
     >
-      {items.map((item) => (
-        <SavedQuestionCardView key={item.bookmarkId} item={item} />
-      ))}
+      <MobileShowMore
+        mobileLimit={MOBILE_PREVIEW}
+        moreLabel="ดูข้อที่บันทึกเพิ่มเติม ({n})"
+        lessLabel="แสดงน้อยลง"
+      >
+        {items.map((item) => (
+          <SavedQuestionCardView key={item.bookmarkId} item={item} />
+        ))}
+      </MobileShowMore>
     </div>
   )
 }
