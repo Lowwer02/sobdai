@@ -33,10 +33,6 @@ export const metadata: Metadata = {
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'google-site-verification-placeholder',
   },
-  icons: {
-    icon: [{ url: '/icon.png', type: 'image/png' }],
-    apple: [{ url: '/apple-icon.png', type: 'image/png' }],
-  },
 }
 
 export const viewport: Viewport = {
