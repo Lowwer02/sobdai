@@ -14,6 +14,13 @@ interface PackageCardData {
   logo_url: string | null
   organizations: {
     name: string
+    /**
+     * Optional org abbreviation (e.g. "สตง.", "สป.อว."). Nullable in the schema
+     * (migration 006) and not selected by every PackageCardData producer, so it
+     * is optional here. The /exams package-scope selector selects it and prefers
+     * it to the full name; other consumers ignore it.
+     */
+    short_name?: string | null
     logo_url: string | null
   } | null
   positions: {
