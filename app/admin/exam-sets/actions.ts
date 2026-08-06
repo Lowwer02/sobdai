@@ -4,6 +4,15 @@ import { requirePermission } from '@/lib/auth/server-protect'
 
 import { revalidatePath } from 'next/cache'
 
+import {
+  normalizeBulkIds,
+  isBulkExamSetTarget,
+  classifyTransitionEligibility,
+  concurrentUpdateSourceStatuses,
+  reconcileConcurrentChange,
+  BULK_REASON,
+} from './bulk-status'
+import type { ExamSetStatus } from './status-filter'
 
 export async function deleteExamSetAction(id: string) {
   try {
@@ -332,6 +341,35 @@ export async function publishDraftQuestionsInExamSetAction(examSetId: string) {
 // RPC (migration 026) first; on failure it returns the RPC's message and does
 // NOT change status. draft/archived are direct writes, no validation.
 
+// Publish rules (>=1 question, no duplicate questions, unique sort_order) are
+// enforced atomically in Postgres by the validate_exam_set_for_publish RPC,
+// which is read-only and never writes. Extracted as a helper so both the
+// single-item action below and the bulk action (bulkSetExamSetStatusAction)
+// apply the SAME publish validation — bulk must never bypass it.
+//
+// Returns { valid: true } on success, or { valid: false, message } with a
+// user-safe message (straight from the RPC) on failure. Throws only on an RPC
+// transport error, matching the single-item behavior.
+async function validateExamSetForPublish(
+  supabase: Awaited<ReturnType<typeof requirePermission>>['supabase'],
+  id: string
+): Promise<{ valid: true } | { valid: false; message: string }> {
+  const { data: vRows, error: vError } = (await (supabase as any).rpc(
+    'validate_exam_set_for_publish',
+    { p_exam_set_id: id }
+  )) as {
+    data: { valid: boolean; error_code: string | null; message: string | null }[] | null
+    error: { message: string } | null
+  }
+
+  if (vError) throw vError
+  const row = vRows && vRows[0]
+  if (!row || !row.valid) {
+    return { valid: false, message: row?.message ?? 'Exam Set is not ready to publish.' }
+  }
+  return { valid: true }
+}
+
 export async function setExamSetStatusAction(
   id: string,
   status: 'draft' | 'published' | 'archived'
@@ -341,27 +379,14 @@ export async function setExamSetStatusAction(
     const permission = status === 'published' ? 'content.publish' : 'content.write'
     const { supabase } = await requirePermission(permission)
 
-    // Publish rules (>=1 question, no duplicate questions, unique sort_order)
-    // are enforced atomically in Postgres by the validate_exam_set_for_publish
-    // RPC. The RPC is read-only — it never writes. We perform the UPDATE here
-    // only after it returns valid=true, so RLS remains the write authority.
+    // Publish rules are enforced atomically in Postgres by the
+    // validate_exam_set_for_publish RPC (migration 026). It is read-only — it
+    // never writes. We perform the UPDATE here only after it returns valid,
+    // so RLS remains the write authority.
     if (status === 'published') {
-      const { data: vRows, error: vError } = (await (supabase as any).rpc(
-        'validate_exam_set_for_publish',
-        { p_exam_set_id: id }
-      )) as {
-        data: { valid: boolean; error_code: string | null; message: string | null }[] | null
-        error: { message: string } | null
-      }
-
-      if (vError) throw vError
-      const row = vRows && vRows[0]
-      if (!row || !row.valid) {
-        return {
-          success: false,
-          error: row?.message ?? 'Exam Set is not ready to publish.',
-          error_code: row?.error_code ?? null,
-        }
+      const v = await validateExamSetForPublish(supabase, id)
+      if (!v.valid) {
+        return { success: false, error: v.message, error_code: null }
       }
     }
 
@@ -380,6 +405,174 @@ export async function setExamSetStatusAction(
   } catch (err: any) {
     console.error('Action error:', err)
     return { success: false, error: err.message }
+  }
+}
+
+// ─── Bulk Publish / Bulk Archive (Phase 3A) ─────────────────────────────
+//
+// One server action handles both targets. Mirrors setExamSetStatusAction:
+//   - permission is split by target (publish = content.publish; archive =
+//     content.write), exactly like the single action (actions.ts ↑).
+//   - publish reuses the SAME validateExamSetForPublish helper, run per
+//     eligible draft set, so bulk can never bypass publish validation.
+//
+// Safety:
+//   - ids are runtime-validated + trimmed + deduped by normalizeBulkIds; the
+//     count is capped at MAX_BULK_EXAM_SET_IDS (15) to mirror the page-scoped
+//     Phase 2 selection — the server never trusts the client count.
+//   - records are FETCHED first; ids not returned (missing or RLS-hidden) are
+//     reported with a generic reason, never revealing existence.
+//   - the final UPDATE re-checks the eligible SOURCE status (concurrent guard);
+//     only that single SQL statement is atomic — validation and update are
+//     separate operations. Eligible ids not returned by the update are reported
+//     as a concurrent change.
+//   - no raw SQL/Supabase errors are returned to the client.
+//
+// Result: a typed partial-success shape. Predictable per-item failures (wrong
+// status, publish validation failure, record unavailable, concurrent change)
+// are reported inside skipped/failed; the top-level action error is reserved
+// for cases where the request cannot be processed at all (malformed input,
+// invalid target, unexpected exception).
+export async function bulkSetExamSetStatusAction(
+  ids: unknown,
+  targetStatus: unknown
+) {
+  try {
+    // Runtime guards — types alone are not enough for a Server Action.
+    if (!isBulkExamSetTarget(targetStatus)) {
+      return {
+        success: false,
+        error: 'Invalid request: unsupported bulk action.',
+      } as const
+    }
+    const target = targetStatus
+    const normalized = normalizeBulkIds(ids)
+    if (!normalized.ok) {
+      return { success: false, error: normalized.error } as const
+    }
+
+    // Permission split, identical to the single action.
+    const permission =
+      target === 'published' ? 'content.publish' : 'content.write'
+    const { supabase } = await requirePermission(permission)
+
+    // Fetch the real records (id + name + current status). Anything not
+    // returned is either missing or hidden by RLS → generic reason.
+    const { data: rows, error: fetchError } = (await supabase
+      .from('exam_sets')
+      .select('id, name, status')
+      .in('id', normalized.ids)) as {
+      data: { id: string; name: string; status: ExamSetStatus }[] | null
+      error: { message: string } | null
+    }
+    if (fetchError) {
+      // Initial fetch failure — action-level error. Don't leak the SQL message.
+      return {
+        success: false,
+        error: 'Could not load the selected Exam Sets. Please try again.',
+      } as const
+    }
+
+    const byId = new Map<string, { id: string; name: string; status: ExamSetStatus }>()
+    for (const r of rows ?? []) byId.set(r.id, r)
+
+    const succeeded: { id: string; name: string }[] = []
+    const skipped: { id: string; name: string; reason: string }[] = []
+    const failed: { id: string; name: string; reason: string }[] = []
+
+    // Phase 1: classify each requested id.
+    const eligibleIds: string[] = []
+    for (const id of normalized.ids) {
+      const record = byId.get(id)
+      if (!record) {
+        failed.push({ id, name: id, reason: BULK_REASON.UNAVAILABLE })
+        continue
+      }
+      const cls = classifyTransitionEligibility(record.status, target)
+      if (!cls.eligible) {
+        skipped.push({ id, name: record.name, reason: cls.reason })
+        continue
+      }
+      eligibleIds.push(id)
+    }
+
+    // Phase 2 (publish only): run the publish-rule RPC for each eligible draft.
+    // Reuses the single-item helper so the rules cannot diverge.
+    const validatedIds: string[] = []
+    if (target === 'published') {
+      for (const id of eligibleIds) {
+        const record = byId.get(id)!
+        const v = await validateExamSetForPublish(supabase, id)
+        if (!v.valid) {
+          failed.push({ id, name: record.name, reason: BULK_REASON.NOT_READY_TO_PUBLISH })
+        } else {
+          validatedIds.push(id)
+        }
+      }
+    } else {
+      validatedIds.push(...eligibleIds)
+    }
+
+    // Phase 3: single atomic UPDATE that re-checks the eligible SOURCE status.
+    // If the list ends up empty, skip the write entirely.
+    if (validatedIds.length > 0) {
+      const sourceStatuses = concurrentUpdateSourceStatuses(target)
+      const { data: updated, error: updateError } = (await supabase
+        .from('exam_sets')
+        .update({ status: target })
+        .in('id', validatedIds)
+        .in('status', sourceStatuses)
+        .select('id')) as {
+        data: { id: string }[] | null
+        error: { message: string } | null
+      }
+
+      if (updateError) {
+        // Final update failed — report the eligible items as failed with a safe
+        // reason rather than leaking the Supabase error.
+        for (const id of validatedIds) {
+          const record = byId.get(id)!
+          failed.push({
+            id,
+            name: record.name,
+            reason:
+              'The update could not be completed. Please try again.',
+          })
+        }
+      } else {
+        const updatedIds = new Set((updated ?? []).map((r) => r.id))
+        for (const id of validatedIds) {
+          const record = byId.get(id)!
+          if (updatedIds.has(id)) {
+            succeeded.push({ id, name: record.name })
+          } else {
+            // Eligible + validated, but the status predicate filtered it out →
+            // the row's status changed between fetch and update.
+            failed.push({
+              id,
+              name: record.name,
+              reason: reconcileConcurrentChange(),
+            })
+          }
+        }
+      }
+    }
+
+    revalidatePath('/admin/exam-sets')
+    return {
+      success: true,
+      target,
+      succeeded,
+      skipped,
+      failed,
+    } as const
+  } catch (err: any) {
+    // Unexpected exception — never surface raw details to the client.
+    console.error('bulkSetExamSetStatusAction error:', err)
+    return {
+      success: false,
+      error: 'Something went wrong. Please try again.',
+    } as const
   }
 }
 

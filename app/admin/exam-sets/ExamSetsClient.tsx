@@ -4,11 +4,16 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2, Copy, Send, Archive, RotateCcw } from 'lucide-react'
-import { deleteExamSetAction, setExamSetStatusAction } from './actions'
+import { deleteExamSetAction, setExamSetStatusAction, bulkSetExamSetStatusAction } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import StatusBadge from '@/components/admin/StatusBadge'
 import { getSubjectLabel } from '@/lib/subjects'
 import { toastEvent } from '@/hooks/useToast'
+import {
+  type BulkExamSetTarget,
+  type BulkStatusSuccess,
+  planBulkFeedback,
+} from './bulk-status'
 import {
   ExamSetStatus,
   ExamSetStatusFilter,
@@ -85,6 +90,17 @@ export default function ExamSetsClient({
     transition: StatusTransition
   } | null>(null)
   const [isStatusChanging, setIsStatusChanging] = useState(false)
+
+  // ── Bulk action (Phase 3A) ──────────────────────────────────────────────
+  // `bulkTarget` carries the target status being confirmed and the selected
+  // ids + names to display in the confirmation dialog; null = dialog closed.
+  // Only Publish and Archive are offered in this phase.
+  const [bulkTarget, setBulkTarget] = useState<{
+    target: BulkExamSetTarget
+    ids: string[]
+    names: string[]
+  } | null>(null)
+  const [isBulking, setIsBulking] = useState(false)
 
   // Whether any list filter is currently applied. Drives the empty-state copy so
   // that "no results" never reads as "no exam sets exist at all". Mirrors the
@@ -214,6 +230,55 @@ export default function ExamSetsClient({
     }
   }
 
+  // ── Bulk action handlers (Phase 3A) ─────────────────────────────────────
+  // Open the confirmation dialog for a bulk target. Uses the CURRENT selected
+  // ids (page-scoped by Phase 2 invariant) and resolves their names from the
+  // visible rows for display.
+  const handleBulkClick = (target: BulkExamSetTarget) => {
+    if (selectedIds.size === 0) return
+    const ids = Array.from(selectedIds)
+    const namesById = new Map(examSets.map((s) => [s.id, s.name as string]))
+    const names = ids.map((id) => namesById.get(id) ?? id)
+    setBulkTarget({ target, ids, names })
+  }
+
+  const confirmBulkAction = async () => {
+    if (!bulkTarget) return
+    setIsBulking(true)
+    // Client sends ids ONLY. The server fetches the real records, enforces
+    // allowed transitions, and reuses the publish-rule RPC — never trust
+    // client-supplied status.
+    const res = await bulkSetExamSetStatusAction(bulkTarget.ids, bulkTarget.target)
+    setIsBulking(false)
+
+    if (!res?.success) {
+      // Action-level error (malformed input, invalid target, fetch failure,
+      // unexpected exception). Selection is preserved so the Admin can retry.
+      toastEvent(res?.error || 'Bulk action failed', 'error')
+      setBulkTarget(null)
+      return
+    }
+
+    // The server result is the source of truth.
+    const feedback = planBulkFeedback(res)
+    toastEvent(feedback.primary.message, feedback.primary.type)
+    if (feedback.reasons) {
+      toastEvent(feedback.reasons.message, feedback.reasons.type)
+    }
+
+    // Selection + refresh are driven by the result, not by success alone.
+    // Only clear + refresh when at least one item actually succeeded; if zero
+    // succeeded, keep the selection so the Admin can inspect or retry.
+    if (res.succeeded.length > 0) {
+      setSelectedIds(new Set())
+      setBulkTarget(null)
+      router.refresh()
+    } else {
+      // Close the dialog but keep the current selection.
+      setBulkTarget(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -285,25 +350,54 @@ export default function ExamSetsClient({
               ))}
             </select>
           </div>
+        </div>
 
-          {/* Selection summary — shown only when at least one row on the
-              current page is selected. `selectedCount` reflects current-page
-              ids only (never `selectedIds.size`). No bulk actions in Phase 2. */}
-          {selectedCount > 0 && (
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-xs font-medium text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-1 rounded-lg whitespace-nowrap">
-                Selected {selectedCount}
-              </span>
+        {/* Bulk Action Bar (Phase 3A) — shown only when at least one row on the
+            current page is selected. `selectedCount` reflects current-page ids
+            only (never `selectedIds.size`). Only Publish and Archive are
+            offered; row-level actions remain unchanged. Buttons lock while a
+            bulk action is pending (double-submit guard). */}
+        {selectedCount > 0 && (
+          <div
+            role="region"
+            aria-label="Bulk actions"
+            className="bg-[#D4AF37]/10 border-y border-[#D4AF37]/30 px-4 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-top-2 duration-200"
+          >
+            <span className="text-sm font-semibold text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              Selected {selectedCount}
+            </span>
+
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={clearSelection}
-                className="text-xs text-[#A1866B] hover:text-[#F5E9D6] underline underline-offset-2 transition-colors whitespace-nowrap"
+                onClick={() => handleBulkClick('published')}
+                disabled={isBulking}
+                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-[#0F0B07] bg-[#22C55E] hover:bg-[#22C55E]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
               >
-                Clear selection
+                <Send size={14} />
+                Publish Selected
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkClick('archived')}
+                disabled={isBulking}
+                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-[#F5E9D6] bg-[#0F0B07] border border-[#A1866B]/40 hover:bg-black/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Archive size={14} />
+                Archive Selected
               </button>
             </div>
-          )}
-        </div>
+
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={isBulking}
+              className="ml-auto text-xs text-[#A1866B] hover:text-[#F5E9D6] underline underline-offset-2 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
 
         {/* Loading Overlay */}
         {isPending && (
@@ -530,6 +624,59 @@ export default function ExamSetsClient({
         cancelText="ยกเลิก"
         isDestructive={statusTarget?.transition.to === 'archived'}
         isLoading={isStatusChanging}
+      />
+
+      {/* Bulk Action Modal (Phase 3A) — shared by Bulk Publish / Bulk Archive.
+          Shows the count and the names (truncated when many). For Publish,
+          explains the server will re-check each set's publish rules. For
+          Archive, warns that archived sets vanish from public exam pages
+          immediately and may affect users currently accessing them. The
+          server is authoritative; per-item outcomes surface as toasts. */}
+      <ConfirmDialog
+        isOpen={!!bulkTarget}
+        onClose={() => !isBulking && setBulkTarget(null)}
+        onConfirm={confirmBulkAction}
+        title={
+          bulkTarget
+            ? `${bulkTarget.target === 'published' ? 'Publish' : 'Archive'} ${bulkTarget.ids.length} Exam Set${bulkTarget.ids.length === 1 ? '' : 's'}`
+            : ''
+        }
+        description={
+          <div className="space-y-2 text-[#F5E9D6]">
+            <div>
+              {bulkTarget?.target === 'published' ? 'Publish' : 'Archive'}{' '}
+              <span className="text-[#D4AF37] font-medium">{bulkTarget?.ids.length}</span>{' '}
+              {bulkTarget?.ids.length === 1 ? 'Exam Set' : 'Exam Sets'}:
+            </div>
+            <div className="text-xs text-[#F5E9D6] bg-[#0F0B07]/60 rounded-lg px-3 py-2 max-h-24 overflow-y-auto">
+              {(bulkTarget?.names ?? [])
+                .slice(0, 6)
+                .map((n, i) => (
+                  <div key={i} className="truncate">{n}</div>
+                ))}
+              {(bulkTarget?.names.length ?? 0) > 6 && (
+                <div className="text-[#A1866B] italic">
+                  และอีก {(bulkTarget!.names.length - 6)} ชุด
+                </div>
+              )}
+            </div>
+            {bulkTarget?.target === 'published' ? (
+              <p className="text-[#A1866B] text-xs">
+                The server re-checks each set's publish rules (at least one question, no duplicate questions, unique display order). Sets that fail are reported, not published.
+              </p>
+            ) : (
+              <p className="text-red-400 text-xs">
+                Archived Exam Sets become unavailable on public exam pages immediately and may affect users currently accessing those sets. You can restore a set to draft individually later.
+              </p>
+            )}
+          </div>
+        }
+        confirmText={
+          bulkTarget?.target === 'published' ? 'Publish Selected' : 'Archive Selected'
+        }
+        cancelText="ยกเลิก"
+        isDestructive={bulkTarget?.target === 'archived'}
+        isLoading={isBulking}
       />
 
     </div>
