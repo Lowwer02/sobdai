@@ -9,12 +9,16 @@ import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import StatusBadge from '@/components/admin/StatusBadge'
 import { getSubjectLabel } from '@/lib/subjects'
 import { toastEvent } from '@/hooks/useToast'
+import {
+  ExamSetStatus,
+  ExamSetStatusFilter,
+  EXAM_SET_STATUS_VALUES,
+} from './status-filter'
 
 // Allowed exam_sets.status transitions in the UI (Session 6.17). Each maps to
 // the existing setExamSetStatusAction — the server (validate_exam_set_for_publish
 // RPC) is the sole source of truth; the client performs NO business validation.
 // `verb` is used in the confirm dialog copy ("Publish …", "Archive …").
-type ExamSetStatus = 'draft' | 'published' | 'archived'
 interface StatusTransition {
   to: ExamSetStatus
   verb: string          // imperative verb for the button + dialog
@@ -44,6 +48,7 @@ interface ExamSetsClientProps {
   search: string
   packageFilter: string
   typeFilter: string
+  statusFilter: ExamSetStatusFilter
 }
 
 export default function ExamSetsClient({
@@ -53,7 +58,8 @@ export default function ExamSetsClient({
   currentPage,
   search,
   packageFilter,
-  typeFilter
+  typeFilter,
+  statusFilter
 }: ExamSetsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -74,6 +80,16 @@ export default function ExamSetsClient({
     transition: StatusTransition
   } | null>(null)
   const [isStatusChanging, setIsStatusChanging] = useState(false)
+
+  // Whether any list filter is currently applied. Drives the empty-state copy so
+  // that "no results" never reads as "no exam sets exist at all". Mirrors the
+  // server-side filter conditions (search/package/type/status); `statusFilter`
+  // is 'all' (no filter) vs. a concrete status.
+  const isAnyFilterActive =
+    !!search ||
+    (!!packageFilter && packageFilter !== 'All') ||
+    (!!typeFilter && typeFilter !== 'All') ||
+    statusFilter !== 'all'
 
   // URL updating helper
   const updateParams = useCallback((updates: Record<string, string>) => {
@@ -184,14 +200,32 @@ export default function ExamSetsClient({
               ))}
             </select>
 
-            <select 
-              value={typeFilter} 
+            <select
+              value={typeFilter}
               onChange={(e) => updateParams({ type: e.target.value })}
               className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
             >
               <option value="">All Types</option>
               <option value="Full">Full Exam</option>
               <option value="Sample">Sample Exam</option>
+            </select>
+
+            <select
+              aria-label="Filter exam sets by status"
+              value={statusFilter === 'all' ? '' : statusFilter}
+              onChange={(e) => updateParams({ status: e.target.value })}
+              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+            >
+              <option value="">All Statuses</option>
+              {EXAM_SET_STATUS_VALUES.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'draft'
+                    ? 'Draft'
+                    : s === 'published'
+                      ? 'Published'
+                      : 'Archived'}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -224,7 +258,9 @@ export default function ExamSetsClient({
               {examSets.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="p-12 text-center text-[#A1866B]">
-                    No exam sets found.
+                    {isAnyFilterActive
+                      ? 'No exam sets match the current filters.'
+                      : 'No exam sets found.'}
                   </td>
                 </tr>
               ) : examSets.map((set) => {
