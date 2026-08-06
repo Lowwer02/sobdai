@@ -3,38 +3,31 @@
 /**
  * components/exams/PackageScopeSelector.tsx
  * ----------------------------------------------------------------------------
- * Phase 2A — the compact package selector above "หัวข้อที่ควรทบทวน".
+ * Phase 2A.1 — the compact package selector above "หัวข้อที่ควรทบทวน".
  *
- * A small Client Component (native `<select>`) that scopes ONLY the Weak Topics
- * section to one owned package, or to "ภาพรวมทุกแพ็กเกจ". Learning Statistics
- * is unaffected (it is computed all-packages on the server, independently).
+ * A CONTROLLED presentational Client Component (native `<select>`) rendered
+ * inside the Weak Topics client island. It scopes ONLY the Weak Topics section
+ * to one owned package, or to "ภาพรวมทุกแพ็กเกจ". Learning Statistics is
+ * unaffected (computed all-packages on the server, independently).
  *
- * URL contract (three-valued, mirrors lib/assessment/learner-analytics.ts
- * `resolveWeakTopicsScope`):
- *   - ?package=all               → explicit all-packages overview (sticky)
- *   - ?package={ownedPackageId}  → scope Weak Topics to that package
- *   - (param removed)            → server re-runs the automatic default
+ * Phase 2A.1 change: this component NO LONGER navigates. It used to call
+ * `router.replace(...)` to change the `?package=` search param, which forced a
+ * full `/exams` Server Component re-render on every selection. That was the
+ * source of the 5–10s delay. Now the component is fully controlled: it reports
+ * the chosen value via `onValueChange` and lets the parent (the client island)
+ * load only the Weak Topics data and keep the URL in sync with
+ * `history.replaceState(...)`. As a result:
+ *   - changing the selector updates ONLY the Weak Topics section;
+ *   - the rest of the dashboard never reloads;
+ *   - the URL still reflects the chosen scope for shareability/refresh.
  *
- * Stickiness: selecting "ภาพรวมทุกแพ็กเกจ" writes `?package=all` (it NEVER
- * strips the param), so the explicit all-packages choice is preserved and is
- * not re-interpreted as "no choice → auto-default".
- *
- * Mechanics (mirrors components/news/NewsListControls.tsx):
- *   - useSearchParams() to read the current `package` value → requires the
- *     caller to wrap this component in <Suspense> (Next.js App Router rule for
- *     any subtree using useSearchParams).
- *   - router.replace(href, { scroll: false }) on change → server re-render with
- *     the new scope, no scroll-to-top, no layout shift.
- *   - Other search params are preserved (only `package` is rewritten).
- *
- * No data fetching, no auth, no viewport detection. The options list (owned
- * packages with names + ids) is passed in from the server page as serializable
- * props.
+ * Ownership: this component performs NO auth, NO ownership validation, and NO
+ * data fetching. The option list (owned packages with display labels) and the
+ * current value are passed in from the parent. The parent guarantees that a
+ * package id in `options` is owned; the server action re-validates ownership on
+ * every request anyway.
  */
 
-import { useRouter, useSearchParams } from 'next/navigation'
-
-/** One selectable package. */
 export interface PackageScopeOption {
   id: string
   /** Display name (package name; may include year/org as the page decides). */
@@ -48,12 +41,21 @@ export interface PackageScopeSelectorProps {
    * The currently-selected value for the `<select>`:
    *   - 'all'                      → "ภาพรวมทุกแพ็กเกจ"
    *   - an owned package id        → that package
-   * This is the RESOLVED scope from the server (so the control reflects the
-   * auto-default too, not just an explicit URL value).
+   * The parent owns this value (the resolved scope), so the control reflects
+   * the auto-default too, not just an explicit URL value.
    */
   value: string
+  /**
+   * Fired when the learner picks a new scope. The parent decides whether to
+   * load data, cache-hit instantly, or restore on failure.
+   */
+  onValueChange: (value: string) => void
   /** Accessible label / visible caption for the control. */
   label?: string
+  /** Whether a load is in flight for a NEW scope (dims + busy indicator). */
+  busy?: boolean
+  /** Disables interaction (e.g. while restoring after an error). */
+  disabled?: boolean
 }
 
 /** The sentinel value representing the all-packages overview. */
@@ -62,23 +64,13 @@ export const ALL_PACKAGES_VALUE = 'all'
 export default function PackageScopeSelector({
   options,
   value,
+  onValueChange,
   label = 'เลือกแพ็กเกจ',
+  busy = false,
+  disabled = false,
 }: PackageScopeSelectorProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
-  /** Build the href for a chosen scope value, preserving unrelated params. */
-  function buildHref(scopeValue: string): string {
-    const params = new URLSearchParams(searchParams?.toString() ?? '')
-    // Always set explicitly — including 'all' — so the choice is sticky and is
-    // never re-interpreted as "absent → auto-default" by the server.
-    params.set('package', scopeValue)
-    const qs = params.toString()
-    return qs ? `/exams?${qs}` : '/exams'
-  }
-
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    router.replace(buildHref(e.target.value), { scroll: false })
+    onValueChange(e.target.value)
   }
 
   return (
@@ -96,6 +88,13 @@ export default function PackageScopeSelector({
         value={value}
         onChange={handleChange}
         aria-label={label}
+        aria-busy={busy || undefined}
+        // Phase 2A.1 fix: the selector stays ENABLED while `busy` so the learner
+        // can change scope again while an uncached request is pending. `busy` is
+        // still used for aria-busy + the pending visual treatment (opacity) and
+        // a progress cursor only when explicitly disabled. The parent's
+        // monotonic request-id guards against stale responses.
+        disabled={disabled}
         style={{
           backgroundColor: 'var(--bg-input, rgba(255,255,255,0.03))',
           border: '1px solid var(--border, rgba(255,255,255,0.08))',
@@ -107,7 +106,8 @@ export default function PackageScopeSelector({
           paddingRight: 36, // room for the chevron
           fontSize: 14,
           outline: 'none',
-          cursor: 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: busy ? 0.7 : 1,
           appearance: 'none',
           WebkitAppearance: 'none',
           MozAppearance: 'none',

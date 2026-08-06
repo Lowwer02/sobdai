@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { PUBLIC_STATIC_ROUTES, absoluteUrl } from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import { getPublishedArticleSitemapRows } from '@/lib/articles-public'
 
 type SitemapEntry = MetadataRoute.Sitemap[number]
 
@@ -15,11 +16,12 @@ type SitemapEntry = MetadataRoute.Sitemap[number]
  * Failures degrade to an empty list rather than failing the whole sitemap build.
  */
 async function getDynamicRoutes(): Promise<SitemapEntry[]> {
-  const [news, packages] = await Promise.all([
+  const [news, packages, articles] = await Promise.all([
     getNewsRoutes(),
     getPackageRoutes(),
+    getArticleRoutes(),
   ])
-  return [...news, ...packages]
+  return [...news, ...packages, ...articles]
 }
 
 /**
@@ -66,7 +68,6 @@ async function getPackageRoutes(): Promise<SitemapEntry[]> {
   }
 }
 
-
 /**
  * Published news articles → /news/[slug]. Mirrors the public list query's scope
  * (anon client, status = 'published') and ordering so the freshest articles
@@ -85,9 +86,6 @@ async function getNewsRoutes(): Promise<SitemapEntry[]> {
 
     if (error || !data) return []
 
-    // Type the rows explicitly: the generated client narrows this select into a
-    // row type the .map() below can't satisfy (same friction the public /news
-    // list hits), so cast through unknown — mirrors the list page's `as NewsRow[]`.
     const rows = data as unknown as {
       slug: string
       updated_at: string | null
@@ -106,6 +104,40 @@ async function getNewsRoutes(): Promise<SitemapEntry[]> {
   }
 }
 
+/**
+ * Published articles → /articles/[slug]. Uses getPublishedArticleSitemapRows()
+ * from lib/articles-public.ts to strictly load published article detail rows.
+ * lastModified falls back through updated_at → published_at.
+ */
+async function getArticleRoutes(): Promise<SitemapEntry[]> {
+  try {
+    const res = await getPublishedArticleSitemapRows()
+    if (!res.success || !res.data) return []
+
+    const seenUrls = new Set<string>()
+    const entries: SitemapEntry[] = []
+
+    for (const row of res.data) {
+      if (!row.slug || !row.slug.trim()) continue
+      const cleanSlug = row.slug.trim()
+      const url = absoluteUrl(`/articles/${cleanSlug}`)
+      if (seenUrls.has(url)) continue
+      seenUrls.add(url)
+
+      entries.push({
+        url,
+        lastModified: new Date(row.updated_at || row.published_at || new Date()),
+        changeFrequency: 'monthly',
+        priority: 0.7,
+      })
+    }
+
+    return entries
+  } catch {
+    return []
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date()
   const staticRoutes = PUBLIC_STATIC_ROUTES.map<SitemapEntry>((route) => ({
@@ -115,5 +147,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route.priority,
   }))
 
-  return [...staticRoutes, ...(await getDynamicRoutes())]
+  const articlesHubUrl = absoluteUrl('/articles')
+  const hasArticlesHub = staticRoutes.some((r) => r.url === articlesHubUrl)
+  const articlesHubEntry: SitemapEntry[] = hasArticlesHub
+    ? []
+    : [
+        {
+          url: articlesHubUrl,
+          lastModified,
+          changeFrequency: 'daily',
+          priority: 0.9,
+        },
+      ]
+
+  const dynamicRoutes = await getDynamicRoutes()
+
+  return [...staticRoutes, ...articlesHubEntry, ...dynamicRoutes]
 }
