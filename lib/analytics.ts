@@ -1,3 +1,5 @@
+import { readConsentFromDocumentCookie } from '@/lib/consent'
+
 declare global {
   interface Window {
     dataLayer?: Record<string, any>[]
@@ -9,6 +11,10 @@ declare global {
  */
 function pushToDataLayer(payload: Record<string, any>): void {
   if (typeof window === 'undefined') return
+
+  const consent = readConsentFromDocumentCookie()
+  if (!consent || !consent.analytics) return
+
   window.dataLayer = window.dataLayer || []
   window.dataLayer.push(payload)
 }

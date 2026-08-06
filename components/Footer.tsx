@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Heart } from 'lucide-react'
 import { legalConfig, socialLinks, type SocialLink } from '@/lib/legal'
+import { CookieSettingsButton } from '@/components/consent/CookieSettingsButton'
 import SupportModal from '@/components/SupportModal'
 import type { FooterSettings, SupportConfig } from '@/lib/homepageConfig'
 
@@ -75,6 +76,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
             <Link href="/cookies" className="hover:text-[#F5E9D6] transition-colors">
               นโยบายคุกกี้
             </Link>
+            <CookieSettingsButton />
             <Link href="/about" className="hover:text-[#F5E9D6] transition-colors">
               เกี่ยวกับเรา
             </Link>
