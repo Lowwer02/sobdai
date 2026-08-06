@@ -9,7 +9,9 @@ import ActivityProvider from '@/components/ActivityProvider'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import StructuredData from '@/components/StructuredData'
 import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL, THEME_COLOR, createPageMetadata } from '@/lib/seo'
-import { GoogleTagManager } from '@next/third-parties/google'
+import { ConsentProvider } from '@/components/consent/ConsentProvider'
+import { ConsentManager } from '@/components/consent/ConsentManager'
+import { ConsentAnalyticsLoader } from '@/components/consent/ConsentAnalyticsLoader'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
@@ -65,15 +67,16 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${sarabun.className} min-h-screen flex flex-col`}>
-        {process.env.NEXT_PUBLIC_GTM_ID && (
-          <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
-        )}
-        <ActivityProvider />
-        <Navbar />
-        <main className="flex-grow">{children}</main>
-        <Footer supportConfig={homepageSettings.support} footerConfig={homepageSettings.footer} />
-        <FloatingSupport supportConfig={homepageSettings.support} />
-        <ToastContainer />
+        <ConsentProvider>
+          <ConsentAnalyticsLoader gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+          <ConsentManager />
+          <ActivityProvider />
+          <Navbar />
+          <main className="flex-grow">{children}</main>
+          <Footer supportConfig={homepageSettings.support} footerConfig={homepageSettings.footer} />
+          <FloatingSupport supportConfig={homepageSettings.support} />
+          <ToastContainer />
+        </ConsentProvider>
       </body>
     </html>
   )
