@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
@@ -8,12 +7,12 @@ import type { PackageCardData } from '@/components/PackageCard'
 import ContinueLearningCard, { ContinueLearningEmpty } from '@/components/exams/ContinueLearningCard'
 import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestResultCard'
 import LearningStats, { LearningStatsEmpty } from '@/components/exams/LearningStats'
-import WeakTopics, { WeakTopicsEmpty, WeakTopicsAllGood } from '@/components/exams/WeakTopics'
+import { WeakTopicsEmpty } from '@/components/exams/WeakTopics'
+import WeakTopicsClientSection from '@/components/exams/WeakTopicsClientSection'
 import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/ActivityTimeline'
 import RecommendedActions from '@/components/exams/RecommendedActions'
 import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQuestions'
 import MobileShowMore from '@/components/exams/MobileShowMore'
-import PackageScopeSelector from '@/components/exams/PackageScopeSelector'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import { fetchSavedQuestionCards } from '@/lib/assessment/saved-questions-data'
 import {
@@ -221,23 +220,18 @@ export default async function ExamDashboardPage({
   const weakTopicsReviewAttemptId = isScopedPackage
     ? (weakTopicsResult?.scopedLatestAttemptId ?? null)
     : (latestResult?.attemptId ?? null)
-  const weakTopicsCaption = isScopedPackage
-    ? 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้งในแพ็กเกจนี้'
-    : 'คำนวณจากผลสอบล่าสุดสูงสุด 20 ครั้ง'
-  const weakTopicsReviewCtaLabel = isScopedPackage
-    ? 'ทบทวนข้อผิดในแพ็กเกจนี้'
-    : 'ทบทวนข้อผิด'
-  // Whether the selected package has zero completed attempts (scoped empty state).
-  const scopedPackageIsEmpty =
-    isScopedPackage && weakTopicsResult !== null && weakTopicsResult.scopedLatestAttemptId === null
-  // Whether the selected package has attempts but no weak topics surfaced.
-  const scopedPackageAllGood =
-    isScopedPackage && !scopedPackageIsEmpty && weakTopicsList.length === 0
 
   // The selector's current value reflects the RESOLVED scope (so the control
   // shows the auto-defaulted package too, not just an explicit URL value).
   const selectorValue = isScopedPackage ? weakTopicsScope.packageId : 'all'
   const selectorOptions = buildPackageScopeOptions(enriched)
+
+  // Phase 2A.1: the all-packages topics are ALWAYS available here (they come
+  // from learnerAnalytics.weakTopics). Pass them to the client island so its
+  // component-local cache starts warm and switching to `all` never needs a
+  // request. The all-packages review CTA target is the global latest attempt.
+  const allPackagesTopics = learnerAnalytics.weakTopics
+  const allPackagesReviewAttemptId = latestResult?.attemptId ?? null
 
   // --- Activity Timeline (Phase 1E) ----------------------------------------
   // Two bounded queries (latest 10 completed attempts + latest 5 active
@@ -341,63 +335,37 @@ export default async function ExamDashboardPage({
           )}
         </section>
 
-        {/* ---------- Weak Topics (Phase 1D / Phase 2A — package-scoped) -------
-            ONLY this section is scoped by the package selector. The selector is
-            rendered inside the card (above the topic list). Branch logic:
-              - no completed attempts anywhere (all-packages) → WeakTopicsEmpty
-                (no selector: nothing to scope yet)
-              - a package is selected but has no completed attempts → render the
-                card WITH the selector + a scoped empty-state node
-              - otherwise → render the card WITH the selector + the topic list
-                (or the all-good state when the scope has attempts but no weak
-                topics) */}
+        {/* ---------- Weak Topics (Phase 1D / Phase 2A / 2A.1) ----------------
+            ONLY this section is scoped by the package selector. The selector +
+            live package switching now live inside a Client Island
+            (WeakTopicsClientSection) so a selector change calls ONLY the Weak
+            Topics Server Action and updates ONLY this section — the rest of the
+            dashboard no longer reloads.
+
+            SSR contract (unchanged guarantees):
+              - Initial content is SERVER-RENDERED from the resolved scope
+                (auto-default: latest-attempt package → active-session package →
+                all), so first paint + noindex are intact.
+              - The island receives the SSR-seeded initial scope + topics, plus
+                the all-packages topics (always available from learnerAnalytics)
+                so its component-local cache starts warm and `all` needs no
+                request.
+              - Branch logic: no completed attempts anywhere → WeakTopicsEmpty
+                (no selector: nothing to scope yet). Otherwise the island owns
+                the scoped-empty / all-good branches client-side. */}
         <section style={{ marginBottom: '48px' }}>
           <SectionTitle>หัวข้อที่ควรทบทวน</SectionTitle>
           {!hasCompletedAttempts ? (
             <WeakTopicsEmpty />
           ) : (
-            <WeakTopics
-              topics={weakTopicsList}
-              reviewAttemptId={weakTopicsReviewAttemptId}
-              caption={weakTopicsCaption}
-              reviewCtaLabel={weakTopicsReviewCtaLabel}
-              selector={
-                <Suspense fallback={null}>
-                  <PackageScopeSelector
-                    options={selectorOptions}
-                    value={selectorValue}
-                  />
-                </Suspense>
-              }
-              scopedEmpty={
-                scopedPackageIsEmpty ? (
-                  <p
-                    style={{
-                      fontSize: '13px',
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.6,
-                      margin: 0,
-                      textAlign: 'center',
-                      padding: '8px 0',
-                    }}
-                  >
-                    ยังไม่มีผลสอบในแพ็กเกจนี้ เริ่มทำข้อสอบเพื่อให้ระบบวิเคราะห์หัวข้อที่ควรทบทวน
-                  </p>
-                ) : scopedPackageAllGood ? (
-                  <p
-                    style={{
-                      fontSize: '13px',
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.6,
-                      margin: 0,
-                      textAlign: 'center',
-                      padding: '8px 0',
-                    }}
-                  >
-                    ยังไม่พบหัวข้อที่ควรทบทวนเป็นพิเศษในแพ็กเกจนี้
-                  </p>
-                ) : null
-              }
+            <WeakTopicsClientSection
+              options={selectorOptions}
+              initialScope={selectorValue}
+              initialTopics={weakTopicsList}
+              initialReviewAttemptId={weakTopicsReviewAttemptId}
+              allPackagesTopics={allPackagesTopics}
+              allPackagesReviewAttemptId={allPackagesReviewAttemptId}
+              hasCompletedAttempts={hasCompletedAttempts}
             />
           )}
         </section>

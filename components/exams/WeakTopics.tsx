@@ -41,6 +41,18 @@ export default function WeakTopics({
    *   - all-packages: 'ทบทวนข้อผิด' (unchanged)
    *   - package scope: 'ทบทวนข้อผิดในแพ็กเกจนี้'
    */
+  /**
+   * Phase 2A.1: compact pending indicator shown when a NEW scope is loading.
+   * Rendered only while `busy` is true; defaults to a Thai inline label.
+   */
+  loadingLabel = 'กำลังโหลดหัวข้อ...',
+  /**
+   * Phase 2A.1: when true, marks the card busy (aria-busy), dims the existing
+   * topic list, and shows `loadingLabel` — WITHOUT replacing the list, so the
+   * learner keeps context while a scoped load is in flight. Driven by the
+   * client island; false on initial server render.
+   */
+  busy = false,
   reviewCtaLabel = 'ทบทวนข้อผิด',
 }: {
   topics: WeakTopicGroup[]
@@ -55,9 +67,11 @@ export default function WeakTopics({
   caption?: string
   scopedEmpty?: React.ReactNode
   reviewCtaLabel?: string
+  loadingLabel?: string
+  busy?: boolean
 }) {
   return (
-    <div className="card" style={{ padding: '24px' }}>
+    <div className="card" style={{ padding: '24px' }} aria-busy={busy || undefined}>
       {/* Header */}
       <div style={{ marginBottom: '18px' }}>
         <div
@@ -87,7 +101,30 @@ export default function WeakTopics({
       {scopedEmpty ? (
         scopedEmpty
       ) : (
-        <>
+        <div
+          style={{
+            // Phase 2A.1: keep the list visible while busy but reduce emphasis
+            // (no full-page loading, no layout shift). The compact loading label
+            // below conveys the pending state accessibly.
+            opacity: busy ? 0.55 : 1,
+            transition: 'opacity 160ms ease-out',
+          }}
+        >
+          {/* Compact pending indicator — shown only while a new scope loads. */}
+          {busy ? (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                fontSize: '12.5px',
+                color: 'var(--text-muted)',
+                marginBottom: '12px',
+              }}
+            >
+              {loadingLabel}
+            </div>
+          ) : null}
+
           {/* Topic list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {topics.map((t) => (
@@ -113,7 +150,7 @@ export default function WeakTopics({
               </Link>
             </div>
           ) : null}
-        </>
+        </div>
       )}
     </div>
   )
