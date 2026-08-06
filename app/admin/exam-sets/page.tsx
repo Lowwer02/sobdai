@@ -1,6 +1,7 @@
 import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import ExamSetsClient from './ExamSetsClient'
 import { applyContentOrdering } from '@/lib/contentOrdering'
+import { parseStatusParam } from './status-filter'
 
 export default async function ExamSetsPage({
   searchParams,
@@ -15,6 +16,9 @@ export default async function ExamSetsPage({
   const search = typeof params.q === 'string' ? params.q : ''
   const packageFilter = typeof params.package === 'string' ? params.package : ''
   const typeFilter = typeof params.type === 'string' ? params.type : '' // Sample vs Full
+  // Validated status filter: invalid/array/unknown values fall back to 'all'
+  // (no filter). `all` never reaches the query — see filter block below.
+  const statusFilter = parseStatusParam(params.status)
 
   const limit = 15
   const from = (page - 1) * limit
@@ -45,6 +49,11 @@ export default async function ExamSetsPage({
   if (typeFilter && typeFilter !== 'All') {
     query = query.eq('is_sample', typeFilter === 'Sample')
   }
+  // Server-side status filter. Only applied for a concrete status; 'all'
+  // preserves the original (unfiltered) query exactly.
+  if (statusFilter !== 'all') {
+    query = query.eq('status', statusFilter)
+  }
 
   // Add pagination and Smart Content Ordering (DB-side).
   query = applyContentOrdering(query).range(from, to)
@@ -69,6 +78,7 @@ export default async function ExamSetsPage({
       search={search}
       packageFilter={packageFilter}
       typeFilter={typeFilter}
+      statusFilter={statusFilter}
     />
   )
 }
