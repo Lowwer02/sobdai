@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState, useTransition, useCallback } from 'react'
+import { useState, useTransition, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, Loader2, Copy, Send, Archive, RotateCcw } from 'lucide-react'
 import { deleteExamSetAction, setExamSetStatusAction } from './actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -14,6 +14,11 @@ import {
   ExamSetStatusFilter,
   EXAM_SET_STATUS_VALUES,
 } from './status-filter'
+import {
+  toggleExamSetSelection,
+  setExamSetPageSelection,
+  getExamSetPageSelectionState,
+} from './exam-set-selection'
 
 // Allowed exam_sets.status transitions in the UI (Session 6.17). Each maps to
 // the existing setExamSetStatusAction — the server (validate_exam_set_for_publish
@@ -90,6 +95,58 @@ export default function ExamSetsClient({
     (!!packageFilter && packageFilter !== 'All') ||
     (!!typeFilter && typeFilter !== 'All') ||
     statusFilter !== 'all'
+
+  // ── Multi-selection (Phase 2) ────────────────────────────────────────────
+  // Selection key = Exam Set `id` (UUID string). Only ids are stored.
+  // Invariants (enforced in ./exam-set-selection.ts):
+  //   - no selected id survives off the current page
+  //   - empty page → header unchecked and not indeterminate
+  //   - duplicate ids do not affect the count
+  //   - React state Set is never mutated (every change produces a NEW Set)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Stable list of visible ids and a stable key derived from it. The key is a
+  // reset dependency so selection also clears when the *dataset* changes for a
+  // reason other than the URL filters — e.g. a row mutation, server refresh,
+  // deletion, or a re-ordered result set under the same URL.
+  const pageIds = useMemo(() => examSets.map((s) => s.id), [examSets])
+  const pageSelectionKey = useMemo(() => pageIds.join('|'), [pageIds])
+
+  // Header tri-state, computed from the pure helper. `selectedCount` counts
+  // ONLY current-page ids (off-page ids are ignored), so it is the value shown
+  // in "Selected N" — never `selectedIds.size`.
+  const { selectedCount, allSelected, someSelected } = getExamSetPageSelectionState(
+    selectedIds,
+    pageIds
+  )
+
+  // Drive the header checkbox `indeterminate` imperatively — React has no
+  // declarative prop for it. Mirrors components/admin/SummaryLibraryTable.tsx.
+  const headerCheckboxRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected
+    }
+  }, [someSelected])
+
+  // Reset selection whenever the filters, page, OR the visible dataset change.
+  // `pageSelectionKey` catches dataset changes that keep the same URL (mutations,
+  // refreshes, deletions). All deps are stable strings/numbers → no effect loop.
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [search, packageFilter, typeFilter, statusFilter, currentPage, pageSelectionKey])
+
+  const handleToggleRow = (id: string) => {
+    setSelectedIds((prev) => toggleExamSetSelection(prev, id))
+  }
+
+  // Header checkbox: unchecked/indeterminate → select current page; checked →
+  // clear. Uses the pure helper in BOTH directions (no off-page assumption).
+  const handleTogglePage = (checked: boolean) => {
+    setSelectedIds((prev) => setExamSetPageSelection(prev, pageIds, checked))
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
 
   // URL updating helper
   const updateParams = useCallback((updates: Record<string, string>) => {
@@ -228,6 +285,24 @@ export default function ExamSetsClient({
               ))}
             </select>
           </div>
+
+          {/* Selection summary — shown only when at least one row on the
+              current page is selected. `selectedCount` reflects current-page
+              ids only (never `selectedIds.size`). No bulk actions in Phase 2. */}
+          {selectedCount > 0 && (
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs font-medium text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                Selected {selectedCount}
+              </span>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="text-xs text-[#A1866B] hover:text-[#F5E9D6] underline underline-offset-2 transition-colors whitespace-nowrap"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Loading Overlay */}
@@ -242,6 +317,19 @@ export default function ExamSetsClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
+                <th className="p-4 font-medium w-10 text-center">
+                  <span className="sr-only">Select exam sets</span>
+                  <input
+                    ref={headerCheckboxRef}
+                    type="checkbox"
+                    aria-label="Select all exam sets on this page"
+                    aria-checked={someSelected ? 'mixed' : allSelected}
+                    checked={allSelected}
+                    onChange={(e) => handleTogglePage(e.target.checked)}
+                    disabled={examSets.length === 0}
+                    className="w-4 h-4 rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] checked:bg-[#D4AF37] checked:border-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-[#0F0B07] transition-colors cursor-pointer disabled:cursor-not-allowed"
+                  />
+                </th>
                 <th className="p-4 font-medium w-[26%]">Exam Name</th>
                 <th className="p-4 font-medium">Package</th>
                 <th className="p-4 font-medium">Status</th>
@@ -257,7 +345,7 @@ export default function ExamSetsClient({
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
               {examSets.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-12 text-center text-[#A1866B]">
+                  <td colSpan={11} className="p-12 text-center text-[#A1866B]">
                     {isAnyFilterActive
                       ? 'No exam sets match the current filters.'
                       : 'No exam sets found.'}
@@ -268,8 +356,24 @@ export default function ExamSetsClient({
                 // null/undefined defensively so the transitions map always keys.
                 const status: ExamSetStatus = (set.status as ExamSetStatus) || 'draft'
                 const transitions = TRANSITIONS[status] || []
+                const isSelected = selectedIds.has(set.id)
                 return (
-                <tr key={set.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
+                <tr
+                  key={set.id}
+                  aria-selected={isSelected}
+                  className="hover:bg-[#D4AF37]/[0.02] transition-colors"
+                >
+                  <td className="p-4 text-center">
+                    {/* Row checkbox lives in its own cell — it is NOT nested in
+                        any <Link>/button, so no stopPropagation is needed. */}
+                    <input
+                      type="checkbox"
+                      aria-label={`Select exam set ${set.name}`}
+                      checked={isSelected}
+                      onChange={() => handleToggleRow(set.id)}
+                      className="w-4 h-4 rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] checked:bg-[#D4AF37] checked:border-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-[#0F0B07] transition-colors cursor-pointer"
+                    />
+                  </td>
                   <td className="p-4">
                     <div className="text-[#F5E9D6] font-medium">{set.name}</div>
                     <div className="text-[#A1866B] text-xs mt-1 truncate max-w-[250px]">{set.description || 'No description'}</div>
@@ -348,6 +452,12 @@ export default function ExamSetsClient({
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Screen-reader announcement of selection size (mirrors
+            SummaryLibraryTable a11y precedent). */}
+        <div className="sr-only" aria-live="polite">
+          {selectedCount > 0 ? `${selectedCount} exam set${selectedCount === 1 ? '' : 's'} selected` : 'No exam sets selected'}
         </div>
 
         {/* Pagination */}
