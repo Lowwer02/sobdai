@@ -321,11 +321,19 @@ export default function QuestionPicker({ selectedQuestions, onChange, initialSel
             <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex flex-wrap gap-3 shrink-0 bg-[#1A140E]">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1866B]" size={16} />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Search questions..." 
+                  // The picker is rendered inside the Exam Set <form>. Pressing
+                  // Enter in this text field could trigger implicit form
+                  // submission (and thus createExamSetAction). The modal is not
+                  // a Portal, so block Enter here as defense-in-depth. Normal
+                  // typing and the live onChange filter are unaffected.
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.preventDefault()
+                  }}
+                  placeholder="Search questions..."
                   className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
                 />
               </div>

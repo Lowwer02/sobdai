@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, X, Loader2, RefreshCw } from 'lucide-react'
@@ -9,6 +9,12 @@ import StatusBadge from './StatusBadge'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { publishDraftQuestionsInExamSetAction } from '@/app/admin/exam-sets/actions'
 import { fetchUniqueFilters } from '@/app/admin/exam-sets/questions.action'
+import {
+  canSubmit,
+  nextSubmissionState,
+  editRouteForCreate,
+  type SubmissionState,
+} from '@/app/admin/exam-sets/submission-guard'
 import { getSubjectLabel } from '@/lib/subjects'
 import { toastEvent } from '@/hooks/useToast'
 
@@ -16,7 +22,11 @@ interface ExamSetFormProps {
   initialData?: any
   packages: any[]
   selectedQuestionsData?: any[]
-  onSubmit: (data: any) => Promise<{success: boolean, error?: string}>
+  // createExamSetAction returns { success, id } on success (and { success,
+  // error, id, partial } on a partial failure); updateExamSetAction returns
+  // { success } / { success, error }. `id` is optional so both actions satisfy
+  // this prop — the Create→Edit promotion uses it when present.
+  onSubmit: (data: any) => Promise<{ success: boolean; error?: string; id?: string }>
   isEdit?: boolean
 }
 
@@ -30,6 +40,20 @@ export default function ExamSetForm({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
+
+  // ── Duplicate-Exam-Set submission guard ─────────────────────────────────
+  // createExamSetAction INSERTs a new exam_sets parent on EVERY call. A fast
+  // Save double-click can invoke it twice because useTransition's isPending
+  // flips true on a LATER render, not synchronously in the click handler, so
+  // disabled={isPending} does not stop the second click. This synchronous ref
+  // is the real re-entry lock (see app/admin/exam-sets/submission-guard.ts):
+  //   idle      → submit allowed
+  //   submitting → concurrent submit rejected (synchronous)
+  //   created   → Create succeeded; form locked until router.replace to /edit
+  // A FAILED submit returns to idle (retry allowed). A successful UPDATE
+  // (Edit mode) also returns to idle so the Admin can save again — Edit
+  // workflow is unchanged. Only a successful CREATE is terminal.
+  const submissionRef = useRef<SubmissionState>('idle')
 
   const [name, setName] = useState(initialData?.name || '')
   const [description, setDescription] = useState(initialData?.description || '')
@@ -80,9 +104,18 @@ export default function ExamSetForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Synchronous re-entry guard. Checked and set BEFORE startTransition /
+    // awaiting the Server Action so a rapid double-click cannot start a second
+    // createExamSetAction (which would INSERT a duplicate exam_sets parent).
+    if (!canSubmit(submissionRef.current)) return
+    submissionRef.current = 'submitting'
     setError('')
 
     if (!name || !packageId) {
+      // Validation failure is not a Server Action attempt — release the lock
+      // so the Admin can correct and retry.
+      submissionRef.current = nextSubmissionState(isEdit, false)
       setError('Name and Package are required')
       return
     }
@@ -106,9 +139,34 @@ export default function ExamSetForm({
       })
 
       if (res.success) {
+        if (isEdit) {
+          // Edit mode: a successful UPDATE returns to idle so the Admin can
+          // save again later. Question selection / status behavior unchanged.
+          submissionRef.current = nextSubmissionState(isEdit, true)
+          setIsDirty(false)
+          router.push('/admin/exam-sets')
+          return
+        }
+
+        // Create mode: a successful CREATE is terminal for this form instance.
+        // Lock the form so a second Save during the brief window before
+        // navigation resolves can never INSERT another parent. Then promote the
+        // workflow to Edit by navigating to /<id>/edit using the returned id —
+        // subsequent saves there run updateExamSetAction (UPDATE, not INSERT).
+        submissionRef.current = nextSubmissionState(isEdit, true)
         setIsDirty(false)
-        router.push('/admin/exam-sets')
+        const editRoute = editRouteForCreate(res.id)
+        if (editRoute) {
+          router.replace(editRoute)
+        } else {
+          // Defensive: create succeeded but no id was surfaced (should not
+          // happen — createExamSetAction returns id on success). Fall back to
+          // the list and surface nothing misleading; the row exists.
+          router.push('/admin/exam-sets')
+        }
       } else {
+        // Failed submit — release the lock so the Admin can retry.
+        submissionRef.current = nextSubmissionState(isEdit, false)
         setError(res.error || 'Something went wrong')
       }
     })
