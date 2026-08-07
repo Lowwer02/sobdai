@@ -1136,19 +1136,24 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
         </div>
       </div>
 
-      {/* Question Navigator Modal Overlay */}
+      {/* Question Navigator Modal Overlay (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
       {isNavigatorOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setIsNavigatorOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="question-navigator-heading"
-            className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl bg-[#1A140E] border border-[rgba(212,175,55,0.3)] shadow-2xl animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-t-3xl lg:rounded-2xl bg-[#1A140E] border-t lg:border border-[rgba(212,175,55,0.3)] shadow-2xl animate-in slide-in-from-bottom-6 lg:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Visual Drag Handle for Mobile Bottom Sheet */}
+            <div className="pt-2.5 pb-1 lg:hidden flex justify-center pointer-events-none">
+              <div className="w-12 h-1.5 bg-[rgba(255,255,255,0.2)] rounded-full" aria-hidden="true" />
+            </div>
+
             <QuestionNavigator
               questions={questions}
               answers={answers}
