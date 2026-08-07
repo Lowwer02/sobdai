@@ -18,6 +18,9 @@
  */
 
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import type { SocialFollowConfig } from './socialFollowConfig'
+import { SOCIAL_FOLLOW_DEFAULTS, normalizeSocialFollowConfig } from './socialFollowConfig'
+
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +147,7 @@ export interface HomepageSettings {
    * PromptPay, bank account, etc.) without requiring new migrations.
    */
   support: SupportConfig
+  social_follow: SocialFollowConfig
 }
 
 /**
@@ -253,6 +257,7 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     account_number: '',
     footer_message: 'ขอบคุณทุกการสนับสนุนที่ช่วยให้ Sobdai พัฒนาต่อไปได้ ♥',
   },
+  social_follow: SOCIAL_FOLLOW_DEFAULTS,
 }
 
 // ─── Validators (strict; no free-form JSON leaks into render) ───────────────
@@ -445,6 +450,7 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     features,
     howto,
     support,
+    social_follow: normalizeSocialFollowConfig(extRaw.social_follow),
   }
 }
 

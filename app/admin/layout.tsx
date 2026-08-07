@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2 } from 'lucide-react'
 import { requireStaff } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 
@@ -18,7 +18,9 @@ const managementNav = [
   { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
   { name: 'Homepage', href: '/admin/homepage', icon: Home, permission: 'content.write' },
+  { name: 'Social Follow', href: '/admin/social-follow', icon: Share2, permission: 'content.write' },
   { name: 'Support', href: '/admin/support', icon: Heart, permission: 'support.manage' },
+
   { name: 'Promotions', href: '/admin/promotions', icon: Megaphone, permission: 'content.write' },
   // Editorial publishing item: government news has a draft→publish→archive
   // lifecycle, grouping with Promotions/Homepage. permission 'content.read'
