@@ -5,6 +5,7 @@ export const ADMIN_ASSESSMENT_BLUEPRINTS = [
     version: '3.0.0',
     title: 'นักวิชาการศึกษา — กรุงเทพมหานคร',
     description: 'Simulation Blueprint v3.0 · 5 sets · 100 questions per set',
+    sourcePath: 'Blueprint/simulation_exam_blueprint.md',
   },
 ] as const
 

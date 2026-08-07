@@ -54,14 +54,7 @@ export async function generateAssessmentAdminAction(
     }
 
     const [blueprintSource, bankRows] = await Promise.all([
-      readFile(
-        path.join(
-          process.cwd(),
-          'Blueprint',
-          'simulation_exam_blueprint.md'
-        ),
-        'utf8'
-      ),
+      readFile(path.join(process.cwd(), blueprint.sourcePath), 'utf8'),
       readQuestionBankMetadata(supabase),
     ])
 
