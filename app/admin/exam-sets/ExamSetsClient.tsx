@@ -17,8 +17,10 @@ import {
 import {
   ExamSetStatus,
   ExamSetStatusFilter,
-  EXAM_SET_STATUS_VALUES,
 } from './status-filter'
+import {
+  EXAM_SET_STATUS_OPTIONS,
+} from '@/lib/exam-set-status'
 import {
   toggleExamSetSelection,
   setExamSetPageSelection,
@@ -59,6 +61,13 @@ interface ExamSetsClientProps {
   packageFilter: string
   typeFilter: string
   statusFilter: ExamSetStatusFilter
+  /** Facet status counts (Phase 4). Null counts = query failure or unavailable. */
+  statusCounts: {
+    all: number | null
+    draft: number | null
+    published: number | null
+    archived: number | null
+  }
 }
 
 export default function ExamSetsClient({
@@ -69,7 +78,8 @@ export default function ExamSetsClient({
   search,
   packageFilter,
   typeFilter,
-  statusFilter
+  statusFilter,
+  statusCounts
 }: ExamSetsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -301,18 +311,18 @@ export default function ExamSetsClient({
         <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex flex-wrap gap-4 items-center">
           <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1866B]" size={18} />
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search exam sets..." 
+              placeholder="Search exam sets..."
               className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-[#D4AF37]/50 transition-colors placeholder:text-[#A1866B]/50"
             />
           </form>
-          
+
           <div className="flex items-center gap-3">
-            <select 
-              value={packageFilter} 
+            <select
+              value={packageFilter}
               onChange={(e) => updateParams({ package: e.target.value })}
               className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50 max-w-[200px] truncate"
             >
@@ -331,25 +341,65 @@ export default function ExamSetsClient({
               <option value="Full">Full Exam</option>
               <option value="Sample">Sample Exam</option>
             </select>
-
-            <select
-              aria-label="Filter exam sets by status"
-              value={statusFilter === 'all' ? '' : statusFilter}
-              onChange={(e) => updateParams({ status: e.target.value })}
-              className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
-            >
-              <option value="">All Statuses</option>
-              {EXAM_SET_STATUS_VALUES.map((s) => (
-                <option key={s} value={s}>
-                  {s === 'draft'
-                    ? 'Draft'
-                    : s === 'published'
-                      ? 'Published'
-                      : 'Archived'}
-                </option>
-              ))}
-            </select>
           </div>
+        </div>
+
+        {/* Status Tabs (Phase 4) — pill-toggle row replacing the old <select>.
+            Counts are FACET counts: they reflect active Search / Package / Type
+            but never the currently selected Status. `updateParams` preserves
+            those filters and resets page=1 (Phase 1). Switching status drives a
+            URL change, which clears Phase 2 selection via the existing reset
+            effect and hides the bulk action bar. Labels come from the shared
+            lib/exam-set-status.ts (single source of truth). On mobile the row
+            wraps (`flex flex-wrap`) per the prevailing admin convention. */}
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="px-4 py-3 border-b border-[rgba(255,255,255,0.05)] flex flex-wrap gap-2 items-center"
+        >
+          {(() => {
+            // Build the tab list: "All" + one per concrete status.
+            const tabs: {
+              label: string
+              count: number | null
+              isActive: boolean
+              onClick: () => void
+            }[] = [
+              {
+                label: 'All',
+                count: statusCounts.all,
+                isActive: statusFilter === 'all',
+                // All removes `status` from the URL (empty value → deleted).
+                onClick: () => updateParams({ status: '' }),
+              },
+              ...EXAM_SET_STATUS_OPTIONS.map((opt) => ({
+                label: opt.label,
+                count: statusCounts[opt.value],
+                isActive: statusFilter === opt.value,
+                onClick: () => updateParams({ status: opt.value }),
+              })),
+            ]
+            return tabs.map((tab) => {
+              const countText =
+                tab.count === null ? '—' : String(tab.count)
+              return (
+                <button
+                  key={tab.label}
+                  type="button"
+                  onClick={tab.onClick}
+                  aria-pressed={tab.isActive}
+                  className={
+                    'px-4 py-1.5 rounded-full text-sm font-bold border transition-colors whitespace-nowrap ' +
+                    (tab.isActive
+                      ? 'bg-[#D4AF37]/15 border-[#D4AF37] text-[#D4AF37]'
+                      : 'bg-[#1A140E] border-[rgba(255,255,255,0.1)] text-[#A1866B] hover:text-[#F5E9D6]')
+                  }
+                >
+                  {tab.label} <span className="opacity-70">({countText})</span>
+                </button>
+              )
+            })
+          })()}
         </div>
 
         {/* Bulk Action Bar (Phase 3A) — shown only when at least one row on the

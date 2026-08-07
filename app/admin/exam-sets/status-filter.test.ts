@@ -25,7 +25,11 @@ import test from 'node:test'
 import {
   parseStatusParam,
   EXAM_SET_STATUS_VALUES,
+  EXAM_SET_STATUS_OPTIONS,
 } from './status-filter'
+// Note: source modules import via the `@/` alias (resolved by tsconfig/Next
+// build). This test runs under plain `npx jiti`, which does not resolve `@/`,
+// so we exercise the re-exported symbols through the relative path above.
 
 test('no status param (undefined) falls back to all', () => {
   assert.equal(parseStatusParam(undefined), 'all')
@@ -62,5 +66,17 @@ test('array value falls back to all (never reaches the query)', () => {
 test('every exported status value round-trips through parseStatusParam', () => {
   for (const s of EXAM_SET_STATUS_VALUES) {
     assert.equal(parseStatusParam(s), s)
+  }
+})
+
+// Phase 4: the shared options (re-exported from lib/exam-set-status.ts) are
+// reachable through this module and stay aligned with the canonical values.
+test('EXAM_SET_STATUS_OPTIONS is re-exported and aligned with values', () => {
+  assert.deepEqual(
+    EXAM_SET_STATUS_OPTIONS.map((o) => o.value),
+    [...EXAM_SET_STATUS_VALUES]
+  )
+  for (const o of EXAM_SET_STATUS_OPTIONS) {
+    assert.ok(o.label.length > 0)
   }
 })

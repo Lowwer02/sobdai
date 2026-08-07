@@ -10,7 +10,14 @@
  * Deliberately presentation-only — no status logic, no transitions. The
  * lifecycle actions live in setExamSetStatusAction; this component just renders
  * whatever status it is given.
+ *
+ * Labels are read from the shared lib/exam-set-status.ts (single source of
+ * truth shared with the Exam Sets admin tabs), so the wording can never drift
+ * between the badge and the filter UI. Colors stay here — they are presentation
+ * concerns local to this badge, not duplicated status metadata.
  */
+import { examSetStatusLabel } from '@/lib/exam-set-status'
+
 type ExamSetStatus = 'draft' | 'published' | 'archived' | string | null | undefined
 
 interface StatusBadgeProps {
@@ -23,27 +30,26 @@ export default function StatusBadge({ status, className = '' }: StatusBadgeProps
     'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border whitespace-nowrap shrink-0'
 
   let style: string
-  let label: string
   switch (status) {
     case 'published':
       style = 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20'
-      label = 'Published'
       break
     case 'archived':
       style = 'text-[#A1866B] bg-black/30 border-[rgba(255,255,255,0.1)]'
-      label = 'Archived'
       break
     case 'draft':
       style = 'text-[#EAB308] bg-[#EAB308]/10 border-[#EAB308]/20'
-      label = 'Draft'
       break
     default:
       // Unknown / null / undefined — neutral. Existing rows created before
       // migration 026 default to 'draft' at the DB, so this branch is only hit
       // if the row hasn't been touched yet AND the DB default hasn't applied.
       style = 'text-[#A1866B] bg-black/30 border-[rgba(255,255,255,0.1)]'
-      label = status || '—'
   }
+
+  // Label from the shared source of truth; fallback to the raw value or '—'
+  // for anything unknown (preserves the previous fallback behavior exactly).
+  const label = examSetStatusLabel(status ?? undefined) ?? (status || '—')
 
   return <span className={`${base} ${style} ${className}`}>{label}</span>
 }
