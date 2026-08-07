@@ -1149,22 +1149,13 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
             className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl bg-[#1A140E] border border-[rgba(212,175,55,0.3)] shadow-2xl animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setIsNavigatorOpen(false)}
-              className="absolute top-3.5 right-3.5 p-2 text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-lg transition-colors z-10"
-              aria-label="ปิดตัวนำทางข้อสอบ"
-            >
-              <X size={18} />
-            </button>
-
             <QuestionNavigator
               questions={questions}
               answers={answers}
               flagged={flagged}
               currentIndex={currentIndex}
               onSelectQuestion={handleSelectQuestionFromNavigator}
+              onClose={() => setIsNavigatorOpen(false)}
             />
           </div>
         </div>

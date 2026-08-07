@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { Flag } from 'lucide-react'
+import { Flag, X } from 'lucide-react'
 
 export interface QuestionNavigatorItem {
   id: string
@@ -18,6 +18,8 @@ export interface QuestionNavigatorProps {
   currentIndex: number
   /** Callback invoked when a user clicks a question (0-based index parameter) */
   onSelectQuestion: (index: number) => void
+  /** Optional callback invoked when close button is clicked */
+  onClose?: () => void
   /** Optional custom title header (defaults to "รายการข้อสอบ") */
   title?: string
   /** Optional extra CSS classes for container */
@@ -105,6 +107,7 @@ export default function QuestionNavigator({
   flagged,
   currentIndex,
   onSelectQuestion,
+  onClose,
   title = 'รายการข้อสอบ',
   className = '',
 }: QuestionNavigatorProps) {
@@ -119,16 +122,30 @@ export default function QuestionNavigator({
     <div
       className={`bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-4 sm:p-5 text-[#F5E9D6] font-sans ${className}`}
     >
-      {/* Header with Title & Live Summary */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-[rgba(255,255,255,0.06)]">
-        <h3 id="question-navigator-heading" className="text-base font-bold text-[#F5E9D6] font-display flex items-center gap-2">
-          <span>{title}</span>
-          <span className="text-xs font-normal text-[#A1866B] bg-[#0F0B07] px-2 py-0.5 rounded-full border border-[rgba(255,255,255,0.05)]">
-            {answeredCount}/{total} ข้อ
-          </span>
-        </h3>
+      {/* Header with Two-Row Layout */}
+      <div className="mb-4 pb-3 border-b border-[rgba(255,255,255,0.06)] space-y-3">
+        {/* Row 1: Title + Counter Pill (Left), Close Button (Right) */}
+        <div className="flex items-center justify-between gap-3">
+          <h3 id="question-navigator-heading" className="text-base font-bold text-[#F5E9D6] font-display flex items-center gap-2">
+            <span>{title}</span>
+            <span className="text-xs font-normal text-[#A1866B] bg-[#0F0B07] px-2 py-0.5 rounded-full border border-[rgba(255,255,255,0.05)]">
+              {answeredCount}/{total} ข้อ
+            </span>
+          </h3>
 
-        {/* Legend Summary */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              aria-label="ปิดตัวนำทางข้อสอบ"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Row 2: Legend Summary Pills */}
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#A1866B]">
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#0F0B07] border border-[rgba(255,255,255,0.04)]">
             <span className="w-2 h-2 rounded-full bg-[#D4AF37]" aria-hidden="true" />

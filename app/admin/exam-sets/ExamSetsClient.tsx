@@ -449,9 +449,11 @@ export default function ExamSetsClient({
           </div>
         )}
 
-        {/* Loading Overlay */}
+        {/* Loading Overlay — z-30 sits ABOVE the sticky Actions cells (header
+            z-20 / body z-10) so the spinner always covers the whole table
+            during a pending navigation, including the frozen column. */}
         {isPending && (
-          <div className="absolute inset-0 bg-[#1A140E]/50 backdrop-blur-sm z-10 flex items-center justify-center">
+          <div className="absolute inset-0 bg-[#1A140E]/50 backdrop-blur-sm z-30 flex items-center justify-center">
             <Loader2 className="animate-spin text-[#D4AF37]" size={32} />
           </div>
         )}
@@ -475,15 +477,21 @@ export default function ExamSetsClient({
                   />
                 </th>
                 <th className="p-4 font-medium w-[26%]">Exam Name</th>
-                <th className="p-4 font-medium">Package</th>
-                <th className="p-4 font-medium">Status</th>
+                <th className="p-4 font-medium max-w-[200px]">Package</th>
+                <th className="p-4 font-medium w-28">Status</th>
                 <th className="p-4 font-medium">Exam Type</th>
                 <th className="p-4 font-medium">Subject / Document</th>
-                <th className="p-4 font-medium text-center">Questions</th>
+                <th className="p-4 font-medium w-16 text-center">Questions</th>
                 <th className="p-4 font-medium text-center">Duration</th>
                 <th className="p-4 font-medium">Type</th>
-                <th className="p-4 font-medium">Updated</th>
-                <th className="p-4 font-medium text-right">Actions</th>
+                <th className="p-4 font-medium w-28 whitespace-nowrap">Updated</th>
+                {/* UX-A: sticky Actions header. OPAQUE bg (not /50) so scrolling
+                    content never shows through. z-20 sits above body sticky
+                    cells (z-10); the left border + subtle shadow mark the
+                    frozen-column boundary without a floating-panel look. */}
+                <th className="p-4 font-medium text-right w-44 sticky right-0 z-20 bg-[#0F0B07] border-l border-[rgba(255,255,255,0.08)] shadow-[rgba(0,0,0,0.35)_-6px_0_12px_-6px]">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
@@ -505,7 +513,7 @@ export default function ExamSetsClient({
                 <tr
                   key={set.id}
                   aria-selected={isSelected}
-                  className="hover:bg-[#D4AF37]/[0.02] transition-colors"
+                  className="group hover:bg-[#D4AF37]/[0.02] transition-colors"
                 >
                   <td className="p-4 text-center">
                     {/* Row checkbox lives in its own cell — it is NOT nested in
@@ -522,8 +530,11 @@ export default function ExamSetsClient({
                     <div className="text-[#F5E9D6] font-medium">{set.name}</div>
                     <div className="text-[#A1866B] text-xs mt-1 truncate max-w-[250px]">{set.description || 'No description'}</div>
                   </td>
-                  <td className="p-4">
-                    <span className="text-[#A1866B] text-xs px-2 py-1 bg-[#0F0B07] rounded-lg border border-[rgba(255,255,255,0.05)] whitespace-nowrap">
+                  <td className="p-4 max-w-[200px]">
+                    <span
+                      title={set.package_name}
+                      className="block text-[#A1866B] text-xs px-2 py-1 bg-[#0F0B07] rounded-lg border border-[rgba(255,255,255,0.05)] whitespace-nowrap overflow-hidden text-ellipsis"
+                    >
                       {set.package_name}
                     </span>
                   </td>
@@ -557,8 +568,24 @@ export default function ExamSetsClient({
                   <td className="p-4 text-xs text-[#A1866B] whitespace-nowrap">
                     {set.updated_at ? new Date(set.updated_at).toLocaleDateString() : '—'}
                   </td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-1 flex-wrap">
+                  {/* UX-A: sticky Actions cell. OPAQUE bg (matches the row) so
+                      horizontally scrolled content never bleeds through. The
+                      `group`/`group-hover` + `group-aria-selected` modifiers
+                      keep the frozen cell visually synced with the row's hover
+                      and selected states. z-10 sits below the sticky Actions
+                      header (z-20) and below the loading overlay (z-30).
+                      border-l + soft shadow mark the boundary subtly. The
+                      inner container is flex-nowrap so all status-dependent
+                      icons (Publish / Revert / Archive / Restore + Edit +
+                      Delete) stay on one line.
+                      Hover color note: the row hover is bg-[#D4AF37]/[0.02]
+                      (gold at 2% alpha), but a translucent hover on the
+                      STICKY cell would let scrolled content show through, so
+                      we use the alpha-composited SOLID equivalent #1E170F
+                      (2% of #D4AF37 blended over the #1A140E base). Visually
+                      matches the row hover while staying fully opaque. */}
+                  <td className="p-4 text-right sticky right-0 z-10 bg-[#1A140E] group-hover:bg-[#1E170F] border-l border-[rgba(255,255,255,0.08)] shadow-[rgba(0,0,0,0.35)_-6px_0_12px_-6px] transition-colors">
+                    <div className="flex items-center justify-end gap-1 flex-nowrap">
                       {/* Lifecycle transitions — server-authoritative, no client
                           validation. Each opens the confirm dialog. Hidden when
                           there are none for the current status (e.g. archived has
