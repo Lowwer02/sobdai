@@ -1,33 +1,46 @@
 // Status filter for the Admin Exam Sets list.
 //
+// Route-specific URL-filter behavior for `?status=`. The shared status
+// metadata (ExamSetStatus, EXAM_SET_STATUS_VALUES, EXAM_SET_STATUS_OPTIONS,
+// label helper) lives in lib/exam-set-status.ts so route-agnostic components
+// such as components/admin/StatusBadge.tsx can depend on it without a
+// backwards dependency from a shared component into this route module.
+//
+// This module re-exports those primitives so the existing in-folder importers
+// (page.tsx, ExamSetsClient.tsx, actions.ts, bulk-status.ts) keep working
+// unchanged, and adds only the URL-filter concerns: ExamSetStatusFilter and
+// parseStatusParam.
+//
 // Pure shared module — safe to import from BOTH the Server Component
 // (app/admin/exam-sets/page.tsx) and the Client Component
 // (app/admin/exam-sets/ExamSetsClient.tsx), and directly from the unit test.
 //
 // No "use client", no React, no browser APIs, no Supabase client.
-//
-// `exam_sets.status` is a TEXT column with a CHECK constraint
-// (migration 026_exam_set_foundation.sql):
-//   CHECK (status IN ('draft', 'published', 'archived'))
-// It is NOT a Postgres enum, so there is no generated Database["public"]["Enums"]
-// to reference. The union below mirrors the CHECK constraint exactly and is the
-// single source of truth for both the DB values and the filter values.
 
-/** Allowed `exam_sets.status` values — mirrors the DB CHECK constraint. */
-export type ExamSetStatus = 'draft' | 'published' | 'archived'
+// Re-export shared metadata so existing in-folder imports (`from './status-filter'`)
+// continue to resolve. New consumers should import directly from
+// lib/exam-set-status.ts.
+//
+// NOTE: this module is imported transitively by the unit tests, which run
+// under plain `npx jiti` (no tsconfig `@/` alias resolution). The lib is at a
+// stable relative depth, so a relative specifier is used here to keep the
+// tests runnable without alias configuration. The build resolves either form.
+export type {
+  ExamSetStatus,
+} from '../../../lib/exam-set-status'
+export {
+  EXAM_SET_STATUS_VALUES,
+  EXAM_SET_STATUS_OPTIONS,
+  examSetStatusLabel,
+} from '../../../lib/exam-set-status'
+
+import { EXAM_SET_STATUS_VALUES, type ExamSetStatus } from '../../../lib/exam-set-status'
 
 /**
  * Filter selector value. `all` means "no status filter" — it is never sent to
  * the query and never persisted in the URL (selecting All removes `?status=`).
  */
 export type ExamSetStatusFilter = 'all' | ExamSetStatus
-
-/** Concrete DB status values, in display order for the <select>. */
-export const EXAM_SET_STATUS_VALUES: readonly ExamSetStatus[] = [
-  'draft',
-  'published',
-  'archived',
-] as const
 
 /**
  * Validate a raw `searchParams.status` value into a safe `ExamSetStatusFilter`.

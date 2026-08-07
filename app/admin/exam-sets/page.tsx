@@ -2,6 +2,11 @@ import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
 import ExamSetsClient from './ExamSetsClient'
 import { applyContentOrdering } from '@/lib/contentOrdering'
 import { parseStatusParam } from './status-filter'
+import {
+  buildExamSetFacetQuery,
+  aggregateFacetCounts,
+  type FilterableQueryBuilder,
+} from './facet-counts'
 
 export default async function ExamSetsPage({
   searchParams,
@@ -62,6 +67,54 @@ export default async function ExamSetsPage({
 
   const totalPages = count ? Math.ceil(count / limit) : 0
 
+  // ── Facet status counts (Phase 4) ────────────────────────────────────────
+  // These counts behave as a FACET: they reflect the active Search / Package /
+  // Type filters (the same predicates as the main list query) but NEVER the
+  // currently selected Status. `all` is derived as draft + published + archived
+  // (the DB CHECK constraint forbids any other status, so the sum equals the
+  // true total). All three queries are `head: true` — no row data is shipped.
+  // Run in parallel via Promise.all (same idiom as questions/page.tsx and the
+  // dashboard). The main list query + pagination above are UNCHANGED: the
+  // pagination `count` still comes from the filtered main query, not from here.
+  const facetFilters = { search, packageFilter, typeFilter }
+  // Build one head-only count query narrowed to a single status. The shared
+  // Search/Package/Type predicates are applied via buildExamSetFacetQuery.
+  //
+  // The Supabase builder returned by `.select(...)` is a deeply-generic
+  // `PostgrestFilterBuilder`; threading it through our generic helper triggers
+  // TS2589 (excessive type instantiation depth). We cast it once to the erased
+  // `FilterableQueryBuilder` contract at the Supabase boundary — the same
+  // boundary-erasure pattern actions.ts uses for RPC calls. The cast only
+  // widens the static type; the runtime object is unchanged.
+  const statusCountFor = (status: 'draft' | 'published' | 'archived') =>
+    buildExamSetFacetQuery(
+      supabase.from('exam_sets').select('*', { count: 'exact', head: true }) as unknown as FilterableQueryBuilder,
+      facetFilters
+    ).eq('status', status)
+  // Each count query selects with head:true first (no rows shipped), then the
+  // shared Search/Package/Type filters are applied, then the per-status
+  // `.eq('status', …)` narrows that facet. Order mirrors the main list query
+  // (`.select(...)` then `.eq(...)`). Run in parallel.
+  const [
+    draftCountRes,
+    publishedCountRes,
+    archivedCountRes,
+  ] = await Promise.all([
+    statusCountFor('draft'),
+    statusCountFor('published'),
+    statusCountFor('archived'),
+  ])
+  // Each result is inspected; ANY error short-circuits to a safe failure rather
+  // than silently substituting 0 (which would compute misleading counts).
+  const facetResult = aggregateFacetCounts(
+    draftCountRes as any,
+    publishedCountRes as any,
+    archivedCountRes as any
+  )
+  const statusCounts = facetResult.ok
+    ? facetResult.counts
+    : { all: null, draft: null, published: null, archived: null }
+
   // Format data
   const examSets = (rawExamSets || []).map((es: any) => ({
     ...es,
@@ -79,6 +132,7 @@ export default async function ExamSetsPage({
       packageFilter={packageFilter}
       typeFilter={typeFilter}
       statusFilter={statusFilter}
+      statusCounts={statusCounts}
     />
   )
 }
