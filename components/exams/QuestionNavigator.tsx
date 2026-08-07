@@ -120,7 +120,7 @@ export default function QuestionNavigator({
 
   return (
     <div
-      className={`bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-4 sm:p-5 text-[#F5E9D6] font-sans ${className}`}
+      className={`p-4 sm:p-5 text-[#F5E9D6] font-sans ${className}`}
     >
       {/* Header with Two-Row Layout */}
       <div className="mb-4 pb-3 border-b border-[rgba(255,255,255,0.06)] space-y-3">
