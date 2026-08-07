@@ -242,3 +242,18 @@ export function trackHomepageNewsViewAllClick(params: {
   })
 }
 
+/**
+ * Track a click on a Social Follow CTA link.
+ */
+export function trackSocialFollowClick(params: {
+  platform: 'facebook' | 'line' | 'tiktok'
+  placement: 'news_detail_end'
+  content_id: string
+}): void {
+  pushToDataLayer({
+    event: 'social_follow_click',
+    platform: params.platform,
+    placement: params.placement,
+    content_id: params.content_id,
+  })
+}

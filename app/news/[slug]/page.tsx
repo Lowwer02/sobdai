@@ -26,6 +26,10 @@ import NewsCtaBox from '@/components/news/NewsCtaBox'
 import GpExamRequirementBadge from '@/components/news/GpExamRequirementBadge'
 import RecruitmentStatusBadge from '@/components/news/RecruitmentStatusBadge'
 import NewsShareButtons from '@/components/news/NewsShareButtons'
+import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
+import { getHomepageSettings } from '@/lib/homepageConfig'
+import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
+
 
 /**
  * Public Government News detail (`/news/[slug]`) — Server Component.
@@ -410,7 +414,17 @@ export default async function NewsDetailPage({
 
   // Editor-curated related packages + summaries (the conversion path). Empty
   // when no relations exist — the section renders nothing in that case.
-  const related = await getRelatedContent(article.id)
+  const [homepageSettings, related] = await Promise.all([
+    getHomepageSettings(),
+    getRelatedContent(article.id),
+  ])
+
+  const socialFollowPlacement = homepageSettings.social_follow.placements.news_detail_end
+  const resolvedSocialChannels = resolveSocialFollowChannels(
+    homepageSettings.social_follow,
+    'news_detail_end',
+    homepageSettings.footer.social_links
+  )
 
   // NewsArticle JSON-LD (resolved once; reuses the same fallback rules as the
   // page <head> metadata via buildNewsJsonLd → resolveNewsSeo). Rendered inline
@@ -684,6 +698,14 @@ export default async function NewsDetailPage({
           newsSlug={slug}
           relatedPackages={related.packages}
           relatedSummaries={related.summaries}
+        />
+
+        {/* Social Follow CTA box */}
+        <NewsSocialFollowBox
+          heading={socialFollowPlacement.heading}
+          description={socialFollowPlacement.description}
+          channels={resolvedSocialChannels}
+          contentId={article.slug}
         />
 
         {/* Related content — the conversion path (News → Package → Summary).

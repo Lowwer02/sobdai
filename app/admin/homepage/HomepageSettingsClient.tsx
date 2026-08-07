@@ -200,7 +200,12 @@ export default function HomepageSettingsClient({ initial }: { initial: HomepageS
 
       {/* ─── Footer ─── */}
       <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-3">
-        <h2 className="text-[#D4AF37] font-bold font-display">Footer Social Links</h2>
+        <div>
+          <h2 className="text-[#D4AF37] font-bold font-display">Social Channels</h2>
+          <p className="text-xs text-[#A1866B] mt-0.5">
+            ช่องทางโซเชียลหลักที่ใช้ทั่วทั้งเว็บไซต์ รวมถึง Footer และ Social Follow CTA
+          </p>
+        </div>
         {settings.footer.social_links.map((social, index) => (
           <div key={social.key} className="p-4 rounded-xl bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] space-y-3">
             <label className="flex items-center gap-3 cursor-pointer">
