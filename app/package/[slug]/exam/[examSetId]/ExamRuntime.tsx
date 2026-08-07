@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw, ChevronDown, LayoutGrid, X } from 'lucide-react'
 import DownloadShareButton from '@/components/share/DownloadShareButton'
 import { computeOutcome } from '@/lib/assessment/outcome'
 import { normalizeMode } from '@/lib/assessment/types'
@@ -20,6 +20,7 @@ import type { QuestionBookmarkState } from '@/lib/assessment/saved-questions-dat
 import type { ExamSet } from '@/lib/types'
 import { completeExam, startExam, submitExam } from '@/lib/analytics'
 import QuestionBookmarkButton from '@/components/exams/QuestionBookmarkButton'
+import QuestionNavigator from '@/components/exams/QuestionNavigator'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -86,6 +87,7 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
   const [flagged, setFlagged] = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<'IN_PROGRESS' | 'CONFIRM_SUBMIT' | 'REVIEW'>('IN_PROGRESS')
   const [isExplanationExpanded, setIsExplanationExpanded] = useState(false)
+  const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
 
   // Outcome: null until the attempt terminates. The Result view reads from
   // this object rather than recomputing inline. (Constitution AI-005: once
@@ -147,6 +149,14 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
   useEffect(() => {
     setIsExplanationExpanded(false)
   }, [currentIndex])
+
+  const handleSelectQuestionFromNavigator = useCallback((index: number) => {
+    setCurrentIndex(index)
+    setIsNavigatorOpen(false)
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [])
 
   // Track start_exam event on runtime initialization
   useEffect(() => {
@@ -498,6 +508,10 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isNavigatorOpen) {
+        setIsNavigatorOpen(false)
+        return
+      }
       if (status === 'IN_PROGRESS' && q) {
         if (e.key === 'ArrowRight') goNext()
         if (e.key === 'ArrowLeft') goPrev()
@@ -513,7 +527,7 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [currentIndex, status, q])
+  }, [currentIndex, status, q, isNavigatorOpen])
 
   // Helper for rendering Question Indicators
   const renderIndicators = () => (
@@ -867,7 +881,16 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
             </Link>
             <div>
               <div className="text-[10px] uppercase tracking-wider font-bold text-[#A1866B] mb-0.5">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.name}</div>
-              <div className="text-sm font-bold text-[#F5E9D6] lg:hidden">ข้อ {currentIndex + 1} จาก {questions.length}</div>
+              <button
+                type="button"
+                onClick={() => setIsNavigatorOpen(true)}
+                className="flex items-center gap-1.5 text-sm font-bold text-[#F5E9D6] hover:text-[#D4AF37] transition-colors lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] px-2 py-0.5 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
+                aria-label="เปิดตัวนำทางข้อสอบ"
+                title="เปิดดูรายการข้อสอบทั้งหมด"
+              >
+                <span>ข้อ {currentIndex + 1} / {questions.length}</span>
+                <ChevronDown size={14} className="text-[#D4AF37]" />
+              </button>
             </div>
           </div>
           
@@ -1070,9 +1093,17 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
               <span>ก่อนหน้า</span>
             </button>
 
-            <div className="text-center flex items-center gap-3 text-sm font-medium text-[#A1866B]">
-              ข้อ <span className="text-xl font-bold text-[#D4AF37]">{currentIndex + 1}</span> / {questions.length}
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsNavigatorOpen(true)}
+              className="group flex items-center gap-2.5 px-4 py-1.5 rounded-xl border border-[rgba(255,255,255,0.1)] hover:border-[#D4AF37]/50 bg-[#1A140E]/60 text-sm font-medium text-[#A1866B] hover:text-[#F5E9D6] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              aria-label="เปิดตัวนำทางข้อสอบ"
+              title="เปิดดูรายการข้อสอบทั้งหมด"
+            >
+              <LayoutGrid size={15} className="text-[#D4AF37]" />
+              <span>ข้อ <span className="text-lg font-bold text-[#D4AF37]">{currentIndex + 1}</span> / {questions.length}</span>
+              <ChevronDown size={14} className="text-[#A1866B] group-hover:text-[#D4AF37] transition-colors" />
+            </button>
 
             {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
               <button type="button"
@@ -1104,6 +1135,40 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
 
         </div>
       </div>
+
+      {/* Question Navigator Modal Overlay */}
+      {isNavigatorOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsNavigatorOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="question-navigator-heading"
+            className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl bg-[#1A140E] border border-[rgba(212,175,55,0.3)] shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsNavigatorOpen(false)}
+              className="absolute top-3.5 right-3.5 p-2 text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-lg transition-colors z-10"
+              aria-label="ปิดตัวนำทางข้อสอบ"
+            >
+              <X size={18} />
+            </button>
+
+            <QuestionNavigator
+              questions={questions}
+              answers={answers}
+              flagged={flagged}
+              currentIndex={currentIndex}
+              onSelectQuestion={handleSelectQuestionFromNavigator}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   )
