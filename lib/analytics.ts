@@ -247,7 +247,7 @@ export function trackHomepageNewsViewAllClick(params: {
  */
 export function trackSocialFollowClick(params: {
   platform: 'facebook' | 'line' | 'tiktok'
-  placement: 'news_detail_end'
+  placement: 'news_detail_end' | 'news_list_banner'
   content_id: string
 }): void {
   pushToDataLayer({
