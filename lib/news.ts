@@ -551,12 +551,23 @@ export function isValidDateOnly(value: unknown): boolean {
 }
 
 /**
- * Parse an application deadline date string (YYYY-MM-DD). Returns null for invalid/absent input.
+ * Parse an application deadline date string (YYYY-MM-DD). Returns canonical Gregorian YYYY-MM-DD.
+ * Converts legacy/BE year (> 2400) to Gregorian (-543) before calendar validation.
+ * Returns null for invalid/absent input or impossible calendar dates.
  */
 export function parseApplicationDeadline(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const s = value.trim()
-  return isValidDateOnly(s) ? s : null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
+
+  const [yStr, mStr, dStr] = s.split('-')
+  let y = parseInt(yStr, 10)
+  if (y > 2400) {
+    y -= 543
+  }
+
+  const gregStr = `${y}-${mStr}-${dStr}`
+  return isValidDateOnly(gregStr) ? gregStr : null
 }
 
 /**
@@ -577,6 +588,20 @@ export function getThailandDateString(dateObj: Date = new Date()): string {
 }
 
 /**
+ * Normalize date string to Gregorian YYYY-MM-DD format (if legacy row stored Buddhist Era year > 2400).
+ */
+export function normalizeGregorianDateOnly(dateStr: string): string {
+  if (!isValidDateOnly(dateStr)) return dateStr
+  const [yStr, mStr, dStr] = dateStr.trim().split('-')
+  const y = parseInt(yStr, 10)
+  if (y > 2400) {
+    const gregY = y - 543
+    return `${gregY}-${mStr}-${dStr}`
+  }
+  return dateStr.trim()
+}
+
+/**
  * Check if a recruitment application deadline is expired relative to Thailand current date.
  * A deadline of 2026-08-31 remains open throughout 31 August and becomes expired on 2026-09-01.
  */
@@ -585,7 +610,8 @@ export function isApplicationExpired(
   todayStr: string = getThailandDateString()
 ): boolean {
   if (!deadline || !isValidDateOnly(deadline)) return false
-  return todayStr > deadline
+  const normDeadline = normalizeGregorianDateOnly(deadline)
+  return todayStr > normDeadline
 }
 
 /**
