@@ -142,22 +142,28 @@ export default function NewsCard({ article, index = 0, onClick }: NewsCardProps)
         {/* Body */}
         <div
           style={{
-            padding: '18px 20px 20px',
+            padding: '16px 14px 18px',
             display: 'flex',
             flexDirection: 'column',
             flex: 1,
           }}
         >
           {/* Metadata row: Published date + ภาค ก. requirement badge + recruitment status badge */}
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 mb-2 text-xs text-[var(--text-muted)]">
-            <div className="inline-flex items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mb-2 text-xs text-[var(--text-muted)]">
+            <div className="inline-flex items-center gap-1 shrink-0">
               <Calendar size={12} aria-hidden />
               <time dateTime={article.published_at || undefined}>{dateLabel}</time>
             </div>
             {article.gp_exam_requirement && (
-              <GpExamRequirementBadge value={article.gp_exam_requirement} />
+              <GpExamRequirementBadge
+                value={article.gp_exam_requirement}
+                className="!px-2 !py-0.5 !text-[11px]"
+              />
             )}
-            <RecruitmentStatusBadge deadline={article.application_deadline} />
+            <RecruitmentStatusBadge
+              deadline={article.application_deadline}
+              className="!px-2 !py-0.5 !text-[11px]"
+            />
           </div>
 
           {/* Title */}
