@@ -148,19 +148,9 @@ export default function NewsCard({ article, index = 0, onClick }: NewsCardProps)
             flex: 1,
           }}
         >
-          {/* Published date + ภาค ก. requirement badge */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '6px 10px',
-              marginBottom: '8px',
-              fontSize: '12px',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          {/* Metadata row: Published date + ภาค ก. requirement badge + recruitment status badge */}
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 mb-2 text-xs text-[var(--text-muted)]">
+            <div className="inline-flex items-center gap-1.5 shrink-0">
               <Calendar size={12} aria-hidden />
               <time dateTime={article.published_at || undefined}>{dateLabel}</time>
             </div>
