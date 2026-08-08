@@ -6,6 +6,8 @@ import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import { createPageMetadata } from '@/lib/seo'
 import { fetchBookmarkStateMap } from '@/lib/assessment/saved-questions-data'
+import { getHomepageSettings } from '@/lib/homepageConfig'
+import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, examSetId: string }> }) {
   const { slug, examSetId } = await params
@@ -327,6 +329,14 @@ export default async function ExamSetPage({
     )
   }
 
+  const homepageSettings = await getHomepageSettings()
+  const socialFollowPlacement = homepageSettings.social_follow.placements.exam_result
+  const resolvedSocialChannels = resolveSocialFollowChannels(
+    homepageSettings.social_follow,
+    'exam_result',
+    homepageSettings.footer.social_links
+  )
+
   // If mode is selected, render Runtime (Current logic)
   return (
     <ExamRuntime
@@ -335,6 +345,11 @@ export default async function ExamSetPage({
       questions={questions}
       mode={mode}
       bookmarkState={bookmarkState}
+      examResultSocialFollow={{
+        heading: socialFollowPlacement.heading,
+        description: socialFollowPlacement.description,
+        channels: resolvedSocialChannels,
+      }}
     />
   )
 }
