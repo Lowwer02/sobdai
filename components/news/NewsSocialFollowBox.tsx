@@ -6,7 +6,7 @@ interface NewsSocialFollowBoxProps {
   description: string
   channels: readonly ResolvedSocialChannel[]
   contentId: string
-  placement?: 'news_detail_end' | 'news_list_banner' | 'dashboard'
+  placement?: 'news_detail_end' | 'news_list_banner' | 'dashboard' | 'exam_result'
 }
 
 /**

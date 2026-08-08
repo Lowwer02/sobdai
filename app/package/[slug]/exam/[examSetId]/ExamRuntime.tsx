@@ -18,9 +18,11 @@ import type { SessionSnapshot } from '@/lib/assessment/session-types'
 import type { BookmarkStateMap } from '@/lib/assessment/saved-questions-data'
 import type { QuestionBookmarkState } from '@/lib/assessment/saved-questions-data'
 import type { ExamSet } from '@/lib/types'
+import type { ResolvedSocialChannel } from '@/lib/socialFollowConfig'
 import { completeExam, startExam, submitExam } from '@/lib/analytics'
 import QuestionBookmarkButton from '@/components/exams/QuestionBookmarkButton'
 import QuestionNavigator from '@/components/exams/QuestionNavigator'
+import NewsSocialFollowLink from '@/components/news/NewsSocialFollowLink'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -54,9 +56,21 @@ interface ExamRuntimeProps {
   mode?: string
   /** Phase 1F: server-rendered saved-question state (questionId → bookmark). */
   bookmarkState?: BookmarkStateMap
+  examResultSocialFollow?: {
+    heading: string
+    description: string
+    channels: readonly ResolvedSocialChannel[]
+  }
 }
 
-export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mode, bookmarkState = {} }: ExamRuntimeProps) {
+export default function ExamRuntime({
+  pkg,
+  examSet,
+  questions: rawQuestions,
+  mode,
+  bookmarkState = {},
+  examResultSocialFollow,
+}: ExamRuntimeProps) {
   // ── Assessment domain boundary ─────────────────────────────────────────
   // Epic 1 (Assessment Runtime) introduces the Outcome boundary. The runtime
   // delegates verdict/scoring computation to lib/assessment/outcome.ts and
@@ -834,6 +848,39 @@ export default function ExamRuntime({ pkg, examSet, questions: rawQuestions, mod
               กลับหน้าหลัก
             </Link>
           </div>
+
+          {/* Social Follow Card (Phase 4 — Exam Result CTA) */}
+          {examResultSocialFollow && examResultSocialFollow.channels.length > 0 && (
+            <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] rounded-2xl p-6">
+              <p className="text-xs font-bold text-[#A1866B] uppercase tracking-wider mb-2">
+                ติดตาม Sobdai
+              </p>
+              <h3 className="text-xl font-bold font-display text-[#F5E9D6] mb-2">
+                {examResultSocialFollow.heading}
+              </h3>
+              {examResultSocialFollow.description && (
+                <p className="text-sm text-[#A1866B] mb-5 leading-relaxed">
+                  {examResultSocialFollow.description}
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {examResultSocialFollow.channels.map((channel, index) => {
+                  const isPrimary = index === 0
+                  return (
+                    <NewsSocialFollowLink
+                      key={channel.key}
+                      platform={channel.key}
+                      placement="exam_result"
+                      url={channel.url}
+                      buttonLabel={channel.button_label}
+                      contentId={examSet.id}
+                      className={isPrimary ? 'btn-primary' : 'btn-outline'}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
