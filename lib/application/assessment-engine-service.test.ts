@@ -143,6 +143,28 @@ function rejects_invalid_service_configuration(): void {
   )
 }
 
+function rejects_invalid_target_set_count(): void {
+  const service = new AssessmentEngineService(dependencies())
+  for (const invalidValue of [0, 6, 2.5, '3'] as unknown[]) {
+    const invalidReq = {
+      ...REQUEST,
+      options: {
+        ...REQUEST.options,
+        targetSetCount: invalidValue as any,
+      },
+    }
+    assert.throws(
+      () => service.execute(invalidReq),
+      (error: unknown) => {
+        assert.ok(error instanceof AssessmentEngineServiceError)
+        assert.equal(error.code, 'INVALID_REQUEST')
+        assert.equal(error.field, 'options.targetSetCount')
+        return true
+      }
+    )
+  }
+}
+
 const tests: readonly {
   readonly name: string
   readonly fn: () => void
@@ -162,6 +184,10 @@ const tests: readonly {
   {
     name: 'rejects invalid service configuration',
     fn: rejects_invalid_service_configuration,
+  },
+  {
+    name: 'rejects invalid targetSetCount values',
+    fn: rejects_invalid_target_set_count,
   },
 ]
 

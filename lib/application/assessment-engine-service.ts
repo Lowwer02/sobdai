@@ -158,6 +158,14 @@ function validateRequest(request: EngineRequest): void {
   ) {
     invalidRequest('options.auditVerbosity')
   }
+  if (
+    value.options.targetSetCount !== undefined &&
+    (!Number.isInteger(value.options.targetSetCount) ||
+      (value.options.targetSetCount as number) < 1 ||
+      (value.options.targetSetCount as number) > 5)
+  ) {
+    invalidRequest('options.targetSetCount')
+  }
 
   if (!isRecord(value.context)) {
     invalidRequest('context')

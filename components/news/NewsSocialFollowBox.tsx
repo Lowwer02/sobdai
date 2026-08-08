@@ -6,11 +6,12 @@ interface NewsSocialFollowBoxProps {
   description: string
   channels: readonly ResolvedSocialChannel[]
   contentId: string
+  placement?: 'news_detail_end' | 'news_list_banner'
 }
 
 /**
  * Public Social Follow Box — rendered near the bottom of news articles
- * (app/news/[slug]/page.tsx).
+ * (app/news/[slug]/page.tsx) or in the news list banner (app/news/page.tsx).
  *
  * Server Component (no 'use client'). Evaluates resolved channels and
  * renders a dark Sobdai gold card with external channel links via
@@ -22,6 +23,7 @@ export default function NewsSocialFollowBox({
   description,
   channels,
   contentId,
+  placement = 'news_detail_end',
 }: NewsSocialFollowBoxProps) {
   if (!channels || channels.length === 0) return null
 
@@ -73,6 +75,7 @@ export default function NewsSocialFollowBox({
               <NewsSocialFollowLink
                 key={channel.key}
                 platform={channel.key}
+                placement={placement}
                 url={channel.url}
                 buttonLabel={channel.button_label}
                 contentId={contentId}

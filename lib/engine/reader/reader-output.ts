@@ -96,6 +96,9 @@ export interface ReadBlueprintOptions {
    * clock itself (would violate determinism). Null when absent.
    */
   readonly timestampIso?: string | null
+
+  /** Target number of sets to produce (1–5). Defaults to 5 if omitted. */
+  readonly targetSetCount?: number | null
 }
 
 /**
@@ -170,7 +173,11 @@ export function readBlueprint(
   const stage5Diagnostics: readonly ReaderError[] = []
 
   // ─── Stage 6: AssemblyRequest Builder ────────────────────────────────────
-  const buildResult: BuildAssemblyRequestResult = buildAssemblyRequest(ast, canonicalMeta)
+  const buildResult: BuildAssemblyRequestResult = buildAssemblyRequest(
+    ast,
+    canonicalMeta,
+    { targetSetCount: options.targetSetCount }
+  )
   if (!buildResult.ok) {
     // Stage 6 refusal: synthesize a single ReaderError representing the
     // failure so the diagnostics list explains WHY no AssemblyRequest was

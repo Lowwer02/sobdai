@@ -78,6 +78,9 @@ export interface EngineExecutionOptions {
 
   /** Audit detail requested in the Assembly Result. */
   readonly auditVerbosity: 'summary' | 'full'
+
+  /** Target number of sets to produce (1–5). Defaults to 5 if omitted. */
+  readonly targetSetCount?: 1 | 2 | 3 | 4 | 5
 }
 
 /**

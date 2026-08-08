@@ -1,11 +1,15 @@
-import { Suspense } from 'react'
+import { Suspense, Fragment } from 'react'
 import Link from 'next/link'
 import { Newspaper, SearchX, AlertTriangle, ArrowRight } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { createPageMetadata } from '@/lib/seo'
+import { getHomepageSettings } from '@/lib/homepageConfig'
+import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
 import NewsCard from '@/components/news/NewsCard'
 import NewsPagination, { buildNewsPageHref } from '@/components/news/NewsPagination'
 import NewsListControls from '@/components/news/NewsListControls'
+import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
+
 
 /**
  * Public Government News list (`/news`) — Server Component.
@@ -92,9 +96,18 @@ export default async function NewsListPage({
   let total = 0
   let categories: string[] = []
   let fetchError = false
+  let socialFollowPlacement = { heading: '', description: '' }
+  let resolvedSocialChannels: import('@/lib/socialFollowConfig').ResolvedSocialChannel[] = []
 
   try {
     const supabase = createAnonServerClient()
+    const homepageSettings = await getHomepageSettings()
+    socialFollowPlacement = homepageSettings.social_follow.placements.news_list_banner
+    resolvedSocialChannels = resolveSocialFollowChannels(
+      homepageSettings.social_follow,
+      'news_list_banner',
+      homepageSettings.footer.social_links
+    )
 
     // --- main list query (published only) ---
     let query: any = supabase
@@ -266,7 +279,20 @@ export default async function NewsListPage({
                 }}
               >
                 {news.map((article, i) => (
-                  <NewsCard key={article.id} article={article} index={i} />
+                  <Fragment key={article.id}>
+                    <NewsCard article={article} index={i} />
+                    {i === 2 && news.length >= 3 && (
+                      <div className="col-span-full" style={{ gridColumn: '1 / -1' }}>
+                        <NewsSocialFollowBox
+                          heading={socialFollowPlacement.heading}
+                          description={socialFollowPlacement.description}
+                          channels={resolvedSocialChannels}
+                          placement="news_list_banner"
+                          contentId="news-list"
+                        />
+                      </div>
+                    )}
+                  </Fragment>
                 ))}
               </div>
             ) : (

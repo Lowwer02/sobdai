@@ -240,6 +240,29 @@ function verifies_runtime_has_no_testing_dependency(): void {
   assert.doesNotMatch(source, /shared\/testing|reader\/testing/)
 }
 
+function verifies_target_set_count_plumbing(): void {
+  for (const count of [1, 3, 5] as const) {
+    const req: EngineRequest = {
+      ...REQUEST,
+      options: {
+        ...REQUEST.options,
+        targetSetCount: count,
+      },
+    }
+    const res = runEngine(req, dependencies())
+    assert.ok(res.assemblyRequest)
+    assert.equal(res.assemblyRequest.target.sets, count)
+    assert.equal(res.assemblyRequest.target.perSet, 100)
+  }
+}
+
+function verifies_default_target_set_count_is_5(): void {
+  const res = runEngine(REQUEST, dependencies())
+  assert.ok(res.assemblyRequest)
+  assert.equal(res.assemblyRequest.target.sets, 5)
+  assert.equal(res.assemblyRequest.target.perSet, 100)
+}
+
 const tests: readonly {
   readonly name: string
   readonly fn: () => void
@@ -263,6 +286,14 @@ const tests: readonly {
   {
     name: 'has no production dependency on testing fixtures',
     fn: verifies_runtime_has_no_testing_dependency,
+  },
+  {
+    name: 'defaults targetSetCount to 5 sets',
+    fn: verifies_default_target_set_count_is_5,
+  },
+  {
+    name: 'plumbs targetSetCount for 1, 3, and 5 sets',
+    fn: verifies_target_set_count_plumbing,
   },
 ]
 

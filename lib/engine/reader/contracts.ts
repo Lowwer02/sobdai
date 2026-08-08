@@ -349,6 +349,11 @@ export interface ReaderError {
   recommendation: string
 }
 
+export interface ReadBlueprintOptions {
+  readonly timestampIso?: string | null
+  readonly targetSetCount?: number | null
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. Reader result — the entry-point return type (Stage 8 output)
 // ═══════════════════════════════════════════════════════════════════════════

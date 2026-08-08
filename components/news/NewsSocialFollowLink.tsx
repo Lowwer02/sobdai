@@ -6,6 +6,7 @@ import { trackSocialFollowClick } from '@/lib/analytics'
 
 interface NewsSocialFollowLinkProps {
   platform: SocialPlatformKey
+  placement: 'news_detail_end' | 'news_list_banner'
   url: string
   buttonLabel: string
   contentId: string
@@ -18,6 +19,7 @@ interface NewsSocialFollowLinkProps {
  */
 export default function NewsSocialFollowLink({
   platform,
+  placement,
   url,
   buttonLabel,
   contentId,
@@ -27,7 +29,7 @@ export default function NewsSocialFollowLink({
     try {
       trackSocialFollowClick({
         platform,
-        placement: 'news_detail_end',
+        placement,
         content_id: contentId,
       })
     } catch {

@@ -239,6 +239,7 @@ function executeReader(
 
   const result = readBlueprint(source, {
     timestampIso: state.execution.startedAtIso,
+    targetSetCount: state.request.options.targetSetCount,
   })
   let nextState = withModuleVersions(state, {
     reader: result.executionMeta.readerVersion,
