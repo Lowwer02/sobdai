@@ -135,9 +135,14 @@ const SPEC_VERSION: AssemblyRequestMeta['specVersion'] = '1.0'
  * @param ast           The Stage-5-projected BlueprintAst.
  * @param canonicalMeta The Stage-4-normalized metadata (for identity).
  */
+export interface BuildAssemblyRequestOptions {
+  readonly targetSetCount?: number | null
+}
+
 export function buildAssemblyRequest(
   ast: BlueprintAst,
-  canonicalMeta: CanonicalBlueprintMetadata
+  canonicalMeta: CanonicalBlueprintMetadata,
+  options?: BuildAssemblyRequestOptions
 ): BuildAssemblyRequestResult {
   // 1. Required-piece checks (Fail Loud — no silent defaults on identity).
   if (canonicalMeta.blueprintVersion === null) {
@@ -212,11 +217,24 @@ export function buildAssemblyRequest(
     ast.similarityThresholds
   )
 
+  const setsCount =
+    typeof options?.targetSetCount === 'number' &&
+    Number.isInteger(options.targetSetCount) &&
+    options.targetSetCount >= 1 &&
+    options.targetSetCount <= 5
+      ? options.targetSetCount
+      : RUN_TARGET.sets
+
+  const target: RunTarget = {
+    sets: setsCount,
+    perSet: RUN_TARGET.perSet,
+  }
+
   // 8. AssemblyRequest.
   const request: AssemblyRequest = {
     identity,
     runUnit: 'blueprint',
-    target: RUN_TARGET,
+    target,
     documentRegistry,
     distributionConstraints,
     coverageRules,

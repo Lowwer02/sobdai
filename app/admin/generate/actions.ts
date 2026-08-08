@@ -17,6 +17,7 @@ const QUESTION_BANK_PAGE_SIZE = 1_000
 
 export interface AdminGenerateAssessmentInput {
   readonly blueprintKey: AdminAssessmentBlueprintKey
+  readonly targetSetCount?: 1 | 2 | 3 | 4 | 5
   readonly overFetchFactor: number
   readonly auditVerbosity: 'summary' | 'full'
 }
@@ -114,6 +115,7 @@ export async function generateAssessmentAdminAction(
         performanceBudgetMs: null,
         parallelismHint: null,
         auditVerbosity: input.auditVerbosity,
+        targetSetCount: input.targetSetCount,
       },
       context: {
         requestedBy: profile.email ?? user.id,
@@ -195,6 +197,15 @@ function validateAdminGenerateInput(
     ![1, 1.5, 2, 3].includes(input.overFetchFactor)
   ) {
     return 'Candidate headroom must be one of the supported values.'
+  }
+
+  if (
+    input.targetSetCount !== undefined &&
+    (!Number.isInteger(input.targetSetCount) ||
+      input.targetSetCount < 1 ||
+      input.targetSetCount > 5)
+  ) {
+    return 'Target set count must be between 1 and 5 sets.'
   }
 
   if (
