@@ -15,6 +15,9 @@ import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQue
 import MobileShowMore from '@/components/exams/MobileShowMore'
 import { getDashboardData } from '@/lib/assessment/dashboard-data'
 import { fetchSavedQuestionCards } from '@/lib/assessment/saved-questions-data'
+import { getHomepageSettings } from '@/lib/homepageConfig'
+import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
+import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
 import {
   getLearnerAnalytics,
   getWeakTopics,
@@ -257,6 +260,14 @@ export default async function ExamDashboardPage({
 
   const allPackages = enriched
 
+  const homepageSettings = await getHomepageSettings()
+  const socialFollowPlacement = homepageSettings.social_follow.placements.dashboard
+  const resolvedSocialChannels = resolveSocialFollowChannels(
+    homepageSettings.social_follow,
+    'dashboard',
+    homepageSettings.footer.social_links
+  )
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 20px 80px' }}>
@@ -418,6 +429,15 @@ export default async function ExamDashboardPage({
             </div>
           ) : null}
         </section>
+
+        {/* ---------- Social Follow Card (Phase 3 — Dashboard Placement) ---------- */}
+        <NewsSocialFollowBox
+          heading={socialFollowPlacement.heading}
+          description={socialFollowPlacement.description}
+          channels={resolvedSocialChannels}
+          placement="dashboard"
+          contentId="dashboard"
+        />
 
         {/* ---------- Activity Timeline (Phase 1E — recent activity) ---------- */}
         <section style={{ marginBottom: '48px' }}>
