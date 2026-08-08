@@ -54,9 +54,11 @@ export async function generateAssessmentAdminAction(
       }
     }
 
+    const packageCode = 'packageCode' in blueprint ? (blueprint as { packageCode?: string }).packageCode : undefined
+
     const [blueprintSource, bankRows] = await Promise.all([
       readFile(path.join(process.cwd(), blueprint.sourcePath), 'utf8'),
-      readQuestionBankMetadata(supabase),
+      readQuestionBankMetadata(supabase, packageCode),
     ])
 
     const submittedAtIso = new Date().toISOString()
@@ -142,33 +144,89 @@ type AdminSupabaseClient =
   Awaited<ReturnType<typeof requirePermission>>['supabase']
 
 async function readQuestionBankMetadata(
-  supabase: AdminSupabaseClient
+  supabase: AdminSupabaseClient,
+  packageCode?: string
 ) {
-  const rows = []
+  if (!packageCode || packageCode.trim().length === 0) {
+    throw new Error('Assessment Blueprint has no package scope configured.')
+  }
+
+  const { data: pkg, error: pkgErr } = await supabase
+    .from('packages')
+    .select('id')
+    .eq('package_code', packageCode)
+    .maybeSingle()
+
+  if (pkgErr) {
+    throw new Error(`Package '${packageCode}' lookup failed: ${pkgErr.message}`)
+  }
+  if (!pkg) {
+    throw new Error(`Package '${packageCode}' could not be found.`)
+  }
+
+  const { data: examSets, error: examSetsErr } = await supabase
+    .from('exam_sets')
+    .select('id')
+    .eq('package_id', pkg.id)
+
+  if (examSetsErr) {
+    throw new Error(`Exam sets for package '${packageCode}' could not be loaded: ${examSetsErr.message}`)
+  }
+
+  const examSetIds = (examSets ?? []).map((es) => es.id)
+  if (examSetIds.length === 0) {
+    return []
+  }
+
+  const allEsqRows: any[] = []
 
   for (let from = 0; ; from += QUESTION_BANK_PAGE_SIZE) {
     const to = from + QUESTION_BANK_PAGE_SIZE - 1
-    const { data, error } = await supabase
-      .from('questions')
-      .select(
-        'question_code, subject, document, topic, law, difficulty, status, blueprint_type, learning_objective, question_pattern, section'
-      )
-      .not('question_code', 'is', null)
-      .order('question_code', { ascending: true })
+    const { data: page, error: esqErr } = await supabase
+      .from('exam_set_questions')
+      .select(`
+        questions (
+          question_code,
+          subject,
+          document,
+          topic,
+          law,
+          difficulty,
+          status,
+          blueprint_type,
+          learning_objective,
+          question_pattern,
+          section
+        )
+      `)
+      .in('exam_set_id', examSetIds)
       .range(from, to)
 
-    if (error) {
-      throw new Error(
-        `Question Bank metadata could not be loaded: ${error.message}`
-      )
+    if (esqErr) {
+      throw new Error(`Package questions for '${packageCode}' could not be loaded: ${esqErr.message}`)
     }
 
-    const page = data ?? []
-    rows.push(...page)
-    if (page.length < QUESTION_BANK_PAGE_SIZE) {
-      return rows
+    const batch = page ?? []
+    allEsqRows.push(...batch)
+    if (batch.length < QUESTION_BANK_PAGE_SIZE) {
+      break
     }
   }
+
+  const rowsMap = new Map<string, any>()
+  for (const row of allEsqRows) {
+    const q = (row as any).questions
+    if (
+      q &&
+      q.status === 'Published' &&
+      q.question_code &&
+      !rowsMap.has(q.question_code)
+    ) {
+      rowsMap.set(q.question_code, q)
+    }
+  }
+
+  return Array.from(rowsMap.values())
 }
 
 function applicationErrorMessage(error: unknown): string {
