@@ -10,6 +10,42 @@ export {
 } from './summary-library-query'
 
 export {
+  SUMMARY_LIBRARY_UNASSIGNED_DOCUMENT,
+  SummaryLibraryCompatibilityMappingError,
+  buildSummaryLibraryDocumentOptions,
+  buildSummaryLibraryPackageOptions,
+  compareSummaryLibraryCompatibilityItems,
+  compareSummaryLibraryCompatibilityLegacyOrder,
+  isUnassignedDocumentFilter,
+  mapSummaryLibraryCompatibilityItem,
+  mapSummaryLibraryPlacementRecord,
+  mapSummaryLibraryProjectionRow,
+  mapSummaryLibrarySourceRecord,
+  matchesSummaryLibraryCompatibilityDocument,
+  normalizeSummaryLibraryCompatibilityQuery,
+} from './summary-library-compatibility'
+
+export type {
+  NormalizedSummaryLibraryCompatibilityQuery,
+  ReferenceDocumentLifecycleStatus,
+  ReferenceDocumentVersionStatus,
+  SummaryLibraryCompatibilityFacetPackage,
+  SummaryLibraryCompatibilityFacets,
+  SummaryLibraryCompatibilityItem,
+  SummaryLibraryCompatibilityMappingErrorCode,
+  SummaryLibraryCompatibilityPage,
+  SummaryLibraryCompatibilityPlacement,
+  SummaryLibraryCompatibilityPublicationStatus,
+  SummaryLibraryCompatibilityQueryRequest,
+  SummaryLibraryCompatibilityReadRepository,
+  SummaryLibraryCompatibilitySource,
+  SummaryLibraryCompatibilityWarning,
+  SummaryLibraryPlacementRecord,
+  SummaryLibraryProjectionRow,
+  SummaryLibrarySourceRecord,
+} from './summary-library-compatibility'
+
+export {
   SUMMARY_LIBRARY_COMPARE_SELECTION_LIMIT,
   setSummaryLibraryPageSelection,
   toggleSummaryLibrarySelection,
