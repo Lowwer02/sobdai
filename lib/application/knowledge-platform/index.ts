@@ -102,3 +102,31 @@ export type {
   VersionPolicy,
   VersionSourceSnapshot,
 } from './contracts'
+
+export {
+  calculateSummaryCompatibilityReadTimeMinutes,
+  computeSummaryCompatibilityChecksum,
+  prepareSummaryCompatibilityMetadata,
+  SummaryBankCompatibilityWriterError,
+  SummaryBankCompatibilityWriterService,
+  isSummaryBankCompatibilityWriterError,
+  SUMMARY_BANK_COMPATIBILITY_CONTENT_SCHEMA_VERSION,
+  SUMMARY_BANK_COMPATIBILITY_CREATE_CHANGE_NOTE,
+  SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE,
+  SUMMARY_BANK_COMPATIBILITY_READ_TIME_POLICY_VERSION,
+} from './summary-bank-compatibility-writer'
+
+export type {
+  SummaryBankCompatibilityCreateInput,
+  SummaryBankCompatibilityCreatePersistenceCommand,
+  SummaryBankCompatibilityCreatePersistenceResult,
+  SummaryBankCompatibilityCreateResult,
+  SummaryBankCompatibilityEditInput,
+  SummaryBankCompatibilityEditPersistenceCommand,
+  SummaryBankCompatibilityEditPersistenceResult,
+  SummaryBankCompatibilityEditResult,
+  SummaryBankCompatibilityMetadata,
+  SummaryBankCompatibilityPersistence,
+  SummaryBankCompatibilityWriter,
+  SummaryBankCompatibilityWriterErrorCode,
+} from './summary-bank-compatibility-writer'

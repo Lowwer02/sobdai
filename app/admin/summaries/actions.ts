@@ -1,52 +1,60 @@
 'use server'
 
 import { requirePermission } from '@/lib/auth/server-protect'
+import { isSummaryBankCompatibilityWriterError } from '@/lib/application/knowledge-platform'
+import { createSummaryBankCompatibilityWriter } from '@/lib/infrastructure/knowledge-platform'
 
 import { revalidatePath } from 'next/cache'
 
 
 export async function createSummary(data: any) {
   try {
-    const { supabase } = await requirePermission('content.write')
-    
-    const { data: result, error } = await supabase
-      .from('summaries')
-      .insert([data])
-      .select('id')
-      .single()
-
-    if (error) {
-      if (error.code === '23505') {
-        return { success: false, error: 'Slug already exists in this package.' }
-      }
-      throw error
-    }
+    const { user } = await requirePermission('content.write')
+    const writer = createSummaryBankCompatibilityWriter()
+    const result = await writer.create({
+      actorId: user.id,
+      packageId: data.package_id,
+      title: data.title,
+      slug: data.slug,
+      subject: data.subject,
+      document: data.document,
+      law: data.law,
+      topic: data.topic,
+      contentMd: data.content_md,
+      sortOrder: data.sort_order,
+      displayOrder: data.display_order,
+      isPublished: data.is_published,
+    })
 
     revalidatePath('/admin/summaries')
     revalidatePath(`/package/${data.package_id}`)
-    return { success: true, id: result.id }
+    return { success: true, id: result.summaryId }
   } catch (err: any) {
+    if (isSummaryBankCompatibilityWriterError(err) && err.code === 'duplicate_legacy_slug') {
+      return { success: false, error: 'Slug already exists in this package.' }
+    }
     return { success: false, error: err.message }
   }
 }
 
 export async function updateSummary(id: string, data: any) {
   try {
-    const { supabase } = await requirePermission('content.write')
-    
-    const { error, data: updateData } = await supabase
-      .from('summaries')
-      .update(data)
-      .eq('id', id)
-      .select('id')
-
-    if (error) {
-      if (error.code === '23505') {
-        return { success: false, error: 'Slug already exists in this package.' }
-      }
-      throw error
-    }
-    if (!updateData || updateData.length === 0) throw new Error('Update failed. You may not have permission.')
+    const { user } = await requirePermission('content.write')
+    const writer = createSummaryBankCompatibilityWriter()
+    await writer.update({
+      actorId: user.id,
+      summaryId: id,
+      packageId: data.package_id,
+      title: data.title,
+      slug: data.slug,
+      subject: data.subject,
+      document: data.document,
+      law: data.law,
+      topic: data.topic,
+      contentMd: data.content_md,
+      sortOrder: data.sort_order,
+      displayOrder: data.display_order,
+    })
 
     revalidatePath('/admin/summaries')
     if (data.package_id) {
@@ -55,6 +63,9 @@ export async function updateSummary(id: string, data: any) {
     }
     return { success: true }
   } catch (err: any) {
+    if (isSummaryBankCompatibilityWriterError(err) && err.code === 'duplicate_legacy_slug') {
+      return { success: false, error: 'Slug already exists in this package.' }
+    }
     return { success: false, error: err.message }
   }
 }
