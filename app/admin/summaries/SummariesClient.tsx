@@ -185,17 +185,52 @@ export default function SummariesClient({
 
   const handleTogglePublish = async (id: string, isPublished: boolean) => {
     setActingOnId(id)
-    await toggleSummaryPublish(id, !isPublished)
-    setActingOnId(null)
+    try {
+      const result = await toggleSummaryPublish(id, !isPublished)
+      if (!result.success) {
+        toastEvent(result.error || 'ไม่สามารถเปลี่ยนสถานะสรุปได้', 'error')
+        return
+      }
+
+      toastEvent(
+        result.outcome === 'unpublished'
+          ? 'ยกเลิกการเผยแพร่สรุปเรียบร้อยแล้ว'
+          : 'เผยแพร่สรุปเรียบร้อยแล้ว',
+        'success',
+      )
+      router.refresh()
+    } catch (error) {
+      toastEvent(
+        error instanceof Error ? error.message : 'ไม่สามารถเปลี่ยนสถานะสรุปได้',
+        'error',
+      )
+    } finally {
+      setActingOnId(null)
+    }
   }
 
   const handleDelete = async () => {
     if (!deleteModal.summaryId) return
-    setActingOnId(deleteModal.summaryId)
+    const summaryId = deleteModal.summaryId
+    setActingOnId(summaryId)
     setDeleteModal({ isOpen: false, summaryId: null })
-    await deleteSummary(deleteModal.summaryId)
-    toastEvent('ลบสรุปเรียบร้อยแล้ว')
-    setActingOnId(null)
+    try {
+      const result = await deleteSummary(summaryId)
+      if (!result.success) {
+        toastEvent(result.error || 'ลบสรุปไม่สำเร็จ', 'error')
+        return
+      }
+
+      toastEvent('ลบสรุปเรียบร้อยแล้ว', 'success')
+      router.refresh()
+    } catch (error) {
+      toastEvent(
+        error instanceof Error ? error.message : 'ลบสรุปไม่สำเร็จ',
+        'error',
+      )
+    } finally {
+      setActingOnId(null)
+    }
   }
 
   const libraryRows: SummaryLibraryTableRow[] = summaries.map((summary) => ({

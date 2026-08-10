@@ -4,9 +4,15 @@ import {
   SummaryBankCompatibilityWriterService,
   type SummaryBankCompatibilityCreatePersistenceCommand,
   type SummaryBankCompatibilityCreatePersistenceResult,
+  type SummaryBankCompatibilityDeletePersistenceCommand,
+  type SummaryBankCompatibilityDeletePersistenceResult,
   type SummaryBankCompatibilityEditPersistenceCommand,
   type SummaryBankCompatibilityEditPersistenceResult,
+  type SummaryBankCompatibilityPublishPersistenceCommand,
+  type SummaryBankCompatibilityPublishPersistenceResult,
   type SummaryBankCompatibilityPersistence,
+  type SummaryBankCompatibilityUnpublishPersistenceCommand,
+  type SummaryBankCompatibilityUnpublishPersistenceResult,
   type SummaryBankCompatibilityWriter,
 } from '@/lib/application/knowledge-platform/summary-bank-compatibility-writer'
 
@@ -20,12 +26,20 @@ interface SupabaseErrorLike {
 interface QueryResponse {
   readonly data: unknown
   readonly error: SupabaseErrorLike | null
+  readonly count?: number | null
 }
 
 interface NamespaceQuery {
-  select(columns: string): NamespaceQuery
+  select(columns: string, options?: { count?: 'exact'; head?: boolean }): NamespaceQuery
   eq(column: string, value: unknown): NamespaceQuery
+  in(column: string, values: readonly unknown[]): NamespaceQuery
+  order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): NamespaceQuery
+  range(from: number, to: number): NamespaceQuery
   maybeSingle(): PromiseLike<QueryResponse>
+  then<TResult1 = QueryResponse, TResult2 = never>(
+    onfulfilled?: ((value: QueryResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2>
 }
 
 export interface SummaryBankCompatibilitySupabaseClient {
@@ -35,7 +49,14 @@ export interface SummaryBankCompatibilitySupabaseClient {
 
 const CREATE_RPC = 'kp_persist_create_compatibility_summary'
 const EDIT_RPC = 'kp_persist_update_compatibility_summary'
+const PUBLISH_RPC = 'kp_persist_publish_compatibility_revision'
+const UNPUBLISH_RPC = 'kp_persist_unpublish_compatibility_summary'
+const DELETE_RPC = 'kp_persist_delete_compatibility_summary'
 const SUMMARY_CODE_ALLOCATOR_RPC = 'allocate_summary_codes'
+const SOURCE_SNAPSHOT_LOOKUP_LIMIT = 1_000
+const OPEN_REVISION_LOOKUP_LIMIT = 2
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function errorText(error: SupabaseErrorLike): string {
   return [error.message, error.details, error.hint]
@@ -116,7 +137,7 @@ function requiredUuid(
   operation: string,
 ): string {
   const uuid = requiredString(value, field, operation)
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid)) {
+  if (!UUID_PATTERN.test(uuid)) {
     throw new SummaryBankCompatibilityWriterError(
       'invalid_response',
       `${operation} returned an invalid ${field}.`,
@@ -139,6 +160,275 @@ function expectedString(
     )
   }
   return actual
+}
+
+function requiredInteger(
+  value: unknown,
+  field: string,
+  operation: string,
+): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new SummaryBankCompatibilityWriterError(
+      'invalid_response',
+      `${operation} returned an invalid ${field}.`,
+    )
+  }
+  return value
+}
+
+function optionalUuid(
+  value: unknown,
+  field: string,
+  operation: string,
+): string | null {
+  if (value === null) return null
+  return requiredUuid(value, field, operation)
+}
+
+interface SummaryPublicationStateRow {
+  readonly id: unknown
+  readonly current_published_version_id: unknown
+  readonly is_published: unknown
+}
+
+interface MarkedPlacementStateRow {
+  readonly package_id: unknown
+  readonly is_summary_bank_compatibility: unknown
+  readonly legacy_slug: unknown
+  readonly status: unknown
+}
+
+interface OpenRevisionStateRow {
+  readonly id: unknown
+  readonly summary_id: unknown
+  readonly status: unknown
+}
+
+interface SourceSnapshotStateRow {
+  readonly reference_document_id: unknown
+  readonly reference_document_version_id: unknown
+  readonly role: unknown
+  readonly coverage_note: unknown
+  readonly sort_order: unknown
+}
+
+interface PublicationTarget {
+  readonly versionId: string
+  readonly packageId: string
+  readonly sourceSnapshots: readonly Record<string, unknown>[]
+}
+
+function queryLookupError(
+  source: string,
+  error: SupabaseErrorLike,
+): SummaryBankCompatibilityWriterError {
+  const text = errorText(error)
+  return new SummaryBankCompatibilityWriterError(
+    'lookup_failed',
+    text || `${source} lookup failed.`,
+  )
+}
+
+function queryBuilder(
+  client: SummaryBankCompatibilitySupabaseClient,
+  table: string,
+): NamespaceQuery {
+  return client.from(table)
+}
+
+async function readRows<T>(
+  source: string,
+  builder: NamespaceQuery,
+  limit: number,
+): Promise<{ readonly rows: readonly T[]; readonly count: number }> {
+  const response = await builder.range(0, limit - 1)
+  if (response.error) throw queryLookupError(source, response.error)
+  if (!Array.isArray(response.data)) {
+    throw new SummaryBankCompatibilityWriterError(
+      'invalid_response',
+      `${source} lookup returned a non-array response.`,
+    )
+  }
+  if (typeof response.count !== 'number') {
+    throw new SummaryBankCompatibilityWriterError(
+      'invalid_response',
+      `${source} lookup did not return an exact count.`,
+    )
+  }
+  if (response.count > limit) {
+    throw new SummaryBankCompatibilityWriterError(
+      'invalid_response',
+      `${source} lookup exceeded its bounded limit of ${limit} rows.`,
+    )
+  }
+  return { rows: response.data as readonly T[], count: response.count }
+}
+
+async function readSingle(
+  source: string,
+  builder: NamespaceQuery,
+): Promise<Record<string, unknown> | null> {
+  const response = await builder.maybeSingle()
+  if (response.error) throw queryLookupError(source, response.error)
+  if (response.data === null) return null
+  return record(response.data, source)
+}
+
+function invalidState(message: string): never {
+  throw new SummaryBankCompatibilityWriterError('invalid_response', message)
+}
+
+async function resolvePublicationTarget(
+  client: SummaryBankCompatibilitySupabaseClient,
+  summaryId: string,
+): Promise<PublicationTarget> {
+  const summaryRecord = await readSingle(
+    'summaries',
+    queryBuilder(client, 'summaries')
+      .select('id, current_published_version_id, is_published')
+      .eq('id', summaryId),
+  )
+  if (!summaryRecord) return invalidState('Summary publication target does not exist.')
+
+  const summary = summaryRecord as unknown as SummaryPublicationStateRow
+  const resolvedSummaryId = requiredUuid(summary.id, 'summary_id', PUBLISH_RPC)
+  matchingIdentity(resolvedSummaryId, 'summary_id', summaryId, PUBLISH_RPC)
+  const currentPublishedVersionId = optionalUuid(
+    summary.current_published_version_id,
+    'current_published_version_id',
+    PUBLISH_RPC,
+  )
+  const isPublished = requiredBoolean(summary.is_published, 'is_published', PUBLISH_RPC)
+
+  const placementResult = await readRows<MarkedPlacementStateRow>(
+    'package_summaries',
+    queryBuilder(client, 'package_summaries')
+      .select(
+        'package_id, is_summary_bank_compatibility, legacy_slug, status',
+        { count: 'exact' },
+      )
+      .eq('summary_id', summaryId)
+      .eq('is_summary_bank_compatibility', true),
+    OPEN_REVISION_LOOKUP_LIMIT,
+  )
+  if (placementResult.count !== 1) {
+    return invalidState(
+      'Summary publication requires exactly one marked compatibility placement.',
+    )
+  }
+  const placement = placementResult.rows[0] as MarkedPlacementStateRow
+  if (placement.is_summary_bank_compatibility !== true) {
+    return invalidState('Summary publication found a malformed compatibility marker.')
+  }
+  const packageId = requiredUuid(placement.package_id, 'package_id', PUBLISH_RPC)
+
+  let currentVersion: OpenRevisionStateRow | null = null
+  if (currentPublishedVersionId !== null) {
+    const currentRecord = await readSingle(
+      'summary_versions',
+      queryBuilder(client, 'summary_versions')
+        .select('id, summary_id, status')
+        .eq('id', currentPublishedVersionId)
+        .eq('summary_id', summaryId),
+    )
+    if (!currentRecord) {
+      return invalidState('Summary publication found a missing current published revision.')
+    }
+    currentVersion = currentRecord as unknown as OpenRevisionStateRow
+    const currentId = requiredUuid(currentVersion.id, 'summary_version_id', PUBLISH_RPC)
+    matchingIdentity(currentId, 'summary_version_id', currentPublishedVersionId, PUBLISH_RPC)
+    matchingIdentity(
+      requiredUuid(currentVersion.summary_id, 'summary_id', PUBLISH_RPC),
+      'summary_id',
+      summaryId,
+      PUBLISH_RPC,
+    )
+    expectedString(currentVersion.status, 'status', 'published', PUBLISH_RPC)
+  } else if (isPublished) {
+    return invalidState('Published Summary has no current published revision.')
+  }
+
+  const openResult = await readRows<OpenRevisionStateRow>(
+    'summary_versions',
+    queryBuilder(client, 'summary_versions')
+      .select('id, summary_id, status', { count: 'exact' })
+      .eq('summary_id', summaryId)
+      .in('status', ['draft', 'in_review'])
+      .order('revision_number', { ascending: false }),
+    OPEN_REVISION_LOOKUP_LIMIT,
+  )
+  if (openResult.count > 1) {
+    return invalidState('Summary publication found multiple open revision candidates.')
+  }
+
+  const openVersion = openResult.rows[0] as OpenRevisionStateRow | undefined
+  const targetVersion = openVersion ?? currentVersion
+  if (!targetVersion) {
+    return invalidState('Summary publication found no valid revision target.')
+  }
+
+  const versionId = requiredUuid(targetVersion.id, 'summary_version_id', PUBLISH_RPC)
+  matchingIdentity(
+    requiredUuid(targetVersion.summary_id, 'summary_id', PUBLISH_RPC),
+    'summary_id',
+    summaryId,
+    PUBLISH_RPC,
+  )
+  if (openVersion) {
+    const status = requiredString(openVersion.status, 'status', PUBLISH_RPC)
+    if (status !== 'draft' && status !== 'in_review') {
+      return invalidState('Summary publication found an invalid open revision state.')
+    }
+  }
+
+  const snapshotResult = await readRows<SourceSnapshotStateRow>(
+    'summary_version_reference_documents',
+    queryBuilder(client, 'summary_version_reference_documents')
+      .select(
+        'reference_document_id, reference_document_version_id, role, coverage_note, sort_order',
+        { count: 'exact' },
+      )
+      .eq('summary_version_id', versionId)
+      .order('sort_order', { ascending: true })
+      .order('reference_document_id', { ascending: true }),
+    SOURCE_SNAPSHOT_LOOKUP_LIMIT,
+  )
+
+  const sourceSnapshots = snapshotResult.rows.map((row, index) => {
+    const snapshot = row as SourceSnapshotStateRow
+    const role = requiredString(snapshot.role, `source_snapshots[${index}].role`, PUBLISH_RPC)
+    if (role !== 'primary' && role !== 'supporting') {
+      return invalidState(`Summary publication found an invalid source role at index ${index}.`)
+    }
+    const coverageNote = snapshot.coverage_note === null
+      ? null
+      : requiredString(
+          snapshot.coverage_note,
+          `source_snapshots[${index}].coverage_note`,
+          PUBLISH_RPC,
+        )
+    return {
+      reference_document_id: requiredUuid(
+        snapshot.reference_document_id,
+        `source_snapshots[${index}].reference_document_id`,
+        PUBLISH_RPC,
+      ),
+      reference_document_version_id: optionalUuid(
+        snapshot.reference_document_version_id,
+        `source_snapshots[${index}].reference_document_version_id`,
+        PUBLISH_RPC,
+      ),
+      role,
+      coverage_note: coverageNote,
+      sort_order: requiredInteger(
+        snapshot.sort_order,
+        `source_snapshots[${index}].sort_order`,
+        PUBLISH_RPC,
+      ),
+    }
+  })
+
+  return { versionId, packageId, sourceSnapshots }
 }
 
 function expectedBoolean(
@@ -357,6 +647,121 @@ class SupabaseSummaryBankCompatibilityPersistence
       revisionCreated,
       packageReassigned,
     }
+  }
+
+  public async publish(
+    command: SummaryBankCompatibilityPublishPersistenceCommand,
+  ): Promise<SummaryBankCompatibilityPublishPersistenceResult> {
+    const target = await resolvePublicationTarget(this.client, command.summaryId)
+    const { data, error } = await this.client.rpc(PUBLISH_RPC, {
+      p_summary_id: command.summaryId,
+      p_version_id: target.versionId,
+      p_actor_id: command.actorId,
+      p_source_snapshots: target.sourceSnapshots,
+    })
+    if (error) throw mapSupabaseError(PUBLISH_RPC, error)
+
+    const response = record(data, PUBLISH_RPC)
+    const summaryId = requiredUuid(response.summary_id, 'summary_id', PUBLISH_RPC)
+    const summaryVersionId = requiredUuid(
+      response.summary_version_id,
+      'summary_version_id',
+      PUBLISH_RPC,
+    )
+    const packageId = requiredUuid(response.package_id, 'package_id', PUBLISH_RPC)
+    const idempotentRetry = requiredBoolean(
+      response.idempotent_retry,
+      'idempotent_retry',
+      PUBLISH_RPC,
+    )
+    const republished = requiredBoolean(response.republished, 'republished', PUBLISH_RPC)
+
+    matchingIdentity(summaryId, 'summary_id', command.summaryId, PUBLISH_RPC)
+    matchingIdentity(summaryVersionId, 'summary_version_id', target.versionId, PUBLISH_RPC)
+    matchingIdentity(packageId, 'package_id', target.packageId, PUBLISH_RPC)
+    if (idempotentRetry && republished) {
+      throw new SummaryBankCompatibilityWriterError(
+        'invalid_response',
+        `${PUBLISH_RPC} returned contradictory lifecycle flags.`,
+      )
+    }
+
+    return {
+      summaryId,
+      summaryVersionId,
+      packageId,
+      idempotentRetry,
+      republished,
+    }
+  }
+
+  public async unpublish(
+    command: SummaryBankCompatibilityUnpublishPersistenceCommand,
+  ): Promise<SummaryBankCompatibilityUnpublishPersistenceResult> {
+    const { data, error } = await this.client.rpc(UNPUBLISH_RPC, {
+      p_summary_id: command.summaryId,
+      p_actor_id: command.actorId,
+    })
+    if (error) throw mapSupabaseError(UNPUBLISH_RPC, error)
+
+    const response = record(data, UNPUBLISH_RPC)
+    const summaryId = requiredUuid(response.summary_id, 'summary_id', UNPUBLISH_RPC)
+    const summaryVersionId = requiredUuid(
+      response.summary_version_id,
+      'summary_version_id',
+      UNPUBLISH_RPC,
+    )
+    const packageId = requiredUuid(response.package_id, 'package_id', UNPUBLISH_RPC)
+    const idempotentRetry = requiredBoolean(
+      response.idempotent_retry,
+      'idempotent_retry',
+      UNPUBLISH_RPC,
+    )
+
+    matchingIdentity(summaryId, 'summary_id', command.summaryId, UNPUBLISH_RPC)
+
+    return {
+      summaryId,
+      summaryVersionId,
+      packageId,
+      idempotentRetry,
+    }
+  }
+
+  public async delete(
+    command: SummaryBankCompatibilityDeletePersistenceCommand,
+  ): Promise<SummaryBankCompatibilityDeletePersistenceResult> {
+    const { data, error } = await this.client.rpc(DELETE_RPC, {
+      p_summary_id: command.summaryId,
+      p_actor_id: command.actorId,
+    })
+    if (error) throw mapSupabaseError(DELETE_RPC, error)
+
+    const response = record(data, DELETE_RPC)
+    const summaryId = requiredUuid(response.summary_id, 'summary_id', DELETE_RPC)
+    const outcome = requiredString(response.outcome, 'outcome', DELETE_RPC)
+    if (outcome !== 'deleted' && outcome !== 'archived') {
+      throw new SummaryBankCompatibilityWriterError(
+        'invalid_response',
+        `${DELETE_RPC} returned an unexpected outcome.`,
+      )
+    }
+    const idempotentRetry = requiredBoolean(
+      response.idempotent_retry,
+      'idempotent_retry',
+      DELETE_RPC,
+    )
+
+    if (outcome === 'deleted' && idempotentRetry) {
+      throw new SummaryBankCompatibilityWriterError(
+        'invalid_response',
+        `${DELETE_RPC} returned an impossible hard-delete retry result.`,
+      )
+    }
+
+    matchingIdentity(summaryId, 'summary_id', command.summaryId, DELETE_RPC)
+
+    return { summaryId, outcome, idempotentRetry }
   }
 }
 

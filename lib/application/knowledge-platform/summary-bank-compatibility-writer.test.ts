@@ -7,10 +7,13 @@ import {
   SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE,
   SUMMARY_BANK_COMPATIBILITY_READ_TIME_POLICY_VERSION,
   SummaryBankCompatibilityWriterService,
+  type SummaryBankCompatibilityDeletePersistenceCommand,
   computeSummaryCompatibilityChecksum,
   type SummaryBankCompatibilityCreatePersistenceCommand,
   type SummaryBankCompatibilityEditPersistenceCommand,
+  type SummaryBankCompatibilityPublishPersistenceCommand,
   type SummaryBankCompatibilityPersistence,
+  type SummaryBankCompatibilityUnpublishPersistenceCommand,
 } from './summary-bank-compatibility-writer'
 
 const ACTOR_ID = '00000000-0000-4000-8000-000000000001'
@@ -22,6 +25,9 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
   public readonly namespace = new Set<string>()
   public createCommand?: SummaryBankCompatibilityCreatePersistenceCommand
   public editCommand?: SummaryBankCompatibilityEditPersistenceCommand
+  public publishCommand?: SummaryBankCompatibilityPublishPersistenceCommand
+  public unpublishCommand?: SummaryBankCompatibilityUnpublishPersistenceCommand
+  public deleteCommand?: SummaryBankCompatibilityDeletePersistenceCommand
 
   public async allocateSummaryCode(): Promise<string> {
     return 'SUM-000123'
@@ -56,6 +62,36 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
       legacySlug: command.legacySlug,
       revisionCreated: true,
       packageReassigned: false,
+    }
+  }
+
+  public async publish(command: SummaryBankCompatibilityPublishPersistenceCommand) {
+    this.publishCommand = command
+    return {
+      summaryId: command.summaryId,
+      summaryVersionId: VERSION_ID,
+      packageId: PACKAGE_ID,
+      idempotentRetry: false,
+      republished: false,
+    }
+  }
+
+  public async unpublish(command: SummaryBankCompatibilityUnpublishPersistenceCommand) {
+    this.unpublishCommand = command
+    return {
+      summaryId: command.summaryId,
+      summaryVersionId: VERSION_ID,
+      packageId: PACKAGE_ID,
+      idempotentRetry: false,
+    }
+  }
+
+  public async delete(command: SummaryBankCompatibilityDeletePersistenceCommand) {
+    this.deleteCommand = command
+    return {
+      summaryId: command.summaryId,
+      outcome: 'archived' as const,
+      idempotentRetry: false,
     }
   }
 }
@@ -151,4 +187,28 @@ test('centralizes the edit metadata and sends no revision or canonical slug from
   )
   assert.equal(persistence.editCommand?.document, '')
   assert.equal('canonicalSlug' in (persistence.editCommand ?? {}), false)
+})
+
+test('delegates publish, unpublish, and delete through the Supabase-free writer contract', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  const publishResult = await writer.publish({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+  })
+  const unpublishResult = await writer.unpublish({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+  })
+  const deleteResult = await writer.delete({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+  })
+
+  assert.equal(persistence.publishCommand?.actorId, ACTOR_ID)
+  assert.equal(persistence.publishCommand?.summaryId, SUMMARY_ID)
+  assert.equal(publishResult.summaryId, SUMMARY_ID)
+  assert.equal(unpublishResult.summaryVersionId, VERSION_ID)
+  assert.equal(deleteResult.outcome, 'archived')
 })

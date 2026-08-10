@@ -106,6 +106,59 @@ export interface SummaryBankCompatibilityEditPersistenceResult {
   readonly packageReassigned: boolean
 }
 
+export interface SummaryBankCompatibilityPublishInput {
+  readonly actorId: UUID
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityUnpublishInput {
+  readonly actorId: UUID
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityDeleteInput {
+  readonly actorId: UUID
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityPublishPersistenceCommand {
+  readonly actorId: UUID
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityUnpublishPersistenceCommand {
+  readonly actorId: UUID
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityDeletePersistenceCommand {
+  readonly actorId: UUID
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityPublishPersistenceResult {
+  readonly summaryId: UUID
+  readonly summaryVersionId: UUID
+  readonly packageId: UUID
+  readonly idempotentRetry: boolean
+  readonly republished: boolean
+}
+
+export interface SummaryBankCompatibilityUnpublishPersistenceResult {
+  readonly summaryId: UUID
+  readonly summaryVersionId: UUID
+  readonly packageId: UUID
+  readonly idempotentRetry: boolean
+}
+
+export type SummaryBankCompatibilityDeleteOutcome = 'deleted' | 'archived'
+
+export interface SummaryBankCompatibilityDeletePersistenceResult {
+  readonly summaryId: UUID
+  readonly outcome: SummaryBankCompatibilityDeleteOutcome
+  readonly idempotentRetry: boolean
+}
+
 export interface SummaryBankCompatibilityPersistence {
   allocateSummaryCode(): Promise<string>
   canonicalSlugExists(candidate: string): Promise<boolean>
@@ -115,6 +168,15 @@ export interface SummaryBankCompatibilityPersistence {
   update(
     command: SummaryBankCompatibilityEditPersistenceCommand
   ): Promise<SummaryBankCompatibilityEditPersistenceResult>
+  publish(
+    command: SummaryBankCompatibilityPublishPersistenceCommand
+  ): Promise<SummaryBankCompatibilityPublishPersistenceResult>
+  unpublish(
+    command: SummaryBankCompatibilityUnpublishPersistenceCommand
+  ): Promise<SummaryBankCompatibilityUnpublishPersistenceResult>
+  delete(
+    command: SummaryBankCompatibilityDeletePersistenceCommand
+  ): Promise<SummaryBankCompatibilityDeletePersistenceResult>
 }
 
 export interface SummaryBankCompatibilityCreateResult
@@ -125,12 +187,22 @@ export interface SummaryBankCompatibilityCreateResult
 export interface SummaryBankCompatibilityEditResult
   extends SummaryBankCompatibilityEditPersistenceResult {}
 
+export interface SummaryBankCompatibilityPublishResult
+  extends SummaryBankCompatibilityPublishPersistenceResult {}
+
+export interface SummaryBankCompatibilityUnpublishResult
+  extends SummaryBankCompatibilityUnpublishPersistenceResult {}
+
+export interface SummaryBankCompatibilityDeleteResult
+  extends SummaryBankCompatibilityDeletePersistenceResult {}
+
 export type SummaryBankCompatibilityWriterErrorCode =
   | 'invalid_input'
   | 'invalid_allocator_result'
   | 'canonical_slug_conflict'
   | 'duplicate_legacy_slug'
   | 'namespace_lookup_failed'
+  | 'lookup_failed'
   | 'rpc_failed'
   | 'invalid_response'
 
@@ -330,6 +402,15 @@ export interface SummaryBankCompatibilityWriter {
   update(
     input: SummaryBankCompatibilityEditInput
   ): Promise<SummaryBankCompatibilityEditResult>
+  publish(
+    input: SummaryBankCompatibilityPublishInput
+  ): Promise<SummaryBankCompatibilityPublishResult>
+  unpublish(
+    input: SummaryBankCompatibilityUnpublishInput
+  ): Promise<SummaryBankCompatibilityUnpublishResult>
+  delete(
+    input: SummaryBankCompatibilityDeleteInput
+  ): Promise<SummaryBankCompatibilityDeleteResult>
 }
 
 export class SummaryBankCompatibilityWriterService
@@ -401,6 +482,33 @@ export class SummaryBankCompatibilityWriterService
       navigationLabel: fields.navigationLabel,
       actorId: fields.actorId,
       changeNote: SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE,
+    })
+  }
+
+  public async publish(
+    input: SummaryBankCompatibilityPublishInput,
+  ): Promise<SummaryBankCompatibilityPublishResult> {
+    return this.persistence.publish({
+      actorId: requiredIdentifier(input.actorId, 'actorId'),
+      summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
+    })
+  }
+
+  public async unpublish(
+    input: SummaryBankCompatibilityUnpublishInput,
+  ): Promise<SummaryBankCompatibilityUnpublishResult> {
+    return this.persistence.unpublish({
+      actorId: requiredIdentifier(input.actorId, 'actorId'),
+      summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
+    })
+  }
+
+  public async delete(
+    input: SummaryBankCompatibilityDeleteInput,
+  ): Promise<SummaryBankCompatibilityDeleteResult> {
+    return this.persistence.delete({
+      actorId: requiredIdentifier(input.actorId, 'actorId'),
+      summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
     })
   }
 }

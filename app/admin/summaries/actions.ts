@@ -72,19 +72,15 @@ export async function updateSummary(id: string, data: any) {
 
 export async function deleteSummary(id: string) {
   try {
-    const { supabase } = await requirePermission('content.delete')
-    
-    const { error, data } = await supabase
-      .from('summaries')
-      .delete()
-      .eq('id', id)
-      .select('id')
-
-    if (error) throw error
-    if (!data || data.length === 0) throw new Error('Delete failed. You may not have permission.')
+    const { user } = await requirePermission('content.delete')
+    const writer = createSummaryBankCompatibilityWriter()
+    const result = await writer.delete({
+      actorId: user.id,
+      summaryId: id,
+    })
 
     revalidatePath('/admin/summaries')
-    return { success: true }
+    return { success: true, outcome: result.outcome }
   } catch (err: any) {
     return { success: false, error: err.message }
   }
@@ -92,19 +88,33 @@ export async function deleteSummary(id: string) {
 
 export async function toggleSummaryPublish(id: string, isPublished: boolean) {
   try {
-    const { supabase } = await requirePermission('content.publish')
-    
-    const { error, data } = await supabase
-      .from('summaries')
-      .update({ is_published: isPublished })
-      .eq('id', id)
-      .select('id')
+    const { user } = await requirePermission('content.publish')
+    const writer = createSummaryBankCompatibilityWriter()
 
-    if (error) throw error
-    if (!data || data.length === 0) throw new Error('Publish failed. You may not have permission.')
+    if (isPublished) {
+      const result = await writer.publish({
+        actorId: user.id,
+        summaryId: id,
+      })
+      revalidatePath('/admin/summaries')
+      return {
+        success: true,
+        outcome: result.republished ? ('republished' as const) : ('published' as const),
+        idempotentRetry: result.idempotentRetry,
+      }
+    }
+
+    const result = await writer.unpublish({
+      actorId: user.id,
+      summaryId: id,
+    })
 
     revalidatePath('/admin/summaries')
-    return { success: true }
+    return {
+      success: true,
+      outcome: 'unpublished' as const,
+      idempotentRetry: result.idempotentRetry,
+    }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

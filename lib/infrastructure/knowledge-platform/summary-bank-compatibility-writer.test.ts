@@ -29,6 +29,42 @@ interface RpcError {
 interface RpcResponse {
   readonly data: unknown
   readonly error: RpcError | null
+  readonly count?: number | null
+}
+
+class FakeQuery {
+  public constructor(private readonly response: RpcResponse) {}
+
+  public select(_columns: string, _options?: unknown): this {
+    return this
+  }
+
+  public eq(_column: string, _value: unknown): this {
+    return this
+  }
+
+  public in(_column: string, _values: readonly unknown[]): this {
+    return this
+  }
+
+  public order(_column: string, _options?: unknown): this {
+    return this
+  }
+
+  public range(_from: number, _to: number): this {
+    return this
+  }
+
+  public maybeSingle(): Promise<RpcResponse> {
+    return Promise.resolve(this.response)
+  }
+
+  public then<TResult1 = RpcResponse, TResult2 = never>(
+    onfulfilled?: ((value: RpcResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve(this.response).then(onfulfilled, onrejected)
+  }
 }
 
 class FakeSupabaseClient implements SummaryBankCompatibilitySupabaseClient {
@@ -37,10 +73,22 @@ class FakeSupabaseClient implements SummaryBankCompatibilitySupabaseClient {
     readonly args: Record<string, unknown>
   }> = []
 
-  public constructor(private readonly response: RpcResponse) {}
+  private readonly queryQueues: Map<string, RpcResponse[]>
 
-  public from(_table: string): never {
-    throw new Error('Unexpected table read in RPC adapter test.')
+  public constructor(
+    private readonly response: RpcResponse,
+    queries: Readonly<Record<string, readonly RpcResponse[]>> = {},
+  ) {
+    this.queryQueues = new Map(
+      Object.entries(queries).map(([table, responses]) => [table, [...responses]]),
+    )
+  }
+
+  public from(table: string): FakeQuery {
+    const queue = this.queryQueues.get(table)
+    const response = queue?.shift()
+    if (!response) throw new Error(`Unexpected table read in RPC adapter test: ${table}`)
+    return new FakeQuery(response)
   }
 
   public rpc(
@@ -106,6 +154,17 @@ function persistence(response: RpcResponse) {
   }
 }
 
+function persistenceWithQueries(
+  response: RpcResponse,
+  queries: Readonly<Record<string, readonly RpcResponse[]>>,
+) {
+  const client = new FakeSupabaseClient(response, queries)
+  return {
+    client,
+    persistence: new SupabaseSummaryBankCompatibilityPersistence(client),
+  }
+}
+
 function createResponse(
   overrides: Readonly<Record<string, unknown>> = {},
 ): RpcResponse {
@@ -140,6 +199,136 @@ function editResponse(
       ...overrides,
     },
     error: null,
+  }
+}
+
+function publishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      idempotent_retry: false,
+      republished: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function unpublishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function deleteResponse(
+  outcome: 'deleted' | 'archived' = 'archived',
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      outcome,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+const PUBLISHED_REVISION = {
+  id: VERSION_ID,
+  summary_id: SUMMARY_ID,
+  status: 'published',
+}
+
+const OPEN_DRAFT_REVISION = {
+  id: VERSION_ID,
+  summary_id: SUMMARY_ID,
+  status: 'draft',
+}
+
+const MARKED_PLACEMENT = {
+  package_id: PACKAGE_ID,
+  is_summary_bank_compatibility: true,
+  legacy_slug: 'a-summary',
+  status: 'draft',
+}
+
+const SOURCE_SNAPSHOT = {
+  reference_document_id: OTHER_SUMMARY_ID,
+  reference_document_version_id: OTHER_VERSION_ID,
+  role: 'primary',
+  coverage_note: 'Section 1',
+  sort_order: 0,
+}
+
+function draftPublicationQueries(
+  overrides: Readonly<Record<string, unknown>> = {},
+) {
+  return {
+    summaries: [{
+      data: {
+        id: SUMMARY_ID,
+        current_published_version_id: null,
+        is_published: false,
+      },
+      error: null,
+    } satisfies RpcResponse],
+    package_summaries: [{
+      data: [MARKED_PLACEMENT],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+    summary_versions: [{
+      data: [{ ...OPEN_DRAFT_REVISION, ...overrides }],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+    summary_version_reference_documents: [{
+      data: [SOURCE_SNAPSHOT],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+  }
+}
+
+function republishQueries() {
+  return {
+    summaries: [{
+      data: {
+        id: SUMMARY_ID,
+        current_published_version_id: VERSION_ID,
+        is_published: false,
+      },
+      error: null,
+    } satisfies RpcResponse],
+    package_summaries: [{
+      data: [{ ...MARKED_PLACEMENT, status: 'hidden' }],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+    summary_versions: [
+      { data: PUBLISHED_REVISION, error: null },
+      { data: [], count: 0, error: null },
+    ],
+    summary_version_reference_documents: [{
+      data: [SOURCE_SNAPSHOT],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
   }
 }
 
@@ -272,4 +461,113 @@ test('edit rejects a malformed returned revision identifier', async () => {
     editResponse({ summary_version_id: 'not-a-uuid' }),
   )
   await assertInvalid(() => adapter.update(EDIT_COMMAND))
+})
+
+test('publish resolves a single draft and preserves its source snapshots', async () => {
+  const { client, persistence: adapter } = persistenceWithQueries(
+    publishResponse(),
+    draftPublicationQueries(),
+  )
+
+  const result = await adapter.publish({
+    summaryId: SUMMARY_ID,
+    actorId: ACTOR_ID,
+  })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    idempotentRetry: false,
+    republished: false,
+  })
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_publish_compatibility_revision')
+  assert.deepEqual(client.calls[0]?.args.p_source_snapshots, [SOURCE_SNAPSHOT])
+})
+
+test('publish reuses the current published revision after compatibility unpublish', async () => {
+  const { client, persistence: adapter } = persistenceWithQueries(
+    publishResponse({ republished: true }),
+    republishQueries(),
+  )
+
+  const result = await adapter.publish({
+    summaryId: SUMMARY_ID,
+    actorId: ACTOR_ID,
+  })
+
+  assert.equal(result.summaryVersionId, VERSION_ID)
+  assert.equal(result.republished, true)
+  assert.equal(client.calls[0]?.args.p_version_id, VERSION_ID)
+  assert.deepEqual(client.calls[0]?.args.p_source_snapshots, [SOURCE_SNAPSHOT])
+})
+
+test('publish fails closed when multiple open revision candidates exist', async () => {
+  const queries = draftPublicationQueries()
+  queries.summary_versions[0] = {
+    data: [OPEN_DRAFT_REVISION, { ...OPEN_DRAFT_REVISION, id: OTHER_VERSION_ID }],
+    count: 2,
+    error: null,
+  }
+  const { client, persistence: adapter } = persistenceWithQueries(
+    publishResponse(),
+    queries,
+  )
+
+  await assertInvalid(() => adapter.publish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+  assert.equal(client.calls.length, 0)
+})
+
+test('publish rejects malformed RPC results and identity mismatches', async () => {
+  const malformed = persistenceWithQueries(
+    publishResponse({ republished: undefined }),
+    draftPublicationQueries(),
+  )
+  await assertInvalid(() => malformed.persistence.publish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const mismatched = persistenceWithQueries(
+    publishResponse({ summary_id: OTHER_SUMMARY_ID }),
+    draftPublicationQueries(),
+  )
+  await assertInvalid(() => mismatched.persistence.publish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+})
+
+test('unpublish accepts the migration-069 result contract', async () => {
+  const { persistence: adapter } = persistence(unpublishResponse())
+  const result = await adapter.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    idempotentRetry: false,
+  })
+})
+
+test('unpublish rejects malformed results and mismatched Summary identity', async () => {
+  const malformed = persistence(unpublishResponse({ idempotent_retry: null }))
+  await assertInvalid(() => malformed.persistence.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const mismatched = persistence(unpublishResponse({ summary_id: OTHER_SUMMARY_ID }))
+  await assertInvalid(() => mismatched.persistence.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+})
+
+for (const outcome of ['deleted', 'archived'] as const) {
+  test(`delete accepts the ${outcome} outcome`, async () => {
+    const { persistence: adapter } = persistence(deleteResponse(outcome))
+    const result = await adapter.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+    assert.equal(result.summaryId, SUMMARY_ID)
+    assert.equal(result.outcome, outcome)
+  })
+}
+
+test('delete rejects unknown, malformed, and mismatched results', async () => {
+  const unknown = persistence(deleteResponse('archived', { outcome: 'removed' }))
+  await assertInvalid(() => unknown.persistence.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const malformed = persistence(deleteResponse('archived', { idempotent_retry: null }))
+  await assertInvalid(() => malformed.persistence.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const mismatched = persistence(deleteResponse('archived', { summary_id: OTHER_SUMMARY_ID }))
+  await assertInvalid(() => mismatched.persistence.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
 })
