@@ -8,9 +8,16 @@ import {
   type SummaryBankCompatibilityDeletePersistenceResult,
   type SummaryBankCompatibilityEditPersistenceCommand,
   type SummaryBankCompatibilityEditPersistenceResult,
+  type SummaryBankCompatibilityImportPlacementLookupResult,
+  type SummaryBankCompatibilityImportReplacementTarget,
+  type SummaryBankCompatibilityImportSlugLookupInput,
+  type SummaryBankCompatibilityPackageLookupInput,
+  type SummaryBankCompatibilityPackageLookupResult,
   type SummaryBankCompatibilityPublishPersistenceCommand,
   type SummaryBankCompatibilityPublishPersistenceResult,
   type SummaryBankCompatibilityPersistence,
+  type SummaryBankCompatibilityReplacePersistenceCommand,
+  type SummaryBankCompatibilityReplacePersistenceResult,
   type SummaryBankCompatibilityUnpublishPersistenceCommand,
   type SummaryBankCompatibilityUnpublishPersistenceResult,
   type SummaryBankCompatibilityWriter,
@@ -49,12 +56,14 @@ export interface SummaryBankCompatibilitySupabaseClient {
 
 const CREATE_RPC = 'kp_persist_create_compatibility_summary'
 const EDIT_RPC = 'kp_persist_update_compatibility_summary'
+const REPLACE_RPC = 'kp_persist_replace_compatibility_summary'
 const PUBLISH_RPC = 'kp_persist_publish_compatibility_revision'
 const UNPUBLISH_RPC = 'kp_persist_unpublish_compatibility_summary'
 const DELETE_RPC = 'kp_persist_delete_compatibility_summary'
 const SUMMARY_CODE_ALLOCATOR_RPC = 'allocate_summary_codes'
 const SOURCE_SNAPSHOT_LOOKUP_LIMIT = 1_000
 const OPEN_REVISION_LOOKUP_LIMIT = 2
+const IMPORT_MARKER_LOOKUP_LIMIT = 2
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -210,6 +219,25 @@ interface SourceSnapshotStateRow {
   readonly role: unknown
   readonly coverage_note: unknown
   readonly sort_order: unknown
+}
+
+interface PackageLookupRow {
+  readonly id: unknown
+  readonly name: unknown
+}
+
+interface ImportPlacementStateRow {
+  readonly summary_id: unknown
+  readonly package_id: unknown
+  readonly legacy_slug: unknown
+  readonly is_summary_bank_compatibility: unknown
+}
+
+interface SummaryIdentityStateRow {
+  readonly id: unknown
+  readonly package_id: unknown
+  readonly slug: unknown
+  readonly lifecycle_status: unknown
 }
 
 interface PublicationTarget {
@@ -463,11 +491,186 @@ function matchingIdentity(
   return actual
 }
 
+async function readImportPlacement(
+  client: SummaryBankCompatibilitySupabaseClient,
+  input: SummaryBankCompatibilityImportSlugLookupInput,
+): Promise<SummaryBankCompatibilityImportPlacementLookupResult | null> {
+  const operation = 'compatibility import slug lookup'
+  const placementResult = await readRows<ImportPlacementStateRow>(
+    'package_summaries',
+    queryBuilder(client, 'package_summaries')
+      .select(
+        'summary_id, package_id, legacy_slug, is_summary_bank_compatibility',
+        { count: 'exact' },
+      )
+      .eq('package_id', input.packageId)
+      .eq('legacy_slug', input.legacySlug)
+      .eq('is_summary_bank_compatibility', true),
+    IMPORT_MARKER_LOOKUP_LIMIT,
+  )
+
+  if (placementResult.count === 0) return null
+  if (placementResult.count !== 1) {
+    return invalidState(
+      'Compatibility import lookup found multiple marked placements for the requested Package and slug.',
+    )
+  }
+
+  const placement = placementResult.rows[0] as ImportPlacementStateRow
+  expectedBoolean(
+    placement.is_summary_bank_compatibility,
+    'is_summary_bank_compatibility',
+    true,
+    operation,
+  )
+  const summaryId = requiredUuid(placement.summary_id, 'summary_id', operation)
+  matchingIdentity(
+    requiredUuid(placement.package_id, 'package_id', operation),
+    'package_id',
+    input.packageId,
+    operation,
+  )
+  matchingIdentity(
+    requiredString(placement.legacy_slug, 'legacy_slug', operation),
+    'legacy_slug',
+    input.legacySlug,
+    operation,
+  )
+
+  const summaryRecord = await readSingle(
+    'summaries',
+    queryBuilder(client, 'summaries')
+      .select('id, package_id, slug, lifecycle_status')
+      .eq('id', summaryId),
+  )
+  if (!summaryRecord) {
+    return invalidState(
+      'Compatibility import lookup found a marked placement without its Summary root.',
+    )
+  }
+
+  const summary = summaryRecord as unknown as SummaryIdentityStateRow
+  matchingIdentity(
+    requiredUuid(summary.id, 'summary_id', operation),
+    'summary_id',
+    summaryId,
+    operation,
+  )
+  matchingIdentity(
+    requiredUuid(summary.package_id, 'package_id', operation),
+    'package_id',
+    input.packageId,
+    operation,
+  )
+  matchingIdentity(
+    requiredString(summary.slug, 'slug', operation),
+    'slug',
+    input.legacySlug,
+    operation,
+  )
+  expectedString(summary.lifecycle_status, 'lifecycle_status', 'active', operation)
+
+  return { summaryId }
+}
+
+async function readImportReplacementTarget(
+  client: SummaryBankCompatibilitySupabaseClient,
+  input: SummaryBankCompatibilityImportSlugLookupInput,
+): Promise<SummaryBankCompatibilityImportReplacementTarget | null> {
+  const placement = await readImportPlacement(client, input)
+  if (!placement) return null
+
+  const operation = 'compatibility import replacement target lookup'
+  const draftResult = await readRows<OpenRevisionStateRow>(
+    'summary_versions',
+    queryBuilder(client, 'summary_versions')
+      .select('id, summary_id, status', { count: 'exact' })
+      .eq('summary_id', placement.summaryId)
+      .eq('status', 'draft')
+      .order('revision_number', { ascending: false }),
+    OPEN_REVISION_LOOKUP_LIMIT,
+  )
+  if (draftResult.count > 1) {
+    return invalidState(
+      'Compatibility import replacement found multiple editable draft revisions.',
+    )
+  }
+  if (draftResult.count === 0) {
+    return { summaryId: placement.summaryId, replacementVersionId: null }
+  }
+
+  const draft = draftResult.rows[0] as OpenRevisionStateRow
+  const replacementVersionId = requiredUuid(
+    draft.id,
+    'summary_version_id',
+    operation,
+  )
+  matchingIdentity(
+    requiredUuid(draft.summary_id, 'summary_id', operation),
+    'summary_id',
+    placement.summaryId,
+    operation,
+  )
+  expectedString(draft.status, 'status', 'draft', operation)
+
+  return { summaryId: placement.summaryId, replacementVersionId }
+}
+
 class SupabaseSummaryBankCompatibilityPersistence
   implements SummaryBankCompatibilityPersistence {
   public constructor(
     private readonly client: SummaryBankCompatibilitySupabaseClient,
   ) {}
+
+  public async resolvePackage(
+    input: SummaryBankCompatibilityPackageLookupInput,
+  ): Promise<SummaryBankCompatibilityPackageLookupResult | null> {
+    const referenceType = input.referenceType
+    if (referenceType !== 'slug' && referenceType !== 'code' && referenceType !== 'ambiguous') {
+      return null
+    }
+
+    const resolveBy = async (
+      column: 'slug' | 'package_code',
+      resolvedBy: 'slug' | 'code',
+    ): Promise<SummaryBankCompatibilityPackageLookupResult | null> => {
+      const packageRecord = await readSingle(
+        'packages',
+        queryBuilder(this.client, 'packages')
+          .select('id, name')
+          .eq(column, input.reference),
+      )
+      if (!packageRecord) return null
+
+      const row = packageRecord as unknown as PackageLookupRow
+      return {
+        packageId: requiredUuid(row.id, 'package_id', 'packages lookup'),
+        packageName: requiredString(row.name, 'package_name', 'packages lookup'),
+        resolvedBy,
+      }
+    }
+
+    if (referenceType === 'slug' || referenceType === 'ambiguous') {
+      const bySlug = await resolveBy('slug', 'slug')
+      if (bySlug) return bySlug
+    }
+    if (referenceType === 'code' || referenceType === 'ambiguous') {
+      return resolveBy('package_code', 'code')
+    }
+    return null
+  }
+
+  public async findCompatibilityByLegacySlug(
+    input: SummaryBankCompatibilityImportSlugLookupInput,
+  ): Promise<SummaryBankCompatibilityImportPlacementLookupResult | null> {
+    return readImportPlacement(this.client, input)
+  }
+
+  public async resolveImportReplacementTarget(
+    input: SummaryBankCompatibilityImportSlugLookupInput,
+  ): Promise<SummaryBankCompatibilityImportReplacementTarget | null> {
+    return readImportReplacementTarget(this.client, input)
+  }
 
   public async allocateSummaryCode(): Promise<string> {
     const { data, error } = await this.client.rpc(
@@ -646,6 +849,95 @@ class SupabaseSummaryBankCompatibilityPersistence
       legacySlug,
       revisionCreated,
       packageReassigned,
+    }
+  }
+
+  public async replace(
+    command: SummaryBankCompatibilityReplacePersistenceCommand,
+  ): Promise<SummaryBankCompatibilityReplacePersistenceResult> {
+    const { data, error } = await this.client.rpc(REPLACE_RPC, {
+      p_summary_id: command.summaryId,
+      p_package_id: command.packageId,
+      p_legacy_slug: command.legacySlug,
+      p_replacement_version_id: command.replacementVersionId,
+      p_canonical_title: command.title,
+      p_subject: command.subject,
+      p_document: command.document,
+      p_law: command.law,
+      p_topic: command.topic,
+      p_content_md: command.contentMd,
+      p_content_checksum: command.contentChecksum,
+      p_read_time_minutes: command.readTimeMinutes,
+      p_read_time_policy_version: command.readTimePolicyVersion,
+      p_content_schema_version: command.contentSchemaVersion,
+      p_change_note: command.changeNote,
+      p_actor_id: command.actorId,
+      p_sort_order: command.sortOrder,
+      p_display_order: command.displayOrder,
+      p_is_published: command.isPublished,
+    })
+    if (error) throw mapSupabaseError(REPLACE_RPC, error)
+
+    const response = record(data, REPLACE_RPC)
+    expectedString(response.outcome, 'outcome', 'replaced', REPLACE_RPC)
+
+    const summaryId = requiredUuid(response.summary_id, 'summary_id', REPLACE_RPC)
+    const summaryVersionId = requiredUuid(
+      response.summary_version_id,
+      'summary_version_id',
+      REPLACE_RPC,
+    )
+    const packageId = requiredUuid(response.package_id, 'package_id', REPLACE_RPC)
+    const legacySlug = requiredString(response.legacy_slug, 'legacy_slug', REPLACE_RPC)
+    const isPublished = requiredBoolean(response.is_published, 'is_published', REPLACE_RPC)
+    const idempotentRetry = requiredBoolean(
+      response.idempotent_retry,
+      'idempotent_retry',
+      REPLACE_RPC,
+    )
+
+    let revisionCreated: boolean
+    if (idempotentRetry) {
+      expectedBoolean(isPublished, 'is_published', true, REPLACE_RPC)
+      if (response.revision_created === undefined) {
+        // Migration 071 omits revision_created on its immutable published retry
+        // result; the absence is an explicit part of that result shape.
+        revisionCreated = false
+      } else {
+        revisionCreated = expectedBoolean(
+          response.revision_created,
+          'revision_created',
+          false,
+          REPLACE_RPC,
+        )
+      }
+    } else {
+      revisionCreated = requiredBoolean(
+        response.revision_created,
+        'revision_created',
+        REPLACE_RPC,
+      )
+    }
+
+    matchingIdentity(summaryId, 'summary_id', command.summaryId, REPLACE_RPC)
+    matchingIdentity(
+      summaryVersionId,
+      'summary_version_id',
+      command.replacementVersionId,
+      REPLACE_RPC,
+    )
+    matchingIdentity(packageId, 'package_id', command.packageId, REPLACE_RPC)
+    matchingIdentity(legacySlug, 'legacy_slug', command.legacySlug, REPLACE_RPC)
+    expectedBoolean(isPublished, 'is_published', command.isPublished, REPLACE_RPC)
+
+    return {
+      summaryId,
+      summaryVersionId,
+      packageId,
+      legacySlug,
+      isPublished,
+      revisionCreated,
+      idempotentRetry,
     }
   }
 

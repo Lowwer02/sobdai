@@ -8,6 +8,40 @@ export const SUMMARY_BANK_COMPATIBILITY_CREATE_CHANGE_NOTE =
   'Initial Summary Bank draft' as const
 export const SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE =
   'Summary Bank compatibility edit' as const
+export const SUMMARY_BANK_COMPATIBILITY_IMPORT_REPLACE_CHANGE_NOTE =
+  'Summary Bank compatibility import replace' as const
+
+export const SUMMARY_BANK_COMPATIBILITY_IMPORT_SLUG_SUFFIX_LIMIT = 1_000 as const
+
+export type SummaryBankCompatibilityPackageReferenceType =
+  | 'slug'
+  | 'code'
+  | 'ambiguous'
+
+export interface SummaryBankCompatibilityPackageLookupInput {
+  readonly reference: string
+  readonly referenceType?: SummaryBankCompatibilityPackageReferenceType
+}
+
+export interface SummaryBankCompatibilityPackageLookupResult {
+  readonly packageId: UUID
+  readonly packageName: string
+  readonly resolvedBy: 'slug' | 'code'
+}
+
+export interface SummaryBankCompatibilityImportSlugLookupInput {
+  readonly packageId: UUID
+  readonly legacySlug: string
+}
+
+export interface SummaryBankCompatibilityImportPlacementLookupResult {
+  readonly summaryId: UUID
+}
+
+export interface SummaryBankCompatibilityImportReplacementTarget {
+  readonly summaryId: UUID
+  readonly replacementVersionId: UUID | null
+}
 
 export interface SummaryBankCompatibilityCreateInput {
   readonly actorId: UUID
@@ -88,6 +122,40 @@ export interface SummaryBankCompatibilityEditPersistenceCommand
   readonly changeNote: typeof SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE
 }
 
+export interface SummaryBankCompatibilityReplaceInput {
+  readonly actorId: UUID
+  readonly packageId: UUID
+  readonly title: string
+  readonly slug: string
+  readonly subject?: string | null
+  readonly document?: string | null
+  readonly law?: string | null
+  readonly topic?: string | null
+  readonly contentMd: string
+  readonly sortOrder?: number | string | null
+  readonly displayOrder?: number | string | null
+  readonly isPublished: boolean
+}
+
+export interface SummaryBankCompatibilityReplacePersistenceCommand
+  extends SummaryBankCompatibilityMetadata {
+  readonly summaryId: UUID
+  readonly packageId: UUID
+  readonly legacySlug: string
+  readonly replacementVersionId: UUID
+  readonly title: string
+  readonly subject: string | null
+  readonly document: string | null
+  readonly law: string | null
+  readonly topic: string | null
+  readonly contentMd: string
+  readonly sortOrder: number | null
+  readonly displayOrder: number | null
+  readonly actorId: UUID
+  readonly isPublished: boolean
+  readonly changeNote: typeof SUMMARY_BANK_COMPATIBILITY_IMPORT_REPLACE_CHANGE_NOTE
+}
+
 export interface SummaryBankCompatibilityCreatePersistenceResult {
   readonly summaryId: UUID
   readonly summaryVersionId: UUID
@@ -104,6 +172,16 @@ export interface SummaryBankCompatibilityEditPersistenceResult {
   readonly legacySlug: string
   readonly revisionCreated: boolean
   readonly packageReassigned: boolean
+}
+
+export interface SummaryBankCompatibilityReplacePersistenceResult {
+  readonly summaryId: UUID
+  readonly summaryVersionId: UUID
+  readonly packageId: UUID
+  readonly legacySlug: string
+  readonly isPublished: boolean
+  readonly revisionCreated: boolean
+  readonly idempotentRetry: boolean
 }
 
 export interface SummaryBankCompatibilityPublishInput {
@@ -160,6 +238,15 @@ export interface SummaryBankCompatibilityDeletePersistenceResult {
 }
 
 export interface SummaryBankCompatibilityPersistence {
+  resolvePackage(
+    input: SummaryBankCompatibilityPackageLookupInput
+  ): Promise<SummaryBankCompatibilityPackageLookupResult | null>
+  findCompatibilityByLegacySlug(
+    input: SummaryBankCompatibilityImportSlugLookupInput
+  ): Promise<SummaryBankCompatibilityImportPlacementLookupResult | null>
+  resolveImportReplacementTarget(
+    input: SummaryBankCompatibilityImportSlugLookupInput
+  ): Promise<SummaryBankCompatibilityImportReplacementTarget | null>
   allocateSummaryCode(): Promise<string>
   canonicalSlugExists(candidate: string): Promise<boolean>
   create(
@@ -168,6 +255,9 @@ export interface SummaryBankCompatibilityPersistence {
   update(
     command: SummaryBankCompatibilityEditPersistenceCommand
   ): Promise<SummaryBankCompatibilityEditPersistenceResult>
+  replace(
+    command: SummaryBankCompatibilityReplacePersistenceCommand
+  ): Promise<SummaryBankCompatibilityReplacePersistenceResult>
   publish(
     command: SummaryBankCompatibilityPublishPersistenceCommand
   ): Promise<SummaryBankCompatibilityPublishPersistenceResult>
@@ -186,6 +276,9 @@ export interface SummaryBankCompatibilityCreateResult
 
 export interface SummaryBankCompatibilityEditResult
   extends SummaryBankCompatibilityEditPersistenceResult {}
+
+export interface SummaryBankCompatibilityReplaceResult
+  extends SummaryBankCompatibilityReplacePersistenceResult {}
 
 export interface SummaryBankCompatibilityPublishResult
   extends SummaryBankCompatibilityPublishPersistenceResult {}
@@ -278,6 +371,14 @@ function normalizeBoolean(value: unknown, field: string): boolean {
   if (value === 'true') return true
   if (value === 'false') return false
   return invalidInput(`${field} must be a boolean.`)
+}
+
+function normalizePackageReferenceType(
+  value: unknown,
+): SummaryBankCompatibilityPackageReferenceType | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  if (value === 'slug' || value === 'code' || value === 'ambiguous') return value
+  return invalidInput('Package reference type is invalid.')
 }
 
 function createUuid(): UUID {
@@ -396,12 +497,24 @@ async function allocateCanonicalSlug(
 }
 
 export interface SummaryBankCompatibilityWriter {
+  resolvePackage(
+    input: SummaryBankCompatibilityPackageLookupInput
+  ): Promise<SummaryBankCompatibilityPackageLookupResult | null>
+  isCompatibilityLegacySlugOccupied(
+    input: SummaryBankCompatibilityImportSlugLookupInput
+  ): Promise<boolean>
+  allocateImportLegacySlug(
+    input: SummaryBankCompatibilityImportSlugLookupInput
+  ): Promise<string>
   create(
     input: SummaryBankCompatibilityCreateInput
   ): Promise<SummaryBankCompatibilityCreateResult>
   update(
     input: SummaryBankCompatibilityEditInput
   ): Promise<SummaryBankCompatibilityEditResult>
+  replace(
+    input: SummaryBankCompatibilityReplaceInput
+  ): Promise<SummaryBankCompatibilityReplaceResult>
   publish(
     input: SummaryBankCompatibilityPublishInput
   ): Promise<SummaryBankCompatibilityPublishResult>
@@ -419,6 +532,56 @@ export class SummaryBankCompatibilityWriterService
     private readonly persistence: SummaryBankCompatibilityPersistence,
     private readonly idAllocator: () => UUID = createUuid,
   ) {}
+
+  public async resolvePackage(
+    input: SummaryBankCompatibilityPackageLookupInput,
+  ): Promise<SummaryBankCompatibilityPackageLookupResult | null> {
+    return this.persistence.resolvePackage({
+      reference: requiredString(input.reference, 'package_ref'),
+      referenceType: normalizePackageReferenceType(input.referenceType),
+    })
+  }
+
+  public async isCompatibilityLegacySlugOccupied(
+    input: SummaryBankCompatibilityImportSlugLookupInput,
+  ): Promise<boolean> {
+    const packageId = requiredIdentifier(input.packageId, 'packageId')
+    const legacySlug = normalizeLegacySlug(input.legacySlug)
+    const placement = await this.persistence.findCompatibilityByLegacySlug({
+      packageId,
+      legacySlug,
+    })
+    return placement !== null
+  }
+
+  public async allocateImportLegacySlug(
+    input: SummaryBankCompatibilityImportSlugLookupInput,
+  ): Promise<string> {
+    const packageId = requiredIdentifier(input.packageId, 'packageId')
+    const baseSlug = normalizeLegacySlug(input.legacySlug)
+
+    const isOccupied = async (legacySlug: string): Promise<boolean> =>
+      (await this.persistence.findCompatibilityByLegacySlug({
+        packageId,
+        legacySlug,
+      })) !== null
+
+    if (!(await isOccupied(baseSlug))) return baseSlug
+
+    for (
+      let suffix = 2;
+      suffix <= SUMMARY_BANK_COMPATIBILITY_IMPORT_SLUG_SUFFIX_LIMIT;
+      suffix += 1
+    ) {
+      const candidate = `${baseSlug}-${suffix}`
+      if (!(await isOccupied(candidate))) return candidate
+    }
+
+    throw new SummaryBankCompatibilityWriterError(
+      'duplicate_legacy_slug',
+      'A unique import slug could not be allocated within the bounded suffix range.',
+    )
+  }
 
   public async create(
     input: SummaryBankCompatibilityCreateInput,
@@ -482,6 +645,42 @@ export class SummaryBankCompatibilityWriterService
       navigationLabel: fields.navigationLabel,
       actorId: fields.actorId,
       changeNote: SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE,
+    })
+  }
+
+  public async replace(
+    input: SummaryBankCompatibilityReplaceInput,
+  ): Promise<SummaryBankCompatibilityReplaceResult> {
+    const fields = normalizeCommonFields(input)
+    const target = await this.persistence.resolveImportReplacementTarget({
+      packageId: fields.packageId,
+      legacySlug: fields.slug,
+    })
+    if (!target) {
+      throw new SummaryBankCompatibilityWriterError(
+        'lookup_failed',
+        'Import replacement target does not exist for the requested Package and slug.',
+      )
+    }
+
+    const metadata = await prepareSummaryCompatibilityMetadata(fields.contentMd)
+    return this.persistence.replace({
+      ...metadata,
+      summaryId: target.summaryId,
+      packageId: fields.packageId,
+      legacySlug: fields.slug,
+      replacementVersionId: target.replacementVersionId ?? this.idAllocator(),
+      title: fields.title,
+      subject: fields.subject,
+      document: fields.document,
+      law: fields.law,
+      topic: fields.topic,
+      contentMd: fields.contentMd,
+      sortOrder: fields.sortOrder,
+      displayOrder: fields.displayOrder,
+      actorId: fields.actorId,
+      isPublished: normalizeBoolean(input.isPublished, 'is_published'),
+      changeNote: SUMMARY_BANK_COMPATIBILITY_IMPORT_REPLACE_CHANGE_NOTE,
     })
   }
 

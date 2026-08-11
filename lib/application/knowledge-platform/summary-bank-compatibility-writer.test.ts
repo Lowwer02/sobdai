@@ -5,14 +5,19 @@ import {
   SUMMARY_BANK_COMPATIBILITY_CONTENT_SCHEMA_VERSION,
   SUMMARY_BANK_COMPATIBILITY_CREATE_CHANGE_NOTE,
   SUMMARY_BANK_COMPATIBILITY_EDIT_CHANGE_NOTE,
+  SUMMARY_BANK_COMPATIBILITY_IMPORT_REPLACE_CHANGE_NOTE,
   SUMMARY_BANK_COMPATIBILITY_READ_TIME_POLICY_VERSION,
+  SummaryBankCompatibilityWriterError,
   SummaryBankCompatibilityWriterService,
   type SummaryBankCompatibilityDeletePersistenceCommand,
   computeSummaryCompatibilityChecksum,
   type SummaryBankCompatibilityCreatePersistenceCommand,
   type SummaryBankCompatibilityEditPersistenceCommand,
+  type SummaryBankCompatibilityImportSlugLookupInput,
+  type SummaryBankCompatibilityPackageLookupInput,
   type SummaryBankCompatibilityPublishPersistenceCommand,
   type SummaryBankCompatibilityPersistence,
+  type SummaryBankCompatibilityReplacePersistenceCommand,
   type SummaryBankCompatibilityUnpublishPersistenceCommand,
 } from './summary-bank-compatibility-writer'
 
@@ -23,11 +28,33 @@ const VERSION_ID = '00000000-0000-4000-8000-000000000004'
 
 class FakePersistence implements SummaryBankCompatibilityPersistence {
   public readonly namespace = new Set<string>()
+  public readonly compatibilitySlugs = new Set<string>()
   public createCommand?: SummaryBankCompatibilityCreatePersistenceCommand
   public editCommand?: SummaryBankCompatibilityEditPersistenceCommand
+  public replaceCommand?: SummaryBankCompatibilityReplacePersistenceCommand
   public publishCommand?: SummaryBankCompatibilityPublishPersistenceCommand
   public unpublishCommand?: SummaryBankCompatibilityUnpublishPersistenceCommand
   public deleteCommand?: SummaryBankCompatibilityDeletePersistenceCommand
+
+  public async resolvePackage(input: SummaryBankCompatibilityPackageLookupInput) {
+    if (!input.referenceType) return null
+    return {
+      packageId: PACKAGE_ID,
+      packageName: 'Package',
+      resolvedBy: input.referenceType === 'code' ? 'code' as const : 'slug' as const,
+    }
+  }
+
+  public async findCompatibilityByLegacySlug(input: SummaryBankCompatibilityImportSlugLookupInput) {
+    return this.compatibilitySlugs.has(input.legacySlug)
+      ? { summaryId: SUMMARY_ID }
+      : null
+  }
+
+  public async resolveImportReplacementTarget(input: SummaryBankCompatibilityImportSlugLookupInput) {
+    if (!this.compatibilitySlugs.has(input.legacySlug)) return null
+    return { summaryId: SUMMARY_ID, replacementVersionId: VERSION_ID }
+  }
 
   public async allocateSummaryCode(): Promise<string> {
     return 'SUM-000123'
@@ -62,6 +89,19 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
       legacySlug: command.legacySlug,
       revisionCreated: true,
       packageReassigned: false,
+    }
+  }
+
+  public async replace(command: SummaryBankCompatibilityReplacePersistenceCommand) {
+    this.replaceCommand = command
+    return {
+      summaryId: command.summaryId,
+      summaryVersionId: command.replacementVersionId,
+      packageId: command.packageId,
+      legacySlug: command.legacySlug,
+      isPublished: command.isPublished,
+      revisionCreated: false,
+      idempotentRetry: false,
     }
   }
 
@@ -211,4 +251,82 @@ test('delegates publish, unpublish, and delete through the Supabase-free writer 
   assert.equal(publishResult.summaryId, SUMMARY_ID)
   assert.equal(unpublishResult.summaryVersionId, VERSION_ID)
   assert.equal(deleteResult.outcome, 'archived')
+})
+
+test('allocates Import NEW slugs from the marker namespace with the legacy suffix sequence', async () => {
+  const persistence = new FakePersistence()
+  persistence.compatibilitySlugs.add('a-summary')
+  persistence.compatibilitySlugs.add('a-summary-2')
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  assert.equal(
+    await writer.allocateImportLegacySlug({ packageId: PACKAGE_ID, legacySlug: 'a-summary' }),
+    'a-summary-3',
+  )
+  assert.equal(
+    await writer.allocateImportLegacySlug({ packageId: PACKAGE_ID, legacySlug: 'free-summary' }),
+    'free-summary',
+  )
+})
+
+test('fails Import NEW slug allocation after the bounded marker namespace search', async () => {
+  const persistence = new FakePersistence()
+  persistence.findCompatibilityByLegacySlug = async () => ({ summaryId: SUMMARY_ID })
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  await assert.rejects(
+    () => writer.allocateImportLegacySlug({ packageId: PACKAGE_ID, legacySlug: 'a-summary' }),
+    (error: unknown) => {
+      assert.ok(error instanceof SummaryBankCompatibilityWriterError)
+      assert.equal(error.code, 'duplicate_legacy_slug')
+      return true
+    },
+  )
+})
+
+test('delegates Import REPLACE through the migration-071 persistence boundary', async () => {
+  const persistence = new FakePersistence()
+  persistence.compatibilitySlugs.add('a-summary')
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  const result = await writer.replace({
+    actorId: ACTOR_ID,
+    packageId: PACKAGE_ID,
+    title: 'Imported replacement',
+    slug: 'a-summary',
+    document: 'free-form document',
+    contentMd: 'replacement content',
+    isPublished: true,
+  })
+
+  assert.equal(result.summaryId, SUMMARY_ID)
+  assert.equal(result.legacySlug, 'a-summary')
+  assert.equal(persistence.replaceCommand?.summaryId, SUMMARY_ID)
+  assert.equal(persistence.replaceCommand?.replacementVersionId, VERSION_ID)
+  assert.equal(
+    persistence.replaceCommand?.changeNote,
+    SUMMARY_BANK_COMPATIBILITY_IMPORT_REPLACE_CHANGE_NOTE,
+  )
+  assert.equal(persistence.replaceCommand?.contentMd, 'replacement content')
+})
+
+test('fails Import REPLACE closed when the marker-backed target is absent', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  await assert.rejects(
+    () => writer.replace({
+      actorId: ACTOR_ID,
+      packageId: PACKAGE_ID,
+      title: 'Imported replacement',
+      slug: 'missing-summary',
+      contentMd: 'replacement content',
+      isPublished: false,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof SummaryBankCompatibilityWriterError)
+      assert.equal(error.code, 'lookup_failed')
+      return true
+    },
+  )
 })

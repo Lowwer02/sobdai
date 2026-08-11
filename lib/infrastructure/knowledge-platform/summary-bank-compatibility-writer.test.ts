@@ -5,6 +5,7 @@ import {
   SummaryBankCompatibilityWriterError,
   type SummaryBankCompatibilityCreatePersistenceCommand,
   type SummaryBankCompatibilityEditPersistenceCommand,
+  type SummaryBankCompatibilityReplacePersistenceCommand,
 } from '../../application/knowledge-platform/summary-bank-compatibility-writer'
 import {
   SupabaseSummaryBankCompatibilityPersistence,
@@ -146,6 +147,28 @@ const EDIT_COMMAND: SummaryBankCompatibilityEditPersistenceCommand = {
   changeNote: 'Summary Bank compatibility edit',
 }
 
+const REPLACE_COMMAND: SummaryBankCompatibilityReplacePersistenceCommand = {
+  summaryId: SUMMARY_ID,
+  packageId: PACKAGE_ID,
+  legacySlug: 'a-summary',
+  replacementVersionId: VERSION_ID,
+  title: 'Imported replacement',
+  subject: 'law',
+  document: 'Document',
+  law: 'Law',
+  topic: 'Topic',
+  contentMd: 'replacement content',
+  contentChecksum: 'c'.repeat(64),
+  readTimeMinutes: 1,
+  readTimePolicyVersion: 'summary-whitespace-200wpm-v1',
+  contentSchemaVersion: 'summary-markdown-v1',
+  sortOrder: 2,
+  displayOrder: 3,
+  actorId: ACTOR_ID,
+  isPublished: true,
+  changeNote: 'Summary Bank compatibility import replace',
+}
+
 function persistence(response: RpcResponse) {
   const client = new FakeSupabaseClient(response)
   return {
@@ -248,6 +271,25 @@ function deleteResponse(
   }
 }
 
+function replaceResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      outcome: 'replaced',
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      legacy_slug: 'a-summary',
+      is_published: true,
+      revision_created: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
 const PUBLISHED_REVISION = {
   id: VERSION_ID,
   summary_id: SUMMARY_ID,
@@ -265,6 +307,13 @@ const MARKED_PLACEMENT = {
   is_summary_bank_compatibility: true,
   legacy_slug: 'a-summary',
   status: 'draft',
+}
+
+const IMPORT_MARKED_PLACEMENT = {
+  summary_id: SUMMARY_ID,
+  package_id: PACKAGE_ID,
+  legacy_slug: 'a-summary',
+  is_summary_bank_compatibility: true,
 }
 
 const SOURCE_SNAPSHOT = {
@@ -461,6 +510,208 @@ test('edit rejects a malformed returned revision identifier', async () => {
     editResponse({ summary_version_id: 'not-a-uuid' }),
   )
   await assertInvalid(() => adapter.update(EDIT_COMMAND))
+})
+
+test('package lookup resolves authoritative slug and code references', async () => {
+  const slugLookup = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      packages: [{ data: { id: PACKAGE_ID, name: 'Package by slug' }, error: null }],
+    },
+  )
+  assert.deepEqual(
+    await slugLookup.persistence.resolvePackage({ reference: 'package-slug', referenceType: 'slug' }),
+    { packageId: PACKAGE_ID, packageName: 'Package by slug', resolvedBy: 'slug' },
+  )
+
+  const codeLookup = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      packages: [{ data: { id: PACKAGE_ID, name: 'Package by code' }, error: null }],
+    },
+  )
+  assert.deepEqual(
+    await codeLookup.persistence.resolvePackage({ reference: 'PKG-001', referenceType: 'code' }),
+    { packageId: PACKAGE_ID, packageName: 'Package by code', resolvedBy: 'code' },
+  )
+})
+
+test('marker-backed import lookup treats a marked placement as a duplicate', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{ data: [IMPORT_MARKED_PLACEMENT], count: 1, error: null }],
+      summaries: [{
+        data: {
+          id: SUMMARY_ID,
+          package_id: PACKAGE_ID,
+          slug: 'a-summary',
+          lifecycle_status: 'active',
+        },
+        error: null,
+      }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    { summaryId: SUMMARY_ID },
+  )
+})
+
+test('target-only placements do not consume an Import NEW slug', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{ data: [], count: 0, error: null }],
+    },
+  )
+
+  assert.equal(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    null,
+  )
+})
+
+test('marker-backed import lookup fails closed on multiple authority rows', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{
+        data: [IMPORT_MARKED_PLACEMENT, { ...IMPORT_MARKED_PLACEMENT, summary_id: OTHER_SUMMARY_ID }],
+        count: 2,
+        error: null,
+      }],
+    },
+  )
+
+  await assertInvalid(() => adapter.findCompatibilityByLegacySlug({
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+  }))
+})
+
+test('replace accepts the exact migration-071 result and passes its dedicated RPC arguments', async () => {
+  const { client, persistence: adapter } = persistence(replaceResponse())
+  const result = await adapter.replace(REPLACE_COMMAND)
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+    isPublished: true,
+    revisionCreated: true,
+    idempotentRetry: false,
+  })
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_replace_compatibility_summary')
+  assert.equal(client.calls[0]?.args.p_replacement_version_id, VERSION_ID)
+  assert.equal(client.calls[0]?.args.p_document, 'Document')
+})
+
+test('replace accepts the migration-071 immutable published retry shape', async () => {
+  const { persistence: adapter } = persistence(replaceResponse({
+    is_published: true,
+    idempotent_retry: true,
+    revision_created: undefined,
+  }))
+
+  const result = await adapter.replace(REPLACE_COMMAND)
+  assert.equal(result.idempotentRetry, true)
+  assert.equal(result.revisionCreated, false)
+})
+
+test('replace accepts the draft publication state and preserves it in the RPC command', async () => {
+  const { client, persistence: adapter } = persistence({
+    data: {
+      outcome: 'replaced',
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      legacy_slug: 'a-summary',
+      is_published: false,
+      revision_created: false,
+      idempotent_retry: false,
+    },
+    error: null,
+  })
+
+  const result = await adapter.replace({ ...REPLACE_COMMAND, isPublished: false })
+  assert.equal(result.isPublished, false)
+  assert.equal(client.calls[0]?.args.p_is_published, false)
+})
+
+for (const [field, value] of [
+  ['summary_id', OTHER_SUMMARY_ID],
+  ['summary_version_id', OTHER_VERSION_ID],
+  ['package_id', OTHER_PACKAGE_ID],
+  ['legacy_slug', 'other-summary'],
+  ['is_published', false],
+] as const) {
+  test(`replace rejects a mismatched ${field}`, async () => {
+    const { persistence: adapter } = persistence(replaceResponse({ [field]: value }))
+    await assertInvalid(() => adapter.replace(REPLACE_COMMAND))
+  })
+}
+
+test('replace rejects a malformed revision-created flag', async () => {
+  const { persistence: adapter } = persistence(replaceResponse({ revision_created: 'true' }))
+  await assertInvalid(() => adapter.replace(REPLACE_COMMAND))
+})
+
+test('replacement target resolution returns one existing editable draft', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{ data: [IMPORT_MARKED_PLACEMENT], count: 1, error: null }],
+      summaries: [{
+        data: {
+          id: SUMMARY_ID,
+          package_id: PACKAGE_ID,
+          slug: 'a-summary',
+          lifecycle_status: 'active',
+        },
+        error: null,
+      }],
+      summary_versions: [{
+        data: [{ id: VERSION_ID, summary_id: SUMMARY_ID, status: 'draft' }],
+        count: 1,
+        error: null,
+      }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.resolveImportReplacementTarget({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    { summaryId: SUMMARY_ID, replacementVersionId: VERSION_ID },
+  )
+})
+
+test('replacement target resolution rejects a marker/root identity mismatch', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{
+        data: [{ ...IMPORT_MARKED_PLACEMENT, package_id: OTHER_PACKAGE_ID }],
+        count: 1,
+        error: null,
+      }],
+    },
+  )
+
+  await assertInvalid(() => adapter.resolveImportReplacementTarget({
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+  }))
 })
 
 test('publish resolves a single draft and preserves its source snapshots', async () => {
