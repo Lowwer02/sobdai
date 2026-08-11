@@ -61,9 +61,14 @@ const ROOT_COLUMNS = [
   'source_document_count',
 ].join(', ')
 
-const ROOT_WITH_PLACEMENT_ORDER = [
-  ROOT_COLUMNS,
-  'placements:package_summaries!inner(package_id, display_order, released_at)',
+const MARKED_ROOT_COLUMNS = [
+  'package_id',
+  'summary_id',
+  'display_order',
+  'released_at',
+  'legacy_slug',
+  'is_summary_bank_compatibility',
+  `root:${ADMIN_LIBRARY_ROOT}!inner(${ROOT_COLUMNS})`,
 ].join(', ')
 
 const PLACEMENT_COLUMNS = [
@@ -77,6 +82,7 @@ const PLACEMENT_COLUMNS = [
   'released_at',
   'navigation_label',
   'legacy_slug',
+  'is_summary_bank_compatibility',
   'created_at',
   'updated_at',
 ].join(', ')
@@ -202,8 +208,19 @@ interface PlacementRow {
   readonly released_at: unknown
   readonly navigation_label: unknown
   readonly legacy_slug: unknown
+  readonly is_summary_bank_compatibility: unknown
   readonly created_at: unknown
   readonly updated_at: unknown
+}
+
+interface LegacyOrderedPlacementRow {
+  readonly package_id: unknown
+  readonly summary_id: unknown
+  readonly display_order: unknown
+  readonly released_at: unknown
+  readonly legacy_slug: unknown
+  readonly is_summary_bank_compatibility: unknown
+  readonly root: unknown
 }
 
 interface SourceRelationshipRow {
@@ -391,28 +408,21 @@ function applyRootOrder(
 ): QueryBuilder {
   if (request.sort.key === 'canonicalTitle') {
     return builder
-      .order('canonical_title', { ascending: request.sort.direction === 'asc' })
+      .order('root(canonical_title)', { ascending: request.sort.direction === 'asc' })
       .order('summary_id', { ascending: true })
   }
 
   return builder
-    .order('updated_at', { ascending: request.sort.direction === 'asc' })
+    .order('root(updated_at)', { ascending: request.sort.direction === 'asc' })
     .order('summary_id', { ascending: true })
 }
 
 function applyLegacyPlacementOrder(builder: QueryBuilder): QueryBuilder {
   return builder
-    .order('placements(display_order)', { ascending: false })
-    .order('placements(released_at)', { ascending: false, nullsFirst: false })
-    .order('updated_at', { ascending: false })
-    .order('created_at', { ascending: false })
-    .order('summary_id', { ascending: true })
-}
-
-function applyUnplacedLegacyOrder(builder: QueryBuilder): QueryBuilder {
-  return builder
-    .order('updated_at', { ascending: false })
-    .order('created_at', { ascending: false })
+    .order('display_order', { ascending: false })
+    .order('released_at', { ascending: false, nullsFirst: false })
+    .order('root(updated_at)', { ascending: false })
+    .order('root(created_at)', { ascending: false })
     .order('summary_id', { ascending: true })
 }
 
@@ -478,10 +488,17 @@ async function readDocumentSummaryIds(
   const documentIds = await readReferenceDocumentIdsByValue(client, document)
   if (documentIds.length === 0) return []
 
+  const markedSummaryIds = await readMarkedSummaryIds(
+    client,
+    DOCUMENT_FILTER_SUMMARY_LIMIT
+  )
+  if (markedSummaryIds.length === 0) return []
+
   const query = queryBuilder(client, SOURCE_RELATIONSHIPS)
     .select('summary_id', { count: 'exact' })
     .eq('role', 'primary')
     .in('reference_document_id', documentIds)
+    .in('summary_id', markedSummaryIds)
   const result = await executeQuery<SourceRelationshipRow>(
     SOURCE_RELATIONSHIPS,
     query.range(0, DOCUMENT_FILTER_SUMMARY_LIMIT - 1)
@@ -490,148 +507,115 @@ async function readDocumentSummaryIds(
   return uniqueIds(result.rows.map((row) => row.summary_id))
 }
 
-async function readExplicitlyOrderedRootPage(
+async function readMarkedSummaryIds(
+  client: SummaryLibraryCompatibilitySupabaseClient,
+  limit: number
+): Promise<readonly string[]> {
+  const query = queryBuilder(client, PACKAGE_PLACEMENTS)
+    .select('summary_id, is_summary_bank_compatibility', { count: 'exact' })
+    .eq('is_summary_bank_compatibility', true)
+    .order('summary_id', { ascending: true })
+  const result = await executeQuery<{
+    readonly summary_id: unknown
+    readonly is_summary_bank_compatibility: unknown
+  }>(
+    PACKAGE_PLACEMENTS,
+    query.range(0, limit - 1)
+  )
+  assertBoundedResult(result, PACKAGE_PLACEMENTS, limit)
+  for (const row of result.rows) {
+    if (row.is_summary_bank_compatibility !== true || !stringId(row.summary_id)) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        'A marker-qualified Summary membership response was incomplete.'
+      )
+    }
+  }
+  return uniqueIds(result.rows.map((row) => row.summary_id))
+}
+
+function mapLegacyOrderedRootRows(
+  rows: readonly LegacyOrderedPlacementRow[]
+): readonly SummaryLibraryProjectionRow[] {
+  const roots: SummaryLibraryProjectionRow[] = []
+  const seenSummaryIds = new Set<string>()
+
+  for (const row of rows) {
+    const placementSummaryId = stringId(row.summary_id)
+    const nestedRoot = Array.isArray(row.root)
+      ? row.root.length === 1 ? row.root[0] : null
+      : row.root
+
+    if (
+      !placementSummaryId ||
+      !stringId(row.package_id) ||
+      row.is_summary_bank_compatibility !== true ||
+      !stringId(row.legacy_slug) ||
+      !nestedRoot ||
+      typeof nestedRoot !== 'object'
+    ) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        'A marker-qualified compatibility Package placement did not include exactly one valid admin Summary projection.'
+      )
+    }
+
+    const root = nestedRoot as SummaryLibraryProjectionRow
+    if (stringId(root.summary_id) !== placementSummaryId) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        'A compatibility Package placement referenced a different admin Summary projection.'
+      )
+    }
+    if (seenSummaryIds.has(placementSummaryId)) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        `Summary ${placementSummaryId} has multiple marker-qualified compatibility Package placements.`
+      )
+    }
+
+    seenSummaryIds.add(placementSummaryId)
+    roots.push(root)
+  }
+
+  return roots
+}
+
+async function readMarkedRootPage(
   client: SummaryLibraryCompatibilitySupabaseClient,
   request: NormalizedSummaryLibraryCompatibilityQuery,
   documentSummaryIds: readonly string[] | null
 ): Promise<RootPage> {
-  if (documentSummaryIds !== null && documentSummaryIds.length === 0) {
+  if (
+    request.hasPackages === false ||
+    (documentSummaryIds !== null && documentSummaryIds.length === 0)
+  ) {
     return { rows: [], totalItems: 0 }
   }
 
   const from = (request.page - 1) * request.pageSize
   const to = from + request.pageSize - 1
-  let query = queryBuilder(client, ADMIN_LIBRARY_ROOT)
-    .select(request.packageId ? ROOT_WITH_PLACEMENT_ORDER : ROOT_COLUMNS, {
-      count: 'exact',
-    })
-  query = applyRootFilters(query, request)
+  let query = queryBuilder(client, PACKAGE_PLACEMENTS)
+    .select(MARKED_ROOT_COLUMNS, { count: 'exact' })
+    .eq('is_summary_bank_compatibility', true)
+  query = applyRootFilters(query, request, 'root.')
   query = applyCandidateIds(query, documentSummaryIds)
-  if (request.packageId) {
-    query = query.eq('placements.package_id', request.packageId)
-  }
-  query = applyRootOrder(query, request).range(from, to)
-
-  const result = await executeQuery<SummaryLibraryProjectionRow>(ADMIN_LIBRARY_ROOT, query)
-  return {
-    rows: result.rows,
-    totalItems: exactCount(result, ADMIN_LIBRARY_ROOT),
-  }
-}
-
-async function readUnplacedCount(
-  client: SummaryLibraryCompatibilitySupabaseClient,
-  request: NormalizedSummaryLibraryCompatibilityQuery,
-  documentSummaryIds: readonly string[] | null
-): Promise<number> {
-  if (documentSummaryIds !== null && documentSummaryIds.length === 0) return 0
-  let query = queryBuilder(client, ADMIN_LIBRARY_ROOT)
-    .select('summary_id', { count: 'exact', head: true })
-  query = applyRootFilters(query, request)
-  query = query.eq('package_placement_count', 0)
-  query = applyCandidateIds(query, documentSummaryIds)
-  const result = await executeQuery<SummaryLibraryProjectionRow>(ADMIN_LIBRARY_ROOT, query)
-  return exactCount(result, ADMIN_LIBRARY_ROOT)
-}
-
-async function readUnplacedRows(
-  client: SummaryLibraryCompatibilitySupabaseClient,
-  request: NormalizedSummaryLibraryCompatibilityQuery,
-  documentSummaryIds: readonly string[] | null,
-  from: number,
-  limit: number,
-  includeCount: boolean
-): Promise<QueryResult<SummaryLibraryProjectionRow>> {
-  if (limit <= 0 || (documentSummaryIds !== null && documentSummaryIds.length === 0)) {
-    return { rows: [], count: includeCount ? 0 : null }
-  }
-  let query = queryBuilder(client, ADMIN_LIBRARY_ROOT)
-    .select(ROOT_COLUMNS, includeCount ? { count: 'exact' } : undefined)
-  query = applyRootFilters(query, request)
-  query = query.eq('package_placement_count', 0)
-  query = applyCandidateIds(query, documentSummaryIds)
-  query = applyUnplacedLegacyOrder(query).range(from, from + limit - 1)
-  return executeQuery<SummaryLibraryProjectionRow>(ADMIN_LIBRARY_ROOT, query)
-}
-
-async function readLegacyOrderedRootPage(
-  client: SummaryLibraryCompatibilitySupabaseClient,
-  request: NormalizedSummaryLibraryCompatibilityQuery,
-  documentSummaryIds: readonly string[] | null
-): Promise<RootPage> {
-  const includePlaced = request.hasPackages !== false
-  const includeUnplaced = request.packageId === null && request.hasPackages !== true
-  const from = (request.page - 1) * request.pageSize
-  const to = from + request.pageSize - 1
-
-  if (!includePlaced && !includeUnplaced) return { rows: [], totalItems: 0 }
-
-  if (!includePlaced) {
-    const unplaced = await readUnplacedRows(
-      client,
-      request,
-      documentSummaryIds,
-      from,
-      request.pageSize,
-      true
-    )
-    return {
-      rows: unplaced.rows,
-      totalItems: exactCount(unplaced, ADMIN_LIBRARY_ROOT),
-    }
-  }
-
-  if (documentSummaryIds !== null && documentSummaryIds.length === 0) {
-    return { rows: [], totalItems: 0 }
-  }
-
-  let placedQuery = queryBuilder(client, ADMIN_LIBRARY_ROOT)
-    .select(ROOT_WITH_PLACEMENT_ORDER, { count: 'exact' })
-  placedQuery = applyRootFilters(placedQuery, request)
-  if (request.hasPackages === null) {
-    placedQuery = placedQuery.gt('package_placement_count', 0)
-  }
-  placedQuery = applyCandidateIds(placedQuery, documentSummaryIds)
-  if (request.packageId) {
-    placedQuery = placedQuery.eq('placements.package_id', request.packageId)
-  }
-  placedQuery = applyLegacyPlacementOrder(placedQuery).range(from, to)
-
-  const placedPromise = executeQuery<SummaryLibraryProjectionRow>(
-    ADMIN_LIBRARY_ROOT,
-    placedQuery
+  if (request.packageId) query = query.eq('package_id', request.packageId)
+  query = usesLegacyOrdering(request)
+    ? applyLegacyPlacementOrder(query)
+    : applyRootOrder(query, request)
+  const result = await executeQuery<LegacyOrderedPlacementRow>(
+    PACKAGE_PLACEMENTS,
+    query.range(from, to)
   )
-  const unplacedCountPromise = includeUnplaced
-    ? readUnplacedCount(client, request, documentSummaryIds)
-    : Promise.resolve(0)
-  const [placed, unplacedCount] = await Promise.all([
-    placedPromise,
-    unplacedCountPromise,
-  ])
-  const placedCount = exactCount(placed, ADMIN_LIBRARY_ROOT)
-
-  const placedRootRows = placed.rows
-
-  if (!includeUnplaced || placedRootRows.length >= request.pageSize) {
-    return {
-      rows: placedRootRows,
-      totalItems: placedCount + unplacedCount,
-    }
-  }
-
-  const unplacedFrom = Math.max(0, from - placedCount)
-  const unplaced = await readUnplacedRows(
-    client,
-    request,
-    documentSummaryIds,
-    unplacedFrom,
-    request.pageSize - placedRootRows.length,
-    false
-  )
-
+  const totalItems = exactCount(result, PACKAGE_PLACEMENTS)
   return {
-    rows: [...placedRootRows, ...unplaced.rows],
-    totalItems: placedCount + unplacedCount,
+    rows: mapLegacyOrderedRootRows(result.rows),
+    totalItems,
   }
 }
 
@@ -643,9 +627,7 @@ async function readRootPage(
     client,
     request.document
   )
-  return usesLegacyOrdering(request)
-    ? readLegacyOrderedRootPage(client, request, documentSummaryIds)
-    : readExplicitlyOrderedRootPage(client, request, documentSummaryIds)
+  return readMarkedRootPage(client, request, documentSummaryIds)
 }
 
 async function readRowsByIds<T>(
@@ -657,12 +639,50 @@ async function readRowsByIds<T>(
   limit: number
 ): Promise<readonly T[]> {
   if (ids.length === 0) return []
+  if (ids.length > limit) {
+    throw new SummaryLibraryCompatibilityRepositoryError(
+      'invalid_response',
+      source,
+      `The compatibility repository received ${ids.length} IDs for ${source}; the bounded read limit is ${limit}.`
+    )
+  }
   const query = queryBuilder(client, source)
     .select(columns, { count: 'exact' })
     .in(column, ids)
     .range(0, limit - 1)
   const result = await executeQuery<T>(source, query)
   assertBoundedResult(result, source, limit)
+  return result.rows
+}
+
+async function readCompatibilityPlacementsBySummaryIds(
+  client: SummaryLibraryCompatibilitySupabaseClient,
+  summaryIds: readonly string[]
+): Promise<readonly PlacementRow[]> {
+  if (summaryIds.length === 0) return []
+  const query = queryBuilder(client, PACKAGE_PLACEMENTS)
+    .select(PLACEMENT_COLUMNS, { count: 'exact' })
+    .in('summary_id', summaryIds)
+    .eq('is_summary_bank_compatibility', true)
+    .order('summary_id', { ascending: true })
+    .order('package_id', { ascending: true })
+    .range(0, PAGE_PLACEMENT_LIMIT - 1)
+  const result = await executeQuery<PlacementRow>(PACKAGE_PLACEMENTS, query)
+  assertBoundedResult(result, PACKAGE_PLACEMENTS, PAGE_PLACEMENT_LIMIT)
+  for (const row of result.rows) {
+    if (
+      row.is_summary_bank_compatibility !== true ||
+      !stringId(row.summary_id) ||
+      !stringId(row.package_id) ||
+      !stringId(row.legacy_slug)
+    ) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        'A marker-qualified compatibility Package placement was incomplete.'
+      )
+    }
+  }
   return result.rows
 }
 
@@ -811,14 +831,7 @@ async function composePageItems(
   if (summaryIds.length === 0) return []
 
   const [placementRows, relationshipRows] = await Promise.all([
-    readRowsByIds<PlacementRow>(
-      client,
-      PACKAGE_PLACEMENTS,
-      PLACEMENT_COLUMNS,
-      'summary_id',
-      summaryIds,
-      PAGE_PLACEMENT_LIMIT
-    ),
+    readCompatibilityPlacementsBySummaryIds(client, summaryIds),
     readRowsByIds<SourceRelationshipRow>(
       client,
       SOURCE_RELATIONSHIPS,
@@ -868,6 +881,17 @@ async function composePageItems(
   const placementsBySummary = groupBySummaryId(placements, (record) => record.summaryId)
   const sourcesBySummary = groupBySummaryId(sources, (record) => record.summaryId)
   const compatibilityDocumentsByReferenceDocument = mapLegacyDocumentValues(aliasRows)
+
+  for (const summaryId of summaryIds) {
+    const summaryPlacements = placementsBySummary.get(summaryId) ?? []
+    if (summaryPlacements.length !== 1) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        `Summary ${summaryId} has ${summaryPlacements.length} marker-qualified compatibility Package placements; exactly one is required.`
+      )
+    }
+  }
 
   return rootRows.map((row) => {
     const root = mapSummaryLibraryProjectionRow(row)
@@ -940,27 +964,58 @@ function mapLegacyDocumentValues(
 async function readPackageFacets(
   client: SummaryLibraryCompatibilitySupabaseClient
 ): Promise<SummaryLibraryCompatibilityFacets['packageOptions']> {
-  const query = queryBuilder(client, PACKAGES)
-    .select('id, name', { count: 'exact' })
-    .order('name', { ascending: true })
-    .order('id', { ascending: true })
-    .range(0, FACET_OPTION_LIMIT - 1)
-  const result = await executeQuery<PackageRow>(PACKAGES, query)
-  assertBoundedResult(result, PACKAGES, FACET_OPTION_LIMIT)
-  return result.rows.flatMap((row) => {
-    const id = stringId(row.id)
-    return id && typeof row.name === 'string' && row.name.trim() !== ''
-      ? [{ id, name: row.name }]
-      : []
-  })
+  const markerQuery = queryBuilder(client, PACKAGE_PLACEMENTS)
+    .select('package_id, is_summary_bank_compatibility', { count: 'exact' })
+    .eq('is_summary_bank_compatibility', true)
+    .order('package_id', { ascending: true })
+  const markerResult = await executeQuery<{
+    readonly package_id: unknown
+    readonly is_summary_bank_compatibility: unknown
+  }>(
+    PACKAGE_PLACEMENTS,
+    markerQuery.range(0, FACET_RELATIONSHIP_LIMIT - 1)
+  )
+  assertBoundedResult(markerResult, PACKAGE_PLACEMENTS, FACET_RELATIONSHIP_LIMIT)
+  for (const row of markerResult.rows) {
+    if (row.is_summary_bank_compatibility !== true || !stringId(row.package_id)) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        'A marker-qualified package facet membership response was incomplete.'
+      )
+    }
+  }
+  const packageIds = uniqueIds(markerResult.rows.map((row) => row.package_id))
+  const packageRows = await readRowsByIds<PackageRow>(
+    client,
+    PACKAGES,
+    PACKAGE_COLUMNS,
+    'id',
+    packageIds,
+    FACET_OPTION_LIMIT
+  )
+  const packages = mapPackageRows(packageRows)
+  return [...packages.entries()]
+    .map(([id, packageDetails]) => ({ id, name: packageDetails.name }))
+    .sort((left, right) => {
+      const byName = left.name.localeCompare(right.name)
+      return byName !== 0 ? byName : left.id.localeCompare(right.id)
+    })
 }
 
 async function readDocumentFacets(
   client: SummaryLibraryCompatibilitySupabaseClient
 ): Promise<readonly string[]> {
+  const markedSummaryIds = await readMarkedSummaryIds(
+    client,
+    FACET_RELATIONSHIP_LIMIT
+  )
+  if (markedSummaryIds.length === 0) return []
+
   const relationshipQuery = queryBuilder(client, SOURCE_RELATIONSHIPS)
     .select('reference_document_id', { count: 'exact' })
     .eq('role', 'primary')
+    .in('summary_id', markedSummaryIds)
     .order('reference_document_id', { ascending: true })
     .range(0, FACET_RELATIONSHIP_LIMIT - 1)
   const relationshipResult = await executeQuery<SourceRelationshipRow>(

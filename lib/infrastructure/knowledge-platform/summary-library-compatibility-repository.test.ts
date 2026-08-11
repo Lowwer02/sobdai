@@ -63,8 +63,50 @@ function placementRow(summaryId: string) {
     released_at: '2026-08-04T00:00:00.000Z',
     navigation_label: null,
     legacy_slug: 'contract-law',
+    is_summary_bank_compatibility: true,
     created_at: '2026-08-01T00:00:00.000Z',
     updated_at: '2026-08-04T00:00:00.000Z',
+  }
+}
+
+function legacyOrderedPlacementRow(
+  summaryId: string,
+  title: string,
+  published: boolean,
+  updatedAt: string,
+  sourceDocumentCount = 0
+  ) {
+  return {
+    package_id: PACKAGE_ONE,
+    summary_id: summaryId,
+    display_order: 5,
+    released_at: '2026-08-04T00:00:00.000Z',
+    legacy_slug: 'contract-law',
+    is_summary_bank_compatibility: true,
+    root: rootRow(summaryId, title, published, updatedAt, sourceDocumentCount),
+  }
+}
+
+function targetOnlyPlacementRow(summaryId: string) {
+  return {
+    ...placementRow(summaryId),
+    package_id: '00000000-0000-4000-8000-000000000102',
+    legacy_slug: 'target-only-summary',
+    is_summary_bank_compatibility: false,
+  }
+}
+
+function targetOnlyOrderedPlacementRow(
+  summaryId: string,
+  title: string,
+  published: boolean,
+  updatedAt: string
+) {
+  return {
+    ...legacyOrderedPlacementRow(summaryId, title, published, updatedAt),
+    package_id: '00000000-0000-4000-8000-000000000102',
+    legacy_slug: 'target-only-summary',
+    is_summary_bank_compatibility: false,
   }
 }
 
@@ -189,6 +231,36 @@ class FakeQueryBuilder implements PromiseLike<{
     return this.record('range', from, to)
   }
 
+  private filteredData(): readonly unknown[] {
+    let rows = [...(this.response.data ?? [])]
+    const valueForColumn = (row: unknown, column: string): unknown => {
+      if (typeof row !== 'object' || row === null) return undefined
+      if (column.startsWith('root.')) {
+        const nested = (row as Record<string, unknown>).root
+        return typeof nested === 'object' && nested !== null
+          ? (nested as Record<string, unknown>)[column.slice('root.'.length)]
+          : undefined
+      }
+      return (row as Record<string, unknown>)[column]
+    }
+    for (const operation of this.operations) {
+      if (operation.name === 'eq') {
+        const [column, value] = operation.args
+        rows = rows.filter((row) => (
+          valueForColumn(row, String(column)) === value
+        ))
+      }
+      if (operation.name === 'in') {
+        const [column, values] = operation.args
+        const allowed = Array.isArray(values) ? values : []
+        rows = rows.filter((row) => (
+          allowed.includes(valueForColumn(row, String(column)))
+        ))
+      }
+    }
+    return rows
+  }
+
   public then<
     TResult1 = {
       readonly data: readonly unknown[] | null
@@ -205,7 +277,7 @@ class FakeQueryBuilder implements PromiseLike<{
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2> {
     return Promise.resolve({
-      data: this.response.data ?? [],
+      data: this.filteredData(),
       error: this.response.error ?? null,
       count: this.response.count ?? null,
     }).then(onfulfilled, onrejected)
@@ -254,9 +326,40 @@ function hasOperation(
   ))
 }
 
+function singleSummaryPlans(root: unknown, placement: unknown) {
+  return {
+    package_summaries: [
+      { data: [root], count: 1 },
+      { data: [placement], count: 1 },
+      { data: [placement], count: 1 },
+      { data: [placement], count: 1 },
+    ],
+    summary_reference_documents: [
+      { data: [], count: 0 },
+      { data: [], count: 0 },
+    ],
+    packages: [
+      { data: [PACKAGE_ROW], count: 1 },
+      { data: [PACKAGE_ROW], count: 1 },
+    ],
+  }
+}
+
 test('delegates legacy search, filters, count, ordering, and pagination to the server', async () => {
   const { client, calls } = fakeClient({
     package_summaries: [
+      {
+        data: [legacyOrderedPlacementRow(
+          SUMMARY_TWO,
+          'Contract Law',
+          false,
+          '2026-08-03T00:00:00.000Z',
+          1
+        )],
+        count: 1,
+      },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
       { data: [placementRow(SUMMARY_TWO)], count: 1 },
     ],
     summary_reference_documents: [
@@ -276,9 +379,6 @@ test('delegates legacy search, filters, count, ordering, and pagination to the s
       { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
       { data: [PACKAGE_ROW], count: 1 },
     ],
-    kp_read_admin_library: [
-      { data: [rootRow(SUMMARY_TWO, 'Contract Law', false, '2026-08-03T00:00:00.000Z', 1)], count: 1 },
-    ],
   })
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
   const result = await repository.search({
@@ -291,39 +391,172 @@ test('delegates legacy search, filters, count, ordering, and pagination to the s
   assert.equal(result.items[0]?.title, 'Contract Law')
   assert.equal(result.items[0]?.document, 'Legacy Administrative Act')
 
-  const root = callFor(calls, 'kp_read_admin_library')
+  const root = callFor(calls, 'package_summaries')
   const select = root.operations.find((operation) => operation.name === 'select')
   assert.deepEqual(select?.args[1], { count: 'exact' })
-  assert.ok(hasOperation(root, 'ilike', 'canonical_title', '%contract%'))
-  assert.ok(hasOperation(root, 'eq', 'legacy_is_published', false))
-  assert.ok(hasOperation(root, 'gt', 'package_placement_count', 0))
+  assert.ok(String(select?.args[0]).includes('root:kp_read_admin_library!inner('))
+  assert.ok(hasOperation(root, 'eq', 'is_summary_bank_compatibility', true))
+  assert.ok(hasOperation(root, 'ilike', 'root.canonical_title', '%contract%'))
+  assert.ok(hasOperation(root, 'eq', 'root.legacy_is_published', false))
+  assert.ok(hasOperation(root, 'gt', 'root.package_placement_count', 0))
   assert.ok(hasOperation(root, 'range', 0, 14))
   assert.deepEqual(
     root.operations.filter((operation) => operation.name === 'order').map((operation) => operation.args),
     [
-      ['placements(display_order)', { ascending: false }],
-      ['placements(released_at)', { ascending: false, nullsFirst: false }],
-      ['updated_at', { ascending: false }],
-      ['created_at', { ascending: false }],
+      ['display_order', { ascending: false }],
+      ['released_at', { ascending: false, nullsFirst: false }],
+      ['root(updated_at)', { ascending: false }],
+      ['root(created_at)', { ascending: false }],
       ['summary_id', { ascending: true }],
     ]
   )
+  assert.ok(root.operations.findIndex((operation) => operation.name === 'order') <
+    root.operations.findIndex((operation) => operation.name === 'range'))
+  assert.equal(
+    root.operations.some((operation) => operation.name === 'order' &&
+      String(operation.args[0]).startsWith('placements(')),
+    false
+  )
 
-  const placements = callFor(calls, 'package_summaries')
-  assert.ok(hasOperation(placements, 'select', 'package_id, summary_id, status, version_policy, pinned_summary_version_id, sort_order, display_order, released_at, navigation_label, legacy_slug, created_at, updated_at', { count: 'exact' }))
+  const placements = callFor(calls, 'package_summaries', 1)
+  assert.ok(hasOperation(placements, 'select', 'package_id, summary_id, status, version_policy, pinned_summary_version_id, sort_order, display_order, released_at, navigation_label, legacy_slug, is_summary_bank_compatibility, created_at, updated_at', { count: 'exact' }))
+  assert.ok(hasOperation(placements, 'eq', 'is_summary_bank_compatibility', true))
   assert.ok(hasOperation(placements, 'range', 0, 999))
   const relationships = callFor(calls, 'summary_reference_documents')
   assert.ok(hasOperation(relationships, 'range', 0, 9_999))
 
   assert.equal(calls.filter((call) => call.table === 'summaries').length, 0)
-  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 1)
+  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 4)
   assert.equal(calls.filter((call) => call.table === 'summary_reference_documents').length, 2)
+  assert.equal(calls.filter((call) => call.table === 'packages').length, 2)
+  assert.equal(calls.filter((call) => call.table === 'reference_documents').length, 2)
+  assert.equal(calls.filter((call) => call.table === 'reference_document_versions').length, 1)
+  assert.equal(calls.filter((call) => call.table === 'reference_document_aliases').length, 2)
+})
+
+test('uses the compatibility marker to exclude target-only placements with legacy slugs', async () => {
+  const marked = legacyOrderedPlacementRow(
+    SUMMARY_ONE,
+    'Marked Summary',
+    true,
+    '2026-08-04T00:00:00.000Z'
+  )
+  const targetOnly = targetOnlyOrderedPlacementRow(
+    SUMMARY_ONE,
+    'Target-only Summary',
+    true,
+    '2026-08-05T00:00:00.000Z'
+  )
+  const { client, calls } = fakeClient({
+    package_summaries: [
+      { data: [targetOnly, marked], count: 1 },
+      { data: [targetOnlyPlacementRow(SUMMARY_ONE), placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [targetOnlyPlacementRow(SUMMARY_ONE), placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [targetOnlyPlacementRow(SUMMARY_ONE), placementRow(SUMMARY_ONE)], count: 1 },
+    ],
+    summary_reference_documents: [
+      { data: [], count: 0 },
+      { data: [], count: 0 },
+    ],
+    packages: [
+      { data: [PACKAGE_ROW], count: 1 },
+      { data: [PACKAGE_ROW], count: 1 },
+    ],
+  })
+  const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
+  const result = await repository.search({ hasPackages: true })
+
+  assert.deepEqual(result.items.map((item) => item.id), [SUMMARY_ONE])
+  assert.equal(result.items[0]?.packageId, PACKAGE_ONE)
+  assert.deepEqual(result.facets.packageOptions, [{ id: PACKAGE_ONE, name: 'General Law' }])
+  assert.ok(hasOperation(callFor(calls, 'package_summaries'), 'eq', 'is_summary_bank_compatibility', true))
+  assert.ok(hasOperation(callFor(calls, 'package_summaries', 1), 'eq', 'is_summary_bank_compatibility', true))
+})
+
+test('uses the marker-qualified root for updatedAt ascending and canonicalTitle descending sorts', async () => {
+  const cases = [
+    {
+      sort: { key: 'updatedAt' as const, direction: 'asc' as const },
+      expected: ['root(updated_at)', { ascending: true }],
+    },
+    {
+      sort: { key: 'canonicalTitle' as const, direction: 'desc' as const },
+      expected: ['root(canonical_title)', { ascending: false }],
+    },
+  ] as const
+
+  for (const testCase of cases) {
+    const { client, calls } = fakeClient(singleSummaryPlans(
+      legacyOrderedPlacementRow(
+        SUMMARY_ONE,
+        'Marked Summary',
+        true,
+        '2026-08-04T00:00:00.000Z'
+      ),
+      placementRow(SUMMARY_ONE)
+    ))
+    const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
+    await repository.search({ hasPackages: true, sort: testCase.sort })
+
+    const root = callFor(calls, 'package_summaries')
+    assert.ok(hasOperation(root, 'eq', 'is_summary_bank_compatibility', true))
+    assert.deepEqual(
+      root.operations
+        .filter((operation) => operation.name === 'order')
+        .map((operation) => operation.args),
+      [testCase.expected, ['summary_id', { ascending: true }]]
+    )
+  }
+})
+
+test('scopes package and document facets to marker-qualified summaries', async () => {
+  const markedRoot = legacyOrderedPlacementRow(
+    SUMMARY_ONE,
+    'Marked Summary',
+    true,
+    '2026-08-04T00:00:00.000Z',
+    1
+  )
+  const { client, calls } = fakeClient({
+    package_summaries: [
+      { data: [markedRoot], count: 1 },
+      { data: [targetOnlyPlacementRow(SUMMARY_TWO), placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [targetOnlyPlacementRow(SUMMARY_TWO), placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [targetOnlyPlacementRow(SUMMARY_TWO), placementRow(SUMMARY_ONE)], count: 1 },
+    ],
+    summary_reference_documents: [
+      { data: [relationshipRow(SUMMARY_ONE), relationshipRow(SUMMARY_TWO)], count: 1 },
+      { data: [relationshipRow(SUMMARY_ONE), relationshipRow(SUMMARY_TWO)], count: 1 },
+    ],
+    packages: [
+      { data: [PACKAGE_ROW], count: 1 },
+      { data: [PACKAGE_ROW], count: 1 },
+    ],
+    reference_documents: [
+      { data: [DOCUMENT_ROW], count: 1 },
+      { data: [DOCUMENT_ROW], count: 1 },
+    ],
+    reference_document_versions: [{ data: [VERSION_ROW], count: 1 }],
+    reference_document_aliases: [
+      { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
+      { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
+    ],
+  })
+  const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
+  const result = await repository.search({ hasPackages: true })
+
+  assert.deepEqual(result.facets.packageOptions, [{ id: PACKAGE_ONE, name: 'General Law' }])
+  assert.deepEqual(result.facets.documentOptions, ['Legacy Administrative Act'])
+  const markerCalls = calls.filter((call) => call.table === 'package_summaries')
+  assert.ok(markerCalls.every((call) => hasOperation(call, 'eq', 'is_summary_bank_compatibility', true)))
+  const relationshipCalls = calls.filter((call) => call.table === 'summary_reference_documents')
+  assert.ok(relationshipCalls.every((call) => hasOperation(call, 'in', 'summary_id', [SUMMARY_ONE])))
 })
 
 test('applies document and Package candidates before server pagination', async () => {
   const { client, calls } = fakeClient({
     reference_documents: [
-      { data: [DOCUMENT_ROW], count: 1 },
+      { data: [{ ...DOCUMENT_ROW, canonical_title: 'Legacy Administrative Act' }], count: 1 },
       { data: [], count: 0 },
       { data: [DOCUMENT_ROW], count: 1 },
       { data: [DOCUMENT_ROW], count: 1 },
@@ -334,16 +567,27 @@ test('applies document and Package candidates before server pagination', async (
       { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
     ],
     summary_reference_documents: [
-      { data: [{ summary_id: SUMMARY_TWO }], count: 1 },
+      { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
       { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
       { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
     ],
-    package_summaries: [{ data: [placementRow(SUMMARY_TWO)], count: 1 }],
+    package_summaries: [
+      { data: [{ summary_id: SUMMARY_TWO, is_summary_bank_compatibility: true }], count: 1 },
+      {
+        data: [legacyOrderedPlacementRow(
+          SUMMARY_TWO,
+          'Contract Law',
+          false,
+          '2026-08-03T00:00:00.000Z',
+          1
+        )],
+        count: 2,
+      },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+    ],
     reference_document_versions: [{ data: [VERSION_ROW], count: 1 }],
-    kp_read_admin_library: [{
-      data: [rootRow(SUMMARY_TWO, 'Contract Law', false, '2026-08-03T00:00:00.000Z', 1)],
-      count: 2,
-    }],
     packages: [
       { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
       { data: [PACKAGE_ROW], count: 1 },
@@ -368,14 +612,18 @@ test('applies document and Package candidates before server pagination', async (
   assert.ok(hasOperation(documentCandidates, 'eq', 'role', 'primary'))
   assert.ok(hasOperation(documentCandidates, 'in', 'reference_document_id', [DOCUMENT_ONE]))
 
-  const root = callFor(calls, 'kp_read_admin_library')
+  const markerCandidates = callFor(calls, 'package_summaries')
+  assert.ok(hasOperation(markerCandidates, 'eq', 'is_summary_bank_compatibility', true))
+  assert.ok(hasOperation(markerCandidates, 'range', 0, 9_999))
+  const root = callFor(calls, 'package_summaries', 1)
   assert.ok(hasOperation(root, 'in', 'summary_id', [SUMMARY_TWO]))
-  assert.ok(hasOperation(root, 'eq', 'placements.package_id', PACKAGE_ONE))
+  assert.ok(hasOperation(root, 'eq', 'is_summary_bank_compatibility', true))
+  assert.ok(hasOperation(root, 'eq', 'package_id', PACKAGE_ONE))
   assert.ok(hasOperation(root, 'range', 1, 1))
   assert.deepEqual(
     root.operations.filter((operation) => operation.name === 'order').map((operation) => operation.args),
     [
-      ['canonical_title', { ascending: true }],
+      ['root(canonical_title)', { ascending: true }],
       ['summary_id', { ascending: true }],
     ]
   )
@@ -384,7 +632,12 @@ test('applies document and Package candidates before server pagination', async (
 
 test('preserves the legacy compatibility document over the normalized Primary Reference Document', async () => {
   const { client } = fakeClient({
-    package_summaries: [{ data: [placementRow(SUMMARY_ONE)], count: 1 }],
+    package_summaries: [
+      { data: [legacyOrderedPlacementRow(SUMMARY_ONE, 'Zoning Law', true, '2026-08-04T00:00:00.000Z', 1)], count: 1 },
+      { data: [placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [placementRow(SUMMARY_ONE)], count: 1 },
+    ],
     summary_reference_documents: [
       { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
       { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
@@ -402,10 +655,6 @@ test('preserves the legacy compatibility document over the normalized Primary Re
       { data: [{ ...LEGACY_DOCUMENT_ALIAS_ROW, alias_value: 'Legacy Civil Code' }], count: 1 },
       { data: [{ ...LEGACY_DOCUMENT_ALIAS_ROW, alias_value: 'Legacy Civil Code' }], count: 1 },
     ],
-    kp_read_admin_library: [{
-      data: [rootRow(SUMMARY_ONE, 'Zoning Law', true, '2026-08-04T00:00:00.000Z', 1)],
-      count: 1,
-    }],
   })
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
   const result = await repository.search({ hasPackages: true })
@@ -417,7 +666,12 @@ test('preserves the legacy compatibility document over the normalized Primary Re
 
 test('does not synthesize a legacy document from the normalized Reference Document title', async () => {
   const { client } = fakeClient({
-    package_summaries: [{ data: [placementRow(SUMMARY_ONE)], count: 1 }],
+    package_summaries: [
+      { data: [legacyOrderedPlacementRow(SUMMARY_ONE, 'Zoning Law', true, '2026-08-04T00:00:00.000Z', 1)], count: 1 },
+      { data: [placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [placementRow(SUMMARY_ONE)], count: 1 },
+      { data: [placementRow(SUMMARY_ONE)], count: 1 },
+    ],
     summary_reference_documents: [
       { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
       { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
@@ -435,10 +689,6 @@ test('does not synthesize a legacy document from the normalized Reference Docume
       { data: [], count: 0 },
       { data: [], count: 0 },
     ],
-    kp_read_admin_library: [{
-      data: [rootRow(SUMMARY_ONE, 'Zoning Law', true, '2026-08-04T00:00:00.000Z', 1)],
-      count: 1,
-    }],
   })
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
   const result = await repository.search({ hasPackages: true })
@@ -449,9 +699,11 @@ test('does not synthesize a legacy document from the normalized Reference Docume
 
 test('returns an empty server page without issuing per-Summary reads', async () => {
   const { client, calls } = fakeClient({
-    kp_read_admin_library: [{ data: [], count: 0 }],
-    packages: [{ data: [], count: 0 }],
-    summary_reference_documents: [{ data: [], count: 0 }],
+    package_summaries: [
+      { data: [], count: 0 },
+      { data: [], count: 0 },
+      { data: [], count: 0 },
+    ],
   })
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
   const result = await repository.search({ hasPackages: true })
@@ -459,16 +711,16 @@ test('returns an empty server page without issuing per-Summary reads', async () 
   assert.equal(result.items.length, 0)
   assert.equal(result.totalItems, 0)
   assert.equal(result.totalPages, 0)
-  assert.equal(calls.filter((call) => call.table === 'kp_read_admin_library').length, 1)
-  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 0)
-  assert.equal(calls.filter((call) => call.table === 'summary_reference_documents').length, 1)
+  assert.equal(calls.filter((call) => call.table === 'kp_read_admin_library').length, 0)
+  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 3)
+  assert.equal(calls.filter((call) => call.table === 'summary_reference_documents').length, 0)
   assert.equal(calls.filter((call) => call.table === 'summaries').length, 0)
 })
 
 test('does not suppress repository errors', async () => {
   const { client } = fakeClient({
-    kp_read_admin_library: [{
-      error: { message: 'failed kp_read_admin_library', code: 'PGRST999' },
+    package_summaries: [{
+      error: { message: 'failed package_summaries', code: 'PGRST999' },
       count: 0,
     }],
   })
@@ -478,6 +730,86 @@ test('does not suppress repository errors', async () => {
     () => repository.search({ hasPackages: true }),
     (error: unknown) => error instanceof SummaryLibraryCompatibilityRepositoryError &&
       error.code === 'query_failed' &&
-      error.source === 'kp_read_admin_library'
+      error.source === 'package_summaries'
+  )
+})
+
+test('paginates one compatibility placement per Summary before hydration', async () => {
+  const { client, calls } = fakeClient({
+    package_summaries: [
+      {
+        data: [legacyOrderedPlacementRow(
+          SUMMARY_TWO,
+          'Second Summary',
+          false,
+          '2026-08-03T00:00:00.000Z'
+        )],
+        count: 2,
+      },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+      { data: [placementRow(SUMMARY_TWO)], count: 1 },
+    ],
+    summary_reference_documents: [
+      { data: [], count: 0 },
+      { data: [], count: 0 },
+    ],
+    packages: [
+      { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
+      { data: [PACKAGE_ROW], count: 1 },
+    ],
+    reference_document_aliases: [{ data: [], count: 0 }],
+    reference_documents: [{ data: [], count: 0 }],
+  })
+  const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
+  const result = await repository.search({
+    hasPackages: true,
+    page: 2,
+    pageSize: 1,
+  })
+
+  assert.equal(result.totalItems, 2)
+  assert.equal(result.totalPages, 2)
+  assert.deepEqual(result.items.map((item) => item.id), [SUMMARY_TWO])
+
+  const orderedPlacements = callFor(calls, 'package_summaries')
+  assert.ok(hasOperation(orderedPlacements, 'eq', 'is_summary_bank_compatibility', true))
+  assert.ok(hasOperation(orderedPlacements, 'range', 1, 1))
+  assert.deepEqual(
+    orderedPlacements.operations
+      .filter((operation) => operation.name === 'order')
+      .map((operation) => operation.args),
+    [
+      ['display_order', { ascending: false }],
+      ['released_at', { ascending: false, nullsFirst: false }],
+      ['root(updated_at)', { ascending: false }],
+      ['root(created_at)', { ascending: false }],
+      ['summary_id', { ascending: true }],
+    ]
+  )
+  const hydratedPlacements = callFor(calls, 'package_summaries', 1)
+  assert.ok(hasOperation(hydratedPlacements, 'in', 'summary_id', [SUMMARY_TWO]))
+  assert.ok(hasOperation(hydratedPlacements, 'eq', 'is_summary_bank_compatibility', true))
+  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 4)
+})
+
+test('rejects duplicate marker-qualified compatibility placements instead of duplicating Summary rows', async () => {
+  const duplicate = legacyOrderedPlacementRow(
+    SUMMARY_ONE,
+    'Duplicate Summary',
+    false,
+    '2026-08-03T00:00:00.000Z'
+  )
+  const { client } = fakeClient({
+    package_summaries: [{ data: [duplicate, duplicate], count: 2 }],
+  })
+  const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
+
+  await assert.rejects(
+    () => repository.search({ hasPackages: true }),
+    (error: unknown) => error instanceof SummaryLibraryCompatibilityRepositoryError &&
+      error.code === 'invalid_response' &&
+      error.source === 'package_summaries' &&
+      error.message.includes('multiple marker-qualified compatibility Package placements')
   )
 })
