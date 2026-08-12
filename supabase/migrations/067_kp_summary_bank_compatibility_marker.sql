@@ -1,36 +1,27 @@
 -- 067_kp_summary_bank_compatibility_marker.sql
--- Sobdai Knowledge Platform — durable Summary Bank compatibility placement.
+-- Sobdai Knowledge Platform — hybrid Summary membership foundation.
 --
--- Migration-number audit
--- ----------------------
--- Migration 066 is the highest tracked or untracked numeric migration present
--- when this file is created. Migration 067 is therefore the next safe identity.
+-- This migration is schema- and validation-only. It deliberately performs no
+-- domain-row mutation against Summary or PackageSummary records.
+-- Existing rows with summary_code IS NULL are grandfathered legacy rows and
+-- remain without PackageSummary placements or compatibility markers.
 --
--- Purpose
--- -------
--- Persist, on PackageSummary itself, the one placement that represents each
--- historical Summary Bank row. The one-time backfill uses the still-present
--- legacy Summary Package association as its only authority. No placement is
--- inferred, selected heuristically, or created by this migration.
---
--- Lifecycle boundary
--- ------------------
--- This migration does not change any kp_persist_* writer. A later forward
--- migration must make those commands maintain this marker before legacy
--- Summary Package ownership or migration-control evidence is retired.
+-- A later writer migration owns creation and maintenance of KP-native rows.
+-- The marker below is an internal canonical/compatibility placement only; the
+-- complete package_summaries relation remains the product membership authority.
 
 set local lock_timeout = '5s';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Fail closed before adding or backfilling the marker. All public.summaries
--- rows are legacy-compatible Summary Bank rows at this coexistence boundary.
+-- Fail closed on required pre-existing storage, without requiring historical
+-- placements. Both the 29-row legacy/zero-placement state and a future state
+-- containing KP-native rows are valid inputs to this migration.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 do $kp_summary_bank_marker_preflight$
 declare
     expected record;
     v_column_exists boolean;
-    v_ledger_mismatch boolean := false;
 begin
     for expected in
         select relation_name
@@ -55,9 +46,12 @@ begin
             ('summaries', 'id', 'uuid', 'NO'),
             ('summaries', 'package_id', 'uuid', 'NO'),
             ('summaries', 'slug', 'text', 'NO'),
-            ('summaries', 'sort_order', 'int4', 'NO'),
-            ('summaries', 'display_order', 'int4', 'NO'),
-            ('summaries', 'released_at', 'timestamptz', 'YES'),
+            ('summaries', 'summary_code', 'text', 'YES'),
+            ('summaries', 'canonical_slug', 'text', 'YES'),
+            ('summaries', 'canonical_title', 'text', 'YES'),
+            ('summaries', 'visibility', 'text', 'YES'),
+            ('summaries', 'lifecycle_status', 'text', 'YES'),
+            ('summaries', 'current_published_version_id', 'uuid', 'YES'),
             ('package_summaries', 'package_id', 'uuid', 'NO'),
             ('package_summaries', 'summary_id', 'uuid', 'NO'),
             ('package_summaries', 'legacy_slug', 'text', 'YES'),
@@ -87,61 +81,6 @@ begin
         end if;
     end loop;
 
-    if exists (
-        select 1
-        from public.summaries s
-        where s.package_id is null
-           or s.slug is null
-           or nullif(btrim(s.slug), '') is null
-    ) then
-        raise exception using
-            errcode = 'not_null_violation',
-            message = 'Knowledge Platform migration 067 requires every Summary Bank Summary to retain a Package and non-empty legacy slug.';
-    end if;
-
-    if exists (
-        select 1
-        from public.summaries s
-        where (
-            select count(*)
-            from public.package_summaries ps
-            where ps.summary_id = s.id
-              and ps.package_id = s.package_id
-        ) <> 1
-    ) then
-        raise exception using
-            errcode = 'cardinality_violation',
-            message = 'Knowledge Platform migration 067 requires exactly one PackageSummary matching each historical Summary/Package association.';
-    end if;
-
-    if exists (
-        select 1
-        from public.summaries s
-        join public.package_summaries ps
-          on ps.summary_id = s.id
-         and ps.package_id = s.package_id
-        where ps.legacy_slug is distinct from s.slug
-    ) then
-        raise exception using
-            errcode = 'check_violation',
-            message = 'Knowledge Platform migration 067 found a historical PackageSummary legacy slug that does not match its Summary.';
-    end if;
-
-    if exists (
-        select 1
-        from public.summaries s
-        join public.package_summaries ps
-          on ps.summary_id = s.id
-         and ps.package_id = s.package_id
-        where ps.sort_order is distinct from s.sort_order
-           or ps.display_order is distinct from s.display_order
-           or ps.released_at is distinct from s.released_at
-    ) then
-        raise exception using
-            errcode = 'check_violation',
-            message = 'Knowledge Platform migration 067 found historical PackageSummary ordering metadata that does not match its Summary.';
-    end if;
-
     select exists (
         select 1
         from information_schema.columns c
@@ -163,24 +102,24 @@ begin
         ) then
             raise exception using
                 errcode = 'check_violation',
-                message = 'Knowledge Platform migration 067 found an incompatible pre-existing Summary Bank compatibility marker column.';
+                message = 'Knowledge Platform migration 067 found an incompatible pre-existing compatibility marker column.';
         end if;
 
         if exists (
             select 1
             from public.package_summaries ps
+            join public.summaries s on s.id = ps.summary_id
             where ps.is_summary_bank_compatibility
-              and not exists (
-                  select 1
-                  from public.summaries s
-                  where s.id = ps.summary_id
-                    and s.package_id = ps.package_id
-                    and s.slug = ps.legacy_slug
+              and (
+                  s.summary_code is null
+                  or ps.legacy_slug is null
+                  or ps.legacy_slug is distinct from s.slug
+                  or ps.package_id is distinct from s.package_id
               )
         ) then
             raise exception using
                 errcode = 'check_violation',
-                message = 'Knowledge Platform migration 067 found a conflicting pre-existing compatibility marker.';
+                message = 'Knowledge Platform migration 067 found a compatibility marker outside the KP-native canonical Package/slug association.';
         end if;
 
         if exists (
@@ -192,7 +131,7 @@ begin
         ) then
             raise exception using
                 errcode = 'unique_violation',
-                message = 'Knowledge Platform migration 067 found multiple pre-existing compatibility markers for one Summary.';
+                message = 'Knowledge Platform migration 067 found multiple compatibility markers for one Summary.';
         end if;
     elsif to_regclass('public.package_summaries_one_bank_compatibility_key') is not null
        or exists (
@@ -206,83 +145,76 @@ begin
             errcode = 'check_violation',
             message = 'Knowledge Platform migration 067 found partial marker schema without its required column.';
     end if;
-
-    -- Migration evidence is optional and is never referenced by a durable
-    -- object. When migration 053 placement evidence remains available, every
-    -- recorded association and ordering value must agree with live authority.
-    if to_regclass('kp_migration.summary_ledger') is not null then
-        for expected in
-            select column_name
-            from (values
-                ('source_summary_id'),
-                ('source_package_id'),
-                ('target_summary_id'),
-                ('target_package_id'),
-                ('target_legacy_slug'),
-                ('provenance')
-            ) as required(column_name)
-        loop
-            if not exists (
-                select 1
-                from information_schema.columns c
-                where c.table_schema = 'kp_migration'
-                  and c.table_name = 'summary_ledger'
-                  and c.column_name = expected.column_name
-            ) then
-                raise exception using
-                    errcode = 'check_violation',
-                    message = format(
-                        'Knowledge Platform migration 067 found incomplete migration evidence: kp_migration.summary_ledger.%I is missing.',
-                        expected.column_name
-                    );
-            end if;
-        end loop;
-
-        execute $ledger_check$
-            select exists (
-                select 1
-                from kp_migration.summary_ledger l
-                join public.summaries s
-                  on s.id = l.source_summary_id
-                join public.package_summaries ps
-                  on ps.summary_id = s.id
-                 and ps.package_id = s.package_id
-                where l.provenance ? 'package_summary_placement'
-                  and (
-                      l.source_package_id is distinct from s.package_id
-                      or l.target_summary_id is distinct from s.id
-                      or l.target_package_id is distinct from s.package_id
-                      or l.target_legacy_slug is distinct from s.slug
-                      or l.provenance #>> '{package_summary_placement,package_id}' is distinct from s.package_id::text
-                      or l.provenance #>> '{package_summary_placement,summary_id}' is distinct from s.id::text
-                      or l.provenance #>> '{package_summary_placement,legacy_slug}' is distinct from s.slug
-                      or l.provenance #> '{package_summary_placement,sort_order}' is distinct from to_jsonb(ps.sort_order)
-                      or l.provenance #> '{package_summary_placement,display_order}' is distinct from to_jsonb(ps.display_order)
-                      or coalesce(l.provenance #> '{package_summary_placement,released_at}', 'null'::jsonb)
-                         is distinct from coalesce(to_jsonb(ps.released_at), 'null'::jsonb)
-                  )
-            )
-        $ledger_check$ into v_ledger_mismatch;
-
-        if v_ledger_mismatch then
-            raise exception using
-                errcode = 'serialization_failure',
-                message = 'Knowledge Platform migration 067 found migration-053 placement evidence that conflicts with live historical authority.';
-        end if;
-    end if;
 end
 $kp_summary_bank_marker_preflight$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Durable target-owned marker and invariants. IF NOT EXISTS is paired with
--- explicit catalog validation so a partial or divergent prior attempt fails.
+-- Summary identity discriminator. Existing all-NULL legacy identity is valid;
+-- a KP-native identity must provide the complete five-field bundle. The
+-- publication pointer is intentionally excluded and may remain NULL for a
+-- KP-native draft until its first publication.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+do $kp_summary_identity_bundle_constraint$
+declare
+    v_definition text;
+begin
+    select pg_catalog.pg_get_constraintdef(c.oid)
+    into v_definition
+    from pg_catalog.pg_constraint c
+    where c.conrelid = 'public.summaries'::regclass
+      and c.conname = 'summaries_kp_identity_bundle_check';
+
+    if v_definition is null then
+        alter table public.summaries
+            add constraint summaries_kp_identity_bundle_check
+            check (
+                (
+                    summary_code is null
+                    and canonical_slug is null
+                    and canonical_title is null
+                    and visibility is null
+                    and lifecycle_status is null
+                )
+                or (
+                    summary_code is not null
+                    and canonical_slug is not null
+                    and canonical_title is not null
+                    and visibility is not null
+                    and lifecycle_status is not null
+                )
+            ) not valid;
+    elsif position('SUMMARY_CODE IS NULL' in upper(v_definition)) = 0
+       or position('SUMMARY_CODE IS NOT NULL' in upper(v_definition)) = 0
+       or position('CANONICAL_SLUG IS NULL' in upper(v_definition)) = 0
+       or position('CANONICAL_SLUG IS NOT NULL' in upper(v_definition)) = 0
+       or position('CANONICAL_TITLE IS NULL' in upper(v_definition)) = 0
+       or position('CANONICAL_TITLE IS NOT NULL' in upper(v_definition)) = 0
+       or position('VISIBILITY IS NULL' in upper(v_definition)) = 0
+       or position('VISIBILITY IS NOT NULL' in upper(v_definition)) = 0
+       or position('LIFECYCLE_STATUS IS NULL' in upper(v_definition)) = 0
+       or position('LIFECYCLE_STATUS IS NOT NULL' in upper(v_definition)) = 0
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 067 found a divergent all-or-none KP identity constraint.';
+    end if;
+end
+$kp_summary_identity_bundle_constraint$;
+
+alter table public.summaries
+    validate constraint summaries_kp_identity_bundle_check;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Durable target-owned marker and its local slug validity rule. No domain row
+-- is created or rewritten here; the empty package_summaries table is valid.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 alter table public.package_summaries
     add column if not exists is_summary_bank_compatibility boolean not null default false;
 
 comment on column public.package_summaries.is_summary_bank_compatibility is
-    'True only for the durable PackageSummary placement representing one historical Summary Bank row.';
+    'True for the one internal canonical/compatibility PackageSummary membership of a KP-native Summary; false for secondary product memberships.';
 
 do $kp_summary_bank_marker_constraint$
 declare
@@ -304,161 +236,150 @@ begin
     elsif v_definition not ilike '%NOT is_summary_bank_compatibility%legacy_slug IS NOT NULL%' then
         raise exception using
             errcode = 'check_violation',
-            message = 'Knowledge Platform migration 067 found an incompatible pre-existing compatibility marker CHECK constraint.';
+            message = 'Knowledge Platform migration 067 found an incompatible compatibility marker CHECK constraint.';
     end if;
 end
 $kp_summary_bank_marker_constraint$;
 
-do $kp_summary_bank_marker_partial_state$
-begin
-    if exists (
-        select 1
-        from public.package_summaries ps
-        where ps.is_summary_bank_compatibility
-          and (
-              ps.legacy_slug is null
-              or not exists (
-                  select 1
-                  from public.summaries s
-                  where s.id = ps.summary_id
-                    and s.package_id = ps.package_id
-                    and s.slug = ps.legacy_slug
-              )
-          )
-    ) then
-        raise exception using
-            errcode = 'check_violation',
-            message = 'Knowledge Platform migration 067 refuses to overwrite conflicting compatibility marker state.';
-    end if;
-
-    if exists (
-        select ps.summary_id
-        from public.package_summaries ps
-        where ps.is_summary_bank_compatibility
-        group by ps.summary_id
-        having count(*) > 1
-    ) then
-        raise exception using
-            errcode = 'unique_violation',
-            message = 'Knowledge Platform migration 067 refuses ambiguous compatibility marker state.';
-    end if;
-end
-$kp_summary_bank_marker_partial_state$;
+alter table public.package_summaries
+    validate constraint package_summaries_bank_compatibility_slug_check;
 
 create unique index if not exists package_summaries_one_bank_compatibility_key
     on public.package_summaries (summary_id)
     where is_summary_bank_compatibility = true;
 
 comment on index public.package_summaries_one_bank_compatibility_key is
-    'Enforces at most one durable Summary Bank compatibility placement per Summary.';
+    'Enforces at most one internal compatibility marker membership per KP-native Summary.';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Exact historical backfill. The join is the preserved Summary UUID plus its
--- preserved Package FK; slug is validation evidence, never a row selector.
--- ─────────────────────────────────────────────────────────────────────────────
-
-update public.package_summaries ps
-set is_summary_bank_compatibility = true
-from public.summaries s
-where ps.summary_id = s.id
-  and ps.package_id = s.package_id
-  and not ps.is_summary_bank_compatibility;
-
-alter table public.package_summaries
-    validate constraint package_summaries_bank_compatibility_slug_check;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- Post-backfill data and catalog reconciliation. No repair path is provided.
+-- Hybrid reconciliation. Each branch is scoped by the frozen discriminator:
+-- legacy rows must have no placements, while KP-native rows require membership
+-- and one marker. These checks are read-only and therefore safe for the live
+-- 29-legacy/zero-placement starting state.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 do $kp_summary_bank_marker_postflight$
 declare
-    v_expected_count bigint;
-    v_marked_count bigint;
     v_marker_attnum smallint;
 begin
-    select count(*) into v_expected_count
-    from public.summaries;
-
-    select count(*) into v_marked_count
-    from public.package_summaries ps
-    where ps.is_summary_bank_compatibility;
-
-    if v_marked_count <> v_expected_count then
+    if exists (
+        select 1
+        from public.summaries s
+        where s.summary_code is null
+          and (
+              s.canonical_slug is not null
+              or s.canonical_title is not null
+              or s.visibility is not null
+              or s.lifecycle_status is not null
+          )
+    ) then
         raise exception using
-            errcode = 'cardinality_violation',
-            message = format(
-                'Knowledge Platform migration 067 marker count mismatch: expected %s, marked %s.',
-                v_expected_count,
-                v_marked_count
-            );
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 067 found legacy Summary rows with partial KP identity.';
     end if;
 
     if exists (
         select 1
         from public.summaries s
-        where (
-            select count(*)
-            from public.package_summaries ps
-            where ps.summary_id = s.id
-              and ps.is_summary_bank_compatibility
-        ) <> 1
-    ) then
-        raise exception using
-            errcode = 'cardinality_violation',
-            message = 'Knowledge Platform migration 067 did not produce exactly one marked placement for every Summary Bank Summary.';
-    end if;
-
-    if exists (
-        select ps.summary_id
-        from public.package_summaries ps
-        where ps.is_summary_bank_compatibility
-        group by ps.summary_id
-        having count(*) > 1
-    ) then
-        raise exception using
-            errcode = 'unique_violation',
-            message = 'Knowledge Platform migration 067 produced multiple marked placements for one Summary.';
-    end if;
-
-    if exists (
-        select 1
-        from public.package_summaries ps
-        where ps.is_summary_bank_compatibility
-          and ps.legacy_slug is null
-    ) then
-        raise exception using
-            errcode = 'not_null_violation',
-            message = 'Knowledge Platform migration 067 produced a marked placement without a legacy slug.';
-    end if;
-
-    if exists (
-        select 1
-        from public.package_summaries ps
-        where ps.is_summary_bank_compatibility
-          and not exists (
-              select 1
-              from public.summaries s
-              where s.id = ps.summary_id
-                and s.package_id = ps.package_id
-                and s.slug = ps.legacy_slug
+        where s.summary_code is not null
+          and (
+              s.canonical_slug is null
+              or s.canonical_title is null
+              or s.visibility is null
+              or s.lifecycle_status is null
+              or nullif(btrim(s.summary_code), '') is null
+              or s.summary_code is distinct from upper(btrim(s.summary_code))
+              or nullif(btrim(s.canonical_slug), '') is null
+              or s.canonical_slug is distinct from lower(btrim(s.canonical_slug))
+              or nullif(btrim(s.canonical_title), '') is null
+              or s.visibility not in ('public_indexable', 'authenticated', 'product_entitled')
+              or s.lifecycle_status not in ('active', 'archived')
           )
     ) then
         raise exception using
             errcode = 'check_violation',
-            message = 'Knowledge Platform migration 067 marked a placement outside the exact historical Package/slug association.';
+            message = 'Knowledge Platform migration 067 found KP-native Summary identity that is incomplete or malformed.';
+    end if;
+
+    if exists (
+        select 1
+        from public.summaries s
+        where s.summary_code is null
+          and exists (
+              select 1
+              from public.package_summaries ps
+              where ps.summary_id = s.id
+          )
+    ) then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'Knowledge Platform migration 067 found a legacy Summary with a Package membership.';
+    end if;
+
+    if exists (
+        select 1
+        from public.summaries s
+        where s.summary_code is null
+          and exists (
+              select 1
+              from public.package_summaries ps
+              where ps.summary_id = s.id
+                and ps.is_summary_bank_compatibility
+          )
+    ) then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'Knowledge Platform migration 067 found a legacy Summary with a compatibility marker.';
+    end if;
+
+    if exists (
+        select 1
+        from public.summaries s
+        where s.summary_code is not null
+          and not exists (
+              select 1
+              from public.package_summaries ps
+              where ps.summary_id = s.id
+          )
+    ) then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'Knowledge Platform migration 067 found a KP-native Summary without a Package membership.';
+    end if;
+
+    if exists (
+        select 1
+        from public.summaries s
+        where s.summary_code is not null
+          and (
+              select count(*)
+              from public.package_summaries ps
+              where ps.summary_id = s.id
+                and ps.is_summary_bank_compatibility
+          ) <> 1
+    ) then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'Knowledge Platform migration 067 found a KP-native Summary without one compatibility marker.';
     end if;
 
     if exists (
         select 1
         from public.package_summaries ps
         join public.summaries s on s.id = ps.summary_id
-        where ps.package_id <> s.package_id
-          and ps.is_summary_bank_compatibility
+        where ps.is_summary_bank_compatibility
+          and (
+              s.summary_code is null
+              or ps.legacy_slug is null
+              or nullif(btrim(ps.legacy_slug), '') is null
+              or ps.legacy_slug is distinct from lower(btrim(ps.legacy_slug))
+              or ps.package_id is distinct from s.package_id
+              or ps.legacy_slug is distinct from s.slug
+          )
     ) then
         raise exception using
             errcode = 'check_violation',
-            message = 'Knowledge Platform migration 067 marked an additional target-only PackageSummary placement.';
+            message = 'Knowledge Platform migration 067 found a marker inconsistent with its KP-native Summary Package or slug.';
     end if;
 
     if not exists (
@@ -474,6 +395,19 @@ begin
         raise exception using
             errcode = 'check_violation',
             message = 'Knowledge Platform migration 067 compatibility marker column has an invalid final definition.';
+    end if;
+
+    if not exists (
+        select 1
+        from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.summaries'::regclass
+          and c.conname = 'summaries_kp_identity_bundle_check'
+          and c.contype = 'c'
+          and c.convalidated
+    ) then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 067 all-or-none KP identity constraint is missing or unvalidated.';
     end if;
 
     if not exists (
@@ -521,3 +455,5 @@ begin
     end if;
 end
 $kp_summary_bank_marker_postflight$;
+
+notify pgrst, 'reload schema';
