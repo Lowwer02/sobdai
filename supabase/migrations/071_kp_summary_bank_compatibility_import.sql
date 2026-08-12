@@ -6,6 +6,7 @@ set local lock_timeout = '5s';
 do $kp_compatibility_import_preflight$
 declare
     v_api_owner oid;
+    v_frozen_create_owner oid;
     v_definition text;
 begin
     if to_regclass('public.summaries') is null
@@ -52,10 +53,15 @@ begin
 
     if to_regprocedure('public.kp_persist_require_actor(uuid)') is null
        or to_regprocedure('public.kp_enforce_summary_writer_boundary()') is null
+       or to_regprocedure('public.kp_enforce_summary_cleanup_fence()') is null
+       or to_regprocedure('public.kp_summary_writer_caller_is_approved()') is null
+       or to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)') is null
        or to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)') is null
        or to_regprocedure('public.kp_persist_update_compatibility_draft(uuid,uuid,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,integer,integer,text)') is null
        or to_regprocedure('public.kp_persist_publish_compatibility_revision(uuid,uuid,uuid,jsonb)') is null
        or to_regprocedure('public.kp_persist_unpublish_compatibility_summary(uuid,uuid)') is null
+       or to_regprocedure('public.kp_persist_publish_legacy_summary(uuid,uuid)') is null
+       or to_regprocedure('public.kp_persist_unpublish_legacy_summary(uuid,uuid)') is null
        or to_regprocedure('public.kp_persist_delete_compatibility_summary(uuid,uuid)') is null
     then
         raise exception using
@@ -63,7 +69,9 @@ begin
             message = 'Knowledge Platform migration 071 requires migrations 058 and 068 through 070.';
     end if;
 
-    if to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)') is not null
+    if to_regprocedure('public.kp_persist_resolve_import_collision(uuid,text)') is not null
+       or to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)') is not null
+       or to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)') is not null
        or to_regprocedure('public.kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean)') is not null
     then
         raise exception using
@@ -85,6 +93,35 @@ begin
         raise exception using
             errcode = 'insufficient_privilege',
             message = 'Knowledge Platform migration 071 must run as the existing persistence API owner.';
+    end if;
+
+    select p.proowner
+    into v_frozen_create_owner
+    from pg_catalog.pg_proc p
+    where p.oid = to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)')
+      and p.prosecdef
+      and array_to_string(p.proconfig, ',') ilike '%search_path=pg_catalog, public, pg_temp%'
+      and array_to_string(p.proconfig, ',') ilike '%lock_timeout=5s%';
+
+    if v_frozen_create_owner is null
+       or v_frozen_create_owner is distinct from v_api_owner
+    then
+        raise exception using
+            errcode = 'insufficient_privilege',
+            message = 'Knowledge Platform migration 071 requires the frozen 068 uuid[] compatibility-create owner and locked SECURITY DEFINER configuration.';
+    end if;
+
+    select pg_catalog.pg_get_functiondef(
+        to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)')
+    ) into v_definition;
+    if v_definition is null
+       or position('p_package_ids uuid[]' in v_definition) = 0
+       or position('is_summary_bank_compatibility' in v_definition) = 0
+       or position('revision_number' in v_definition) = 0
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 071 requires the exact frozen 068 uuid[] compatibility-create semantics.';
     end if;
 
     select pg_catalog.pg_get_functiondef(
@@ -125,23 +162,22 @@ begin
     if exists (
         select 1
         from public.summaries s
-        where (
-            s.lifecycle_status = 'active'
-            and (
+        where s.summary_code is not null
+          and (
+            s.lifecycle_status is null
+            or s.lifecycle_status not in ('active', 'archived')
+            or (
+                select count(*)
+                from public.package_summaries ps
+                where ps.summary_id = s.id
+            ) < 1
+            or (
                 select count(*)
                 from public.package_summaries ps
                 where ps.summary_id = s.id
                   and ps.is_summary_bank_compatibility
             ) <> 1
-        ) or (
-            s.lifecycle_status = 'archived'
-            and exists (
-                select 1
-                from public.package_summaries ps
-                where ps.summary_id = s.id
-                  and ps.is_summary_bank_compatibility
-            )
-        )
+          )
     )
        or exists (
             select 1
@@ -163,9 +199,221 @@ begin
 end
 $kp_compatibility_import_preflight$;
 
--- Import-new extends the frozen compatibility-create boundary without changing
--- its existing signature. Free-form document text remains legacy compatibility
--- data; publication uses an explicit empty normalized source-snapshot set.
+-- Import collision resolution is discriminator-first. The legacy root lookup
+-- intentionally remains in place for the 29 grandfathered rows, while the
+-- PackageSummary lookup intentionally ignores the compatibility marker: every
+-- membership is a real product membership and a secondary membership is still
+-- an authoritative import collision for its Package/legacy-slug pair.
+create function public.kp_persist_resolve_import_collision(
+    p_package_id uuid,
+    p_legacy_slug text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_legacy_slug text := lower(btrim(p_legacy_slug));
+    v_summary_id uuid;
+    v_summary public.summaries%rowtype;
+    v_marker public.package_summaries%rowtype;
+    v_target public.package_summaries%rowtype;
+    v_candidate_count bigint;
+    v_membership_count bigint;
+    v_marker_count bigint;
+    v_membership_package_ids jsonb;
+begin
+    if p_package_id is null
+       or p_legacy_slug is null
+       or v_legacy_slug = ''
+       or p_legacy_slug <> v_legacy_slug
+    then
+        raise exception using
+            errcode = 'invalid_parameter_value',
+            message = 'Import collision lookup requires a lowercase Package slug and Package ID.';
+    end if;
+
+    if not exists (
+        select 1 from public.packages p where p.id = p_package_id
+    ) then
+        raise exception using
+            errcode = 'foreign_key_violation',
+            message = 'Import collision lookup Package does not exist.';
+    end if;
+
+    select count(*)
+    into v_candidate_count
+    from (
+        select s.id as summary_id
+        from public.summaries s
+        where s.package_id = p_package_id
+          and s.slug = v_legacy_slug
+        union
+        select ps.summary_id
+        from public.package_summaries ps
+        where ps.package_id = p_package_id
+          and ps.legacy_slug = v_legacy_slug
+    ) candidates;
+
+    if v_candidate_count = 0 then
+        return jsonb_build_object(
+            'outcome', 'none',
+            'collision_kind', null,
+            'summary_id', null,
+            'package_id', p_package_id,
+            'legacy_slug', v_legacy_slug
+        );
+    end if;
+
+    if v_candidate_count <> 1 then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'Import collision is ambiguous across Summary roots.';
+    end if;
+
+    select candidates.summary_id
+    into v_summary_id
+    from (
+        select s.id as summary_id
+        from public.summaries s
+        where s.package_id = p_package_id
+          and s.slug = v_legacy_slug
+        union
+        select ps.summary_id
+        from public.package_summaries ps
+        where ps.package_id = p_package_id
+          and ps.legacy_slug = v_legacy_slug
+    ) candidates
+    limit 1;
+
+    select *
+    into v_summary
+    from public.summaries s
+    where s.id = v_summary_id
+    for update;
+    if not found then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'Import collision references a missing Summary root.';
+    end if;
+
+    perform ps.summary_id
+    from public.package_summaries ps
+    where ps.summary_id = v_summary_id
+    order by ps.package_id
+    for update;
+
+    select count(*)
+    into v_membership_count
+    from public.package_summaries ps
+    where ps.summary_id = v_summary_id;
+
+    if v_summary.summary_code is null then
+        if v_membership_count <> 0
+           or exists (
+                select 1
+                from public.summary_versions sv
+                where sv.summary_id = v_summary_id
+           )
+        then
+            raise exception using
+                errcode = 'cardinality_violation',
+                message = 'Legacy import collision has divergent Knowledge Platform state.';
+        end if;
+
+        return jsonb_build_object(
+            'outcome', 'collision',
+            'collision_kind', 'legacy',
+            'summary_id', v_summary_id,
+            'package_id', p_package_id,
+            'legacy_slug', v_legacy_slug,
+            'membership_count', 0,
+            'marker_count', 0,
+            'canonical_package_id', v_summary.package_id,
+            'canonical_legacy_slug', v_summary.slug,
+            'lifecycle_status', null
+        );
+    end if;
+
+    if v_summary.lifecycle_status is null
+       or v_summary.lifecycle_status not in ('active', 'archived')
+    then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'KP import collision has an invalid Summary lifecycle state.';
+    end if;
+
+    select count(*)
+    into v_marker_count
+    from public.package_summaries ps
+    where ps.summary_id = v_summary_id
+      and ps.is_summary_bank_compatibility;
+
+    select *
+    into v_marker
+    from public.package_summaries ps
+    where ps.summary_id = v_summary_id
+      and ps.is_summary_bank_compatibility
+    for update;
+
+    if v_membership_count < 1
+       or v_marker_count <> 1
+       or v_marker.package_id is distinct from v_summary.package_id
+       or v_marker.legacy_slug is null
+       or v_marker.legacy_slug is distinct from lower(btrim(v_marker.legacy_slug))
+       or v_marker.legacy_slug is distinct from v_summary.slug
+    then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'KP import collision has divergent membership or marker state.';
+    end if;
+
+    select *
+    into v_target
+    from public.package_summaries ps
+    where ps.summary_id = v_summary_id
+      and ps.package_id = p_package_id
+      and ps.legacy_slug = v_legacy_slug
+    for update;
+    if not found then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'KP import collision lost its matching Package membership.';
+    end if;
+
+    select jsonb_agg(to_jsonb(ps.package_id) order by ps.package_id)
+    into v_membership_package_ids
+    from public.package_summaries ps
+    where ps.summary_id = v_summary_id;
+
+    return jsonb_build_object(
+        'outcome', 'collision',
+        'collision_kind', 'kp_native',
+        'summary_id', v_summary_id,
+        'package_id', p_package_id,
+        'legacy_slug', v_legacy_slug,
+        'matched_is_marker', v_target.is_summary_bank_compatibility,
+        'membership_count', v_membership_count,
+        'marker_count', v_marker_count,
+        'membership_package_ids', v_membership_package_ids,
+        'canonical_package_id', v_summary.package_id,
+        'canonical_legacy_slug', v_summary.slug,
+        'lifecycle_status', v_summary.lifecycle_status
+    );
+end
+$function$;
+
+comment on function public.kp_persist_resolve_import_collision(uuid,text) is
+    'Atomic import collision resolver: searches legacy Summary identity and every PackageSummary membership, then returns one discriminator-safe shared Summary target or fails closed.';
+
+-- Import-new always delegates root/revision/membership creation to the frozen
+-- KP-native UUID-array writer. The import overload adds the compatibility
+-- document and optional one-click publication without ever creating a Legacy
+-- Summary. It also checks every requested Package for a collision before the
+-- frozen writer is called, so a secondary membership cannot create a duplicate
+-- root.
 create function public.kp_persist_create_compatibility_summary(
     p_summary_id uuid,
     p_summary_code text,
@@ -175,7 +423,7 @@ create function public.kp_persist_create_compatibility_summary(
     p_topic text,
     p_law text,
     p_visibility text,
-    p_package_id uuid,
+    p_package_ids uuid[],
     p_legacy_slug text,
     p_content_md text,
     p_content_checksum text,
@@ -200,14 +448,14 @@ as $function$
 declare
     v_create_result jsonb;
     v_publish_result jsonb;
+    v_collision jsonb;
     v_summary public.summaries%rowtype;
     v_version public.summary_versions%rowtype;
     v_placement public.package_summaries%rowtype;
-    -- Compatibility root values remain byte-for-byte legacy values. Frozen
-    -- revision constraints require blank optional snapshots to be NULL, but
-    -- nonblank snapshot text is not trimmed.
-    v_legacy_title text := p_canonical_title;
+    v_package_id uuid;
+    v_legacy_slug text := lower(btrim(p_legacy_slug));
     v_document text := case when p_document is null or p_document = '' then null else p_document end;
+    v_legacy_title text := p_canonical_title;
     v_subject text := p_subject;
     v_topic text := p_topic;
     v_law text := p_law;
@@ -217,14 +465,55 @@ declare
     v_navigation_label text := nullif(btrim(p_navigation_label), '');
     v_was_retry boolean;
     v_result_idempotent boolean;
+    v_publish_idempotent boolean := false;
     v_affected bigint;
+    v_membership_count bigint;
+    v_marker_count bigint;
 begin
+    perform public.kp_persist_require_actor(p_actor_id);
+
+    if p_summary_id is null or p_version_id is null then
+        raise exception using errcode = 'invalid_parameter_value', message = 'Summary and revision IDs are required.';
+    end if;
+    if p_package_ids is null or cardinality(p_package_ids) is null or cardinality(p_package_ids) = 0 then
+        raise exception using errcode = 'invalid_parameter_value', message = 'Import-new requires at least one Package ID.';
+    end if;
+    if exists (
+        select 1 from unnest(p_package_ids) requested(package_id)
+        where requested.package_id is null
+    ) then
+        raise exception using errcode = 'invalid_parameter_value', message = 'Import-new Package IDs cannot contain NULL.';
+    end if;
+    if (
+        select count(*)
+        from (select distinct package_id from unnest(p_package_ids) requested(package_id)) distinct_packages
+    ) <> cardinality(p_package_ids) then
+        raise exception using errcode = 'unique_violation', message = 'Import-new Package IDs cannot contain duplicates.';
+    end if;
+    if p_legacy_slug is null or v_legacy_slug = '' or p_legacy_slug <> v_legacy_slug then
+        raise exception using errcode = 'check_violation', message = 'Import-new legacy slug must be lowercase and trimmed.';
+    end if;
     if p_is_published is null then
-        raise exception using
-            errcode = 'invalid_parameter_value',
-            message = 'Imported publication state is required.';
+        raise exception using errcode = 'invalid_parameter_value', message = 'Imported publication state is required.';
     end if;
 
+    for v_package_id in
+        select requested.package_id
+        from unnest(p_package_ids) requested(package_id)
+        order by requested.package_id
+    loop
+        v_collision := public.kp_persist_resolve_import_collision(v_package_id, v_legacy_slug);
+        if v_collision ->> 'outcome' <> 'none'
+           and (v_collision ->> 'summary_id')::uuid is distinct from p_summary_id
+        then
+            raise exception using
+                errcode = 'unique_violation',
+                message = 'Import-new collides with an existing Legacy or KP-native Summary; use discriminator-specific replace.';
+        end if;
+    end loop;
+
+    -- This exact call resolves to the frozen 068 uuid[] overload. It owns the
+    -- one-root/N-membership/exactly-one-marker invariant.
     v_create_result := public.kp_persist_create_compatibility_summary(
         p_summary_id,
         p_summary_code,
@@ -234,7 +523,7 @@ begin
         p_topic,
         p_law,
         p_visibility,
-        p_package_id,
+        p_package_ids,
         p_legacy_slug,
         p_content_md,
         p_content_checksum,
@@ -249,30 +538,41 @@ begin
         p_navigation_label
     );
     v_was_retry := coalesce((v_create_result ->> 'idempotent_retry')::boolean, false);
-    v_result_idempotent := v_was_retry;
 
     select * into v_summary
     from public.summaries s
     where s.id = p_summary_id
     for update;
-
     select * into v_version
     from public.summary_versions sv
     where sv.id = p_version_id
       and sv.summary_id = p_summary_id
     for update;
-
     select * into v_placement
     from public.package_summaries ps
     where ps.summary_id = p_summary_id
       and ps.is_summary_bank_compatibility
     for update;
 
-    if v_summary.id is null or v_version.id is null or v_placement.summary_id is null then
-        raise exception using
-            errcode = 'object_not_in_prerequisite_state',
-            message = 'Compatibility import-new did not create a complete aggregate.';
+    select count(*) into v_membership_count
+    from public.package_summaries ps
+    where ps.summary_id = p_summary_id;
+    select count(*) into v_marker_count
+    from public.package_summaries ps
+    where ps.summary_id = p_summary_id
+      and ps.is_summary_bank_compatibility;
+
+    if v_summary.id is null
+       or v_summary.summary_code is null
+       or v_version.id is null
+       or v_placement.summary_id is null
+       or v_membership_count <> cardinality(p_package_ids)
+       or v_marker_count <> 1
+    then
+        raise exception using errcode = 'cardinality_violation', message = 'Import-new did not produce one KP root, all requested memberships, and one marker.';
     end if;
+
+    v_result_idempotent := v_was_retry;
 
     if v_was_retry then
         if v_summary.title is distinct from v_legacy_title
@@ -309,13 +609,11 @@ begin
             topic = v_topic,
             law = v_law,
             document = v_document
-        where id = p_summary_id;
-
+        where id = p_summary_id
+          and summary_code is not null;
         get diagnostics v_affected = row_count;
         if v_affected <> 1 then
-            raise exception using
-                errcode = 'cardinality_violation',
-                message = 'Compatibility import-new did not update exactly one legacy Summary mirror.';
+            raise exception using errcode = 'cardinality_violation', message = 'Compatibility import-new did not update exactly one legacy Summary mirror.';
         end if;
 
         update public.summary_versions
@@ -335,11 +633,11 @@ begin
         end if;
     end if;
 
+    perform public.kp_persist_assert_kp_summary_membership(p_summary_id);
+
     if p_is_published then
         if v_version.status not in ('draft', 'published') then
-            raise exception using
-                errcode = 'object_not_in_prerequisite_state',
-                message = 'Published import-new found an incompatible revision lifecycle state.';
+            raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Published import-new found an incompatible revision lifecycle state.';
         end if;
 
         if v_was_retry
@@ -378,8 +676,7 @@ begin
             select 1
             from public.summary_version_reference_documents svrd
             where svrd.summary_version_id = p_version_id
-        )
-        then
+        ) then
             raise exception using
                 errcode = 'object_not_in_prerequisite_state',
                 message = 'Published import-new cannot replace explicit source snapshots with the empty compatibility snapshot set.';
@@ -391,30 +688,31 @@ begin
             p_actor_id,
             '[]'::jsonb
         );
-        v_result_idempotent := v_was_retry
-            and coalesce((v_publish_result ->> 'idempotent_retry')::boolean, false);
+        v_publish_idempotent := coalesce((v_publish_result ->> 'idempotent_retry')::boolean, false);
+        v_result_idempotent := v_was_retry and v_publish_idempotent;
 
-        if not coalesce((v_publish_result ->> 'idempotent_retry')::boolean, false) then
-            -- Migration 069 mirrors canonical_title into the legacy title
-            -- column. Restore the exact imported compatibility title in the
-            -- same command without writing during an exact published retry.
+        if not v_publish_idempotent then
+            -- 069 mirrors canonical_title into the legacy title column. The
+            -- import contract preserves the exact Markdown title payload.
             update public.summaries
-            set title = v_legacy_title
+            set title = p_canonical_title
             where id = p_summary_id;
-
             get diagnostics v_affected = row_count;
             if v_affected <> 1 then
-                raise exception using
-                    errcode = 'cardinality_violation',
-                    message = 'Published import-new did not preserve exactly one legacy Summary title.';
+                raise exception using errcode = 'cardinality_violation', message = 'Published import-new did not preserve exactly one imported title.';
             end if;
         end if;
     else
         if v_version.status <> 'draft'
            or v_summary.is_published
            or v_summary.current_published_version_id is not null
-           or v_placement.status <> 'draft'
-        then
+           or exists (
+                select 1
+                from public.package_summaries ps
+                where ps.summary_id = p_summary_id
+                  and ps.status <> 'draft'
+           )
+    then
             raise exception using
                 errcode = 'object_not_in_prerequisite_state',
                 message = 'Draft import-new retry conflicts with existing publication state.';
@@ -425,11 +723,82 @@ begin
         'outcome', 'created',
         'summary_id', p_summary_id,
         'summary_version_id', p_version_id,
-        'package_id', p_package_id,
-        'legacy_slug', lower(btrim(p_legacy_slug)),
+        'package_id', v_summary.package_id,
+        'canonical_package_id', v_summary.package_id,
+        'package_count', v_membership_count,
+        'marker_count', v_marker_count,
+        'legacy_slug', v_legacy_slug,
         'is_published', p_is_published,
         'idempotent_retry', v_result_idempotent
     );
+end
+$function$;
+
+comment on function public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean) is
+    'Atomic import-new KP-native overload: creates one shared root, one revision, every requested Package membership, exactly one marker, and optional publication while preserving the legacy document field.';
+
+-- The existing one-Package import signature remains the application-compatible
+-- entry point and delegates to the multi-Package import contract.
+create function public.kp_persist_create_compatibility_summary(
+    p_summary_id uuid,
+    p_summary_code text,
+    p_canonical_slug text,
+    p_canonical_title text,
+    p_subject text,
+    p_topic text,
+    p_law text,
+    p_visibility text,
+    p_package_id uuid,
+    p_legacy_slug text,
+    p_content_md text,
+    p_content_checksum text,
+    p_read_time_minutes integer,
+    p_read_time_policy_version text,
+    p_content_schema_version text,
+    p_change_note text,
+    p_actor_id uuid,
+    p_version_id uuid,
+    p_sort_order integer,
+    p_display_order integer,
+    p_navigation_label text,
+    p_document text,
+    p_is_published boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_result jsonb;
+begin
+    v_result := public.kp_persist_create_compatibility_summary(
+        p_summary_id,
+        p_summary_code,
+        p_canonical_slug,
+        p_canonical_title,
+        p_subject,
+        p_topic,
+        p_law,
+        p_visibility,
+        array[p_package_id]::uuid[],
+        p_legacy_slug,
+        p_content_md,
+        p_content_checksum,
+        p_read_time_minutes,
+        p_read_time_policy_version,
+        p_content_schema_version,
+        p_change_note,
+        p_actor_id,
+        p_version_id,
+        p_sort_order,
+        p_display_order,
+        p_navigation_label,
+        p_document,
+        p_is_published
+    );
+    return v_result || jsonb_build_object('package_id', p_package_id);
 end
 $function$;
 
@@ -471,10 +840,12 @@ as $function$
 declare
     v_now timestamptz := clock_timestamp();
     v_summary public.summaries%rowtype;
+    v_marker public.package_summaries%rowtype;
     v_placement public.package_summaries%rowtype;
     v_revision public.summary_versions%rowtype;
     v_requested_revision public.summary_versions%rowtype;
     v_current_version public.summary_versions%rowtype;
+    v_collision jsonb;
     -- Keep exact legacy mirror values separate from target canonical/snapshot
     -- forms so import parity does not weaken frozen target constraints.
     v_legacy_title text := p_canonical_title;
@@ -492,6 +863,8 @@ declare
     v_marker_count bigint;
     v_open_count bigint;
     v_affected bigint;
+    v_legacy_sort_order integer;
+    v_legacy_display_order integer;
     v_created_revision boolean := false;
     v_publish_result jsonb;
     v_unpublish_result jsonb;
@@ -527,6 +900,114 @@ begin
     if not found then
         raise exception using errcode = 'no_data_found', message = 'Summary does not exist.';
     end if;
+
+    v_collision := public.kp_persist_resolve_import_collision(
+        p_package_id,
+        v_legacy_slug
+    );
+    if v_collision ->> 'outcome' = 'none'
+       or (v_collision ->> 'summary_id')::uuid is distinct from p_summary_id
+    then
+        raise exception using
+            errcode = 'no_data_found',
+            message = 'Import replacement target does not match the authoritative Package/slug collision.';
+    end if;
+
+    if v_summary.summary_code is null then
+        if v_collision ->> 'collision_kind' <> 'legacy' then
+            raise exception using
+                errcode = 'cardinality_violation',
+                message = 'Legacy import replacement resolved to a divergent collision discriminator.';
+        end if;
+        if p_replacement_version_id is not null then
+            raise exception using
+                errcode = 'object_not_in_prerequisite_state',
+                message = 'Legacy import replacement cannot accept a Knowledge Platform revision ID.';
+        end if;
+        if exists (
+            select 1 from public.package_summaries ps where ps.summary_id = p_summary_id
+        ) or exists (
+            select 1 from public.summary_versions sv where sv.summary_id = p_summary_id
+        ) then
+            raise exception using
+                errcode = 'cardinality_violation',
+                message = 'Legacy import replacement found divergent Knowledge Platform state.';
+        end if;
+
+        v_legacy_sort_order := coalesce(p_sort_order, v_summary.sort_order);
+        v_legacy_display_order := coalesce(p_display_order, v_summary.display_order);
+
+        if v_summary.title is not distinct from v_legacy_title
+           and v_summary.subject is not distinct from v_subject
+           and v_summary.topic is not distinct from v_topic
+           and v_summary.law is not distinct from v_law
+           and v_summary.document is not distinct from v_document
+           and v_summary.content_md is not distinct from p_content_md
+           and v_summary.read_time_minutes is not distinct from p_read_time_minutes
+           and v_summary.sort_order is not distinct from v_legacy_sort_order
+           and v_summary.display_order is not distinct from v_legacy_display_order
+           and v_summary.is_published is not distinct from p_is_published
+        then
+            return jsonb_build_object(
+                'outcome', 'replaced',
+                'summary_id', p_summary_id,
+                'summary_version_id', null,
+                'package_id', p_package_id,
+                'legacy_slug', v_legacy_slug,
+                'is_published', p_is_published,
+                'revision_created', false,
+                'idempotent_retry', true,
+                'legacy', true
+            );
+        end if;
+
+        update public.summaries
+        set title = v_legacy_title,
+            subject = v_subject,
+            topic = v_topic,
+            law = v_law,
+            document = v_document,
+            content_md = p_content_md,
+            read_time_minutes = p_read_time_minutes,
+            sort_order = v_legacy_sort_order,
+            display_order = v_legacy_display_order,
+            updated_at = v_now
+        where id = p_summary_id
+          and summary_code is null
+          and package_id = p_package_id
+          and slug = v_legacy_slug;
+
+        get diagnostics v_affected = row_count;
+        if v_affected <> 1 then
+            raise exception using
+                errcode = 'cardinality_violation',
+                message = 'Legacy import replacement did not update exactly one Legacy Summary.';
+        end if;
+
+        if p_is_published and not v_summary.is_published then
+            perform public.kp_persist_publish_legacy_summary(p_summary_id, p_actor_id);
+        elsif not p_is_published and v_summary.is_published then
+            perform public.kp_persist_unpublish_legacy_summary(p_summary_id, p_actor_id);
+        end if;
+
+        return jsonb_build_object(
+            'outcome', 'replaced',
+            'summary_id', p_summary_id,
+            'summary_version_id', null,
+            'package_id', p_package_id,
+            'legacy_slug', v_legacy_slug,
+            'is_published', p_is_published,
+            'revision_created', false,
+            'idempotent_retry', false,
+            'legacy', true
+        );
+    end if;
+
+    if v_collision ->> 'collision_kind' <> 'kp_native' then
+        raise exception using
+            errcode = 'cardinality_violation',
+            message = 'KP import replacement resolved to a divergent collision discriminator.';
+    end if;
     if v_summary.lifecycle_status is distinct from 'active'
        or v_summary.archived_by is not null
        or v_summary.archived_at is not null
@@ -535,6 +1016,16 @@ begin
     end if;
 
     select * into v_placement
+    from public.package_summaries ps
+    where ps.summary_id = p_summary_id
+      and ps.package_id = p_package_id
+      and ps.legacy_slug = v_legacy_slug
+    for update;
+    if not found then
+        raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Requested Package membership is missing.';
+    end if;
+
+    select * into v_marker
     from public.package_summaries ps
     where ps.summary_id = p_summary_id
       and ps.is_summary_bank_compatibility
@@ -550,15 +1041,14 @@ begin
     if v_marker_count <> 1 then
         raise exception using errcode = 'cardinality_violation', message = 'Compatibility import-replace found corrupted marker cardinality.';
     end if;
-    if v_placement.legacy_slug is null
-       or nullif(btrim(v_placement.legacy_slug), '') is null
-       or v_placement.legacy_slug is distinct from lower(btrim(v_placement.legacy_slug))
-       or v_placement.package_id is distinct from v_summary.package_id
-       or v_placement.legacy_slug is distinct from v_summary.slug
+    if v_marker.package_id is distinct from v_summary.package_id
+       or v_marker.legacy_slug is null
+       or v_marker.legacy_slug is distinct from lower(btrim(v_marker.legacy_slug))
+       or v_marker.legacy_slug is distinct from v_summary.slug
        or v_placement.package_id is distinct from p_package_id
        or v_placement.legacy_slug is distinct from v_legacy_slug
     then
-        raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Requested Package and slug do not identify the marked compatibility Summary.';
+        raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Requested Package and slug do not identify a valid KP-native Summary membership.';
     end if;
 
     perform sv.id
@@ -587,19 +1077,37 @@ begin
     end if;
 
     if v_summary.is_published
-       and (v_summary.current_published_version_id is null or v_placement.status <> 'active')
+       and (
+            v_summary.current_published_version_id is null
+            or exists (
+                select 1
+                from public.package_summaries ps
+                where ps.summary_id = p_summary_id
+                  and ps.status <> 'active'
+            )
+       )
     then
         raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Published compatibility Summary does not have an active marked placement.';
     end if;
     if not v_summary.is_published
        and v_summary.current_published_version_id is not null
-       and v_placement.status <> 'hidden'
+       and exists (
+            select 1
+            from public.package_summaries ps
+            where ps.summary_id = p_summary_id
+              and ps.status <> 'hidden'
+       )
     then
         raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Unpublished compatibility Summary does not have a hidden marked placement.';
     end if;
     if not v_summary.is_published
        and v_summary.current_published_version_id is null
-       and v_placement.status <> 'draft'
+       and exists (
+            select 1
+            from public.package_summaries ps
+            where ps.summary_id = p_summary_id
+              and ps.status <> 'draft'
+       )
     then
         raise exception using errcode = 'object_not_in_prerequisite_state', message = 'Never-published compatibility Summary does not have a draft marked placement.';
     end if;
@@ -633,7 +1141,12 @@ begin
                or v_open_count <> 0
                or v_summary.current_published_version_id is distinct from p_replacement_version_id
                or not v_summary.is_published
-               or v_placement.status <> 'active'
+               or exists (
+                    select 1
+                    from public.package_summaries ps
+                    where ps.summary_id = p_summary_id
+                      and ps.status <> 'active'
+               )
                or v_requested_revision.content_md is distinct from p_content_md
                or v_requested_revision.content_checksum is distinct from p_content_checksum
                or v_requested_revision.title_snapshot is distinct from v_legacy_title
@@ -799,11 +1312,11 @@ begin
         updated_at = v_now
     where package_id = v_placement.package_id
       and summary_id = p_summary_id
-      and is_summary_bank_compatibility;
+      and legacy_slug = v_legacy_slug;
 
     get diagnostics v_affected = row_count;
     if v_affected <> 1 then
-        raise exception using errcode = 'cardinality_violation', message = 'Compatibility import-replace did not update exactly one marked placement.';
+        raise exception using errcode = 'cardinality_violation', message = 'Compatibility import-replace did not update exactly one requested Package membership.';
     end if;
 
     if p_is_published then
@@ -833,6 +1346,8 @@ begin
         );
     end if;
 
+    perform public.kp_persist_assert_kp_summary_membership(p_summary_id);
+
     return jsonb_build_object(
         'outcome', 'replaced',
         'summary_id', p_summary_id,
@@ -849,12 +1364,273 @@ $function$;
 comment on function public.kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean) is
     'Atomic Summary Bank import-replace: preserves Summary/Package/slug identity, updates or creates one draft revision only when explicit draft snapshots are absent, and delegates publish/unpublish to migration 069 without fabricating normalized sources.';
 
+-- 071 adds protected SECURITY DEFINER writers and a collision resolver. Reassert
+-- the shared caller-bound helper so both effective fences authorize the active
+-- 071 routine OID, not merely the trusted API owner or a same-owner wrapper.
+create or replace function public.kp_summary_writer_caller_is_approved()
+returns boolean
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_context text;
+    v_active_signature text;
+    v_active_oid oid;
+begin
+    get diagnostics v_context = pg_context;
+
+    with frames as (
+        select
+            stack.frame_no,
+            pg_catalog.regexp_replace(
+                pg_catalog.regexp_replace(
+                    pg_catalog.regexp_replace(lower(btrim(stack.line)), '^.*function[[:space:]]+', ''),
+                    '[[:space:]]+line[[:space:]].*$', ''
+                ),
+                '"', '', 'g'
+            ) as call_signature,
+            pg_catalog.regexp_replace(
+                pg_catalog.regexp_replace(
+                    pg_catalog.regexp_replace(
+                        pg_catalog.regexp_replace(lower(btrim(stack.line)), '^.*function[[:space:]]+', ''),
+                        '[[:space:]]+line[[:space:]].*$', ''
+                    ),
+                    '[[:space:]]+', '', 'g'
+                ),
+                '"', '', 'g'
+            ) as signature
+        from pg_catalog.regexp_split_to_table(coalesce(v_context, ''), E'\n') with ordinality as stack(line, frame_no)
+        where lower(btrim(stack.line)) ~ '(^|[[:space:]])function[[:space:]]'
+    )
+    select frames.call_signature
+    into v_active_signature
+    from frames
+    where frames.signature not in (
+        'public.kp_summary_writer_caller_is_approved()',
+        'kp_summary_writer_caller_is_approved()',
+        'public.kp_enforce_summary_cleanup_fence()',
+        'kp_enforce_summary_cleanup_fence()',
+        'public.kp_enforce_summary_writer_boundary()',
+        'kp_enforce_summary_writer_boundary()'
+    )
+    order by frames.frame_no
+    limit 1;
+
+    if v_active_signature is not null then
+        if position('.' in v_active_signature) > 0 then
+            v_active_oid := to_regprocedure(v_active_signature);
+        else
+            select case when count(*) = 1 then (array_agg(p.oid order by p.oid))[1] end
+            into v_active_oid
+            from pg_catalog.pg_proc p
+            where pg_catalog.regexp_replace(
+                      pg_catalog.regexp_replace(
+                          lower(p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')'),
+                          '[[:space:]]+', '', 'g'
+                      ),
+                      '"', '', 'g'
+                  ) = pg_catalog.regexp_replace(
+                          pg_catalog.regexp_replace(lower(v_active_signature), '[[:space:]]+', '', 'g'),
+                          '"', '', 'g'
+                      );
+        end if;
+    end if;
+
+    return exists (
+        select 1
+        from pg_catalog.pg_proc p
+        join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.oid in (
+              to_regprocedure('public.kp_persist_require_actor(uuid)'),
+              to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)'),
+              to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)'),
+              to_regprocedure('public.kp_persist_update_compatibility_draft(uuid,uuid,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,integer,integer,text)'),
+              to_regprocedure('public.kp_persist_publish_compatibility_revision(uuid,uuid,uuid,jsonb)'),
+              to_regprocedure('public.kp_persist_unpublish_compatibility_summary(uuid,uuid)'),
+              to_regprocedure('public.kp_persist_publish_legacy_summary(uuid,uuid)'),
+              to_regprocedure('public.kp_persist_unpublish_legacy_summary(uuid,uuid)'),
+              to_regprocedure('public.kp_persist_retire_compatibility_revision(uuid,uuid,uuid,text,uuid)'),
+              to_regprocedure('public.kp_persist_reassign_compatibility_package(uuid,uuid,text,uuid)'),
+              to_regprocedure('public.kp_persist_replace_summary_sources(uuid,jsonb,uuid)'),
+              to_regprocedure('public.kp_persist_reconcile_package_memberships(uuid,uuid[],uuid)'),
+              to_regprocedure('public.kp_persist_attach_package_summary(uuid,uuid,text,text,uuid,integer,integer,timestamptz,text,text,uuid)'),
+              to_regprocedure('public.kp_persist_detach_package_summary(uuid,uuid,uuid)'),
+              to_regprocedure('public.kp_persist_register_summary_alias(uuid,text,text,text,uuid)'),
+              to_regprocedure('public.kp_persist_delete_compatibility_summary(uuid,uuid)'),
+              to_regprocedure('public.kp_persist_resolve_import_collision(uuid,text)'),
+              to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)'),
+              to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)'),
+              to_regprocedure('public.kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean)')
+          )
+          and p.prosecdef
+          and pg_catalog.pg_get_userbyid(p.proowner) = current_user
+          and array_to_string(p.proconfig, ',') ilike '%search_path=pg_catalog, public, pg_temp%'
+          and array_to_string(p.proconfig, ',') ilike '%lock_timeout=5s%'
+          and p.oid = v_active_oid
+    );
+end
+$function$;
+
+comment on function public.kp_summary_writer_caller_is_approved() is
+    'Caller-bound Summary writer authorization for the hybrid 067-071 aggregate. Matches the active PG_CONTEXT persistence RPC frame and exact locked function metadata, not merely owner identity.';
+
+revoke all on function public.kp_summary_writer_caller_is_approved()
+    from public, anon, authenticated, service_role;
+
+-- Reassert both effective mutation fences. The 071 writers may mutate frozen
+-- aggregate tables only through the caller-bound active-OID path; direct
+-- public/anon/authenticated/service_role table writes remain denied.
+create or replace function public.kp_enforce_summary_writer_boundary()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_is_superuser boolean := false;
+    v_is_approved_api_owner boolean := false;
+begin
+    if current_user in ('public', 'anon', 'authenticated', 'service_role') then
+        raise exception using
+            errcode = 'insufficient_privilege',
+            message = 'Direct Summary mutations are disabled; use the approved transactional persistence API.';
+    end if;
+
+    select session_user = current_user and (
+           coalesce(r.rolsuper, false)
+           or exists (
+               select 1
+               from pg_catalog.pg_database d
+               where d.datname = current_database()
+                 and pg_catalog.pg_get_userbyid(d.datdba) = current_user
+           )
+    )
+    into v_is_superuser
+    from pg_catalog.pg_roles r
+    where r.rolname = current_user;
+
+    if not v_is_superuser then
+        v_is_approved_api_owner := public.kp_summary_writer_caller_is_approved();
+    end if;
+
+    if not v_is_superuser and not v_is_approved_api_owner then
+        raise exception using
+            errcode = 'insufficient_privilege',
+            message = 'Direct Summary mutations are disabled; use the approved transactional persistence API or a controlled migration operator.';
+    end if;
+
+    if tg_op = 'DELETE' then
+        return old;
+    end if;
+    return new;
+end
+$function$;
+
+comment on function public.kp_enforce_summary_writer_boundary() is
+    'SECURITY INVOKER single-writer fence for the hybrid Summary aggregate. Browser and direct service-role table writes are denied; approved 057, 068, 069, 070, and 071 SECURITY DEFINER commands are bound to their active PG_CONTEXT caller, and controlled migration operators remain allowed.';
+
+revoke all on function public.kp_enforce_summary_writer_boundary()
+    from public, anon, authenticated;
+grant execute on function public.kp_enforce_summary_writer_boundary()
+    to service_role;
+
+create or replace function public.kp_enforce_summary_cleanup_fence()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_is_controlled_operator boolean := false;
+    v_is_approved_api_owner boolean := false;
+begin
+    if current_user in ('public', 'anon', 'authenticated', 'service_role') then
+        raise exception using
+            errcode = 'insufficient_privilege',
+            message = 'Direct Summary mutations are disabled; use the approved transactional persistence API.';
+    end if;
+
+    select session_user = current_user and (
+        exists (
+            select 1
+            from pg_catalog.pg_roles r
+            where r.rolname = current_user
+              and r.rolsuper
+        ) or exists (
+            select 1
+            from pg_catalog.pg_database d
+            where d.datname = current_database()
+              and pg_catalog.pg_get_userbyid(d.datdba) = current_user
+        )
+    )
+    into v_is_controlled_operator;
+
+    if not v_is_controlled_operator then
+        v_is_approved_api_owner := public.kp_summary_writer_caller_is_approved();
+    end if;
+
+    if not v_is_approved_api_owner and not v_is_controlled_operator then
+        if tg_op = 'INSERT' then
+            raise exception using
+                errcode = 'insufficient_privilege',
+                message = 'Summary INSERT is disabled; use the approved transactional persistence API.';
+        end if;
+        if tg_op = 'DELETE' then
+            raise exception using
+                errcode = 'insufficient_privilege',
+                message = 'Summary DELETE is disabled; use the approved transactional persistence API.';
+        end if;
+        if new.package_id is distinct from old.package_id
+           or new.title is distinct from old.title
+           or new.slug is distinct from old.slug
+           or new.content_md is distinct from old.content_md
+           or new.read_time_minutes is distinct from old.read_time_minutes
+           or new.sort_order is distinct from old.sort_order
+           or new.display_order is distinct from old.display_order
+           or new.released_at is distinct from old.released_at
+           or new.is_published is distinct from old.is_published
+           or new.document is distinct from old.document
+        then
+            raise exception using
+                errcode = 'insufficient_privilege',
+                message = 'Legacy Summary authority fields are read-only outside the approved transactional persistence API.';
+        end if;
+    end if;
+
+    if tg_op = 'DELETE' then
+        return old;
+    end if;
+    return new;
+end
+$function$;
+
+comment on function public.kp_enforce_summary_cleanup_fence() is
+    'SECURITY INVOKER permanent Hybrid cleanup fence. Direct public, anon, authenticated, and service_role writes remain blocked; explicitly allowlisted SECURITY DEFINER persistence RPCs including 071 are authorized by their active PG_CONTEXT caller and locked function metadata, while legacy columns remain protected for all other callers.';
+
+revoke all on function public.kp_enforce_summary_cleanup_fence()
+    from public, anon, authenticated;
+grant execute on function public.kp_enforce_summary_cleanup_fence()
+    to service_role;
+
 revoke all on function public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)
+    from public, anon, authenticated;
+revoke all on function public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)
+    from public, anon, authenticated;
+revoke all on function public.kp_persist_resolve_import_collision(uuid,text)
     from public, anon, authenticated;
 revoke all on function public.kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean)
     from public, anon, authenticated;
 
 grant execute on function public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)
+    to service_role;
+grant execute on function public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)
+    to service_role;
+grant execute on function public.kp_persist_resolve_import_collision(uuid,text)
     to service_role;
 grant execute on function public.kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean)
     to service_role;
@@ -865,25 +1641,42 @@ declare
     v_function oid;
     v_api_owner oid;
     v_definition text;
+    v_helper_definition text;
+    v_writer_fence_definition text;
+    v_cleanup_fence_definition text;
 begin
     select p.proowner into v_api_owner
     from pg_catalog.pg_proc p
     where p.oid = to_regprocedure('public.kp_persist_require_actor(uuid)');
 
     for expected in
-        select function_name, required_fragment, outcome_fragment
+        select function_name, required_fragment, outcome_fragment, requires_document
         from (values
             (
-                'public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)',
+                'public.kp_persist_resolve_import_collision(uuid,text)',
+                'kp_persist_resolve_import_collision',
+                'collision_kind',
+                false
+            ),
+            (
+                'public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)',
                 'kp_persist_publish_compatibility_revision',
-                '''outcome'', ''created'''
+                '''outcome'', ''created''',
+                true
+            ),
+            (
+                'public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)',
+                'kp_persist_create_compatibility_summary',
+                'package_id',
+                true
             ),
             (
                 'public.kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean)',
-                'kp_persist_unpublish_compatibility_summary',
-                '''outcome'', ''replaced'''
+                'kp_persist_resolve_import_collision',
+                '''outcome'', ''replaced''',
+                true
             )
-        ) as required(function_name, required_fragment, outcome_fragment)
+        ) as required(function_name, required_fragment, outcome_fragment, requires_document)
     loop
         v_function := to_regprocedure(expected.function_name);
         if v_function is null then
@@ -902,10 +1695,9 @@ begin
           and array_to_string(p.proconfig, ',') ilike '%lock_timeout=5s%';
 
         if v_definition is null
-           or position('is_summary_bank_compatibility' in v_definition) = 0
-           or position('document' in v_definition) = 0
            or position(expected.required_fragment in v_definition) = 0
            or position(expected.outcome_fragment in v_definition) = 0
+           or (expected.requires_document and position('document' in v_definition) = 0)
         then
             raise exception using
                 errcode = 'check_violation',
@@ -922,6 +1714,41 @@ begin
                 message = format('Knowledge Platform migration 071 failed to preserve service-role-only execution: %s.', expected.function_name);
         end if;
     end loop;
+
+    select pg_catalog.pg_get_functiondef(to_regprocedure('public.kp_summary_writer_caller_is_approved()'))
+    into v_helper_definition;
+    if v_helper_definition is null
+       or position('security invoker' in lower(v_helper_definition)) = 0
+       or position('pg_context' in lower(v_helper_definition)) = 0
+       or position('p.oid = v_active_oid' in lower(v_helper_definition)) = 0
+       or position('kp_persist_resolve_import_collision(uuid,text)' in lower(v_helper_definition)) = 0
+       or position('kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)' in lower(v_helper_definition)) = 0
+       or position('kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text,text,boolean)' in lower(v_helper_definition)) = 0
+       or position('kp_persist_replace_compatibility_summary(uuid,uuid,text,uuid,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,boolean)' in lower(v_helper_definition)) = 0
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 071 failed to extend caller-bound active-OID authorization.';
+    end if;
+
+    select pg_catalog.pg_get_functiondef(to_regprocedure('public.kp_enforce_summary_writer_boundary()'))
+    into v_writer_fence_definition;
+    select pg_catalog.pg_get_functiondef(to_regprocedure('public.kp_enforce_summary_cleanup_fence()'))
+    into v_cleanup_fence_definition;
+    if v_writer_fence_definition is null
+       or position('security invoker' in lower(v_writer_fence_definition)) = 0
+       or position('current_user in (''public'', ''anon'', ''authenticated'', ''service_role'')' in lower(v_writer_fence_definition)) = 0
+       or position('kp_summary_writer_caller_is_approved()' in lower(v_writer_fence_definition)) = 0
+       or v_cleanup_fence_definition is null
+       or position('security invoker' in lower(v_cleanup_fence_definition)) = 0
+       or position('current_user in (''public'', ''anon'', ''authenticated'', ''service_role'')' in lower(v_cleanup_fence_definition)) = 0
+       or position('session_user = current_user' in lower(v_cleanup_fence_definition)) = 0
+       or position('kp_summary_writer_caller_is_approved()' in lower(v_cleanup_fence_definition)) = 0
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 071 failed to preserve both effective Summary mutation fences.';
+    end if;
 end
 $kp_compatibility_import_postflight$;
 
