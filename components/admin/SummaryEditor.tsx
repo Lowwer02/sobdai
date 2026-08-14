@@ -236,23 +236,35 @@ export default function SummaryEditor({
         <div className="w-full lg:w-[300px] flex flex-col gap-4 overflow-y-auto pr-0 lg:pr-2 custom-scrollbar max-h-[none] lg:max-h-full">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-4 space-y-4">
             {summaryKind === 'kp_native' ? (
-              <fieldset aria-describedby="summary-package-help summary-package-error">
-                <legend className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">
-                  Use with Packages <span className="text-red-400">*</span>
+              <fieldset
+                aria-describedby="summary-package-help summary-package-error"
+                className="rounded-2xl border border-[rgba(212,175,55,0.18)] bg-[#140E09]/80 px-3.5 py-4 shadow-[0_16px_32px_rgba(0,0,0,0.12)]"
+              >
+                <legend className="block px-1 text-sm font-semibold tracking-tight text-[#F5E9D6] font-display">
+                  <span className="flex items-center gap-2">
+                    <span>Use with Packages</span>
+                    <span className="rounded-full border border-[#D4AF37]/25 bg-[#D4AF37]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-[#D4AF37]">
+                      Required
+                    </span>
+                  </span>
                 </legend>
-                <p id="summary-package-help" className="text-xs text-[#A1866B] mb-3">
+                <p id="summary-package-help" className="mt-1.5 px-1 text-xs leading-5 text-[#A1866B]">
                   Select every Package that should use this Summary.
                 </p>
-                <div className="space-y-2" role="group" aria-label="Use with Packages">
+                <div
+                  className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1 custom-scrollbar"
+                  role="group"
+                  aria-label="Use with Packages"
+                >
                   {packages.map((pkg) => {
                     const isSelected = formData.package_ids.includes(pkg.id)
                     return (
                       <label
                         key={pkg.id}
-                        className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors cursor-pointer ${
+                        className={`group flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-[#D4AF37]/15 ${
                           isSelected
-                            ? 'border-[#D4AF37]/70 bg-[#D4AF37]/10 text-[#F5E9D6]'
-                            : 'border-[rgba(255,255,255,0.1)] bg-[#0F0B07] text-[#A1866B] hover:border-[#D4AF37]/50'
+                            ? 'border-[#D4AF37]/75 bg-[#D4AF37]/10 text-[#F5E9D6] shadow-[inset_0_0_0_1px_rgba(212,175,55,0.12)]'
+                            : 'border-[rgba(255,255,255,0.08)] bg-[#0F0B07]/75 text-[#B59B82] hover:border-[#D4AF37]/45 hover:bg-[#21180F] hover:text-[#F5E9D6]'
                         }`}
                       >
                         <input
@@ -262,21 +274,43 @@ export default function SummaryEditor({
                           checked={isSelected}
                           onChange={() => handlePackageToggle(pkg.id)}
                           disabled={isSaving}
-                          className="h-4 w-4 shrink-0 accent-[#D4AF37]"
+                          className="h-4 w-4 shrink-0 accent-[#D4AF37] focus-visible:outline-none"
                         />
-                        <span className="min-w-0 truncate">{pkg.name}</span>
+                        <span className="min-w-0 flex-1 break-words font-medium leading-5">
+                          {pkg.name}
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+                            isSelected ? 'bg-[#D4AF37]' : 'bg-[#6D5948] group-hover:bg-[#A1866B]'
+                          }`}
+                        />
                       </label>
                     )
                   })}
                 </div>
                 {packages.length === 0 && (
-                  <p className="mt-2 text-sm text-[#A1866B]">No Packages are available.</p>
+                  <p className="mt-4 rounded-xl border border-dashed border-[rgba(255,255,255,0.1)] bg-[#0F0B07]/60 px-3 py-3 text-xs leading-5 text-[#A1866B]">
+                    No Packages are available.
+                  </p>
                 )}
-                <p className="mt-3 text-xs text-[#A1866B]" aria-live="polite">
-                  {formData.package_ids.length} selected
-                </p>
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-[rgba(255,255,255,0.07)] px-1 pt-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#806A56]">
+                    Package coverage
+                  </span>
+                  <span
+                    className="inline-flex items-center rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-2.5 py-1 text-xs font-semibold text-[#D4AF37]"
+                    aria-live="polite"
+                  >
+                    {formData.package_ids.length} selected
+                  </span>
+                </div>
                 {packageError && (
-                  <p id="summary-package-error" role="alert" className="mt-2 text-sm font-medium text-red-400">
+                  <p
+                    id="summary-package-error"
+                    role="alert"
+                    className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-medium leading-5 text-red-300"
+                  >
                     {packageError}
                   </p>
                 )}
