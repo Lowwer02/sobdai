@@ -35,6 +35,7 @@ export interface SummaryLibraryTableRow {
   readonly title: string
   readonly slug: string | null
   readonly packageName: string | null
+  readonly packageNames: readonly string[]
   readonly subject: string | null
   readonly document: string | null
   readonly topic: string | null
@@ -58,6 +59,25 @@ function subjectLabel(subject: string | null): string {
   return isUnassignedSubject(subject)
     ? UNASSIGNED_SUBJECT.label
     : getSubjectLabel(subject)
+}
+
+function packageLabel(row: SummaryLibraryTableRow): string {
+  const names = row.packageNames.length > 0
+    ? row.packageNames
+    : row.packageName
+      ? [row.packageName]
+      : []
+  if (names.length === 0) return 'Unknown Package'
+  return names.length === 1 ? names[0]! : `${names[0]} +${names.length - 1}`
+}
+
+function packageTitle(row: SummaryLibraryTableRow): string {
+  const names = row.packageNames.length > 0
+    ? row.packageNames
+    : row.packageName
+      ? [row.packageName]
+      : []
+  return names.length > 0 ? names.join(', ') : 'Unknown Package'
 }
 
 function selectionErrorMessage(
@@ -395,7 +415,7 @@ export default function SummaryLibraryTable({
                   </td>
                   <td className="p-4">
                     <div className="max-w-[200px] truncate text-sm text-[#F5E9D6]">
-                      {row.packageName || 'Unknown Package'}
+                      <span title={packageTitle(row)}>{packageLabel(row)}</span>
                     </div>
                   </td>
                   <td className="p-4"><Classification row={row} /></td>
@@ -484,7 +504,7 @@ export default function SummaryLibraryTable({
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[rgba(255,255,255,0.06)] pt-3 text-xs">
                 <div>
                   <p className="text-[#A1866B]">Package</p>
-                  <p className="mt-1 truncate text-[#F5E9D6]">{row.packageName || 'Unknown Package'}</p>
+                  <p className="mt-1 truncate text-[#F5E9D6]" title={packageTitle(row)}>{packageLabel(row)}</p>
                 </div>
                 <div>
                   <p className="text-[#A1866B]">Order</p>

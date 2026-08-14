@@ -4,6 +4,7 @@ import PackageClient from './PackageClient'
 import { notFound } from 'next/navigation'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { applyContentOrdering } from '@/lib/contentOrdering'
+import { listPublicPackageSummaries } from '@/lib/public-summary'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
@@ -83,14 +84,10 @@ export default async function PackagePage({ params }: PageProps) {
       : user
         ? supabase.from('profiles').select('role').eq('id', user.id).single()
         : Promise.resolve({ data: null }),
-    // Smart Content Ordering (DB-side): display_order → released_at → updated_at → created_at
-    applyContentOrdering(
-      supabase
-        .from('summaries')
-        .select('id, title, slug, subject, topic, read_time_minutes, updated_at, is_published')
-        .eq('package_id', pkg.id)
-        .eq('is_published', true)
-    ),
+    // Hybrid Summary read: Legacy rows retain their direct Package ownership;
+    // KP rows come from active PackageSummary memberships and their selected
+    // published revision. The repository deduplicates by Summary root.
+    listPublicPackageSummaries(supabase, pkg.id),
     // exam_sets with the same ordering chain, DB-side.
     // Only show published exam sets to end users (status filter mirrors summaries).
     applyContentOrdering(
@@ -148,7 +145,7 @@ export default async function PackagePage({ params }: PageProps) {
     <>
       <StructuredData data={breadcrumbJsonLd} />
       <Suspense fallback={<div>Loading...</div>}>
-        <PackageClient pkg={pkg} examSets={examSetsData} summaries={summaries?.data || []} isPurchased={isPurchased} supportConfig={supportConfig} />
+        <PackageClient pkg={pkg} examSets={examSetsData} summaries={[...summaries]} isPurchased={isPurchased} supportConfig={supportConfig} />
       </Suspense>
     </>
   )

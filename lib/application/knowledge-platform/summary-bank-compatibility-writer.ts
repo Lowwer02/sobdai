@@ -18,6 +18,8 @@ export type SummaryBankCompatibilityPackageReferenceType =
   | 'code'
   | 'ambiguous'
 
+export type SummaryBankCompatibilitySummaryKind = 'legacy' | 'kp_native'
+
 export interface SummaryBankCompatibilityPackageLookupInput {
   readonly reference: string
   readonly referenceType?: SummaryBankCompatibilityPackageReferenceType
@@ -36,16 +38,23 @@ export interface SummaryBankCompatibilityImportSlugLookupInput {
 
 export interface SummaryBankCompatibilityImportPlacementLookupResult {
   readonly summaryId: UUID
+  readonly summaryKind: SummaryBankCompatibilitySummaryKind
 }
 
 export interface SummaryBankCompatibilityImportReplacementTarget {
   readonly summaryId: UUID
+  readonly summaryKind: SummaryBankCompatibilitySummaryKind
   readonly replacementVersionId: UUID | null
 }
 
 export interface SummaryBankCompatibilityCreateInput {
   readonly actorId: UUID
+  /**
+   * Retained for import compatibility and as the caller's selected Package.
+   * New admin creates must also provide the complete packageIds set.
+   */
   readonly packageId: UUID
+  readonly packageIds?: readonly UUID[]
   readonly title: string
   readonly slug: string
   readonly subject?: string | null
@@ -59,7 +68,7 @@ export interface SummaryBankCompatibilityCreateInput {
   readonly isPublished: boolean
 }
 
-export interface SummaryBankCompatibilityEditInput {
+interface SummaryBankCompatibilityEditFields {
   readonly actorId: UUID
   readonly summaryId: UUID
   readonly packageId: UUID
@@ -74,6 +83,29 @@ export interface SummaryBankCompatibilityEditInput {
   readonly displayOrder?: number | string | null
   readonly navigationLabel?: string | null
 }
+
+interface SummaryBankCompatibilityUnclassifiedEditInput
+  extends SummaryBankCompatibilityEditFields {
+  /**
+   * Transitional compatibility for broad callers. The service rejects this
+   * shape before persistence until the caller supplies the Legacy/KP kind.
+   */
+  readonly summaryKind?: never
+  readonly packageIds?: never
+}
+
+export type SummaryBankCompatibilityEditInput =
+  | (SummaryBankCompatibilityEditFields & {
+      readonly summaryKind: 'legacy'
+      /** Legacy remains single-Package and does not require KP memberships. */
+      readonly packageIds?: null
+    })
+  | (SummaryBankCompatibilityEditFields & {
+      readonly summaryKind: 'kp_native'
+      /** KP callers must provide the complete desired Package set. */
+      readonly packageIds: readonly UUID[]
+    })
+  | SummaryBankCompatibilityUnclassifiedEditInput
 
 export interface SummaryBankCompatibilityMetadata {
   readonly contentChecksum: string
@@ -89,6 +121,8 @@ export interface SummaryBankCompatibilityCreatePersistenceCommand
   readonly summaryCode: string
   readonly canonicalSlug: string
   readonly packageId: UUID
+  /** Complete desired KP-native membership set. */
+  readonly packageIds: readonly UUID[]
   readonly legacySlug: string
   readonly title: string
   readonly subject: string | null
@@ -107,7 +141,9 @@ export interface SummaryBankCompatibilityCreatePersistenceCommand
 export interface SummaryBankCompatibilityEditPersistenceCommand
   extends SummaryBankCompatibilityMetadata {
   readonly summaryId: UUID
+  readonly summaryKind: SummaryBankCompatibilitySummaryKind
   readonly packageId: UUID
+  readonly packageIds: readonly UUID[] | null
   readonly legacySlug: string
   readonly title: string
   readonly subject: string | null
@@ -142,7 +178,7 @@ export interface SummaryBankCompatibilityReplacePersistenceCommand
   readonly summaryId: UUID
   readonly packageId: UUID
   readonly legacySlug: string
-  readonly replacementVersionId: UUID
+  readonly replacementVersionId: UUID | null
   readonly title: string
   readonly subject: string | null
   readonly document: string | null
@@ -167,7 +203,7 @@ export interface SummaryBankCompatibilityCreatePersistenceResult {
 
 export interface SummaryBankCompatibilityEditPersistenceResult {
   readonly summaryId: UUID
-  readonly summaryVersionId: UUID
+  readonly summaryVersionId: UUID | null
   readonly packageId: UUID
   readonly legacySlug: string
   readonly revisionCreated: boolean
@@ -176,7 +212,7 @@ export interface SummaryBankCompatibilityEditPersistenceResult {
 
 export interface SummaryBankCompatibilityReplacePersistenceResult {
   readonly summaryId: UUID
-  readonly summaryVersionId: UUID
+  readonly summaryVersionId: UUID | null
   readonly packageId: UUID
   readonly legacySlug: string
   readonly isPublished: boolean
@@ -229,6 +265,22 @@ export interface SummaryBankCompatibilityUnpublishPersistenceResult {
   readonly idempotentRetry: boolean
 }
 
+export interface SummaryBankCompatibilityLegacyPublishPersistenceResult {
+  readonly summaryId: UUID
+  readonly summaryVersionId: null
+  readonly packageId: UUID
+  readonly isPublished: true
+  readonly idempotentRetry: boolean
+}
+
+export interface SummaryBankCompatibilityLegacyUnpublishPersistenceResult {
+  readonly summaryId: UUID
+  readonly summaryVersionId: null
+  readonly packageId: UUID
+  readonly isPublished: false
+  readonly idempotentRetry: boolean
+}
+
 export type SummaryBankCompatibilityDeleteOutcome = 'deleted' | 'archived'
 
 export interface SummaryBankCompatibilityDeletePersistenceResult {
@@ -264,6 +316,12 @@ export interface SummaryBankCompatibilityPersistence {
   unpublish(
     command: SummaryBankCompatibilityUnpublishPersistenceCommand
   ): Promise<SummaryBankCompatibilityUnpublishPersistenceResult>
+  publishLegacy(
+    command: SummaryBankCompatibilityPublishPersistenceCommand
+  ): Promise<SummaryBankCompatibilityLegacyPublishPersistenceResult>
+  unpublishLegacy(
+    command: SummaryBankCompatibilityUnpublishPersistenceCommand
+  ): Promise<SummaryBankCompatibilityLegacyUnpublishPersistenceResult>
   delete(
     command: SummaryBankCompatibilityDeletePersistenceCommand
   ): Promise<SummaryBankCompatibilityDeletePersistenceResult>
@@ -285,6 +343,12 @@ export interface SummaryBankCompatibilityPublishResult
 
 export interface SummaryBankCompatibilityUnpublishResult
   extends SummaryBankCompatibilityUnpublishPersistenceResult {}
+
+export interface SummaryBankCompatibilityLegacyPublishResult
+  extends SummaryBankCompatibilityLegacyPublishPersistenceResult {}
+
+export interface SummaryBankCompatibilityLegacyUnpublishResult
+  extends SummaryBankCompatibilityLegacyUnpublishPersistenceResult {}
 
 export interface SummaryBankCompatibilityDeleteResult
   extends SummaryBankCompatibilityDeletePersistenceResult {}
@@ -364,6 +428,52 @@ function normalizeInteger(
     return invalidInput(`${field} must be an integer.`)
   }
   return numberValue
+}
+
+function normalizeLegacyPackageIds(value: unknown): null {
+  if (value === undefined || value === null) return null
+  return invalidInput('Legacy edits do not accept KP packageIds.')
+}
+
+function normalizeCreatePackageIds(
+  value: unknown,
+  packageId: UUID,
+): readonly UUID[] {
+  if (value === undefined) return [packageId]
+  if (!Array.isArray(value) || value.length === 0) {
+    return invalidInput('packageIds must contain at least one Package ID.')
+  }
+
+  const packageIds = value.map((candidate, index) =>
+    requiredIdentifier(candidate, `packageIds[${index}]`)
+  )
+  if (new Set(packageIds).size !== packageIds.length) {
+    return invalidInput('packageIds cannot contain duplicates.')
+  }
+  if (!packageIds.includes(packageId)) {
+    return invalidInput('packageIds must include packageId.')
+  }
+  return packageIds
+}
+
+function normalizeKpPackageIds(
+  value: unknown,
+  packageId: UUID,
+): readonly UUID[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return invalidInput('packageIds must contain at least one Package ID.')
+  }
+
+  const packageIds = value.map((packageId, index) =>
+    requiredIdentifier(packageId, `packageIds[${index}]`)
+  )
+  if (new Set(packageIds).size !== packageIds.length) {
+    return invalidInput('packageIds cannot contain duplicates.')
+  }
+  if (!packageIds.includes(packageId)) {
+    return invalidInput('packageIds must include packageId.')
+  }
+  return packageIds
 }
 
 function normalizeBoolean(value: unknown, field: string): boolean {
@@ -521,6 +631,12 @@ export interface SummaryBankCompatibilityWriter {
   unpublish(
     input: SummaryBankCompatibilityUnpublishInput
   ): Promise<SummaryBankCompatibilityUnpublishResult>
+  publishLegacy(
+    input: SummaryBankCompatibilityPublishInput
+  ): Promise<SummaryBankCompatibilityLegacyPublishResult>
+  unpublishLegacy(
+    input: SummaryBankCompatibilityUnpublishInput
+  ): Promise<SummaryBankCompatibilityLegacyUnpublishResult>
   delete(
     input: SummaryBankCompatibilityDeleteInput
   ): Promise<SummaryBankCompatibilityDeleteResult>
@@ -587,6 +703,7 @@ export class SummaryBankCompatibilityWriterService
     input: SummaryBankCompatibilityCreateInput,
   ): Promise<SummaryBankCompatibilityCreateResult> {
     const fields = normalizeCommonFields(input)
+    const packageIds = normalizeCreatePackageIds(input.packageIds, fields.packageId)
     const summaryId = this.idAllocator()
     const versionId = this.idAllocator()
     const summaryCode = normalizeSummaryCode(
@@ -606,6 +723,7 @@ export class SummaryBankCompatibilityWriterService
       summaryCode,
       canonicalSlug,
       packageId: fields.packageId,
+      packageIds,
       legacySlug: fields.slug,
       title: fields.title,
       subject: fields.subject,
@@ -628,11 +746,19 @@ export class SummaryBankCompatibilityWriterService
     input: SummaryBankCompatibilityEditInput,
   ): Promise<SummaryBankCompatibilityEditResult> {
     const fields = normalizeCommonFields(input)
+    if (input.summaryKind !== 'legacy' && input.summaryKind !== 'kp_native') {
+      return invalidInput('summaryKind is required for compatibility edits.')
+    }
+    const packageIds = input.summaryKind === 'legacy'
+      ? normalizeLegacyPackageIds(input.packageIds)
+      : normalizeKpPackageIds(input.packageIds, fields.packageId)
     const metadata = await prepareSummaryCompatibilityMetadata(fields.contentMd)
     return this.persistence.update({
       ...metadata,
       summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
+      summaryKind: input.summaryKind,
       packageId: fields.packageId,
+      packageIds,
       legacySlug: fields.slug,
       title: fields.title,
       subject: fields.subject,
@@ -664,12 +790,15 @@ export class SummaryBankCompatibilityWriterService
     }
 
     const metadata = await prepareSummaryCompatibilityMetadata(fields.contentMd)
+    const replacementVersionId = target.summaryKind === 'legacy'
+      ? null
+      : target.replacementVersionId ?? this.idAllocator()
     return this.persistence.replace({
       ...metadata,
       summaryId: target.summaryId,
       packageId: fields.packageId,
       legacySlug: fields.slug,
-      replacementVersionId: target.replacementVersionId ?? this.idAllocator(),
+      replacementVersionId,
       title: fields.title,
       subject: fields.subject,
       document: fields.document,
@@ -697,6 +826,24 @@ export class SummaryBankCompatibilityWriterService
     input: SummaryBankCompatibilityUnpublishInput,
   ): Promise<SummaryBankCompatibilityUnpublishResult> {
     return this.persistence.unpublish({
+      actorId: requiredIdentifier(input.actorId, 'actorId'),
+      summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
+    })
+  }
+
+  public async publishLegacy(
+    input: SummaryBankCompatibilityPublishInput,
+  ): Promise<SummaryBankCompatibilityLegacyPublishResult> {
+    return this.persistence.publishLegacy({
+      actorId: requiredIdentifier(input.actorId, 'actorId'),
+      summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
+    })
+  }
+
+  public async unpublishLegacy(
+    input: SummaryBankCompatibilityUnpublishInput,
+  ): Promise<SummaryBankCompatibilityLegacyUnpublishResult> {
+    return this.persistence.unpublishLegacy({
       actorId: requiredIdentifier(input.actorId, 'actorId'),
       summaryId: requiredIdentifier(input.summaryId, 'summaryId'),
     })

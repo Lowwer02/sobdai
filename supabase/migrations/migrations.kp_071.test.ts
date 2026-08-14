@@ -112,6 +112,8 @@ function verifiesStaticHybridContract(): void {
   assert.match(helper, /pg_context/i);
   assert.match(helper, /v_active_oid/i);
   assert.match(helper, /p\.oid\s*=\s*v_active_oid/i);
+  assert.match(helper, /pg_catalog\.oidvectortypes\(p\.proargtypes\)/i);
+  assert.doesNotMatch(helper, /pg_get_function_identity_arguments/i);
 
   const assertEffectiveFenceAllowlist = (fence: string, label: string): void => {
     assert.match(fence, /security\s+invoker/i);

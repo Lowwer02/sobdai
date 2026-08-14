@@ -15,6 +15,7 @@ import {
 const ACTOR_ID = '00000000-0000-4000-8000-000000000001'
 const PACKAGE_ID = '00000000-0000-4000-8000-000000000002'
 const OTHER_PACKAGE_ID = '00000000-0000-4000-8000-000000000005'
+const THIRD_PACKAGE_ID = '00000000-0000-4000-8000-000000000008'
 const SUMMARY_ID = '00000000-0000-4000-8000-000000000003'
 const OTHER_SUMMARY_ID = '00000000-0000-4000-8000-000000000006'
 const VERSION_ID = '00000000-0000-4000-8000-000000000004'
@@ -107,6 +108,7 @@ const CREATE_COMMAND: SummaryBankCompatibilityCreatePersistenceCommand = {
   summaryCode: 'SUM-000123',
   canonicalSlug: 'a-summary-sum-000123',
   packageId: PACKAGE_ID,
+  packageIds: [PACKAGE_ID],
   legacySlug: 'a-summary',
   title: 'A Summary',
   subject: 'law',
@@ -128,7 +130,9 @@ const CREATE_COMMAND: SummaryBankCompatibilityCreatePersistenceCommand = {
 
 const EDIT_COMMAND: SummaryBankCompatibilityEditPersistenceCommand = {
   summaryId: SUMMARY_ID,
+  summaryKind: 'kp_native',
   packageId: PACKAGE_ID,
+  packageIds: [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
   legacySlug: 'a-summary',
   title: 'Edited Summary',
   subject: 'law',
@@ -256,6 +260,40 @@ function unpublishResponse(
   }
 }
 
+function legacyPublishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: null,
+      package_id: PACKAGE_ID,
+      is_published: true,
+      legacy: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function legacyUnpublishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: null,
+      package_id: PACKAGE_ID,
+      is_published: false,
+      legacy: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
 function deleteResponse(
   outcome: 'deleted' | 'archived' = 'archived',
   overrides: Readonly<Record<string, unknown>> = {},
@@ -314,6 +352,21 @@ const IMPORT_MARKED_PLACEMENT = {
   package_id: PACKAGE_ID,
   legacy_slug: 'a-summary',
   is_summary_bank_compatibility: true,
+}
+
+const IMPORT_SECONDARY_PLACEMENT = {
+  ...IMPORT_MARKED_PLACEMENT,
+  package_id: OTHER_PACKAGE_ID,
+  legacy_slug: 'secondary-summary',
+  is_summary_bank_compatibility: false,
+}
+
+const IMPORT_KP_SUMMARY = {
+  id: SUMMARY_ID,
+  summary_code: 'SUM-000123',
+  package_id: PACKAGE_ID,
+  slug: 'a-summary',
+  lifecycle_status: 'active',
 }
 
 const SOURCE_SNAPSHOT = {
@@ -417,7 +470,7 @@ for (const [label, data] of [
 }
 
 test('create accepts the exact migration-071 result contract', async () => {
-  const { persistence: adapter } = persistence(createResponse())
+  const { client, persistence: adapter } = persistence(createResponse())
   const result = await adapter.create(CREATE_COMMAND)
 
   assert.deepEqual(result, {
@@ -428,6 +481,22 @@ test('create accepts the exact migration-071 result contract', async () => {
     isPublished: true,
     idempotentRetry: false,
   })
+  assert.deepEqual(client.calls[0]?.args.p_package_ids, [PACKAGE_ID])
+})
+
+test('create forwards the complete three-Package set to the migration-071 RPC', async () => {
+  const { client, persistence: adapter } = persistence(createResponse({
+    package_id: PACKAGE_ID,
+  }))
+  await adapter.create({
+    ...CREATE_COMMAND,
+    packageIds: [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  })
+
+  assert.deepEqual(
+    client.calls[0]?.args.p_package_ids,
+    [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  )
 })
 
 for (const [label, value] of [
@@ -459,7 +528,7 @@ for (const [field, value] of [
 }
 
 test('edit accepts the exact migration-072 result contract', async () => {
-  const { persistence: adapter } = persistence(editResponse())
+  const { client, persistence: adapter } = persistence(editResponse())
   const result = await adapter.update(EDIT_COMMAND)
 
   assert.deepEqual(result, {
@@ -470,6 +539,42 @@ test('edit accepts the exact migration-072 result contract', async () => {
     revisionCreated: true,
     packageReassigned: false,
   })
+  assert.deepEqual(
+    client.calls[0]?.args.p_package_ids,
+    [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  )
+})
+
+test('KP edit sends an exact one-Package set to the migration-072 RPC', async () => {
+  const { client, persistence: adapter } = persistence(editResponse())
+  await adapter.update({ ...EDIT_COMMAND, packageIds: [PACKAGE_ID] })
+
+  assert.deepEqual(client.calls[0]?.args.p_package_ids, [PACKAGE_ID])
+})
+
+test('Legacy edit accepts summary_version_id=null and passes a null package set', async () => {
+  const { client, persistence: adapter } = persistence(editResponse({
+    summary_version_id: null,
+    revision_created: false,
+  }))
+  const result = await adapter.update({
+    ...EDIT_COMMAND,
+    summaryKind: 'legacy',
+    packageIds: null,
+  })
+
+  assert.equal(result.summaryVersionId, null)
+  assert.equal(client.calls[0]?.args.p_package_ids, null)
+})
+
+test('KP edit rejects a missing Package set before invoking the RPC', async () => {
+  const { client, persistence: adapter } = persistence(editResponse())
+
+  await assertInvalid(() => adapter.update({
+    ...EDIT_COMMAND,
+    packageIds: null,
+  }))
+  assert.equal(client.calls.length, 0)
 })
 
 test('edit rejects an unexpected outcome', async () => {
@@ -512,6 +617,16 @@ test('edit rejects a malformed returned revision identifier', async () => {
   await assertInvalid(() => adapter.update(EDIT_COMMAND))
 })
 
+for (const [label, value] of [
+  ['null', null],
+  ['missing', undefined],
+] as const) {
+  test(`KP edit rejects a ${label} returned revision identifier`, async () => {
+    const { persistence: adapter } = persistence(editResponse({ summary_version_id: value }))
+    await assertInvalid(() => adapter.update(EDIT_COMMAND))
+  })
+}
+
 test('package lookup resolves authoritative slug and code references', async () => {
   const slugLookup = persistenceWithQueries(
     { data: null, error: null },
@@ -536,18 +651,14 @@ test('package lookup resolves authoritative slug and code references', async () 
   )
 })
 
-test('marker-backed import lookup treats a marked placement as a duplicate', async () => {
+test('canonical membership lookup resolves the shared KP Summary root', async () => {
   const { persistence: adapter } = persistenceWithQueries(
     { data: null, error: null },
     {
       package_summaries: [{ data: [IMPORT_MARKED_PLACEMENT], count: 1, error: null }],
       summaries: [{
-        data: {
-          id: SUMMARY_ID,
-          package_id: PACKAGE_ID,
-          slug: 'a-summary',
-          lifecycle_status: 'active',
-        },
+        data: [IMPORT_KP_SUMMARY],
+        count: 1,
         error: null,
       }],
     },
@@ -558,7 +669,28 @@ test('marker-backed import lookup treats a marked placement as a duplicate', asy
       packageId: PACKAGE_ID,
       legacySlug: 'a-summary',
     }),
-    { summaryId: SUMMARY_ID },
+    { summaryId: SUMMARY_ID, summaryKind: 'kp_native' },
+  )
+})
+
+test('secondary marker=false membership resolves the same shared KP Summary root', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [
+        { data: [], count: 0, error: null },
+        { data: IMPORT_KP_SUMMARY, error: null },
+      ],
+      package_summaries: [{ data: [IMPORT_SECONDARY_PLACEMENT], count: 1, error: null }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: OTHER_PACKAGE_ID,
+      legacySlug: 'secondary-summary',
+    }),
+    { summaryId: SUMMARY_ID, summaryKind: 'kp_native' },
   )
 })
 
@@ -566,6 +698,7 @@ test('target-only placements do not consume an Import NEW slug', async () => {
   const { persistence: adapter } = persistenceWithQueries(
     { data: null, error: null },
     {
+      summaries: [{ data: [], count: 0, error: null }],
       package_summaries: [{ data: [], count: 0, error: null }],
     },
   )
@@ -579,12 +712,42 @@ test('target-only placements do not consume an Import NEW slug', async () => {
   )
 })
 
-test('marker-backed import lookup fails closed on multiple authority rows', async () => {
+test('Legacy Summary lookup uses summaries.package_id + summaries.slug without KP state', async () => {
   const { persistence: adapter } = persistenceWithQueries(
     { data: null, error: null },
     {
+      summaries: [{
+        data: [{
+          ...IMPORT_KP_SUMMARY,
+          summary_code: null,
+          lifecycle_status: null,
+        }],
+        count: 1,
+        error: null,
+      }],
+      package_summaries: [{ data: [], count: 0, error: null }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    { summaryId: SUMMARY_ID, summaryKind: 'legacy' },
+  )
+})
+
+test('ambiguous Summary-root and membership matches fail closed', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [{ data: [IMPORT_KP_SUMMARY], count: 1, error: null }],
       package_summaries: [{
-        data: [IMPORT_MARKED_PLACEMENT, { ...IMPORT_MARKED_PLACEMENT, summary_id: OTHER_SUMMARY_ID }],
+        data: [
+          { ...IMPORT_MARKED_PLACEMENT, summary_id: OTHER_SUMMARY_ID },
+          { ...IMPORT_MARKED_PLACEMENT, summary_id: SUMMARY_ID },
+        ],
         count: 2,
         error: null,
       }],
@@ -613,6 +776,23 @@ test('replace accepts the exact migration-071 result and passes its dedicated RP
   assert.equal(client.calls[0]?.functionName, 'kp_persist_replace_compatibility_summary')
   assert.equal(client.calls[0]?.args.p_replacement_version_id, VERSION_ID)
   assert.equal(client.calls[0]?.args.p_document, 'Document')
+})
+
+test('Legacy replace accepts summary_version_id=null without inventing a UUID', async () => {
+  const { client, persistence: adapter } = persistence(replaceResponse({
+    summary_version_id: null,
+    is_published: false,
+    revision_created: false,
+    legacy: true,
+  }))
+  const result = await adapter.replace({
+    ...REPLACE_COMMAND,
+    replacementVersionId: null,
+    isPublished: false,
+  })
+
+  assert.equal(result.summaryVersionId, null)
+  assert.equal(client.calls[0]?.args.p_replacement_version_id, null)
 })
 
 test('replace accepts the migration-071 immutable published retry shape', async () => {
@@ -671,12 +851,8 @@ test('replacement target resolution returns one existing editable draft', async 
     {
       package_summaries: [{ data: [IMPORT_MARKED_PLACEMENT], count: 1, error: null }],
       summaries: [{
-        data: {
-          id: SUMMARY_ID,
-          package_id: PACKAGE_ID,
-          slug: 'a-summary',
-          lifecycle_status: 'active',
-        },
+        data: [IMPORT_KP_SUMMARY],
+        count: 1,
         error: null,
       }],
       summary_versions: [{
@@ -692,7 +868,11 @@ test('replacement target resolution returns one existing editable draft', async 
       packageId: PACKAGE_ID,
       legacySlug: 'a-summary',
     }),
-    { summaryId: SUMMARY_ID, replacementVersionId: VERSION_ID },
+    {
+      summaryId: SUMMARY_ID,
+      summaryKind: 'kp_native',
+      replacementVersionId: VERSION_ID,
+    },
   )
 })
 
@@ -700,6 +880,7 @@ test('replacement target resolution rejects a marker/root identity mismatch', as
   const { persistence: adapter } = persistenceWithQueries(
     { data: null, error: null },
     {
+      summaries: [{ data: [], count: 0, error: null }],
       package_summaries: [{
         data: [{ ...IMPORT_MARKED_PLACEMENT, package_id: OTHER_PACKAGE_ID }],
         count: 1,
@@ -801,6 +982,44 @@ test('unpublish rejects malformed results and mismatched Summary identity', asyn
 
   const mismatched = persistence(unpublishResponse({ summary_id: OTHER_SUMMARY_ID }))
   await assertInvalid(() => mismatched.persistence.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+})
+
+test('Legacy publish uses the frozen Legacy RPC without KP reads or state', async () => {
+  const { client, persistence: adapter } = persistence(legacyPublishResponse())
+  const result = await adapter.publishLegacy({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: null,
+    packageId: PACKAGE_ID,
+    isPublished: true,
+    idempotentRetry: false,
+  })
+  assert.equal(client.calls.length, 1)
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_publish_legacy_summary')
+  assert.deepEqual(client.calls[0]?.args, {
+    p_summary_id: SUMMARY_ID,
+    p_actor_id: ACTOR_ID,
+  })
+})
+
+test('Legacy unpublish uses the frozen Legacy RPC without KP reads or state', async () => {
+  const { client, persistence: adapter } = persistence(legacyUnpublishResponse())
+  const result = await adapter.unpublishLegacy({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: null,
+    packageId: PACKAGE_ID,
+    isPublished: false,
+    idempotentRetry: false,
+  })
+  assert.equal(client.calls.length, 1)
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_unpublish_legacy_summary')
+  assert.deepEqual(client.calls[0]?.args, {
+    p_summary_id: SUMMARY_ID,
+    p_actor_id: ACTOR_ID,
+  })
 })
 
 for (const outcome of ['deleted', 'archived'] as const) {

@@ -7,7 +7,10 @@ do $kp_compatibility_import_preflight$
 declare
     v_api_owner oid;
     v_frozen_create_owner oid;
+    v_wrapper_owner oid;
     v_definition text;
+    v_wrapper_definition text;
+    v_wrapper_normalized text;
 begin
     if to_regclass('public.summaries') is null
        or to_regclass('public.summary_versions') is null
@@ -111,6 +114,43 @@ begin
             message = 'Knowledge Platform migration 071 requires the frozen 068 uuid[] compatibility-create owner and locked SECURITY DEFINER configuration.';
     end if;
 
+    select p.proowner, pg_catalog.pg_get_functiondef(p.oid)
+    into v_wrapper_owner, v_wrapper_definition
+    from pg_catalog.pg_proc p
+    where p.oid = to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)')
+      and p.prosecdef
+      and array_to_string(p.proconfig, ',') ilike '%search_path=pg_catalog, public, pg_temp%'
+      and array_to_string(p.proconfig, ',') ilike '%lock_timeout=5s%';
+
+    if v_wrapper_owner is null
+       or v_wrapper_owner is distinct from v_api_owner
+       or v_wrapper_definition is null
+    then
+        raise exception using
+            errcode = 'insufficient_privilege',
+            message = 'Knowledge Platform migration 071 requires the exact frozen 068 single-Package compatibility-create wrapper owner and locked SECURITY DEFINER configuration.';
+    end if;
+
+    -- The single-Package overload is intentionally only a compatibility
+    -- wrapper. Normalize PostgreSQL's rendered whitespace and require the
+    -- complete positional forwarding call so a missing, wrong, or ambiguous
+    -- overload cannot silently replace the authoritative UUID-array writer.
+    v_wrapper_normalized := pg_catalog.regexp_replace(
+        lower(v_wrapper_definition),
+        '[[:space:]]+',
+        '',
+        'g'
+    );
+    if position(
+        'v_result:=public.kp_persist_create_compatibility_summary(p_summary_id,p_summary_code,p_canonical_slug,p_canonical_title,p_subject,p_topic,p_law,p_visibility,array[p_package_id]::uuid[],p_legacy_slug,p_content_md,p_content_checksum,p_read_time_minutes,p_read_time_policy_version,p_content_schema_version,p_change_note,p_actor_id,p_version_id,p_sort_order,p_display_order,p_navigation_label)'
+        in v_wrapper_normalized
+    ) = 0
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Knowledge Platform migration 071 requires the 068 single-Package wrapper to delegate with exact UUID-array argument forwarding.';
+    end if;
+
     select pg_catalog.pg_get_functiondef(
         to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid[],text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)')
     ) into v_definition;
@@ -122,18 +162,6 @@ begin
         raise exception using
             errcode = 'check_violation',
             message = 'Knowledge Platform migration 071 requires the exact frozen 068 uuid[] compatibility-create semantics.';
-    end if;
-
-    select pg_catalog.pg_get_functiondef(
-        to_regprocedure('public.kp_persist_create_compatibility_summary(uuid,text,text,text,text,text,text,text,uuid,text,text,text,integer,text,text,text,uuid,uuid,integer,integer,text)')
-    ) into v_definition;
-    if v_definition is null
-       or position('is_summary_bank_compatibility' in v_definition) = 0
-       or position('revision_number' in v_definition) = 0
-    then
-        raise exception using
-            errcode = 'check_violation',
-            message = 'Knowledge Platform migration 071 requires migration 068 compatibility-create semantics.';
     end if;
 
     select pg_catalog.pg_get_functiondef(
@@ -1427,7 +1455,7 @@ begin
             from pg_catalog.pg_proc p
             where pg_catalog.regexp_replace(
                       pg_catalog.regexp_replace(
-                          lower(p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')'),
+                          lower(p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')'),
                           '[[:space:]]+', '', 'g'
                       ),
                       '"', '', 'g'
@@ -1718,7 +1746,12 @@ begin
     select pg_catalog.pg_get_functiondef(to_regprocedure('public.kp_summary_writer_caller_is_approved()'))
     into v_helper_definition;
     if v_helper_definition is null
-       or position('security invoker' in lower(v_helper_definition)) = 0
+       or not exists (
+            select 1
+            from pg_catalog.pg_proc p
+            where p.oid = to_regprocedure('public.kp_summary_writer_caller_is_approved()')
+              and p.prosecdef = false
+       )
        or position('pg_context' in lower(v_helper_definition)) = 0
        or position('p.oid = v_active_oid' in lower(v_helper_definition)) = 0
        or position('kp_persist_resolve_import_collision(uuid,text)' in lower(v_helper_definition)) = 0
@@ -1736,11 +1769,21 @@ begin
     select pg_catalog.pg_get_functiondef(to_regprocedure('public.kp_enforce_summary_cleanup_fence()'))
     into v_cleanup_fence_definition;
     if v_writer_fence_definition is null
-       or position('security invoker' in lower(v_writer_fence_definition)) = 0
+       or not exists (
+            select 1
+            from pg_catalog.pg_proc p
+            where p.oid = to_regprocedure('public.kp_enforce_summary_writer_boundary()')
+              and p.prosecdef = false
+       )
        or position('current_user in (''public'', ''anon'', ''authenticated'', ''service_role'')' in lower(v_writer_fence_definition)) = 0
        or position('kp_summary_writer_caller_is_approved()' in lower(v_writer_fence_definition)) = 0
        or v_cleanup_fence_definition is null
-       or position('security invoker' in lower(v_cleanup_fence_definition)) = 0
+       or not exists (
+            select 1
+            from pg_catalog.pg_proc p
+            where p.oid = to_regprocedure('public.kp_enforce_summary_cleanup_fence()')
+              and p.prosecdef = false
+       )
        or position('current_user in (''public'', ''anon'', ''authenticated'', ''service_role'')' in lower(v_cleanup_fence_definition)) = 0
        or position('session_user = current_user' in lower(v_cleanup_fence_definition)) = 0
        or position('kp_summary_writer_caller_is_approved()' in lower(v_cleanup_fence_definition)) = 0

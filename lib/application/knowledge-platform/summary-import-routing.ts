@@ -45,8 +45,9 @@ export async function routeSummaryImport(
     legacySlug: data.slug,
   })
 
-  // The marker-backed lookup is authoritative. A stale/default client value
-  // must never turn a genuinely new import into a replacement.
+  // The package-local discriminator-aware lookup is authoritative. It covers
+  // the Legacy root and every KP Package membership; a stale/default client
+  // value must never turn a genuinely new import into a replacement.
   if (!isDuplicate || input.conflictResolution === 'new') {
     const finalSlug = await writer.allocateImportLegacySlug({
       packageId: pkg.packageId,

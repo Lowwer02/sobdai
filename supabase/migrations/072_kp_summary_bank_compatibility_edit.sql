@@ -329,7 +329,7 @@ begin
     ) <> cardinality(p_package_ids) then
         raise exception using errcode = 'unique_violation', message = 'KP-native edit Package IDs cannot contain duplicates.';
     end if;
-    if p_package_id <> any(p_package_ids) then
+    if not (p_package_id = any(p_package_ids)) then
         raise exception using errcode = 'check_violation', message = 'The edit Package must be included in the complete KP membership set.';
     end if;
     if exists (
@@ -720,7 +720,7 @@ begin
             from pg_catalog.pg_proc p
             where pg_catalog.regexp_replace(
                       pg_catalog.regexp_replace(
-                          lower(p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')'),
+                          lower(p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')'),
                           '[[:space:]]+', '', 'g'
                       ),
                       '"', '', 'g'
@@ -929,10 +929,20 @@ begin
        or position('p.oid = v_active_oid' in lower(v_helper_definition)) = 0
        or position('kp_persist_update_compatibility_summary(uuid,uuid,text,text,text,text,text,text,text,text,integer,text,text,text,uuid,integer,integer,text,uuid[])' in lower(v_helper_definition)) = 0
        or v_writer_definition is null
-       or position('security invoker' in lower(v_writer_definition)) = 0
+       or not exists (
+            select 1
+            from pg_catalog.pg_proc p
+            where p.oid = to_regprocedure('public.kp_enforce_summary_writer_boundary()')
+              and p.prosecdef = false
+       )
        or position('kp_summary_writer_caller_is_approved()' in lower(v_writer_definition)) = 0
        or v_cleanup_definition is null
-       or position('security invoker' in lower(v_cleanup_definition)) = 0
+       or not exists (
+            select 1
+            from pg_catalog.pg_proc p
+            where p.oid = to_regprocedure('public.kp_enforce_summary_cleanup_fence()')
+              and p.prosecdef = false
+       )
        or position('kp_summary_writer_caller_is_approved()' in lower(v_cleanup_definition)) = 0
        or position('session_user = current_user' in lower(v_cleanup_definition)) = 0
     then

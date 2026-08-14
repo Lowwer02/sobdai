@@ -776,6 +776,88 @@ function verifiesDirectWriterFenceDeniesClientRoles(): void {
   }
 }
 
+type ResolverCatalogRow = {
+  oid: string;
+  proname: string;
+  typeOnlyArguments: string;
+  namedIdentityArguments: string;
+};
+
+function normalizeResolverSignature(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, '').replaceAll('"', '');
+}
+
+function resolveUnqualifiedTypeOnlySignature(
+  activeSignature: string,
+  catalog: readonly ResolverCatalogRow[],
+): string | null {
+  const matches = catalog.filter((row) => normalizeResolverSignature(
+    `${row.proname}(${row.typeOnlyArguments})`,
+  ) === normalizeResolverSignature(activeSignature));
+  return matches.length === 1 ? matches[0]!.oid : null;
+}
+
+function verifiesPgContextTypeOnlySignatureResolution(): void {
+  const callerHelper = executable.match(
+    /create\s+or\s+replace\s+function\s+public\.kp_summary_writer_caller_is_approved\(\)[\s\S]*?\$function\$[\s\S]*?\$function\$/i,
+  )?.[0];
+  assert.ok(callerHelper, 'caller-bound helper must be installed');
+  assert.match(callerHelper, /p\.proname\s*\|\|\s*'\('\s*\|\|\s*pg_catalog\.oidvectortypes\(p\.proargtypes\)/i);
+  assert.doesNotMatch(callerHelper, /pg_get_function_identity_arguments/i);
+
+  const arrayWriter: ResolverCatalogRow = {
+    oid: 'approved-array-writer',
+    proname: 'kp_persist_create_compatibility_summary',
+    typeOnlyArguments: 'uuid,text,uuid[]',
+    namedIdentityArguments: 'p_summary_id uuid, p_summary_code text, p_package_ids uuid[]',
+  };
+  const singleWriter: ResolverCatalogRow = {
+    oid: 'approved-single-writer',
+    proname: 'kp_persist_create_compatibility_summary',
+    typeOnlyArguments: 'uuid,text,uuid',
+    namedIdentityArguments: 'p_summary_id uuid, p_summary_code text, p_package_id uuid',
+  };
+
+  assert.notEqual(arrayWriter.namedIdentityArguments, arrayWriter.typeOnlyArguments);
+  assert.equal(
+    resolveUnqualifiedTypeOnlySignature(
+      `${arrayWriter.proname}(${arrayWriter.typeOnlyArguments})`,
+      [arrayWriter, singleWriter],
+    ),
+    arrayWriter.oid,
+    'PG_CONTEXT type-only signature must resolve the approved array overload',
+  );
+  assert.equal(
+    resolveUnqualifiedTypeOnlySignature(
+      `${singleWriter.proname}(${singleWriter.typeOnlyArguments})`,
+      [arrayWriter, singleWriter],
+    ),
+    singleWriter.oid,
+    'PG_CONTEXT type-only signature must resolve the approved single overload',
+  );
+  assert.equal(
+    resolveUnqualifiedTypeOnlySignature(
+      `${arrayWriter.proname}(uuid,text,boolean)`,
+      [arrayWriter, singleWriter],
+    ),
+    null,
+    'a wrong overload must fail closed',
+  );
+  assert.equal(
+    resolveUnqualifiedTypeOnlySignature(
+      `${arrayWriter.proname}(${arrayWriter.typeOnlyArguments})`,
+      [arrayWriter, { ...arrayWriter, oid: 'divergent-schema-writer' }],
+    ),
+    null,
+    'globally ambiguous matches must fail closed',
+  );
+  assert.equal(
+    resolveUnqualifiedTypeOnlySignature('malformed stack frame', [arrayWriter, singleWriter]),
+    null,
+    'malformed PG_CONTEXT frames must fail closed',
+  );
+}
+
 function verifiesCallerBoundNegativeSecurityContract(): void {
   const callerHelper = executable.match(
     /create\s+or\s+replace\s+function\s+public\.kp_summary_writer_caller_is_approved\(\)[\s\S]*?\$function\$[\s\S]*?\$function\$/i,
@@ -822,6 +904,7 @@ const tests = [
   ['exact CREATE retry payload guards', verifiesExactRetryPayloadStaticGuards],
   ['semantic rollback and membership lifecycle', verifiesSemanticFailureAtomicityAndMembershipLifecycle],
   ['direct client writes remain blocked', verifiesDirectWriterFenceDeniesClientRoles],
+  ['PG_CONTEXT type-only overload resolution', verifiesPgContextTypeOnlySignatureResolution],
   ['caller-bound negative security contract', verifiesCallerBoundNegativeSecurityContract],
 ] as const;
 

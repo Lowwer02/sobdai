@@ -56,6 +56,7 @@ export default async function SummariesPage({
     title: item.title,
     slug: item.slug,
     package_name: item.packageName,
+    package_names: item.packages.map((pkg) => pkg.name),
     subject: item.subject,
     document: item.document,
     topic: item.topic,

@@ -238,6 +238,11 @@ export default function SummariesClient({
     title: summary.title,
     slug: summary.slug ?? null,
     packageName: summary.package_name ?? null,
+    packageNames: Array.isArray(summary.package_names)
+      ? summary.package_names.filter((name: unknown): name is string => typeof name === 'string')
+      : summary.package_name
+        ? [summary.package_name]
+        : [],
     subject: summary.subject ?? null,
     document: summary.document ?? null,
     topic: summary.topic ?? null,
