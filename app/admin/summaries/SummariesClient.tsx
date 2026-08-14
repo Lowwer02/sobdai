@@ -125,26 +125,26 @@ export default function SummariesClient({
 
   const filterControls = (
     <>
-      <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-[#A1866B] md:min-w-[150px]">
-        <span>Package</span>
+      <label className="flex min-w-[150px] flex-1 md:flex-none">
+        <span className="sr-only">Package</span>
         <select
           aria-label="Filter summaries by package"
           value={packageFilter}
           onChange={(e) => updateParams({ package: e.target.value })}
-          className="w-full max-w-[220px] rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm text-[#F5E9D6] focus:border-[#D4AF37]/50 focus:outline-none"
+          className="h-10 w-full max-w-[220px] truncate rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm text-[#F5E9D6] transition-colors focus:border-[#D4AF37]/50 focus:outline-none"
         >
           <option value="">All Packages</option>
           {packages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </label>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-[#A1866B] md:min-w-[130px]">
-        <span>Status</span>
+      <label className="flex min-w-[140px] flex-1 md:flex-none">
+        <span className="sr-only">Status</span>
         <select
           aria-label="Filter summaries by status"
           value={statusFilter}
           onChange={(e) => updateParams({ status: e.target.value })}
-          className="w-full max-w-[180px] rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm text-[#F5E9D6] focus:border-[#D4AF37]/50 focus:outline-none"
+          className="h-10 w-full max-w-[180px] rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm text-[#F5E9D6] transition-colors focus:border-[#D4AF37]/50 focus:outline-none"
         >
           <option value="">All Statuses</option>
           <option value="published">Published</option>
@@ -152,13 +152,13 @@ export default function SummariesClient({
         </select>
       </label>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-[#A1866B] md:min-w-[150px]">
-        <span>Subject</span>
+      <label className="flex min-w-[150px] flex-1 md:flex-none">
+        <span className="sr-only">Subject</span>
         <select
           aria-label="Filter summaries by subject"
           value={subjectFilter}
           onChange={(e) => updateParams({ subject: e.target.value })}
-          className="w-full max-w-[200px] truncate rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm text-[#F5E9D6] focus:border-[#D4AF37]/50 focus:outline-none"
+          className="h-10 w-full max-w-[200px] truncate rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm text-[#F5E9D6] transition-colors focus:border-[#D4AF37]/50 focus:outline-none"
         >
           <option value="">All Subjects</option>
           {getSubjectDropdownOptions().map((opt) => (
@@ -167,13 +167,13 @@ export default function SummariesClient({
         </select>
       </label>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-[#A1866B] md:min-w-[150px]">
-        <span>Document</span>
+      <label className="flex min-w-[150px] flex-1 md:flex-none">
+        <span className="sr-only">Document</span>
         <select
           aria-label="Filter summaries by document"
           value={documentFilter}
           onChange={(e) => updateParams({ document: e.target.value })}
-          className="w-full max-w-[200px] truncate rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm text-[#F5E9D6] focus:border-[#D4AF37]/50 focus:outline-none"
+          className="h-10 w-full max-w-[200px] truncate rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm text-[#F5E9D6] transition-colors focus:border-[#D4AF37]/50 focus:outline-none"
         >
           <option value="">All Documents</option>
           <option value={UNASSIGNED_SUBJECT.code}>{UNASSIGNED_SUBJECT.label}</option>
@@ -260,22 +260,22 @@ export default function SummariesClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Summary Bank</h1>
-          <p className="text-[#A1866B] mt-1">Manage reading materials for learning packages.</p>
+          <p className="mt-1 text-sm text-[#A1866B]">Manage reading materials for learning packages.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Link 
             href="/admin/summaries/import"
-            className="bg-[#0F0B07] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#D4AF37] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#D4AF37]/30 bg-[#0F0B07] px-4 py-2.5 text-sm font-bold text-[#D4AF37] transition-colors hover:border-[#D4AF37]"
           >
             <UploadCloud size={18} />
             Import Markdown
           </Link>
           <Link 
             href="/admin/summaries/create"
-            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#D4AF37] px-4 py-2.5 text-sm font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A]"
           >
             <Plus size={18} />
             Create Summary
@@ -286,9 +286,9 @@ export default function SummariesClient({
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
         
         {/* Toolbar */}
-        <div className="p-4 border-b border-[rgba(255,255,255,0.05)] space-y-3">
-          <div className="flex flex-wrap gap-3 items-end justify-between">
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[220px] max-w-md">
+        <div className="space-y-3 border-b border-[rgba(255,255,255,0.05)] p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <form onSubmit={handleSearchSubmit} className="relative min-w-[220px] max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1866B]" size={18} aria-hidden="true" />
               <label htmlFor="summary-library-search" className="sr-only">Search summaries</label>
               <input
@@ -298,12 +298,12 @@ export default function SummariesClient({
                 maxLength={120}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search summaries by title..."
-                className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-[#D4AF37]/50"
+                className="h-10 w-full rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] pl-10 pr-4 text-sm text-[#F5E9D6] transition-colors placeholder:text-[#A1866B]/50 focus:border-[#D4AF37]/50 focus:outline-none"
               />
             </form>
 
-            <div className="flex items-center gap-2">
-              <label className="hidden sm:flex items-center gap-2 text-xs text-[#A1866B]">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="hidden items-center gap-2 text-xs text-[#A1866B] sm:flex">
                 <ArrowUpDown size={15} aria-hidden="true" />
                 <span className="sr-only">Sort summaries</span>
                 <select
@@ -313,7 +313,7 @@ export default function SummariesClient({
                     const [nextSortKey, nextDirection] = e.target.value.split(':')
                     updateParams({ sort: nextSortKey, direction: nextDirection })
                   }}
-                  className="rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm text-[#F5E9D6] focus:border-[#D4AF37]/50 focus:outline-none"
+                  className="h-10 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm text-[#F5E9D6] transition-colors focus:border-[#D4AF37]/50 focus:outline-none"
                 >
                   <option value="updatedAt:desc">Recently updated</option>
                   <option value="updatedAt:asc">Oldest updated</option>
@@ -325,7 +325,7 @@ export default function SummariesClient({
               <button
                 type="button"
                 onClick={() => setIsFilterDrawerOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm font-medium text-[#F5E9D6] hover:border-[#D4AF37]/50 md:hidden"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm font-medium text-[#F5E9D6] transition-colors hover:border-[#D4AF37]/50 md:hidden"
                 aria-haspopup="dialog"
                 aria-expanded={isFilterDrawerOpen}
               >
@@ -340,7 +340,7 @@ export default function SummariesClient({
             </div>
           </div>
 
-          <div className="hidden flex-wrap gap-3 md:flex">
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             {filterControls}
           </div>
 
@@ -355,7 +355,7 @@ export default function SummariesClient({
                 const [nextSortKey, nextDirection] = e.target.value.split(':')
                 updateParams({ sort: nextSortKey, direction: nextDirection })
               }}
-              className="flex-1 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 py-2 text-sm text-[#F5E9D6] focus:border-[#D4AF37]/50 focus:outline-none"
+              className="h-10 flex-1 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#0F0B07] px-3 text-sm text-[#F5E9D6] transition-colors focus:border-[#D4AF37]/50 focus:outline-none"
             >
               <option value="updatedAt:desc">Recently updated</option>
               <option value="updatedAt:asc">Oldest updated</option>
@@ -365,7 +365,7 @@ export default function SummariesClient({
           </div>
 
           {activeFilters.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2" aria-live="polite" aria-label="Active summary filters">
+            <div className="flex flex-wrap items-center gap-2 border-t border-[rgba(255,255,255,0.05)] pt-3" aria-live="polite" aria-label="Active summary filters">
               <span className="text-xs text-[#A1866B]">Active filters:</span>
               {activeFilters.map((filter) => (
                 <button

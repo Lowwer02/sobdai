@@ -140,7 +140,7 @@ function PublicationControl({
       onClick={() => onTogglePublish(row.id, row.isPublished)}
       disabled={isActing}
       aria-label={`${row.isPublished ? 'Unpublish' : 'Publish'} ${row.title}`}
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors disabled:opacity-50 ${
+      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors disabled:opacity-50 ${
         row.isPublished
           ? 'border-[#22C55E]/30 bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20'
           : 'border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] text-[#A1866B] hover:bg-[rgba(255,255,255,0.1)]'
@@ -160,19 +160,19 @@ function PublicationControl({
 
 function Classification({ row }: { readonly row: SummaryLibraryTableRow }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex max-w-[220px] flex-col gap-1">
       {isUnassignedSubject(row.subject) ? (
         <span className="text-xs italic text-[#A1866B]/60">
           {UNASSIGNED_SUBJECT.label}
         </span>
       ) : (
-        <span className="w-max whitespace-nowrap rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 px-2 py-1 text-xs text-[#F5E9D6]">
+        <span className="w-max max-w-full truncate whitespace-nowrap rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 px-2 py-1 text-xs text-[#F5E9D6]">
           {subjectLabel(row.subject)}
         </span>
       )}
       {row.document ? (
         <span
-          className="max-w-[180px] truncate text-[11px] text-[#A1866B]"
+          className="max-w-full truncate text-[11px] text-[#A1866B]"
           title={row.document}
         >
           {row.document}
@@ -367,11 +367,11 @@ export default function SummaryLibraryTable({
                 />
               </th>
               <th scope="col" className="w-12 p-4 text-center font-medium">Order</th>
-              <th scope="col" className="p-4 font-medium">Title &amp; Slug</th>
-              <th scope="col" className="p-4 font-medium">Package</th>
+              <th scope="col" className="w-[30%] p-4 font-medium">Title &amp; Slug</th>
+              <th scope="col" className="max-w-[200px] p-4 font-medium">Package</th>
               <th scope="col" className="p-4 font-medium">Subject / Document</th>
-              <th scope="col" className="p-4 font-medium">Status</th>
-              <th scope="col" className="p-4 text-right font-medium">Actions</th>
+              <th scope="col" className="w-28 p-4 font-medium">Status</th>
+              <th scope="col" className="sticky right-0 z-20 w-36 border-l border-[rgba(255,255,255,0.08)] bg-[#0F0B07] p-4 text-right font-medium shadow-[rgba(0,0,0,0.35)_-6px_0_12px_-6px]">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
@@ -389,7 +389,7 @@ export default function SummaryLibraryTable({
                 <tr
                   key={row.id}
                   aria-selected={isSelected}
-                  className={`transition-colors hover:bg-[#D4AF37]/[0.02] ${isSelected ? 'bg-[#D4AF37]/[0.04]' : ''}`}
+                  className={`group transition-colors hover:bg-[#D4AF37]/[0.02] ${isSelected ? 'bg-[#D4AF37]/[0.04]' : ''}`}
                 >
                   <td className="p-4 text-center">
                     <SelectionCheckbox
@@ -404,19 +404,23 @@ export default function SummaryLibraryTable({
                   <td className="p-4">
                     <Link
                       href={workspaceHref}
-                      className="text-sm font-medium text-[#F5E9D6] underline-offset-2 hover:text-[#D4AF37] hover:underline"
+                      className="block max-w-[360px] truncate text-sm font-medium text-[#F5E9D6] underline-offset-2 hover:text-[#D4AF37] hover:underline"
                       aria-label={`Open workspace for ${row.title}`}
+                      title={row.title}
                     >
                       {row.title}
                     </Link>
-                    <div className="mt-0.5 text-xs text-[#A1866B]">
+                    <div className="mt-1 max-w-[360px] truncate text-xs text-[#A1866B]">
                       {row.slug ? `/${row.slug}` : '—'}
                     </div>
                   </td>
                   <td className="p-4">
-                    <div className="max-w-[200px] truncate text-sm text-[#F5E9D6]">
-                      <span title={packageTitle(row)}>{packageLabel(row)}</span>
-                    </div>
+                    <span
+                      title={packageTitle(row)}
+                      className="block max-w-[200px] truncate rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0F0B07] px-2 py-1 text-xs text-[#A1866B]"
+                    >
+                      {packageLabel(row)}
+                    </span>
                   </td>
                   <td className="p-4"><Classification row={row} /></td>
                   <td className="p-4">
@@ -426,8 +430,8 @@ export default function SummaryLibraryTable({
                       onTogglePublish={onTogglePublish}
                     />
                   </td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="sticky right-0 z-10 border-l border-[rgba(255,255,255,0.08)] bg-[#1A140E] p-4 text-right shadow-[rgba(0,0,0,0.35)_-6px_0_12px_-6px] transition-colors group-hover:bg-[#1E170F]">
+                    <div className="flex items-center justify-end gap-1">
                       <Link
                         href={workspaceHref}
                         className="rounded-lg p-2 text-[#A1866B] transition-colors hover:bg-[#D4AF37]/10 hover:text-[#D4AF37]"
