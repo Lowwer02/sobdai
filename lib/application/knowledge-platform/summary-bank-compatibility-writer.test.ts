@@ -18,6 +18,7 @@ import {
   type SummaryBankCompatibilityPublishPersistenceCommand,
   type SummaryBankCompatibilityPersistence,
   type SummaryBankCompatibilityReplacePersistenceCommand,
+  type SummaryBankCompatibilitySummaryKind,
   type SummaryBankCompatibilityUnpublishPersistenceCommand,
 } from './summary-bank-compatibility-writer'
 
@@ -25,15 +26,20 @@ const ACTOR_ID = '00000000-0000-4000-8000-000000000001'
 const PACKAGE_ID = '00000000-0000-4000-8000-000000000002'
 const SUMMARY_ID = '00000000-0000-4000-8000-000000000003'
 const VERSION_ID = '00000000-0000-4000-8000-000000000004'
+const OTHER_PACKAGE_ID = '00000000-0000-4000-8000-000000000005'
+const THIRD_PACKAGE_ID = '00000000-0000-4000-8000-000000000006'
 
 class FakePersistence implements SummaryBankCompatibilityPersistence {
   public readonly namespace = new Set<string>()
   public readonly compatibilitySlugs = new Set<string>()
+  public replacementSummaryKind: SummaryBankCompatibilitySummaryKind = 'kp_native'
   public createCommand?: SummaryBankCompatibilityCreatePersistenceCommand
   public editCommand?: SummaryBankCompatibilityEditPersistenceCommand
   public replaceCommand?: SummaryBankCompatibilityReplacePersistenceCommand
   public publishCommand?: SummaryBankCompatibilityPublishPersistenceCommand
   public unpublishCommand?: SummaryBankCompatibilityUnpublishPersistenceCommand
+  public legacyPublishCommand?: SummaryBankCompatibilityPublishPersistenceCommand
+  public legacyUnpublishCommand?: SummaryBankCompatibilityUnpublishPersistenceCommand
   public deleteCommand?: SummaryBankCompatibilityDeletePersistenceCommand
 
   public async resolvePackage(input: SummaryBankCompatibilityPackageLookupInput) {
@@ -47,13 +53,17 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
 
   public async findCompatibilityByLegacySlug(input: SummaryBankCompatibilityImportSlugLookupInput) {
     return this.compatibilitySlugs.has(input.legacySlug)
-      ? { summaryId: SUMMARY_ID }
+      ? { summaryId: SUMMARY_ID, summaryKind: this.replacementSummaryKind }
       : null
   }
 
   public async resolveImportReplacementTarget(input: SummaryBankCompatibilityImportSlugLookupInput) {
     if (!this.compatibilitySlugs.has(input.legacySlug)) return null
-    return { summaryId: SUMMARY_ID, replacementVersionId: VERSION_ID }
+    return {
+      summaryId: SUMMARY_ID,
+      summaryKind: this.replacementSummaryKind,
+      replacementVersionId: this.replacementSummaryKind === 'legacy' ? null : VERSION_ID,
+    }
   }
 
   public async allocateSummaryCode(): Promise<string> {
@@ -84,10 +94,10 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
     this.editCommand = command
     return {
       summaryId: command.summaryId,
-      summaryVersionId: VERSION_ID,
+      summaryVersionId: command.packageIds === null ? null : VERSION_ID,
       packageId: command.packageId,
       legacySlug: command.legacySlug,
-      revisionCreated: true,
+      revisionCreated: command.packageIds !== null,
       packageReassigned: false,
     }
   }
@@ -100,7 +110,7 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
       packageId: command.packageId,
       legacySlug: command.legacySlug,
       isPublished: command.isPublished,
-      revisionCreated: false,
+      revisionCreated: command.replacementVersionId !== null,
       idempotentRetry: false,
     }
   }
@@ -122,6 +132,28 @@ class FakePersistence implements SummaryBankCompatibilityPersistence {
       summaryId: command.summaryId,
       summaryVersionId: VERSION_ID,
       packageId: PACKAGE_ID,
+      idempotentRetry: false,
+    }
+  }
+
+  public async publishLegacy(command: SummaryBankCompatibilityPublishPersistenceCommand) {
+    this.legacyPublishCommand = command
+    return {
+      summaryId: command.summaryId,
+      summaryVersionId: null,
+      packageId: PACKAGE_ID,
+      isPublished: true as const,
+      idempotentRetry: false,
+    }
+  }
+
+  public async unpublishLegacy(command: SummaryBankCompatibilityUnpublishPersistenceCommand) {
+    this.legacyUnpublishCommand = command
+    return {
+      summaryId: command.summaryId,
+      summaryVersionId: null,
+      packageId: PACKAGE_ID,
+      isPublished: false as const,
       idempotentRetry: false,
     }
   }
@@ -168,6 +200,7 @@ test('uses identity-normalized SHA-256 metadata and preserves exact Markdown byt
   assert.equal(command.readTimePolicyVersion, SUMMARY_BANK_COMPATIBILITY_READ_TIME_POLICY_VERSION)
   assert.equal(command.contentSchemaVersion, SUMMARY_BANK_COMPATIBILITY_CONTENT_SCHEMA_VERSION)
   assert.equal(command.changeNote, SUMMARY_BANK_COMPATIBILITY_CREATE_CHANGE_NOTE)
+  assert.deepEqual(command.packageIds, [PACKAGE_ID])
   assert.match(command.contentChecksum, /^[0-9a-f]{64}$/)
   assert.equal(command.canonicalSlug, 'a-summary-sum-000123')
   assert.equal(result.summaryId, SUMMARY_ID)
@@ -177,6 +210,49 @@ test('uses identity-normalized SHA-256 metadata and preserves exact Markdown byt
   const whitespaceChecksum = await computeSummaryCompatibilityChecksum(' first second ')
   assert.notEqual(command.contentChecksum, lfChecksum)
   assert.notEqual(command.contentChecksum, whitespaceChecksum)
+})
+
+test('KP-native create forwards the complete three-Package set', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence, ids())
+
+  await writer.create({
+    actorId: ACTOR_ID,
+    packageId: PACKAGE_ID,
+    packageIds: [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+    title: 'A Summary',
+    slug: 'a-summary',
+    contentMd: 'content',
+    isPublished: false,
+  })
+
+  assert.deepEqual(
+    persistence.createCommand?.packageIds,
+    [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  )
+})
+
+test('KP-native create rejects an empty Package set before persistence', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  await assert.rejects(
+    () => writer.create({
+      actorId: ACTOR_ID,
+      packageId: PACKAGE_ID,
+      packageIds: [],
+      title: 'A Summary',
+      slug: 'a-summary',
+      contentMd: 'content',
+      isPublished: false,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof SummaryBankCompatibilityWriterError)
+      assert.equal(error.code, 'invalid_input')
+      return true
+    },
+  )
+  assert.equal(persistence.createCommand, undefined)
 })
 
 test('uses the bounded Summary-ID fallback for a historical canonical or alias collision', async () => {
@@ -207,6 +283,7 @@ test('centralizes the edit metadata and sends no revision or canonical slug from
     actorId: ACTOR_ID,
     summaryId: SUMMARY_ID,
     packageId: PACKAGE_ID,
+    summaryKind: 'legacy',
     title: 'Edited Summary',
     slug: 'edited-summary',
     document: '',
@@ -227,6 +304,97 @@ test('centralizes the edit metadata and sends no revision or canonical slug from
   )
   assert.equal(persistence.editCommand?.document, '')
   assert.equal('canonicalSlug' in (persistence.editCommand ?? {}), false)
+  assert.equal(persistence.editCommand?.packageIds, null)
+  assert.equal(result.summaryVersionId, null)
+})
+
+test('KP edit carries the complete one-Package set', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  await writer.update({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+    packageId: PACKAGE_ID,
+    summaryKind: 'kp_native',
+    packageIds: [PACKAGE_ID],
+    title: 'Edited Summary',
+    slug: 'edited-summary',
+    contentMd: 'edited content',
+  })
+
+  assert.deepEqual(persistence.editCommand?.packageIds, [PACKAGE_ID])
+  assert.equal(persistence.editCommand?.packageId, PACKAGE_ID)
+})
+
+test('KP edit carries the complete three-Package set without marker inference', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  await writer.update({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+    packageId: OTHER_PACKAGE_ID,
+    summaryKind: 'kp_native',
+    packageIds: [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+    title: 'Edited Summary',
+    slug: 'edited-summary',
+    contentMd: 'edited content',
+  })
+
+  assert.deepEqual(
+    persistence.editCommand?.packageIds,
+    [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  )
+  assert.equal(persistence.editCommand?.packageId, OTHER_PACKAGE_ID)
+})
+
+test('KP edit rejects an empty complete Package set before persistence', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+
+  await assert.rejects(
+    () => writer.update({
+      actorId: ACTOR_ID,
+      summaryId: SUMMARY_ID,
+      packageId: PACKAGE_ID,
+      summaryKind: 'kp_native',
+      packageIds: [],
+      title: 'Edited Summary',
+      slug: 'edited-summary',
+      contentMd: 'edited content',
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof SummaryBankCompatibilityWriterError)
+      assert.equal(error.code, 'invalid_input')
+      return true
+    },
+  )
+  assert.equal(persistence.editCommand, undefined)
+})
+
+test('KP edit rejects missing packageIds before persistence', async () => {
+  const persistence = new FakePersistence()
+  const writer = new SummaryBankCompatibilityWriterService(persistence)
+  const input = {
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+    packageId: PACKAGE_ID,
+    summaryKind: 'kp_native' as const,
+    title: 'Edited Summary',
+    slug: 'edited-summary',
+    contentMd: 'edited content',
+  } as any
+
+  await assert.rejects(
+    () => writer.update(input),
+    (error: unknown) => {
+      assert.ok(error instanceof SummaryBankCompatibilityWriterError)
+      assert.equal(error.code, 'invalid_input')
+      return true
+    },
+  )
+  assert.equal(persistence.editCommand, undefined)
 })
 
 test('delegates publish, unpublish, and delete through the Supabase-free writer contract', async () => {
@@ -241,6 +409,14 @@ test('delegates publish, unpublish, and delete through the Supabase-free writer 
     actorId: ACTOR_ID,
     summaryId: SUMMARY_ID,
   })
+  const legacyPublishResult = await writer.publishLegacy({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+  })
+  const legacyUnpublishResult = await writer.unpublishLegacy({
+    actorId: ACTOR_ID,
+    summaryId: SUMMARY_ID,
+  })
   const deleteResult = await writer.delete({
     actorId: ACTOR_ID,
     summaryId: SUMMARY_ID,
@@ -250,10 +426,16 @@ test('delegates publish, unpublish, and delete through the Supabase-free writer 
   assert.equal(persistence.publishCommand?.summaryId, SUMMARY_ID)
   assert.equal(publishResult.summaryId, SUMMARY_ID)
   assert.equal(unpublishResult.summaryVersionId, VERSION_ID)
+  assert.equal(persistence.legacyPublishCommand?.summaryId, SUMMARY_ID)
+  assert.equal(persistence.legacyUnpublishCommand?.summaryId, SUMMARY_ID)
+  assert.equal(legacyPublishResult.summaryVersionId, null)
+  assert.equal(legacyPublishResult.isPublished, true)
+  assert.equal(legacyUnpublishResult.summaryVersionId, null)
+  assert.equal(legacyUnpublishResult.isPublished, false)
   assert.equal(deleteResult.outcome, 'archived')
 })
 
-test('allocates Import NEW slugs from the marker namespace with the legacy suffix sequence', async () => {
+test('allocates Import NEW slugs from the package-local namespace with the legacy suffix sequence', async () => {
   const persistence = new FakePersistence()
   persistence.compatibilitySlugs.add('a-summary')
   persistence.compatibilitySlugs.add('a-summary-2')
@@ -269,9 +451,12 @@ test('allocates Import NEW slugs from the marker namespace with the legacy suffi
   )
 })
 
-test('fails Import NEW slug allocation after the bounded marker namespace search', async () => {
+test('fails Import NEW slug allocation after the bounded package-local namespace search', async () => {
   const persistence = new FakePersistence()
-  persistence.findCompatibilityByLegacySlug = async () => ({ summaryId: SUMMARY_ID })
+  persistence.findCompatibilityByLegacySlug = async () => ({
+    summaryId: SUMMARY_ID,
+    summaryKind: 'kp_native',
+  })
   const writer = new SummaryBankCompatibilityWriterService(persistence)
 
   await assert.rejects(
@@ -310,7 +495,29 @@ test('delegates Import REPLACE through the migration-071 persistence boundary', 
   assert.equal(persistence.replaceCommand?.contentMd, 'replacement content')
 })
 
-test('fails Import REPLACE closed when the marker-backed target is absent', async () => {
+test('Legacy Import REPLACE keeps the nullable revision contract and allocates no fake UUID', async () => {
+  const persistence = new FakePersistence()
+  persistence.compatibilitySlugs.add('a-summary')
+  persistence.replacementSummaryKind = 'legacy'
+  const writer = new SummaryBankCompatibilityWriterService(
+    persistence,
+    () => { throw new Error('Legacy replacement must not allocate a revision UUID') },
+  )
+
+  const result = await writer.replace({
+    actorId: ACTOR_ID,
+    packageId: PACKAGE_ID,
+    title: 'Imported replacement',
+    slug: 'a-summary',
+    contentMd: 'replacement content',
+    isPublished: false,
+  })
+
+  assert.equal(result.summaryVersionId, null)
+  assert.equal(persistence.replaceCommand?.replacementVersionId, null)
+})
+
+test('fails Import REPLACE closed when the package-local target is absent', async () => {
   const persistence = new FakePersistence()
   const writer = new SummaryBankCompatibilityWriterService(persistence)
 

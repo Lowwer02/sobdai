@@ -50,6 +50,12 @@ export interface SummaryLibraryCompatibilityPlacement {
   readonly updatedAt: string
 }
 
+export interface SummaryLibraryCompatibilityPackage {
+  readonly id: UUID
+  readonly name: string
+  readonly slug: string | null
+}
+
 export type ReferenceDocumentLifecycleStatus =
   | 'active'
   | 'superseded'
@@ -91,6 +97,10 @@ export interface SummaryLibraryCompatibilityItem extends SummaryLibraryItem {
   readonly packageId: UUID | null
   readonly packageName: string | null
   readonly packageSlug: string | null
+  /** Product-facing Package membership. This is never derived from the marker. */
+  readonly packageIds: readonly UUID[]
+  readonly packages: readonly SummaryLibraryCompatibilityPackage[]
+  readonly summaryKind: 'legacy' | 'kp_native'
   readonly subject: string | null
   readonly document: string | null
   readonly topic: string | null
@@ -164,6 +174,29 @@ export interface SummaryLibraryProjectionRow {
   readonly source_document_count: unknown
 }
 
+/**
+ * The grandfathered Summary Bank rows predate the KP root projection. They
+ * remain readable through their legacy root columns and intentionally have no
+ * PackageSummary placement.
+ */
+export interface SummaryLibraryLegacyProjectionRow {
+  readonly id: unknown
+  readonly summary_code: unknown
+  readonly package_id: unknown
+  readonly title: unknown
+  readonly slug: unknown
+  readonly subject: unknown
+  readonly topic: unknown
+  readonly law: unknown
+  readonly document: unknown
+  readonly sort_order: unknown
+  readonly display_order: unknown
+  readonly released_at: unknown
+  readonly is_published: unknown
+  readonly created_at: unknown
+  readonly updated_at: unknown
+}
+
 export interface SummaryLibraryPlacementRecord {
   readonly packageId: unknown
   readonly summaryId: unknown
@@ -179,6 +212,16 @@ export interface SummaryLibraryPlacementRecord {
   readonly legacySlug: unknown
   readonly createdAt: unknown
   readonly updatedAt: unknown
+}
+
+export interface SummaryLibraryLegacyOwnershipRecord {
+  readonly packageId: unknown
+  readonly packageName: unknown
+  readonly packageSlug: unknown
+  readonly legacySlug: unknown
+  readonly sortOrder: unknown
+  readonly displayOrder: unknown
+  readonly releasedAt: unknown
 }
 
 export interface SummaryLibrarySourceRecord {
@@ -353,6 +396,37 @@ export function mapSummaryLibraryProjectionRow(
   }
 }
 
+export function mapSummaryLibraryLegacyProjectionRow(
+  row: SummaryLibraryLegacyProjectionRow
+): SummaryLibraryItem {
+  const summaryId = requiredString(row.id, 'id', 'invalid_root_projection')
+  return {
+    summaryId,
+    summaryCode: null,
+    canonicalSlug: nullableString(row.slug, 'slug', 'invalid_root_projection', summaryId),
+    canonicalTitle: requiredString(row.title, 'title', 'invalid_root_projection', summaryId),
+    subject: nullableString(row.subject, 'subject', 'invalid_root_projection', summaryId),
+    topic: nullableString(row.topic, 'topic', 'invalid_root_projection', summaryId),
+    law: nullableString(row.law, 'law', 'invalid_root_projection', summaryId),
+    visibility: null,
+    lifecycleStatus: null,
+    currentPublishedVersionId: null,
+    createdAt: requiredString(row.created_at, 'created_at', 'invalid_root_projection', summaryId),
+    updatedAt: requiredString(row.updated_at, 'updated_at', 'invalid_root_projection', summaryId),
+    currentRevisionNumber: null,
+    currentRevisionStatus: null,
+    currentRevisionTitle: null,
+    currentRevisionSubject: null,
+    currentRevisionTopic: null,
+    currentRevisionLaw: null,
+    currentRevisionReadTimeMinutes: null,
+    currentRevisionPublishedAt: null,
+    currentRevisionContentChecksum: null,
+    packagePlacementCount: 0,
+    sourceDocumentCount: 0,
+  }
+}
+
 export function mapSummaryLibraryPlacementRecord(
   record: SummaryLibraryPlacementRecord,
   summaryId: string | null = null
@@ -441,28 +515,51 @@ export function mapSummaryLibraryCompatibilityItem(
   placementRecords: readonly SummaryLibraryPlacementRecord[] = [],
   sourceRecords: readonly SummaryLibrarySourceRecord[] = [],
   projectedPublicationState: boolean,
-  legacyDocument: string | null = null
+  legacyDocument: string | null = null,
+  legacyOwnership: SummaryLibraryLegacyOwnershipRecord | null = null
 ): SummaryLibraryCompatibilityItem {
   const placements = placementRecords
     .map((record) => mapSummaryLibraryPlacementRecord(record, root.summaryId))
     .sort(comparePlacements)
-
-  if (placements.length > 1) {
-    throw new SummaryLibraryCompatibilityMappingError(
-      'ambiguous_placement',
-      `Summary ${root.summaryId} has multiple Package placements and cannot be represented as one legacy Summary Bank row.`,
-      { summaryId: root.summaryId }
-    )
-  }
 
   const sources = sourceRecords
     .map((record) => mapSummaryLibrarySourceRecord(record, root.summaryId))
     .sort(compareSources)
   const primarySource = sources.find((source) => source.role === 'primary') ?? null
   const placement = placements[0] ?? null
+  const summaryKind = root.summaryCode === null ? 'legacy' : 'kp_native'
+  const legacyPackageId = legacyOwnership
+    ? requiredString(legacyOwnership.packageId, 'package_id', 'invalid_placement', root.summaryId)
+    : null
+  const legacyPackageName = legacyOwnership
+    ? nullableString(legacyOwnership.packageName, 'package_name', 'invalid_placement', root.summaryId)
+    : null
+  const legacyPackageSlug = legacyOwnership
+    ? nullableString(legacyOwnership.packageSlug, 'package_slug', 'invalid_placement', root.summaryId)
+    : null
+  const packages = new Map<string, SummaryLibraryCompatibilityPackage>()
+  for (const currentPlacement of placements) {
+    packages.set(currentPlacement.packageId, {
+      id: currentPlacement.packageId,
+      name: currentPlacement.packageName,
+      slug: currentPlacement.packageSlug,
+    })
+  }
+  if (legacyPackageId) {
+    packages.set(legacyPackageId, {
+      id: legacyPackageId,
+      name: legacyPackageName ?? legacyPackageId,
+      slug: legacyPackageSlug,
+    })
+  }
+  const packageList = [...packages.values()].sort((left, right) => {
+    const byName = left.name.localeCompare(right.name)
+    return byName !== 0 ? byName : left.id.localeCompare(right.id)
+  })
+  const packageIds = packageList.map((currentPackage) => currentPackage.id)
   const warnings: SummaryLibraryCompatibilityWarning[] = []
 
-  if (!placement) warnings.push('no_package_placement')
+  if (!placement && !legacyPackageId) warnings.push('no_package_placement')
   if (!primarySource) warnings.push('no_primary_reference_document')
 
   const document = legacyDocument
@@ -472,14 +569,25 @@ export function mapSummaryLibraryCompatibilityItem(
     ...root,
     id: root.summaryId,
     title,
-    slug: placement?.legacySlug ?? null,
-    packageId: placement?.packageId ?? null,
-    packageName: placement?.packageName ?? null,
-    packageSlug: placement?.packageSlug ?? null,
+    slug: summaryKind === 'legacy'
+      ? nullableString(legacyOwnership?.legacySlug, 'slug', 'invalid_placement', root.summaryId)
+      : root.canonicalSlug ?? placement?.legacySlug ?? null,
+    packageId: legacyPackageId ?? placement?.packageId ?? null,
+    packageName: legacyPackageName ?? placement?.packageName ?? null,
+    packageSlug: legacyPackageSlug ?? placement?.packageSlug ?? null,
+    packageIds,
+    packages: packageList,
+    summaryKind,
     document,
-    sortOrder: placement?.sortOrder ?? null,
-    displayOrder: placement?.displayOrder ?? null,
-    releasedAt: placement?.releasedAt ?? null,
+    sortOrder: legacyOwnership
+      ? nullableNumber(legacyOwnership.sortOrder, 'sort_order', root.summaryId)
+      : placement?.sortOrder ?? null,
+    displayOrder: legacyOwnership
+      ? nullableNumber(legacyOwnership.displayOrder, 'display_order', root.summaryId)
+      : placement?.displayOrder ?? null,
+    releasedAt: legacyOwnership
+      ? nullableDate(legacyOwnership.releasedAt, 'released_at', 'invalid_placement', root.summaryId)
+      : placement?.releasedAt ?? null,
     isPublished: projectedPublicationState,
     placements,
     sources,
@@ -569,10 +677,10 @@ export function compareSummaryLibraryCompatibilityItems(
       result = left.canonicalTitle.localeCompare(right.canonicalTitle)
       break
     case 'summaryCode':
-      result = left.summaryCode.localeCompare(right.summaryCode)
+      result = compareNullableText(left.summaryCode, right.summaryCode)
       break
     case 'lifecycleStatus':
-      result = left.lifecycleStatus.localeCompare(right.lifecycleStatus)
+      result = compareNullableText(left.lifecycleStatus, right.lifecycleStatus)
       break
     case 'currentRevisionNumber':
       result = compareNullableNumber(left.currentRevisionNumber, right.currentRevisionNumber)

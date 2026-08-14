@@ -1428,7 +1428,7 @@ begin
             from pg_catalog.pg_proc p
             where pg_catalog.regexp_replace(
                       pg_catalog.regexp_replace(
-                          lower(p.proname || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')'),
+                          lower(p.proname || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')'),
                           '[[:space:]]+', '', 'g'
                       ),
                       '"', '', 'g'
@@ -1699,7 +1699,12 @@ begin
     select pg_catalog.pg_get_functiondef(to_regprocedure('public.kp_summary_writer_caller_is_approved()'))
     into v_caller_definition;
     if v_boundary_definition is null
-       or position('security invoker' in lower(v_boundary_definition)) = 0
+       or not exists (
+            select 1
+            from pg_catalog.pg_proc p
+            where p.oid = to_regprocedure('public.kp_enforce_summary_writer_boundary()')
+              and p.prosecdef = false
+       )
        or position('current_user in (''public'', ''anon'', ''authenticated'', ''service_role'')' in lower(v_boundary_definition)) = 0
        or position('kp_summary_writer_caller_is_approved()' in lower(v_boundary_definition)) = 0
        or v_caller_definition is null

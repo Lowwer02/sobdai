@@ -21,6 +21,10 @@ const sql = readFileSync(
   join(migrationDir, '072_kp_summary_bank_compatibility_edit.sql'),
   'utf8',
 );
+const writerCoreSql = readFileSync(
+  join(migrationDir, '068_kp_summary_bank_compatibility_writer_core.sql'),
+  'utf8',
+);
 const executable = sql
   .split('\n')
   .filter((line) => !line.trimStart().startsWith('--'))
@@ -127,6 +131,8 @@ function verifiesStaticHybridEditContract(): void {
   assert.match(helper, /pg_context/i);
   assert.match(helper, /v_active_oid/i);
   assert.match(helper, /p\.oid\s*=\s*v_active_oid/i);
+  assert.match(helper, /pg_catalog\.oidvectortypes\(p\.proargtypes\)/i);
+  assert.doesNotMatch(helper, /pg_get_function_identity_arguments/i);
   assert.doesNotMatch(helper, /session_user/i);
   assert.match(helper, exactCatalogCall(EDIT_SIGNATURE));
   for (const signature of EXISTING_APPROVED_SIGNATURES) {
@@ -514,6 +520,53 @@ function register(model: HybridEditModel, packageIds: string[]): void {
   for (const packageId of packageIds) model.registerPackage(packageId);
 }
 
+function verifiesSelectedPackageMembershipPredicate(): void {
+  const edit = extractFunction(/create\s+function\s+public\.kp_persist_update_compatibility_summary\s*\(/i);
+  assert.match(
+    edit,
+    /if\s+not\s*\(\s*p_package_id\s*=\s*any\s*\(\s*p_package_ids\s*\)\s*\)\s*then/i,
+    '072 must reject only when the selected Package is absent from the complete set',
+  );
+  assert.doesNotMatch(edit, /p_package_id\s*<>\s*any\s*\(\s*p_package_ids\s*\)/i);
+  assert.match(edit, /p_package_ids\s+is\s+null\s+or\s+cardinality\(p_package_ids\)\s+is\s+null/i);
+  assert.match(edit, /requested\.package_id\s+is\s+null/i);
+
+  const accepted = new HybridEditModel();
+  register(accepted, ['package-b', 'package-c', 'package-d']);
+  accepted.seed(makeKp('kp-membership-accepted', ['package-b'], 'membership-accepted'));
+  const edited = accepted.edit(
+    baseEdit('kp-membership-accepted', 'package-b', ['package-b', 'package-c', 'package-d'], 'membership-accepted'),
+  );
+  assert.equal(edited.memberships.length, 3, 'selected B must be accepted in [B,C,D]');
+  assert.ok(edited.memberships.some((membership) => membership.packageId === 'package-b'));
+
+  const missing = new HybridEditModel();
+  register(missing, ['package-b', 'package-c', 'package-d', 'package-x']);
+  missing.seed(makeKp('kp-membership-missing', ['package-b'], 'membership-missing'));
+  const beforeMissing = fingerprint(missing.state);
+  assert.throws(
+    () => missing.edit(
+      baseEdit('kp-membership-missing', 'package-x', ['package-b', 'package-c', 'package-d'], 'membership-missing'),
+    ),
+    /edit Package is not selected/i,
+  );
+  assert.equal(fingerprint(missing.state), beforeMissing, 'missing selected Package must fail atomically');
+
+  const single = new HybridEditModel();
+  register(single, ['package-b']);
+  single.seed(makeKp('kp-membership-single', ['package-b'], 'membership-single'));
+  const singleEdited = single.edit(
+    baseEdit('kp-membership-single', 'package-b', ['package-b'], 'membership-single'),
+  );
+  assert.equal(singleEdited.memberships.length, 1, 'single Package [B] must remain valid');
+
+  assert.match(
+    writerCoreSql,
+    /if\s+v_membership_count\s+<=\s+1\s+then\s+raise\s+exception\s+using\s+errcode\s*=\s*'cardinality_violation',\s+message\s*=\s*'A KP-native Summary must retain at least one Package membership\.'/i,
+    '068 final-membership protection must remain unchanged',
+  );
+}
+
 function verifiesLegacyEditIsolation(): void {
   const model = new HybridEditModel();
   register(model, ['legacy-package']);
@@ -718,6 +771,7 @@ function verifiesAtomicRollbackForBothMutationDirections(): void {
 
 const tests = [
   ['static Hybrid edit, discriminator, and security contract', verifiesStaticHybridEditContract],
+  ['selected Package membership predicate and final-membership protection', verifiesSelectedPackageMembershipPredicate],
   ['Legacy edit remains single-Package with zero KP state', verifiesLegacyEditIsolation],
   ['KP one-Package edit updates one shared aggregate', verifiesKpOnePackageEdit],
   ['KP three-Package edit adds memberships and preserves canonical', verifiesKpThreePackageAddAndPreserveCanonical],

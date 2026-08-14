@@ -35,6 +35,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { AssessmentOutcome, AttemptHistoryItem } from '@/lib/assessment/types'
+import {
+  findPublicSummaryTargets,
+  matchPublicSummaryTarget,
+} from '@/lib/summary-target'
 
 // ─── Public return shape ────────────────────────────────────────────────────
 
@@ -269,13 +273,13 @@ export async function fetchMyRecommendations(): Promise<FetchMyRecommendationsRe
 
 /**
  * Attach actionable targets to recommendations by reading (never writing) the
- * Summaries and ExamSets tables. For a weak subject/topic, find a matching
- * Summary the learner can read; for retry-simulation, find a Simulation ExamSet
- * in a package the learner owns.
+ * Summary target boundary and ExamSets tables. For a weak subject/topic, find
+ * a matching verified Summary the learner can read; for retry-simulation, find
+ * a Simulation ExamSet in a package the learner owns.
  *
  * Matching is intentionally simple and deterministic (Phase 1):
- *   - subject/topic recommendation → first published Summary whose subject or
- *     topic matches (preferring topic match).
+ *   - subject/topic recommendation → first verified Summary target whose
+ *     current authoritative subject or topic matches (preferring topic match).
  *   - retry_simulation → the learner's most recent Simulation ExamSet.
  * If no target is found, `target` stays null and the UI shows the rec without a
  * link (still useful as guidance).
@@ -290,7 +294,7 @@ async function enrichWithTargets(
   // If somehow unauthenticated here, return recs unenriched (safe degradation).
   if (!user) return recs
 
-  // ── Collect distinct subject/topic labels to look up in one Summary query ──
+  // ── Collect distinct subject/topic labels for one batched target lookup ──
   const wantedSubjects = new Set<string>()
   const wantedTopics = new Set<string>()
   for (const r of recs) {
@@ -298,59 +302,28 @@ async function enrichWithTargets(
     if (r.topic) wantedTopics.add(r.topic)
   }
 
-  // Published summaries matching any wanted subject or topic. We fetch once and
-  // match client-side to keep this a bounded, simple read.
-  let summaryRows: Array<{
-    id: string
-    slug: string
-    title: string
-    subject: string | null
-    topic: string | null
-    package_id: string
-  }> = []
-  if (wantedSubjects.size > 0 || wantedTopics.size > 0) {
-    // Supabase `.or()` with many values can get long; cap defensively.
-    const orClauses: string[] = []
-    for (const s of wantedSubjects) orClauses.push(`subject.eq.${s}`)
-    for (const t of wantedTopics) orClauses.push(`topic.eq.${t}`)
-    const { data, error: sErr } = await supabase
-      .from('summaries')
-      .select('id, slug, title, subject, topic, package_id')
-      .eq('is_published', true)
-      .or(orClauses.slice(0, 20).join(','))
-      .limit(50)
-    if (sErr) console.error('recommendation summary lookup failed:', sErr.message)
-    if (data) summaryRows = data as typeof summaryRows
-  }
-
-  // We need package slugs to build URLs; fetch once for the packages involved.
-  const packageIds = new Set<string>()
-  for (const s of summaryRows) packageIds.add(s.package_id)
-  const packageSlugMap = new Map<string, string>()
-  if (packageIds.size > 0) {
-    const { data: pkgs } = await supabase
-      .from('packages')
-      .select('id, slug')
-      .in('id', Array.from(packageIds))
-    if (pkgs) for (const p of pkgs) packageSlugMap.set(p.id, p.slug)
-  }
+  const summaryTargets = wantedSubjects.size > 0 || wantedTopics.size > 0
+    ? await findPublicSummaryTargets(supabase, {
+      subjects: [...wantedSubjects],
+      topics: [...wantedTopics],
+      limit: 50,
+    })
+    : new Map()
+  const targetRows = [...summaryTargets.values()]
 
   // ── Enrich each recommendation deterministically ─────────────────────────
   return recs.map((r) => {
     if (r.category === 'study_weak_subject' || r.category === 'review_weak_topic') {
       // Prefer a topic match, then a subject match.
-      const match =
-        (r.topic && summaryRows.find((s) => s.topic === r.topic)) ||
-        (r.subject && summaryRows.find((s) => s.subject === r.subject)) ||
-        null
+      const match = matchPublicSummaryTarget(targetRows, r)
       if (match) {
         return {
           ...r,
           target: {
             kind: 'summary' as const,
-            id: match.id,
-            slug: match.slug,
-            packageSlug: packageSlugMap.get(match.package_id),
+            id: match.summaryId,
+            slug: match.summarySlug,
+            packageSlug: match.packageSlug,
             label: match.title,
           },
         }
@@ -364,5 +337,3 @@ async function enrichWithTargets(
     return r
   })
 }
-
-

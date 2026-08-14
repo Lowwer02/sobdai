@@ -1,13 +1,19 @@
-import { requirePermission, getAdminSession } from '@/lib/auth/server-protect'
+import { requirePermission } from '@/lib/auth/server-protect'
 import SummaryEditor from '@/components/admin/SummaryEditor'
 import { createSummary } from '../actions'
 import { redirect } from 'next/navigation'
 
 export default async function CreateSummaryPage() {
-  const { supabase, profile } = await requirePermission('content.read')
+  const { supabase } = await requirePermission('content.read')
 
-  
-  const { data: packages } = await supabase.from('packages').select('id, name').order('name')
+  const { data: packages, error } = await supabase
+    .from('packages')
+    .select('id, name')
+    .order('name')
+
+  if (error) {
+    throw new Error('Available Packages could not be loaded safely.')
+  }
 
   const handleCreate = async (data: any) => {
     'use server'
@@ -22,6 +28,7 @@ export default async function CreateSummaryPage() {
     <SummaryEditor 
       packages={packages || []}
       onSubmit={handleCreate}
+      summaryKind="kp_native"
     />
   )
 }

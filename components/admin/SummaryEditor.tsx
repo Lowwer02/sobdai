@@ -8,10 +8,34 @@ import rehypeRaw from 'rehype-raw'
 import Link from 'next/link'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { SUBJECTS, UNASSIGNED_SUBJECT, getSubjectDropdownOptions } from '@/lib/subjects'
+import {
+  stripEditPublicationState,
+  type AdminSummaryKind,
+} from '@/app/admin/summaries/summary-action-logic'
 
 interface SummaryData {
   id?: string
+  package_id?: string | null
+  title: string
+  slug: string
+  subject?: string | null
+  document?: string | null
+  law?: string | null
+  topic?: string | null
+  content_md?: string | null
+  sort_order?: number | null
+  display_order?: number | null
+  is_published?: boolean | null
+}
+
+interface PackageOption {
+  id: string
+  name: string
+}
+
+interface SummaryFormData {
   package_id: string
+  package_ids: string[]
   title: string
   slug: string
   subject: string
@@ -19,21 +43,37 @@ interface SummaryData {
   law: string
   topic: string
   content_md: string
-  sort_order: number
-  display_order: number
+  sort_order: number | string
+  display_order: number | string
   is_published: boolean
 }
 
 interface SummaryEditorProps {
   initialData?: SummaryData
-  packages: any[]
+  packages: PackageOption[]
   onSubmit: (data: any) => Promise<{ success: boolean; error?: string; id?: string }>
   isEditing?: boolean
+  summaryKind: AdminSummaryKind
+  selectedPackageIds?: readonly string[]
 }
 
-export default function SummaryEditor({ initialData, packages, onSubmit, isEditing }: SummaryEditorProps) {
-  const [formData, setFormData] = useState<SummaryData>({
-    package_id: initialData?.package_id || '',
+export default function SummaryEditor({
+  initialData,
+  packages,
+  onSubmit,
+  isEditing,
+  summaryKind,
+  selectedPackageIds,
+}: SummaryEditorProps) {
+  const initialPackages = selectedPackageIds
+    ? [...selectedPackageIds]
+    : initialData?.package_id
+      ? [initialData.package_id]
+      : []
+
+  const [formData, setFormData] = useState<SummaryFormData>({
+    package_id: initialPackages[0] || '',
+    package_ids: initialPackages,
     title: initialData?.title || '',
     slug: initialData?.slug || '',
     subject: initialData?.subject || '',
@@ -41,14 +81,15 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
     law: initialData?.law || '',
     topic: initialData?.topic || '',
     content_md: initialData?.content_md || '',
-    sort_order: initialData?.sort_order || 0,
-    display_order: initialData?.display_order || 0,
-    is_published: initialData?.is_published || false,
+    sort_order: initialData?.sort_order ?? 0,
+    display_order: initialData?.display_order ?? 0,
+    is_published: initialData?.is_published ?? false,
   })
 
   const [isPreview, setIsPreview] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [packageError, setPackageError] = useState('')
   const [isDirty, setIsDirty] = useState(false)
 
   useUnsavedChanges(isDirty)
@@ -70,49 +111,109 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    setFormData(prev => ({ ...prev, [name]: val }))
+    setFormData(prev => name === 'package_id'
+      ? { ...prev, package_id: String(val), package_ids: val ? [String(val)] : [] }
+      : { ...prev, [name]: val })
+    if (name === 'package_id') setPackageError('')
+    setIsDirty(true)
+  }
+
+  const handlePackageToggle = (packageId: string) => {
+    setFormData((prev) => {
+      const packageIds = prev.package_ids.includes(packageId)
+        ? prev.package_ids.filter((id) => id !== packageId)
+        : [...prev.package_ids, packageId]
+      return {
+        ...prev,
+        package_id: packageIds[0] || '',
+        package_ids: packageIds,
+      }
+    })
+    setPackageError('')
     setIsDirty(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (formData.package_ids.length === 0) {
+      setPackageError('Choose at least one Package.')
+      return
+    }
+
+    setPackageError('')
     setIsSaving(true)
     
     // Auto calculate read time (approx 200 words per minute for english, maybe slightly different for Thai, but good enough)
     const wordCount = formData.content_md.trim().split(/\s+/).length
     const readTime = Math.max(1, Math.ceil(wordCount / 200))
     
-    const dataToSave = { ...formData, read_time_minutes: readTime }
-    
-    const res = await onSubmit(dataToSave)
-    setIsSaving(false)
-    if (!res.success) {
-      setError(res.error || 'Failed to save summary')
-    } else {
-      setIsDirty(false)
+    const { package_ids: _packageIds, ...formDataWithoutPackageIds } = formData
+    const commonData = isEditing
+      ? stripEditPublicationState(formDataWithoutPackageIds)
+      : formDataWithoutPackageIds
+    const dataToSave = summaryKind === 'kp_native'
+      ? {
+          ...commonData,
+          package_id: formData.package_ids[0],
+          packageIds: formData.package_ids,
+          read_time_minutes: readTime,
+        }
+      : {
+          ...commonData,
+          package_id: formData.package_ids[0],
+          read_time_minutes: readTime,
+        }
+
+    try {
+      const res = await onSubmit(dataToSave)
+      if (!res.success) {
+        setError(res.error || 'Failed to save summary')
+      } else {
+        setIsDirty(false)
+      }
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Failed to save summary')
+    } finally {
+      setIsSaving(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="h-[calc(100vh-120px)] flex flex-col gap-6">
+    <form onSubmit={handleSubmit} className="min-h-[calc(100vh-120px)] flex flex-col gap-6">
       
       {/* Top Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold font-display text-[#F5E9D6] tracking-tight">
           {isEditing ? 'Edit Summary' : 'Create Summary'}
         </h1>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 cursor-pointer mr-4">
-            <input 
-              type="checkbox" 
-              name="is_published"
-              checked={formData.is_published}
-              onChange={handleChange}
-              className="accent-[#D4AF37] w-4 h-4 cursor-pointer"
-            />
-            <span className="text-sm font-bold text-[#F5E9D6]">Publish</span>
-          </label>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {isEditing ? (
+            <div
+              role="status"
+              aria-label="Publication status"
+              className="flex max-w-[24rem] flex-col items-end gap-0.5 text-right"
+            >
+              <span className="text-sm font-bold text-[#F5E9D6]">
+                Status: {formData.is_published ? 'Published' : 'Draft'}
+              </span>
+              <span className="text-xs text-[#A1866B]">
+                Change status with the separate Publish / Unpublish control in Summary Bank.
+              </span>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 cursor-pointer mr-4">
+              <input
+                type="checkbox"
+                name="is_published"
+                checked={formData.is_published}
+                onChange={handleChange}
+                className="accent-[#D4AF37] w-4 h-4 cursor-pointer"
+              />
+              <span className="text-sm font-bold text-[#F5E9D6]">Publish</span>
+            </label>
+          )}
 
           <Link href="/admin/summaries" className="px-4 py-2 rounded-xl text-[#F5E9D6] hover:bg-[#1A140E] transition-colors text-sm font-medium">
             Cancel
@@ -130,23 +231,76 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
 
       {error && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg text-sm font-medium">{error}</div>}
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
         {/* Left Column: Metadata */}
-        <div className="w-[300px] flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="w-full lg:w-[300px] flex flex-col gap-4 overflow-y-auto pr-0 lg:pr-2 custom-scrollbar max-h-[none] lg:max-h-full">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-4 space-y-4">
-            <div>
-              <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Package <span className="text-red-400">*</span></label>
-              <select 
-                required
-                name="package_id"
-                value={formData.package_id}
-                onChange={handleChange}
-                className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
-              >
-                <option value="">-- Select Package --</option>
-                {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+            {summaryKind === 'kp_native' ? (
+              <fieldset aria-describedby="summary-package-help summary-package-error">
+                <legend className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">
+                  Use with Packages <span className="text-red-400">*</span>
+                </legend>
+                <p id="summary-package-help" className="text-xs text-[#A1866B] mb-3">
+                  Select every Package that should use this Summary.
+                </p>
+                <div className="space-y-2" role="group" aria-label="Use with Packages">
+                  {packages.map((pkg) => {
+                    const isSelected = formData.package_ids.includes(pkg.id)
+                    return (
+                      <label
+                        key={pkg.id}
+                        className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'border-[#D4AF37]/70 bg-[#D4AF37]/10 text-[#F5E9D6]'
+                            : 'border-[rgba(255,255,255,0.1)] bg-[#0F0B07] text-[#A1866B] hover:border-[#D4AF37]/50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          name="packageIds"
+                          value={pkg.id}
+                          checked={isSelected}
+                          onChange={() => handlePackageToggle(pkg.id)}
+                          disabled={isSaving}
+                          className="h-4 w-4 shrink-0 accent-[#D4AF37]"
+                        />
+                        <span className="min-w-0 truncate">{pkg.name}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                {packages.length === 0 && (
+                  <p className="mt-2 text-sm text-[#A1866B]">No Packages are available.</p>
+                )}
+                <p className="mt-3 text-xs text-[#A1866B]" aria-live="polite">
+                  {formData.package_ids.length} selected
+                </p>
+                {packageError && (
+                  <p id="summary-package-error" role="alert" className="mt-2 text-sm font-medium text-red-400">
+                    {packageError}
+                  </p>
+                )}
+              </fieldset>
+            ) : (
+              <div>
+                <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">
+                  Package <span className="text-red-400">*</span>
+                </label>
+                <select
+                  required
+                  name="package_id"
+                  value={formData.package_id}
+                  onChange={handleChange}
+                  className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                >
+                  <option value="">-- Select Package --</option>
+                  {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}
+                </select>
+                {packageError && (
+                  <p role="alert" className="mt-2 text-sm font-medium text-red-400">{packageError}</p>
+                )}
+              </div>
+            )}
             <div>
               <label className="text-xs text-[#A1866B] font-bold uppercase block mb-1.5">Title <span className="text-red-400">*</span></label>
               <input 
@@ -261,7 +415,7 @@ export default function SummaryEditor({ initialData, packages, onSubmit, isEditi
         </div>
 
         {/* Right Column: Editor / Preview */}
-        <div className="flex-1 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-[26rem] bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.05)] bg-[#0F0B07]">
             <div className="flex gap-2">
               <button 

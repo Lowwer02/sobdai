@@ -6,6 +6,8 @@ import type {
   SummaryLibraryCompatibilityPage,
   SummaryLibraryCompatibilityQueryRequest,
   SummaryLibraryCompatibilityReadRepository,
+  SummaryLibraryLegacyOwnershipRecord,
+  SummaryLibraryLegacyProjectionRow,
   SummaryLibraryPlacementRecord,
   SummaryLibraryProjectionRow,
   SummaryLibrarySourceRecord,
@@ -13,12 +15,14 @@ import type {
 import {
   SUMMARY_LIBRARY_UNASSIGNED_DOCUMENT,
   mapSummaryLibraryCompatibilityItem,
+  mapSummaryLibraryLegacyProjectionRow,
   mapSummaryLibraryProjectionRow,
   normalizeSummaryLibraryCompatibilityQuery,
   SummaryLibraryCompatibilityMappingError,
 } from '../../application/knowledge-platform/summary-library-compatibility'
 
 const ADMIN_LIBRARY_ROOT = 'kp_read_admin_library'
+const SUMMARIES = 'summaries'
 const PACKAGE_PLACEMENTS = 'package_summaries'
 const PACKAGES = 'packages'
 const SOURCE_RELATIONSHIPS = 'summary_reference_documents'
@@ -61,14 +65,23 @@ const ROOT_COLUMNS = [
   'source_document_count',
 ].join(', ')
 
-const MARKED_ROOT_COLUMNS = [
+
+const LEGACY_ROOT_COLUMNS = [
+  'id',
+  'summary_code',
   'package_id',
-  'summary_id',
+  'title',
+  'slug',
+  'subject',
+  'topic',
+  'law',
+  'document',
+  'sort_order',
   'display_order',
   'released_at',
-  'legacy_slug',
-  'is_summary_bank_compatibility',
-  `root:${ADMIN_LIBRARY_ROOT}!inner(${ROOT_COLUMNS})`,
+  'is_published',
+  'created_at',
+  'updated_at',
 ].join(', ')
 
 const PLACEMENT_COLUMNS = [
@@ -82,7 +95,6 @@ const PLACEMENT_COLUMNS = [
   'released_at',
   'navigation_label',
   'legacy_slug',
-  'is_summary_bank_compatibility',
   'created_at',
   'updated_at',
 ].join(', ')
@@ -208,19 +220,8 @@ interface PlacementRow {
   readonly released_at: unknown
   readonly navigation_label: unknown
   readonly legacy_slug: unknown
-  readonly is_summary_bank_compatibility: unknown
   readonly created_at: unknown
   readonly updated_at: unknown
-}
-
-interface LegacyOrderedPlacementRow {
-  readonly package_id: unknown
-  readonly summary_id: unknown
-  readonly display_order: unknown
-  readonly released_at: unknown
-  readonly legacy_slug: unknown
-  readonly is_summary_bank_compatibility: unknown
-  readonly root: unknown
 }
 
 interface SourceRelationshipRow {
@@ -268,8 +269,18 @@ interface MappedSourceRecord {
 }
 
 interface RootPage {
-  readonly rows: readonly SummaryLibraryProjectionRow[]
+  readonly rows: readonly RootRecord[]
   readonly totalItems: number
+}
+
+interface RootRecord {
+  readonly kind: 'legacy' | 'kp_native'
+  readonly row: SummaryLibraryProjectionRow | SummaryLibraryLegacyProjectionRow
+}
+
+interface LegacyPackageFacetRow {
+  readonly package_id: unknown
+  readonly summary_code: unknown
 }
 
 function queryBuilder(
@@ -352,9 +363,10 @@ function uniqueIds(values: readonly unknown[]): readonly string[] {
 
 function applyCandidateIds(
   builder: QueryBuilder,
-  summaryIds: readonly string[] | null
+  summaryIds: readonly string[] | null,
+  column = 'summary_id'
 ): QueryBuilder {
-  return summaryIds === null ? builder : builder.in('summary_id', summaryIds)
+  return summaryIds === null ? builder : builder.in(column, summaryIds)
 }
 
 function applyRootFilters(
@@ -402,36 +414,74 @@ function applyRootFilters(
   return query
 }
 
-function applyRootOrder(
+function applyLegacyRootFilters(
   builder: QueryBuilder,
   request: NormalizedSummaryLibraryCompatibilityQuery
 ): QueryBuilder {
-  if (request.sort.key === 'canonicalTitle') {
-    return builder
-      .order('root(canonical_title)', { ascending: request.sort.direction === 'asc' })
-      .order('summary_id', { ascending: true })
+  let query = builder
+
+  if (request.search) query = query.ilike('title', `%${request.search}%`)
+  if (request.publicationStatus) {
+    query = query.eq('is_published', request.publicationStatus === 'published')
+  }
+  if (request.subject) {
+    query = request.subject === SUMMARY_LIBRARY_UNASSIGNED_DOCUMENT
+      ? query.is('subject', null)
+      : query.eq('subject', request.subject)
+  }
+  if (request.topic) query = query.eq('topic', request.topic)
+  if (request.law) query = query.eq('law', request.law)
+
+  // Legacy rows have no target lifecycle, visibility, revision, PackageSummary,
+  // or normalized source state. Keep those filters root-scoped and fail closed
+  // for the legacy branch instead of inferring KP state from the marker.
+  if (request.lifecycleStatus || request.visibility) {
+    query = query.eq('summary_code', '__kp_native_only__')
+  }
+  if (request.hasPublishedRevision === true || request.hasPackages === false) {
+    query = query.eq('summary_code', '__kp_native_only__')
+  }
+  if (request.hasSources === true) {
+    query = query.eq('summary_code', '__kp_native_only__')
+  }
+  if (request.document === SUMMARY_LIBRARY_UNASSIGNED_DOCUMENT) {
+    query = query.is('document', null)
   }
 
-  return builder
-    .order('root(updated_at)', { ascending: request.sort.direction === 'asc' })
-    .order('summary_id', { ascending: true })
+  return query
 }
 
-function applyLegacyPlacementOrder(builder: QueryBuilder): QueryBuilder {
+function applyRootOrder(
+  builder: QueryBuilder,
+  request: NormalizedSummaryLibraryCompatibilityQuery,
+  kind: RootRecord['kind']
+): QueryBuilder {
+  if (kind === 'legacy' && isLegacyDefaultSort(request)) {
+    return applyLegacyDefaultOrder(builder)
+  }
+
+  const column = kind === 'legacy'
+    ? request.sort.key === 'canonicalTitle' ? 'title' : request.sort.key === 'summaryCode' ? 'summary_code' : request.sort.key === 'lifecycleStatus' ? 'summary_code' : request.sort.key === 'currentRevisionNumber' ? 'summary_code' : 'updated_at'
+    : request.sort.key === 'canonicalTitle' ? 'canonical_title' : request.sort.key === 'summaryCode' ? 'summary_code' : request.sort.key === 'lifecycleStatus' ? 'lifecycle_status' : request.sort.key === 'currentRevisionNumber' ? 'current_revision_number' : 'updated_at'
+
+  return builder
+    .order(column, { ascending: request.sort.direction === 'asc', nullsFirst: false })
+    .order(kind === 'legacy' ? 'id' : 'summary_id', { ascending: true })
+}
+
+function isLegacyDefaultSort(
+  request: NormalizedSummaryLibraryCompatibilityQuery
+): boolean {
+  return request.sort.key === 'updatedAt' && request.sort.direction === 'desc'
+}
+
+function applyLegacyDefaultOrder(builder: QueryBuilder): QueryBuilder {
   return builder
     .order('display_order', { ascending: false })
     .order('released_at', { ascending: false, nullsFirst: false })
-    .order('root(updated_at)', { ascending: false })
-    .order('root(created_at)', { ascending: false })
-    .order('summary_id', { ascending: true })
-}
-
-function usesLegacyOrdering(
-  request: NormalizedSummaryLibraryCompatibilityQuery
-): boolean {
-  return request.sort.key !== 'canonicalTitle' && !(
-    request.sort.key === 'updatedAt' && request.sort.direction === 'asc'
-  )
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
 }
 
 async function readBoundedRows<T>(
@@ -486,148 +536,291 @@ async function readDocumentSummaryIds(
 ): Promise<readonly string[] | null> {
   if (!document || document === SUMMARY_LIBRARY_UNASSIGNED_DOCUMENT) return null
   const documentIds = await readReferenceDocumentIdsByValue(client, document)
-  if (documentIds.length === 0) return []
+  const sourceSummaryIds = documentIds.length === 0
+    ? []
+    : await (async () => {
+      const query = queryBuilder(client, SOURCE_RELATIONSHIPS)
+        .select('summary_id', { count: 'exact' })
+        .eq('role', 'primary')
+        .in('reference_document_id', documentIds)
+        .order('summary_id', { ascending: true })
+      const result = await executeQuery<SourceRelationshipRow>(
+        SOURCE_RELATIONSHIPS,
+        query.range(0, DOCUMENT_FILTER_SUMMARY_LIMIT - 1)
+      )
+      assertBoundedResult(result, SOURCE_RELATIONSHIPS, DOCUMENT_FILTER_SUMMARY_LIMIT)
+      return uniqueIds(result.rows.map((row) => row.summary_id))
+    })()
 
-  const markedSummaryIds = await readMarkedSummaryIds(
-    client,
-    DOCUMENT_FILTER_SUMMARY_LIMIT
-  )
-  if (markedSummaryIds.length === 0) return []
+  const legacyQuery = queryBuilder(client, SUMMARIES)
+    .select('id, summary_code, document', { count: 'exact' })
+    .is('summary_code', null)
+    .eq('document', document)
+  const legacyResult = await executeQuery<{
+    readonly id: unknown
+    readonly summary_code: unknown
+    readonly document: unknown
+  }>(SUMMARIES, legacyQuery.range(0, DOCUMENT_FILTER_SUMMARY_LIMIT - 1))
+  assertBoundedResult(legacyResult, SUMMARIES, DOCUMENT_FILTER_SUMMARY_LIMIT)
 
-  const query = queryBuilder(client, SOURCE_RELATIONSHIPS)
-    .select('summary_id', { count: 'exact' })
-    .eq('role', 'primary')
-    .in('reference_document_id', documentIds)
-    .in('summary_id', markedSummaryIds)
-  const result = await executeQuery<SourceRelationshipRow>(
-    SOURCE_RELATIONSHIPS,
-    query.range(0, DOCUMENT_FILTER_SUMMARY_LIMIT - 1)
-  )
-  assertBoundedResult(result, SOURCE_RELATIONSHIPS, DOCUMENT_FILTER_SUMMARY_LIMIT)
-  return uniqueIds(result.rows.map((row) => row.summary_id))
+  return uniqueIds([
+    ...sourceSummaryIds,
+    ...legacyResult.rows.map((row) => row.id),
+  ])
 }
 
-async function readMarkedSummaryIds(
+async function readPackageSummaryIds(
   client: SummaryLibraryCompatibilitySupabaseClient,
-  limit: number
+  packageId: string
 ): Promise<readonly string[]> {
   const query = queryBuilder(client, PACKAGE_PLACEMENTS)
-    .select('summary_id, is_summary_bank_compatibility', { count: 'exact' })
-    .eq('is_summary_bank_compatibility', true)
+    .select('summary_id, package_id', { count: 'exact' })
+    .eq('package_id', packageId)
     .order('summary_id', { ascending: true })
-  const result = await executeQuery<{
-    readonly summary_id: unknown
-    readonly is_summary_bank_compatibility: unknown
-  }>(
+  const result = await executeQuery<{ readonly summary_id: unknown }>(
     PACKAGE_PLACEMENTS,
-    query.range(0, limit - 1)
+    query.range(0, DOCUMENT_FILTER_SUMMARY_LIMIT - 1)
   )
-  assertBoundedResult(result, PACKAGE_PLACEMENTS, limit)
-  for (const row of result.rows) {
-    if (row.is_summary_bank_compatibility !== true || !stringId(row.summary_id)) {
-      throw new SummaryLibraryCompatibilityRepositoryError(
-        'invalid_response',
-        PACKAGE_PLACEMENTS,
-        'A marker-qualified Summary membership response was incomplete.'
-      )
-    }
-  }
+  assertBoundedResult(result, PACKAGE_PLACEMENTS, DOCUMENT_FILTER_SUMMARY_LIMIT)
   return uniqueIds(result.rows.map((row) => row.summary_id))
 }
 
-function mapLegacyOrderedRootRows(
-  rows: readonly LegacyOrderedPlacementRow[]
-): readonly SummaryLibraryProjectionRow[] {
-  const roots: SummaryLibraryProjectionRow[] = []
-  const seenSummaryIds = new Set<string>()
-
-  for (const row of rows) {
-    const placementSummaryId = stringId(row.summary_id)
-    const nestedRoot = Array.isArray(row.root)
-      ? row.root.length === 1 ? row.root[0] : null
-      : row.root
-
-    if (
-      !placementSummaryId ||
-      !stringId(row.package_id) ||
-      row.is_summary_bank_compatibility !== true ||
-      !stringId(row.legacy_slug) ||
-      !nestedRoot ||
-      typeof nestedRoot !== 'object'
-    ) {
-      throw new SummaryLibraryCompatibilityRepositoryError(
-        'invalid_response',
-        PACKAGE_PLACEMENTS,
-        'A marker-qualified compatibility Package placement did not include exactly one valid admin Summary projection.'
-      )
-    }
-
-    const root = nestedRoot as SummaryLibraryProjectionRow
-    if (stringId(root.summary_id) !== placementSummaryId) {
-      throw new SummaryLibraryCompatibilityRepositoryError(
-        'invalid_response',
-        PACKAGE_PLACEMENTS,
-        'A compatibility Package placement referenced a different admin Summary projection.'
-      )
-    }
-    if (seenSummaryIds.has(placementSummaryId)) {
-      throw new SummaryLibraryCompatibilityRepositoryError(
-        'invalid_response',
-        PACKAGE_PLACEMENTS,
-        `Summary ${placementSummaryId} has multiple marker-qualified compatibility Package placements.`
-      )
-    }
-
-    seenSummaryIds.add(placementSummaryId)
-    roots.push(root)
-  }
-
-  return roots
-}
-
-async function readMarkedRootPage(
+async function readProjectionRootPage(
   client: SummaryLibraryCompatibilitySupabaseClient,
   request: NormalizedSummaryLibraryCompatibilityQuery,
-  documentSummaryIds: readonly string[] | null
+  packageSummaryIds: readonly string[] | null,
+  documentSummaryIds: readonly string[] | null,
+  to: number
 ): Promise<RootPage> {
   if (
-    request.hasPackages === false ||
+    (request.packageId !== null && packageSummaryIds !== null && packageSummaryIds.length === 0) ||
     (documentSummaryIds !== null && documentSummaryIds.length === 0)
   ) {
     return { rows: [], totalItems: 0 }
   }
 
-  const from = (request.page - 1) * request.pageSize
-  const to = from + request.pageSize - 1
-  let query = queryBuilder(client, PACKAGE_PLACEMENTS)
-    .select(MARKED_ROOT_COLUMNS, { count: 'exact' })
-    .eq('is_summary_bank_compatibility', true)
-  query = applyRootFilters(query, request, 'root.')
+  let query = queryBuilder(client, ADMIN_LIBRARY_ROOT)
+    .select(ROOT_COLUMNS, { count: 'exact' })
+    .not('summary_code', 'is', null)
+  query = applyRootFilters(query, request)
   query = applyCandidateIds(query, documentSummaryIds)
-  if (request.packageId) query = query.eq('package_id', request.packageId)
-  query = usesLegacyOrdering(request)
-    ? applyLegacyPlacementOrder(query)
-    : applyRootOrder(query, request)
-  const result = await executeQuery<LegacyOrderedPlacementRow>(
-    PACKAGE_PLACEMENTS,
-    query.range(from, to)
+  query = applyCandidateIds(query, packageSummaryIds)
+  query = applyRootOrder(query, request, 'kp_native')
+  const result = await executeQuery<SummaryLibraryProjectionRow>(
+    ADMIN_LIBRARY_ROOT,
+    query.range(0, to)
   )
-  const totalItems = exactCount(result, PACKAGE_PLACEMENTS)
+  const rows = result.rows.filter((row) => row.summary_code !== null && row.summary_code !== undefined)
   return {
-    rows: mapLegacyOrderedRootRows(result.rows),
-    totalItems,
+    rows: rows.map((row) => ({ kind: 'kp_native', row })),
+    totalItems: exactCount(result, ADMIN_LIBRARY_ROOT),
   }
+}
+
+async function readLegacyRootPage(
+  client: SummaryLibraryCompatibilitySupabaseClient,
+  request: NormalizedSummaryLibraryCompatibilityQuery,
+  documentSummaryIds: readonly string[] | null,
+  to: number
+): Promise<RootPage> {
+  if (
+    (documentSummaryIds !== null && documentSummaryIds.length === 0) ||
+    request.hasPackages === false ||
+    request.hasPublishedRevision === true ||
+    request.hasSources === true
+  ) {
+    return { rows: [], totalItems: 0 }
+  }
+
+  let query = queryBuilder(client, SUMMARIES)
+    .select(LEGACY_ROOT_COLUMNS, { count: 'exact' })
+    .is('summary_code', null)
+  query = applyLegacyRootFilters(query, request)
+  query = applyCandidateIds(query, documentSummaryIds, 'id')
+  if (request.packageId) query = query.eq('package_id', request.packageId)
+  query = applyRootOrder(query, request, 'legacy')
+  const result = await executeQuery<SummaryLibraryLegacyProjectionRow>(
+    SUMMARIES,
+    query.range(0, to)
+  )
+  const rows = result.rows.filter((row) => row.summary_code === null || row.summary_code === undefined)
+  return {
+    rows: rows.map((row) => ({ kind: 'legacy', row })),
+    totalItems: exactCount(result, SUMMARIES),
+  }
+}
+
+function rootRecordSummaryId(record: RootRecord): string {
+  const value = stringId(record.kind === 'legacy'
+    ? (record.row as SummaryLibraryLegacyProjectionRow).id
+    : (record.row as SummaryLibraryProjectionRow).summary_id)
+  if (!value) {
+    throw new SummaryLibraryCompatibilityRepositoryError(
+      'invalid_response',
+      record.kind === 'legacy' ? SUMMARIES : ADMIN_LIBRARY_ROOT,
+      'A Summary Library root row has no Summary ID.'
+    )
+  }
+  return value
+}
+
+function rootRecordValue(record: RootRecord, field: string): unknown {
+  if (record.kind === 'legacy') {
+    const row = record.row as SummaryLibraryLegacyProjectionRow
+    if (field === 'summary_id') return row.id
+    if (field === 'canonical_title') return row.title
+    if (field === 'canonical_slug') return row.slug
+    if (field === 'summary_code') return null
+    if (field === 'lifecycle_status' || field === 'current_revision_number') return null
+    return row[field as keyof SummaryLibraryLegacyProjectionRow]
+  }
+  return (record.row as SummaryLibraryProjectionRow)[field as keyof SummaryLibraryProjectionRow]
+}
+
+function compareNullableRootValues(left: unknown, right: unknown): number {
+  if (left === right) return 0
+  if (left === null || left === undefined) return 1
+  if (right === null || right === undefined) return -1
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left < right ? -1 : 1
+  }
+  return String(left).localeCompare(String(right))
+}
+
+function compareDescendingRootValues(
+  left: unknown,
+  right: unknown,
+  nullsFirst = false
+): number {
+  if (left === right) return 0
+  if (left === null || left === undefined) return nullsFirst ? -1 : 1
+  if (right === null || right === undefined) return nullsFirst ? 1 : -1
+  return -compareNullableRootValues(left, right)
+}
+
+function compareLegacyDefaultRootRecords(
+  left: RootRecord,
+  right: RootRecord
+): number {
+  const leftRow = left.row as SummaryLibraryLegacyProjectionRow
+  const rightRow = right.row as SummaryLibraryLegacyProjectionRow
+  const fields = [
+    ['display_order', false],
+    ['released_at', false],
+    ['updated_at', false],
+    ['created_at', false],
+  ] as const
+
+  for (const [field, nullsFirst] of fields) {
+    const result = compareDescendingRootValues(
+      leftRow[field],
+      rightRow[field],
+      nullsFirst
+    )
+    if (result !== 0) return result
+  }
+
+  return rootRecordSummaryId(left).localeCompare(rootRecordSummaryId(right))
+}
+
+function compareRootRecords(
+  left: RootRecord,
+  right: RootRecord,
+  request: NormalizedSummaryLibraryCompatibilityQuery
+): number {
+  if (
+    isLegacyDefaultSort(request) &&
+    left.kind === 'legacy' &&
+    right.kind === 'legacy'
+  ) {
+    return compareLegacyDefaultRootRecords(left, right)
+  }
+
+  const field = request.sort.key === 'canonicalTitle'
+    ? 'canonical_title'
+    : request.sort.key === 'summaryCode'
+      ? 'summary_code'
+      : request.sort.key === 'lifecycleStatus'
+        ? 'lifecycle_status'
+        : request.sort.key === 'currentRevisionNumber'
+          ? 'current_revision_number'
+          : 'updated_at'
+  const result = compareNullableRootValues(
+    rootRecordValue(left, field),
+    rootRecordValue(right, field)
+  )
+  if (result !== 0) return request.sort.direction === 'asc' ? result : -result
+  return rootRecordSummaryId(left).localeCompare(rootRecordSummaryId(right))
+}
+
+function deduplicateRootRecords(records: readonly RootRecord[]): readonly RootRecord[] {
+  const bySummaryId = new Map<string, RootRecord>()
+  for (const record of records) {
+    const summaryId = rootRecordSummaryId(record)
+    if (!bySummaryId.has(summaryId)) bySummaryId.set(summaryId, record)
+  }
+  return [...bySummaryId.values()]
+}
+
+function mergeDefaultRootRecords(
+  kpRows: readonly RootRecord[],
+  legacyRows: readonly RootRecord[],
+  request: NormalizedSummaryLibraryCompatibilityQuery
+): readonly RootRecord[] {
+  const merged: RootRecord[] = []
+  let kpIndex = 0
+  let legacyIndex = 0
+
+  while (kpIndex < kpRows.length || legacyIndex < legacyRows.length) {
+    if (kpIndex >= kpRows.length) {
+      merged.push(legacyRows[legacyIndex++] as RootRecord)
+      continue
+    }
+    if (legacyIndex >= legacyRows.length) {
+      merged.push(kpRows[kpIndex++] as RootRecord)
+      continue
+    }
+
+    const kpRow = kpRows[kpIndex] as RootRecord
+    const legacyRow = legacyRows[legacyIndex] as RootRecord
+    if (compareRootRecords(kpRow, legacyRow, request) <= 0) {
+      merged.push(kpRow)
+      kpIndex += 1
+    } else {
+      merged.push(legacyRow)
+      legacyIndex += 1
+    }
+  }
+
+  return merged
 }
 
 async function readRootPage(
   client: SummaryLibraryCompatibilitySupabaseClient,
   request: NormalizedSummaryLibraryCompatibilityQuery
 ): Promise<RootPage> {
-  const documentSummaryIds = await readDocumentSummaryIds(
-    client,
-    request.document
-  )
-  return readMarkedRootPage(client, request, documentSummaryIds)
+  const [packageSummaryIds, documentSummaryIds] = await Promise.all([
+    request.packageId ? readPackageSummaryIds(client, request.packageId) : Promise.resolve(null),
+    readDocumentSummaryIds(client, request.document),
+  ])
+  const to = (request.page * request.pageSize) - 1
+  const [kpPage, legacyPage] = await Promise.all([
+    readProjectionRootPage(client, request, packageSummaryIds, documentSummaryIds, to),
+    readLegacyRootPage(client, request, documentSummaryIds, to),
+  ])
+  const deduplicated = deduplicateRootRecords([...kpPage.rows, ...legacyPage.rows])
+  const sorted = isLegacyDefaultSort(request)
+    ? mergeDefaultRootRecords(
+      deduplicated.filter((record) => record.kind === 'kp_native'),
+      deduplicated.filter((record) => record.kind === 'legacy'),
+      request
+    )
+    : [...deduplicated].sort((left, right) => compareRootRecords(left, right, request))
+  const from = (request.page - 1) * request.pageSize
+  return {
+    rows: sorted.slice(from, from + request.pageSize),
+    totalItems: kpPage.totalItems + legacyPage.totalItems,
+  }
 }
 
 async function readRowsByIds<T>(
@@ -663,7 +856,6 @@ async function readCompatibilityPlacementsBySummaryIds(
   const query = queryBuilder(client, PACKAGE_PLACEMENTS)
     .select(PLACEMENT_COLUMNS, { count: 'exact' })
     .in('summary_id', summaryIds)
-    .eq('is_summary_bank_compatibility', true)
     .order('summary_id', { ascending: true })
     .order('package_id', { ascending: true })
     .range(0, PAGE_PLACEMENT_LIMIT - 1)
@@ -671,15 +863,13 @@ async function readCompatibilityPlacementsBySummaryIds(
   assertBoundedResult(result, PACKAGE_PLACEMENTS, PAGE_PLACEMENT_LIMIT)
   for (const row of result.rows) {
     if (
-      row.is_summary_bank_compatibility !== true ||
       !stringId(row.summary_id) ||
-      !stringId(row.package_id) ||
-      !stringId(row.legacy_slug)
+      !stringId(row.package_id)
     ) {
       throw new SummaryLibraryCompatibilityRepositoryError(
         'invalid_response',
         PACKAGE_PLACEMENTS,
-        'A marker-qualified compatibility Package placement was incomplete.'
+        'A Package membership read was incomplete.'
       )
     }
   }
@@ -823,11 +1013,25 @@ function rootPublicationState(
   return row.legacy_is_published
 }
 
+function legacyPublicationState(
+  row: SummaryLibraryLegacyProjectionRow,
+  summaryId: string
+): boolean {
+  if (typeof row.is_published !== 'boolean') {
+    throw new SummaryLibraryCompatibilityMappingError(
+      'invalid_root_projection',
+      'Legacy Summary compatibility publication state is invalid.',
+      { summaryId, field: 'is_published' }
+    )
+  }
+  return row.is_published
+}
+
 async function composePageItems(
   client: SummaryLibraryCompatibilitySupabaseClient,
-  rootRows: readonly SummaryLibraryProjectionRow[]
+  rootRows: readonly RootRecord[]
 ): Promise<readonly SummaryLibraryCompatibilityItem[]> {
-  const summaryIds = uniqueIds(rootRows.map((row) => row.summary_id))
+  const summaryIds = uniqueIds(rootRows.map((record) => rootRecordSummaryId(record)))
   if (summaryIds.length === 0) return []
 
   const [placementRows, relationshipRows] = await Promise.all([
@@ -842,7 +1046,13 @@ async function composePageItems(
     ),
   ])
 
-  const packageIds = uniqueIds(placementRows.map((row) => row.package_id))
+  const legacyRows = rootRows
+    .filter((record): record is RootRecord & { readonly kind: 'legacy'; readonly row: SummaryLibraryLegacyProjectionRow } => record.kind === 'legacy')
+    .map((record) => record.row)
+  const packageIds = uniqueIds([
+    ...placementRows.map((row) => row.package_id),
+    ...legacyRows.map((row) => row.package_id),
+  ])
   const documentIds = uniqueIds(relationshipRows.map((row) => row.reference_document_id))
   const versionIds = uniqueIds(relationshipRows.map((row) => row.reference_document_version_id))
   const [packageRows, documentRows, versionRows, aliasRows] = await Promise.all([
@@ -882,30 +1092,65 @@ async function composePageItems(
   const sourcesBySummary = groupBySummaryId(sources, (record) => record.summaryId)
   const compatibilityDocumentsByReferenceDocument = mapLegacyDocumentValues(aliasRows)
 
-  for (const summaryId of summaryIds) {
+  for (const record of rootRows) {
+    const summaryId = rootRecordSummaryId(record)
     const summaryPlacements = placementsBySummary.get(summaryId) ?? []
-    if (summaryPlacements.length !== 1) {
+    if (record.kind === 'legacy' && summaryPlacements.length !== 0) {
       throw new SummaryLibraryCompatibilityRepositoryError(
         'invalid_response',
         PACKAGE_PLACEMENTS,
-        `Summary ${summaryId} has ${summaryPlacements.length} marker-qualified compatibility Package placements; exactly one is required.`
+        `Legacy Summary ${summaryId} has ${summaryPlacements.length} Package memberships; Legacy roots must have zero placements.`
+      )
+    }
+    if (record.kind === 'kp_native' && summaryPlacements.length === 0) {
+      throw new SummaryLibraryCompatibilityRepositoryError(
+        'invalid_response',
+        PACKAGE_PLACEMENTS,
+        `KP-native Summary ${summaryId} has no Package memberships.`
       )
     }
   }
 
-  return rootRows.map((row) => {
-    const root = mapSummaryLibraryProjectionRow(row)
+  return rootRows.map((record) => {
+    const summaryId = rootRecordSummaryId(record)
+    const root = record.kind === 'legacy'
+      ? mapSummaryLibraryLegacyProjectionRow(record.row as SummaryLibraryLegacyProjectionRow)
+      : mapSummaryLibraryProjectionRow(record.row as SummaryLibraryProjectionRow)
     const sourceRecords = (sourcesBySummary.get(root.summaryId) ?? [])
       .map((entry) => entry.record)
     const primaryReferenceDocumentId = primaryDocumentId(sourceRecords)
+    const legacyRow = record.kind === 'legacy'
+      ? record.row as SummaryLibraryLegacyProjectionRow
+      : null
+    const legacyPackageDetails = legacyRow
+      ? packages.get(stringId(legacyRow.package_id) ?? '')
+      : undefined
+    const legacyOwnership: SummaryLibraryLegacyOwnershipRecord | null = legacyRow
+      ? {
+          packageId: legacyRow.package_id,
+          packageName: legacyPackageDetails?.name ?? null,
+          packageSlug: legacyPackageDetails?.slug ?? null,
+          legacySlug: legacyRow.slug,
+          sortOrder: legacyRow.sort_order,
+          displayOrder: legacyRow.display_order,
+          releasedAt: legacyRow.released_at,
+        }
+      : null
     return mapSummaryLibraryCompatibilityItem(
       root,
       placementsBySummary.get(root.summaryId) ?? [],
       sourceRecords,
-      rootPublicationState(row, root.summaryId),
-      primaryReferenceDocumentId
-        ? compatibilityDocumentsByReferenceDocument.get(primaryReferenceDocumentId) ?? null
-        : null
+      record.kind === 'legacy'
+        ? legacyPublicationState(legacyRow!, summaryId)
+        : rootPublicationState(record.row as SummaryLibraryProjectionRow, root.summaryId),
+      record.kind === 'legacy'
+        ? typeof legacyRow!.document === 'string' && legacyRow!.document !== ''
+          ? legacyRow!.document
+          : null
+        : primaryReferenceDocumentId
+          ? compatibilityDocumentsByReferenceDocument.get(primaryReferenceDocumentId) ?? null
+          : null,
+      legacyOwnership
     )
   })
 }
@@ -964,28 +1209,29 @@ function mapLegacyDocumentValues(
 async function readPackageFacets(
   client: SummaryLibraryCompatibilitySupabaseClient
 ): Promise<SummaryLibraryCompatibilityFacets['packageOptions']> {
-  const markerQuery = queryBuilder(client, PACKAGE_PLACEMENTS)
-    .select('package_id, is_summary_bank_compatibility', { count: 'exact' })
-    .eq('is_summary_bank_compatibility', true)
-    .order('package_id', { ascending: true })
-  const markerResult = await executeQuery<{
-    readonly package_id: unknown
-    readonly is_summary_bank_compatibility: unknown
-  }>(
-    PACKAGE_PLACEMENTS,
-    markerQuery.range(0, FACET_RELATIONSHIP_LIMIT - 1)
-  )
-  assertBoundedResult(markerResult, PACKAGE_PLACEMENTS, FACET_RELATIONSHIP_LIMIT)
-  for (const row of markerResult.rows) {
-    if (row.is_summary_bank_compatibility !== true || !stringId(row.package_id)) {
-      throw new SummaryLibraryCompatibilityRepositoryError(
-        'invalid_response',
-        PACKAGE_PLACEMENTS,
-        'A marker-qualified package facet membership response was incomplete.'
-      )
-    }
-  }
-  const packageIds = uniqueIds(markerResult.rows.map((row) => row.package_id))
+  const [membershipResult, legacyResult] = await Promise.all([
+    executeQuery<{ readonly package_id: unknown }>(
+      PACKAGE_PLACEMENTS,
+      queryBuilder(client, PACKAGE_PLACEMENTS)
+        .select('package_id', { count: 'exact' })
+        .order('package_id', { ascending: true })
+        .range(0, FACET_RELATIONSHIP_LIMIT - 1)
+    ),
+    executeQuery<LegacyPackageFacetRow>(
+      SUMMARIES,
+      queryBuilder(client, SUMMARIES)
+        .select('package_id, summary_code', { count: 'exact' })
+        .is('summary_code', null)
+        .order('package_id', { ascending: true })
+        .range(0, FACET_RELATIONSHIP_LIMIT - 1)
+    ),
+  ])
+  assertBoundedResult(membershipResult, PACKAGE_PLACEMENTS, FACET_RELATIONSHIP_LIMIT)
+  assertBoundedResult(legacyResult, SUMMARIES, FACET_RELATIONSHIP_LIMIT)
+  const packageIds = uniqueIds([
+    ...membershipResult.rows.map((row) => row.package_id),
+    ...legacyResult.rows.map((row) => row.package_id),
+  ])
   const packageRows = await readRowsByIds<PackageRow>(
     client,
     PACKAGES,
@@ -1006,16 +1252,9 @@ async function readPackageFacets(
 async function readDocumentFacets(
   client: SummaryLibraryCompatibilitySupabaseClient
 ): Promise<readonly string[]> {
-  const markedSummaryIds = await readMarkedSummaryIds(
-    client,
-    FACET_RELATIONSHIP_LIMIT
-  )
-  if (markedSummaryIds.length === 0) return []
-
   const relationshipQuery = queryBuilder(client, SOURCE_RELATIONSHIPS)
     .select('reference_document_id', { count: 'exact' })
     .eq('role', 'primary')
-    .in('summary_id', markedSummaryIds)
     .order('reference_document_id', { ascending: true })
     .range(0, FACET_RELATIONSHIP_LIMIT - 1)
   const relationshipResult = await executeQuery<SourceRelationshipRow>(
@@ -1027,24 +1266,28 @@ async function readDocumentFacets(
   const documentIds = uniqueIds(
     relationshipResult.rows.map((row) => row.reference_document_id)
   )
-  const [documentRows, aliasRows] = await Promise.all([
-    readRowsByIds<ReferenceDocumentRow>(
-      client,
-      REFERENCE_DOCUMENTS,
-      REFERENCE_DOCUMENT_COLUMNS,
-      'id',
-      documentIds,
-      FACET_RELATIONSHIP_LIMIT
-    ),
+  const [aliasRows, legacyRows] = await Promise.all([
     readCompatibilityAliasRows(client, documentIds, FACET_OPTION_LIMIT),
+    executeQuery<{ readonly document: unknown }>(
+      SUMMARIES,
+      queryBuilder(client, SUMMARIES)
+        .select('document', { count: 'exact' })
+        .is('summary_code', null)
+        .range(0, FACET_RELATIONSHIP_LIMIT - 1)
+    ),
   ])
+  assertBoundedResult(legacyRows, SUMMARIES, FACET_RELATIONSHIP_LIMIT)
   const compatibilityTitles = mapLegacyDocumentValues(aliasRows)
-  return [...new Set(
+  const legacyDocuments = legacyRows.rows
+    .map((row) => legacyDocumentValue(row.document))
+    .filter((value): value is string => value !== null)
+  return [...new Set([
     documentIds.flatMap((id) => {
       const value = compatibilityTitles.get(id)
       return value ? [value] : []
-    })
-  )].sort((left, right) => left.localeCompare(right))
+    }),
+    ...legacyDocuments,
+  ].flat())].sort((left, right) => left.localeCompare(right))
 }
 
 export class SupabaseSummaryLibraryCompatibilityRepository
