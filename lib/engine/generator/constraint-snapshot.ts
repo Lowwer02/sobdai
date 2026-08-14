@@ -29,6 +29,7 @@ export function projectConstraintSnapshot(
     coverageRules: source.coverageRules,
     duplicatePrevention: source.duplicatePrevention,
     loDistribution: source.loDistribution,
+    patternDistributionTargets: source.patternDistributionTargets,
     documentRegistry: source.documentRegistry.map((entry) => ({
       id: entry.id,
       tier: entry.tier,

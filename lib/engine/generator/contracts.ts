@@ -49,6 +49,7 @@ import type {
   DocumentRegistryEntry,
   DuplicatePreventionRule,
   LoDistribution,
+  PatternDistributionTarget,
   RunTarget,
 } from '../reader/contracts'
 
@@ -99,6 +100,15 @@ export type GeneratorSeverity = 'Pass' | 'Warning' | 'Blocking' | 'Fatal'
  *               Recall); Ranking will lower their score downstream.
  */
 export type ConfidenceLevel = 'full' | 'reduced'
+
+/**
+ * Pattern availability state for the filtered structural eligible pool.
+ *
+ * - 'FULL'       — every row in the pool has a usable non-null questionPattern.
+ * - 'PARTIAL'    — at least one row has a usable pattern, AND at least one row has NULL/absent.
+ * - 'UNAVAILABLE'— every row has NULL/absent questionPattern.
+ */
+export type PatternAvailability = 'FULL' | 'PARTIAL' | 'UNAVAILABLE'
 
 /**
  * Per-axis completeness flag (§5.2, §9.2). Binary per axis: a Candidate's
@@ -457,6 +467,7 @@ export interface ConstraintSnapshot {
   readonly coverageRules: readonly DeepReadonly<CoverageRule>[]
   readonly duplicatePrevention: readonly DeepReadonly<DuplicatePreventionRule>[]
   readonly loDistribution: DeepReadonly<LoDistribution>
+  readonly patternDistributionTargets?: readonly DeepReadonly<PatternDistributionTarget>[]
   readonly documentRegistry: readonly DeepReadonly<Pick<DocumentRegistryEntry, 'id' | 'tier'>>[]
   readonly target: DeepReadonly<RunTarget>
   readonly runUnit: RunUnit
@@ -622,6 +633,7 @@ export interface CandidateSet {
   readonly statistics: CandidateStatistics
   readonly exclusionsLog: readonly ExclusionEntry[]
   readonly meta: CandidateSetMeta
+  readonly patternAvailability?: PatternAvailability
 }
 
 /**

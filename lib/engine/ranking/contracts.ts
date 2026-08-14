@@ -25,6 +25,7 @@
 
 import type {
   BlueprintSlot,
+  Candidate,
   CandidateSet,
   ConstraintSnapshot,
   CoverageSatisfaction,
@@ -259,7 +260,107 @@ export interface RankedCandidateSet {
   /** Generator warnings carried forward plus Ranking-emitted warnings (§7.3). */
   readonly warnings: readonly (GeneratorWarning | RankingWarning)[]
   readonly meta: RankedCandidateSetMeta
+  /**
+   * OPTIONAL additive candidate-centric projection (Phase 2B bridge).
+   *
+   * A per-Set pivot of the SAME tie-resolved data carried in `slots`. Each
+   * questionCode appears exactly once per Set, with one AxisProfile per slot it
+   * was evaluated against. It is a presentation/index over `slots` — it carries
+   * NO global/aggregated candidate score, and its lexical-by-questionCode order
+   * is a deterministic presentation order, not a Ranking result.
+   *
+   * Absent when no projection was built. The legacy `slots` field remains the
+   * authoritative ordering and is unaffected by this field.
+   */
+  readonly setProfiles?: readonly SetCandidateProfiles[]
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4b. Candidate-centric projection (Phase 2B bridge)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * One Candidate's suitability for one AxisTarget (Blueprint slot), pivoted from
+ * a RankedCandidate. References the original per-slot rank and CompositeScore by
+ * identity; it neither recomputes nor aggregates.
+ */
+export interface AxisProfile {
+  /** Stable slot id matching RankedSlot.slotId (§7.3 `slot_id`). */
+  readonly slotId: string
+  /** The AxisTarget/PlanningSlot this suitability was evaluated against. */
+  readonly slot: BlueprintSlot
+  /** Original one-based rank within that slot (§7.3). */
+  readonly rank: number
+  /** Original Composite Score for this (Candidate × AxisTarget), by reference. */
+  readonly compositeScore: CompositeScore
+}
+
+/**
+ * One Candidate's full per-Set suitability profile: the Candidate plus every
+ * AxisProfile for the slots it was evaluated against in that Set. A Candidate is
+ * never assigned ownership of a single axis; it carries every axis evaluation.
+ *
+ * There is intentionally NO global/aggregated numeric score field on this type.
+ */
+export interface CandidateProfile {
+  /** Question Code (immutable Candidate identity). */
+  readonly questionCode: string
+  /** The Candidate, by reference from CandidateSet. */
+  readonly candidate: Candidate
+  /** Every AxisProfile for this Candidate in this Set. */
+  readonly suitabilityProfiles: readonly AxisProfile[]
+}
+
+/**
+ * Per-Set candidate-centric projection. Every Candidate evaluated against any
+ * AxisTarget in this Set appears exactly once.
+ */
+export interface SetCandidateProfiles {
+  /** Set number (1..5). */
+  readonly setNumber: 1 | 2 | 3 | 4 | 5
+  /** One CandidateProfile per unique questionCode in this Set. */
+  readonly profiles: readonly CandidateProfile[]
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4c. Pre-tie candidate-centric projection (Phase 2B bridge)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * One Candidate's suitability for one AxisTarget (Blueprint slot) BEFORE tie resolution.
+ * References the original CompositeScore by identity; it has no rank.
+ */
+export interface PreTieAxisProfile {
+  /** Stable slot id matching RankedSlot.slotId (§7.3 `slot_id`). */
+  readonly slotId: string
+  /** The AxisTarget/PlanningSlot this suitability was evaluated against. */
+  readonly slot: BlueprintSlot
+  /** Original Composite Score for this (Candidate × AxisTarget), by reference. */
+  readonly compositeScore: CompositeScore
+}
+
+/**
+ * One Candidate's full per-Set suitability profile before tie resolution.
+ */
+export interface PreTieCandidateProfile {
+  /** Question Code (immutable Candidate identity). */
+  readonly questionCode: string
+  /** The Candidate, by reference from CandidateSet. */
+  readonly candidate: Candidate
+  /** Every PreTieAxisProfile for this Candidate in this Set. */
+  readonly suitabilityProfiles: readonly PreTieAxisProfile[]
+}
+
+/**
+ * Per-Set candidate-centric pre-tie projection.
+ */
+export interface PreTieSetCandidateProfiles {
+  /** Set number (1..5). */
+  readonly setNumber: 1 | 2 | 3 | 4 | 5
+  /** One PreTieCandidateProfile per unique questionCode in this Set. */
+  readonly profiles: readonly PreTieCandidateProfile[]
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. Structured failures (§10)

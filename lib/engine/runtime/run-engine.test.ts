@@ -72,7 +72,7 @@ class CountingBankAdapter implements BankReadAdapter {
 
   public constructor(
     private readonly rows: readonly BankMetadataRow[]
-  ) {}
+  ) { }
 
   public readMetadata(): readonly BankMetadataRow[] {
     this.reads += 1
@@ -256,6 +256,22 @@ function verifies_target_set_count_plumbing(): void {
   }
 }
 
+function buildTestBank(count: number): BankMetadataRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    questionCode: `Q-RUNTIME-${String(i + 1).padStart(3, '0')}`,
+    subject: null,
+    document: 'พ.ร.บ.ทดสอบ 2560',
+    topic: 'หลักการ (ม.6–8)',
+    law: null,
+    difficulty: 'Easy' as const,
+    status: 'Published' as const,
+    blueprintType: 'Memory' as const,
+    learningObjective: 'LO1' as const,
+    questionPattern: 'Positive' as const,
+    section: 'section-1',
+  }))
+}
+
 function verifies_default_target_set_count_is_5(): void {
   const res = runEngine(REQUEST, dependencies())
   assert.ok(res.assemblyRequest)
@@ -263,39 +279,314 @@ function verifies_default_target_set_count_is_5(): void {
   assert.equal(res.assemblyRequest.target.perSet, 100)
 }
 
+function verifies_physical_solver_omitted(): void {
+  const result = runEngine(REQUEST, dependencies())
+  assert.equal(result.physicalSolverResult, null, 'physicalSolverResult must be null when physicalSolver option is omitted')
+}
+
+function verifies_physical_solver_present_and_coexistence(): void {
+  const bank = new CountingBankAdapter(buildTestBank(100))
+
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+      physicalSolver: {
+        maxNodesVisited: 500,
+      },
+    },
+  }
+
+  const result = runEngine(req, dependencies({ bank }))
+
+  assert.ok(result.physicalSolverResult !== null, 'physicalSolverResult should be non-null')
+  if (result.physicalSolverResult !== null) {
+    assert.equal(result.physicalSolverResult.results.length, 1)
+    const runRes = result.physicalSolverResult.results[0]!
+    assert.equal(runRes.status, 'COMPLETE')
+    if (runRes.status === 'COMPLETE') {
+      assert.equal(runRes.assignment.placements.length, 100)
+      for (const placement of runRes.assignment.placements) {
+        assert.equal(placement.position.setNumber, 1)
+      }
+    }
+  }
+
+  assert.ok('allocatedCandidateSet' in result)
+}
+
+function verifies_physical_solver_budget_exhausted(): void {
+  const bank = new CountingBankAdapter(buildTestBank(100))
+
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+      physicalSolver: {
+        maxNodesVisited: 1,
+      },
+    },
+  }
+
+  const result = runEngine(req, dependencies({ bank }))
+  assert.ok(result.physicalSolverResult !== null && result.physicalSolverResult !== undefined)
+  if (result.physicalSolverResult !== null) {
+    const runRes = result.physicalSolverResult.results[0]!
+    assert.equal(runRes.status, 'SEARCH_BUDGET_EXHAUSTED')
+    assert.equal(runRes.diagnostics.nodesVisited, 1)
+  }
+}
+
+function verifies_physical_solver_determinism(): void {
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+      physicalSolver: {
+        maxNodesVisited: 500,
+      },
+    },
+  }
+
+  const res1 = runEngine(req, dependencies())
+  const res2 = runEngine(req, dependencies())
+
+  assert.deepEqual(res1.physicalSolverResult, res2.physicalSolverResult)
+}
+
+function verifies_physical_solver_immutability(): void {
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+      physicalSolver: {
+        maxNodesVisited: 500,
+      },
+    },
+  }
+  const originalJSON = JSON.stringify(req)
+
+  runEngine(req, dependencies())
+
+  assert.equal(JSON.stringify(req), originalJSON, 'runEngine must not mutate input request')
+}
+
+function verifies_legacy_failure_with_physical_enabled(): void {
+  // Use a bank with 100 candidates to let the physical solver COMPLETE,
+  // but the legacy solver will fail because of unsatisfied Blueprint constraints
+  // (e.g. buildStage5CompleteBlueprint requires specific distributions that are not met by buildTestBank(100)).
+  const bank = new CountingBankAdapter(buildTestBank(100))
+
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+      physicalSolver: {
+        maxNodesVisited: 500,
+      },
+    },
+  }
+
+  const result = runEngine(req, dependencies({ bank }))
+
+  // 1. Overall legacy Engine failure semantics remain exactly as currently defined
+  assert.equal(result.status, 'Failed')
+
+  // 2. physicalSolverResult is NOT null
+  assert.ok(result.physicalSolverResult !== null, 'physicalSolverResult must not be null')
+  if (result.physicalSolverResult !== null) {
+    assert.equal(result.physicalSolverResult.results.length, 1)
+    const runRes = result.physicalSolverResult.results[0]!
+
+    // 3. physicalSolverResult contains the actual physical per-Set result (status === COMPLETE)
+    assert.equal(runRes.status, 'COMPLETE')
+  }
+
+  // 5. The legacy fatal/error diagnostics are still present
+  assert.ok(result.errors.length > 0)
+  assert.equal(result.errors[0]?.category, 'Constraint Error')
+  assert.equal(result.errors[0]?.module, 'Solver')
+}
+
+function verifies_legacy_failure_with_physical_omitted(): void {
+  const bank = new CountingBankAdapter(buildTestBank(100))
+
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+    },
+  }
+
+  const result = runEngine(req, dependencies({ bank }))
+
+  assert.equal(result.status, 'Failed')
+  assert.equal(result.physicalSolverResult, null, 'physicalSolverResult must be null when physicalSolver is omitted')
+  assert.ok(result.errors.length > 0)
+  assert.equal(result.errors[0]?.category, 'Constraint Error')
+  assert.equal(result.errors[0]?.module, 'Solver')
+}
+
+function verifies_tie_overflow_failure_with_physical_enabled(): void {
+  // 101 candidates with identical ordering-relevant metadata form ONE
+  // unresolved tie group of 101 > DEFAULT_MAX_TIE_GROUP_SIZE (100), so legacy
+  // Ranking throws a genuine tie-overflow exception from resolveTies(...).
+  // The pre-tie Physical Solver bridge must still execute exactly once from
+  // physicalRankingBridge while the exact legacy Ranking error is preserved.
+  const bank = new CountingBankAdapter(buildTestBank(101))
+
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+      physicalSolver: {
+        maxNodesVisited: 500,
+      },
+    },
+  }
+
+  const result = runEngine(req, dependencies({ bank }))
+
+  // Scoring succeeded; Ranking threw genuine tie overflow.
+  assert.equal(result.status, 'Failed')
+  assert.equal(result.rankedCandidateSet, null)
+  assert.ok(result.compositeScores.length > 0)
+
+  // Legacy Ranking error semantics preserved exactly.
+  assert.equal(result.errors[0]?.module, 'Ranking')
+  assert.equal(result.errors[0]?.category, 'Runtime Error')
+  assert.equal(result.errors[0]?.location, 'Ranking:runtime')
+  assert.equal(result.errors[0]?.severity, 'fatal')
+  assert.match(result.errors[0]?.explanation ?? '', /tie overflow/)
+
+  // Physical Solver executed exactly once from the pre-tie bridge despite the
+  // overall Failed status.
+  assert.ok(
+    result.physicalSolverResult !== null,
+    'physicalSolverResult must be populated despite Ranking failure'
+  )
+  if (result.physicalSolverResult !== null) {
+    assert.equal(result.physicalSolverResult.results.length, 1)
+    const runRes = result.physicalSolverResult.results[0]!
+    assert.equal(runRes.status, 'COMPLETE')
+    if (runRes.status === 'COMPLETE') {
+      assert.equal(runRes.assignment.placements.length, 100)
+      for (const placement of runRes.assignment.placements) {
+        assert.equal(placement.position.setNumber, 1)
+      }
+    }
+  }
+}
+
+function verifies_tie_overflow_failure_with_physical_omitted(): void {
+  // Same genuine tie-overflow Ranking failure, but physicalSolver is omitted.
+  // Existing legacy behavior must remain unchanged: no Physical Solver runs and
+  // physicalSolverResult stays null.
+  const bank = new CountingBankAdapter(buildTestBank(101))
+
+  const req: EngineRequest = {
+    ...REQUEST,
+    options: {
+      ...REQUEST.options,
+      targetSetCount: 1,
+    },
+  }
+
+  const result = runEngine(req, dependencies({ bank }))
+
+  assert.equal(result.status, 'Failed')
+  assert.equal(result.rankedCandidateSet, null)
+
+  // Same legacy Ranking error semantics preserved.
+  assert.equal(result.errors[0]?.module, 'Ranking')
+  assert.equal(result.errors[0]?.category, 'Runtime Error')
+  assert.equal(result.errors[0]?.location, 'Ranking:runtime')
+  assert.equal(result.errors[0]?.severity, 'fatal')
+  assert.match(result.errors[0]?.explanation ?? '', /tie overflow/)
+
+  assert.equal(
+    result.physicalSolverResult,
+    null,
+    'physicalSolverResult must be null when physicalSolver is omitted'
+  )
+}
+
 const tests: readonly {
   readonly name: string
   readonly fn: () => void
 }[] = [
-  {
-    name: 'executes canonical order and propagates Solver failure',
-    fn: verifies_canonical_pipeline_and_failure_propagation,
-  },
-  {
-    name: 'halts after Reader failure',
-    fn: verifies_reader_failure_halts_pipeline,
-  },
-  {
-    name: 'maps Blueprint dependency failure',
-    fn: verifies_blueprint_dependency_failure_is_structured,
-  },
-  {
-    name: 'preserves completed artifacts on cancellation',
-    fn: verifies_cancellation_preserves_completed_artifacts,
-  },
-  {
-    name: 'has no production dependency on testing fixtures',
-    fn: verifies_runtime_has_no_testing_dependency,
-  },
-  {
-    name: 'defaults targetSetCount to 5 sets',
-    fn: verifies_default_target_set_count_is_5,
-  },
-  {
-    name: 'plumbs targetSetCount for 1, 3, and 5 sets',
-    fn: verifies_target_set_count_plumbing,
-  },
-]
+    {
+      name: 'executes canonical order and propagates Solver failure',
+      fn: verifies_canonical_pipeline_and_failure_propagation,
+    },
+    {
+      name: 'halts after Reader failure',
+      fn: verifies_reader_failure_halts_pipeline,
+    },
+    {
+      name: 'maps Blueprint dependency failure',
+      fn: verifies_blueprint_dependency_failure_is_structured,
+    },
+    {
+      name: 'preserves completed artifacts on cancellation',
+      fn: verifies_cancellation_preserves_completed_artifacts,
+    },
+    {
+      name: 'has no production dependency on testing fixtures',
+      fn: verifies_runtime_has_no_testing_dependency,
+    },
+    {
+      name: 'defaults targetSetCount to 5 sets',
+      fn: verifies_default_target_set_count_is_5,
+    },
+    {
+      name: 'plumbs targetSetCount for 1, 3, and 5 sets',
+      fn: verifies_target_set_count_plumbing,
+    },
+    {
+      name: 'verifies physical solver omitted',
+      fn: verifies_physical_solver_omitted,
+    },
+    {
+      name: 'verifies physical solver present and coexistence',
+      fn: verifies_physical_solver_present_and_coexistence,
+    },
+    {
+      name: 'verifies physical solver budget exhausted',
+      fn: verifies_physical_solver_budget_exhausted,
+    },
+    {
+      name: 'verifies physical solver determinism',
+      fn: verifies_physical_solver_determinism,
+    },
+    {
+      name: 'verifies physical solver immutability',
+      fn: verifies_physical_solver_immutability,
+    },
+    {
+      name: 'verifies legacy failure with physical enabled',
+      fn: verifies_legacy_failure_with_physical_enabled,
+    },
+    {
+      name: 'verifies legacy failure with physical omitted',
+      fn: verifies_legacy_failure_with_physical_omitted,
+    },
+    {
+      name: 'verifies tie-overflow Ranking failure with physical enabled',
+      fn: verifies_tie_overflow_failure_with_physical_enabled,
+    },
+    {
+      name: 'verifies tie-overflow Ranking failure with physical omitted',
+      fn: verifies_tie_overflow_failure_with_physical_omitted,
+    },
+  ]
 
 let passed = 0
 let failed = 0

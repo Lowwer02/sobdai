@@ -55,8 +55,10 @@ import {
   type ShortfallReport,
   type SlotIndex,
 } from './contracts'
+import type { AssemblyRequest } from '../reader/contracts'
 import { stableStringify } from '../shared/testing/determinism'
-import { buildConstraintSnapshot } from '../shared/testing/fixtures'
+import { buildAssemblyRequest, buildConstraintSnapshot } from '../shared/testing/fixtures'
+import { projectConstraintSnapshot } from './constraint-snapshot'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -523,9 +525,25 @@ function verifies_constraint_snapshot_shape_is_read_only_projection(): void {
   assert.ok(snapshot.duplicatePrevention.length > 0)
   assert.ok(snapshot.loDistribution.targets.LO1 > 0)
   assert.ok(snapshot.documentRegistry.every((entry) => entry.id.length > 0))
+  assert.equal(snapshot.patternDistributionTargets, undefined)
   assert.ok(!('identity' in snapshot))
   assert.ok(!('exclusions' in snapshot))
   assert.ok(!('meta' in snapshot))
+
+  // Test patternDistributionTargets projection when present
+  const reqWithPattern: AssemblyRequest = {
+    ...buildAssemblyRequest(),
+    patternDistributionTargets: [{ pattern: 'Positive', min: 10, max: 20, target: 15 }],
+  }
+  const snapshotWithPattern = projectConstraintSnapshot(reqWithPattern)
+  assert.ok(snapshotWithPattern.patternDistributionTargets !== undefined)
+  assert.equal(snapshotWithPattern.patternDistributionTargets.length, 1)
+  assert.deepEqual(snapshotWithPattern.patternDistributionTargets[0], {
+    pattern: 'Positive',
+    min: 10,
+    max: 20,
+    target: 15,
+  })
 }
 
 // ═══ CandidateStatistics counts ══════════════════════════════════════════

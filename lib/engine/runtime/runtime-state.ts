@@ -8,6 +8,8 @@
  * scoring, ranking, filtering, persistence, or application behavior.
  */
 
+import type { PhysicalSolverRun } from '../solver/physical-solver-orchestrator'
+import type { PhysicalSolverInput } from '../solver/set-solver-input'
 import type {
   AssemblyResult,
   EngineExecutionMetadata,
@@ -158,6 +160,12 @@ export interface RuntimeState {
   /** Solver-owned output, retained by reference. */
   readonly allocatedCandidateSet: AssemblyResult['allocatedCandidateSet']
 
+  /** Physical solver output, retained by reference. */
+  readonly physicalSolverResult: PhysicalSolverRun | null
+
+  /** Pre-tie physical ranking bridge sidecar. */
+  readonly physicalRankingBridge: PhysicalSolverInput | null
+
   /** Runtime-normalized warnings accumulated without mutation. */
   readonly warnings: AssemblyResult['warnings']
 
@@ -193,6 +201,8 @@ export function createRuntimeState(
     compositeScores: [],
     rankedCandidateSet: null,
     allocatedCandidateSet: null,
+    physicalSolverResult: null,
+    physicalRankingBridge: null,
     warnings: [],
     errors: [],
     snapshots: [],
@@ -320,6 +330,32 @@ export function withAllocatedCandidateSet(
 }
 
 /**
+ * Returns a new Runtime State carrying the PhysicalSolverRun.
+ */
+export function withPhysicalSolverResult(
+  state: RuntimeState,
+  physicalSolverResult: PhysicalSolverRun
+): RuntimeState {
+  return {
+    ...state,
+    physicalSolverResult,
+  }
+}
+
+/**
+ * Returns a new Runtime State carrying the PhysicalSolverInput bridge sidecar.
+ */
+export function withPhysicalRankingBridge(
+  state: RuntimeState,
+  physicalRankingBridge: PhysicalSolverInput
+): RuntimeState {
+  return {
+    ...state,
+    physicalRankingBridge,
+  }
+}
+
+/**
  * Appends normalized Runtime warnings without mutating either input array.
  *
  * @spec Assessment Engine Runtime API Specification v1.0 §7.4 and §8
@@ -372,6 +408,8 @@ export function captureExecutionSnapshot(
     compositeScores: state.compositeScores,
     rankedCandidateSet: state.rankedCandidateSet,
     allocatedCandidateSet: state.allocatedCandidateSet,
+    physicalSolverResult: state.physicalSolverResult,
+    physicalRankingBridge: state.physicalRankingBridge,
     warnings: state.warnings,
     errors: state.errors,
   }

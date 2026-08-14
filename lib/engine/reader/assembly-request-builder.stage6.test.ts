@@ -269,6 +269,7 @@ function verifies_assembly_request_omits_per_set_illustrative_tables(): void {
     'distributionConstraints',
     'coverageRules',
     'loDistribution',
+    'patternDistributionTargets',
     'duplicatePrevention',
     'exclusions',
     'meta',
@@ -276,6 +277,16 @@ function verifies_assembly_request_omits_per_set_illustrative_tables(): void {
   for (const k of keys) {
     assert.ok(allowedKeys.has(k), `AssemblyRequest carries unexpected key: ${k}`)
   }
+}
+
+function verifies_pattern_distribution_targets_carried(): void {
+  const { result } = buildFromFixture()
+  if (!result.ok) return assert.fail()
+  const req: AssemblyRequest = result.request
+  assert.ok(req.patternDistributionTargets !== undefined)
+  assert.equal(req.patternDistributionTargets.length, 6)
+  const pos = req.patternDistributionTargets.find((p) => p.pattern === 'Positive')
+  assert.deepEqual(pos, { pattern: 'Positive', min: 35, max: 40, target: 38 })
 }
 
 // ─── runner ─────────────────────────────────────────────────────────────────
@@ -288,6 +299,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'Distribution Constraints carried (sumPerSet, tier floors, anchor)', fn: verifies_distribution_constraints_carried },
   { name: 'Coverage Rules carried with typed bindings', fn: verifies_coverage_rules_carried_with_bindings },
   { name: 'LO Distribution: targets + typeMap populated', fn: verifies_lo_distribution_targets_and_type_map },
+  { name: 'Pattern Distribution Targets carried when present in AST', fn: verifies_pattern_distribution_targets_carried },
   { name: 'Duplicate Prevention: 5 L-rules with similarity thresholds attached', fn: verifies_duplicate_prevention_all_five_with_thresholds },
   { name: 'exclusions empty by default (runtime-only)', fn: verifies_exclusions_empty_by_default },
   { name: "meta.specVersion is constant '1.0'", fn: verifies_meta_spec_version_is_constant_1_0 },

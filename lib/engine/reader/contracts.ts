@@ -251,6 +251,17 @@ export interface AssemblyRequestMeta {
  *  A byte-identical Blueprint produces a byte-identical AssemblyRequest. This is
  *  verified by a property test in the Reader's acceptance criteria (E-1.2 S-1.2.6).
  */
+/**
+ * Pattern distribution target entry. From Blueprint "Pattern Distribution Target" table.
+ * Static desired target bounds per QuestionPattern.
+ */
+export interface PatternDistributionTarget {
+  readonly pattern: QuestionPattern
+  readonly min: number
+  readonly max: number
+  readonly target: number
+}
+
 export interface AssemblyRequest {
   /** Blueprint identity (id + version + profile). */
   identity: AssemblyRequestIdentity
@@ -266,6 +277,8 @@ export interface AssemblyRequest {
   coverageRules: CoverageRule[]
   /** LO1–LO4 percentage targets + LO↔BlueprintType correspondence. */
   loDistribution: LoDistribution
+  /** Static desired targets for Question Patterns (when declared by Blueprint). */
+  patternDistributionTargets?: PatternDistributionTarget[]
   /** L1–L5 with scope, enforcement level, optional similarity thresholds. */
   duplicatePrevention: DuplicatePreventionRule[]
   /** Runtime-only: Question Codes to exclude from this run (not persisted). */

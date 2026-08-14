@@ -112,14 +112,14 @@ function verifies_complete_pipeline_and_single_bank_read(): void {
 function verifies_component_fatal_is_forwarded(): void {
   const row = eligibleRow('Q-000001')
   const {
-    questionPattern: omittedQuestionPattern,
-    ...rowWithoutQuestionPattern
+    learningObjective: omittedLearningObjective,
+    ...rowWithoutLearningObjective
   } = row
-  void omittedQuestionPattern
+  void omittedLearningObjective
 
   const result = runGenerator({
     assemblyRequest: minimalRequest(),
-    bank: new CountingBankAdapter([rowWithoutQuestionPattern]),
+    bank: new CountingBankAdapter([rowWithoutLearningObjective]),
     identity: IDENTITY,
   })
 
@@ -194,6 +194,149 @@ function verifies_production_runtime_has_no_testing_dependency(): void {
   assert.doesNotMatch(source, /shared\/testing/)
 }
 
+function requestWithLo1Shortfall(): AssemblyRequest {
+  return buildAssemblyRequest({
+    documentRegistry: [
+      buildDocument({
+        id: 'LAW-ACT-HED-2562',
+        name: 'LAW-ACT-HED-2562',
+        tier: 1,
+      }),
+    ],
+    loDistribution: {
+      targets: { LO1: 1, LO2: 0, LO3: 0, LO4: 0 } as never,
+      typeMap: {
+        LO1: ['Memory'],
+        LO2: ['Concept'],
+        LO3: ['Procedure'],
+        LO4: ['Scenario'],
+      },
+    },
+  })
+}
+
+function hundredFullRows(): BankMetadataRow[] {
+  const rows: BankMetadataRow[] = []
+  for (let i = 1; i <= 100; i++) {
+    rows.push(
+      eligibleRow(`Q-FULL-${i}`, {
+        topic: `topic-${i}`,
+        questionPattern: 'Positive',
+      })
+    )
+  }
+  return rows
+}
+
+function verifies_expansion_case_1_unactivated_expansion_ignores_supplemental(): void {
+  const request = minimalRequest() // lo targets = 0, 100 distinct topics -> Pass -> expansion NOT activated
+  const bank = new CountingBankAdapter(hundredFullRows())
+  const supplementalRows = [
+    eligibleRow('Q-SUPP-1', { questionPattern: null }),
+  ]
+
+  const result = runGenerator({
+    assemblyRequest: request,
+    bank,
+    supplementalRows,
+    identity: IDENTITY,
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.candidateSet.patternAvailability, 'FULL')
+}
+
+function verifies_expansion_case_2_activated_expansion_includes_supplemental_null(): void {
+  const request = requestWithLo1Shortfall() // target 10 -> 1 initial row -> shortfall Warning -> expansion ACTIVATED
+  const bank = new CountingBankAdapter([
+    eligibleRow('Q-000001', { questionPattern: 'Positive' }),
+  ])
+  const supplementalRows = [
+    eligibleRow('Q-SUPP-1', { questionPattern: null }),
+  ]
+
+  const result = runGenerator({
+    assemblyRequest: request,
+    bank,
+    supplementalRows,
+    identity: IDENTITY,
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.candidateSet.patternAvailability, 'PARTIAL')
+}
+
+function verifies_expansion_case_3_activated_expansion_initial_unavailable_supp_populated(): void {
+  const request = requestWithLo1Shortfall()
+  const bank = new CountingBankAdapter([
+    eligibleRow('Q-000001', { questionPattern: null }),
+  ])
+  const supplementalRows = [
+    eligibleRow('Q-SUPP-1', { questionPattern: 'Positive' }),
+  ]
+
+  const result = runGenerator({
+    assemblyRequest: request,
+    bank,
+    supplementalRows,
+    identity: IDENTITY,
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.candidateSet.patternAvailability, 'PARTIAL')
+}
+
+function verifies_expansion_case_4_structural_purity_includes_secondary_rejected_supplemental(): void {
+  const request = requestWithLo1Shortfall()
+  const bank = new CountingBankAdapter([
+    eligibleRow('Q-000001', { questionPattern: 'Positive' }),
+  ])
+  const supplementalRows = [
+    // Q1: Published + correct document + Pattern NULL, but invalid difficulty (rejected secondary)
+    eligibleRow('Q-SUPP-1', { questionPattern: null, difficulty: 'Corrupt' as never }),
+    // Q2: Published + correct document + Pattern Positive (accepted)
+    eligibleRow('Q-SUPP-2', { questionPattern: 'Positive', difficulty: 'Easy' }),
+  ]
+
+  const result = runGenerator({
+    assemblyRequest: request,
+    bank,
+    supplementalRows,
+    identity: IDENTITY,
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.candidateSet.patternAvailability, 'PARTIAL')
+}
+
+function verifies_expansion_case_5_structurally_invalid_supplemental_has_no_effect(): void {
+  const request = requestWithLo1Shortfall()
+  const bank = new CountingBankAdapter([
+    eligibleRow('Q-000001', { questionPattern: 'Positive' }),
+  ])
+  const supplementalRows = [
+    // Wrong document -> excluded structurally
+    eligibleRow('Q-SUPP-1', { document: 'WRONG-DOC', questionPattern: null }),
+    // Unpublished -> excluded structurally
+    eligibleRow('Q-SUPP-2', { status: 'Draft', questionPattern: null }),
+  ]
+
+  const result = runGenerator({
+    assemblyRequest: request,
+    bank,
+    supplementalRows,
+    identity: IDENTITY,
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.candidateSet.patternAvailability, 'FULL')
+}
+
 const tests: readonly { readonly name: string; readonly fn: () => void }[] = [
   {
     name: 'executes the complete pipeline and reads the Bank once',
@@ -218,6 +361,26 @@ const tests: readonly { readonly name: string; readonly fn: () => void }[] = [
   {
     name: 'has no production dependency on testing fixtures',
     fn: verifies_production_runtime_has_no_testing_dependency,
+  },
+  {
+    name: 'Case 1: unactivated expansion ignores supplemental rows',
+    fn: verifies_expansion_case_1_unactivated_expansion_ignores_supplemental,
+  },
+  {
+    name: 'Case 2: activated expansion includes supplemental null pattern',
+    fn: verifies_expansion_case_2_activated_expansion_includes_supplemental_null,
+  },
+  {
+    name: 'Case 3: activated expansion initial unavailable + supp populated = PARTIAL',
+    fn: verifies_expansion_case_3_activated_expansion_initial_unavailable_supp_populated,
+  },
+  {
+    name: 'Case 4: structural purity includes secondary-rejected supplemental row',
+    fn: verifies_expansion_case_4_structural_purity_includes_secondary_rejected_supplemental,
+  },
+  {
+    name: 'Case 5: structurally invalid supplemental rows have no effect',
+    fn: verifies_expansion_case_5_structurally_invalid_supplemental_has_no_effect,
   },
 ]
 

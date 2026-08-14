@@ -44,6 +44,12 @@ import type {
   RankingWarning,
   TieBreakerSource,
   TieGroup,
+  AxisProfile,
+  CandidateProfile,
+  SetCandidateProfiles,
+  PreTieAxisProfile,
+  PreTieCandidateProfile,
+  PreTieSetCandidateProfiles,
 } from './contracts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -541,6 +547,69 @@ function verifies_no_ranking_logic_keywords(): void {
   }
 }
 
+function verifies_pretie_profile_contracts(): void {
+  // 1. PreTieAxisProfile contains NO rank field and maps to composite score
+  const composite = mkComposite()
+  const preTieAxis: PreTieAxisProfile = {
+    slotId: 'slot-1',
+    slot: mkSlot(),
+    compositeScore: composite,
+  }
+  assert.equal(preTieAxis.slotId, 'slot-1')
+  assert.equal(preTieAxis.compositeScore, composite)
+  // @ts-expect-error — PreTieAxisProfile has no rank
+  preTieAxis.rank = 1
+
+  // 2. PreTieCandidateProfile preserves questionCode, candidate reference, and suitabilityProfiles shape
+  const candidate = mkCandidate()
+  const preTieCandidate: PreTieCandidateProfile = {
+    questionCode: 'Q-000001',
+    candidate,
+    suitabilityProfiles: [preTieAxis],
+  }
+  assert.equal(preTieCandidate.questionCode, 'Q-000001')
+  assert.equal(preTieCandidate.candidate, candidate)
+  assert.equal(preTieCandidate.suitabilityProfiles[0], preTieAxis)
+
+  // 3. Empty suitabilityProfiles is valid
+  const emptyPreTieCandidate: PreTieCandidateProfile = {
+    questionCode: 'Q-000002',
+    candidate,
+    suitabilityProfiles: [],
+  }
+  assert.equal(emptyPreTieCandidate.suitabilityProfiles.length, 0)
+
+  // 4. PreTieSetCandidateProfiles preserves setNumber and profiles array
+  const preTieSet: PreTieSetCandidateProfiles = {
+    setNumber: 1,
+    profiles: [preTieCandidate],
+  }
+  assert.equal(preTieSet.setNumber, 1)
+  assert.equal(preTieSet.profiles[0], preTieCandidate)
+
+  // 5. Existing AxisProfile still requires/contains a legitimate rank
+  const postTieAxis: AxisProfile = {
+    slotId: 'slot-1',
+    slot: mkSlot(),
+    rank: 3,
+    compositeScore: composite,
+  }
+  assert.equal(postTieAxis.rank, 3)
+
+  // 6. Existing CandidateProfile & SetCandidateProfiles behavior is unchanged
+  const postTieCandidate: CandidateProfile = {
+    questionCode: 'Q-000001',
+    candidate,
+    suitabilityProfiles: [postTieAxis],
+  }
+  const postTieSet: SetCandidateProfiles = {
+    setNumber: 1,
+    profiles: [postTieCandidate],
+  }
+  assert.equal(postTieSet.profiles[0].suitabilityProfiles[0].rank, 3)
+}
+
+
 // ═══ runner ═══════════════════════════════════════════════════════════════
 
 const tests: Array<{ name: string; fn: () => void }> = [
@@ -565,6 +634,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'No forbidden imports or side-effect APIs in contracts.ts', fn: verifies_contract_file_has_no_forbidden_imports },
   { name: 'No duplicate Scoring contracts are defined', fn: verifies_no_duplicate_scoring_contracts_are_defined },
   { name: 'No ranking/scoring/solver logic keywords in contracts.ts', fn: verifies_no_ranking_logic_keywords },
+  { name: 'Pre-tie candidate profile contracts compile and preserve invariants', fn: verifies_pretie_profile_contracts },
 ]
 
 let passed = 0

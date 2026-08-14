@@ -15,12 +15,15 @@ import {
 
 const QUESTION_BANK_PAGE_SIZE = 1_000
 
-export interface AdminGenerateAssessmentInput {
-  readonly blueprintKey: AdminAssessmentBlueprintKey
-  readonly targetSetCount?: 1 | 2 | 3 | 4 | 5
-  readonly overFetchFactor: number
-  readonly auditVerbosity: 'summary' | 'full'
-}
+import {
+  resolveAdminExecutionOptions,
+  validateAdminGenerateInput,
+  type AdminGenerateAssessmentInput,
+} from './admin-options'
+
+import { resolveDocumentIdentity } from './document-identity'
+
+export type { AdminGenerateAssessmentInput }
 
 /**
  * Admin Server Action transport for the GenerateAssessmentAction use case.
@@ -80,7 +83,7 @@ export async function generateAssessmentAdminAction(
           return bankRows.map((row) => ({
             questionCode: row.question_code,
             subject: row.subject,
-            document: row.document ?? '',
+            document: resolveDocumentIdentity(row.document ?? ''),
             topic: row.topic,
             law: row.law,
             difficulty: row.difficulty,
@@ -101,6 +104,11 @@ export async function generateAssessmentAdminAction(
       isCancellationRequested: () => false,
     })
 
+    // Registry policy is authoritative: the characterized Physical Solver
+    // budget for this blueprint always wins over any caller-supplied value
+    // (see resolveAdminExecutionOptions). Validation order is unchanged.
+    const options = resolveAdminExecutionOptions(input, blueprint.key)
+
     const response = action.execute({
       blueprint: {
         id: blueprint.id,
@@ -112,13 +120,7 @@ export async function generateAssessmentAdminAction(
         targetVersion: '1.0',
         minimumVersion: '1.0',
       },
-      options: {
-        overFetchFactor: input.overFetchFactor,
-        performanceBudgetMs: null,
-        parallelismHint: null,
-        auditVerbosity: input.auditVerbosity,
-        targetSetCount: input.targetSetCount,
-      },
+      options,
       context: {
         requestedBy: profile.email ?? user.id,
         submittedAtIso,
@@ -234,44 +236,4 @@ function applicationErrorMessage(error: unknown): string {
     return error.message
   }
   return 'Assessment generation could not be completed.'
-}
-
-function validateAdminGenerateInput(
-  input: AdminGenerateAssessmentInput
-): string | null {
-  const value: unknown = input
-  if (typeof value !== 'object' || value === null) {
-    return 'Generation settings are required.'
-  }
-
-  if (
-    typeof input.blueprintKey !== 'string' ||
-    input.blueprintKey.trim().length === 0
-  ) {
-    return 'Select a supported Assessment Blueprint.'
-  }
-
-  if (
-    ![1, 1.5, 2, 3].includes(input.overFetchFactor)
-  ) {
-    return 'Candidate headroom must be one of the supported values.'
-  }
-
-  if (
-    input.targetSetCount !== undefined &&
-    (!Number.isInteger(input.targetSetCount) ||
-      input.targetSetCount < 1 ||
-      input.targetSetCount > 5)
-  ) {
-    return 'Target set count must be between 1 and 5 sets.'
-  }
-
-  if (
-    input.auditVerbosity !== 'summary' &&
-    input.auditVerbosity !== 'full'
-  ) {
-    return 'Audit detail must be summary or full.'
-  }
-
-  return null
 }

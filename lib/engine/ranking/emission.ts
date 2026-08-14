@@ -20,15 +20,18 @@
  *    use time, randomness, or hidden state.
  */
 
-import type { CandidateSet } from '../generator/contracts'
+import type { Candidate, CandidateSet } from '../generator/contracts'
 import type { ComponentId } from '../scoring/contracts'
 import type {
+  AxisProfile,
+  CandidateProfile,
   NeighborComparison,
   OrderingReason,
   RankedCandidate,
   RankedCandidateSet,
   RankedSlot,
   RankedSlotSummary,
+  SetCandidateProfiles,
 } from './contracts'
 import type {
   TieResolvedCandidate,
@@ -71,6 +74,8 @@ export function emitRankedCandidateSet(
     emitRankedSlot(slot, knownCodes)
   )
 
+  const setProfiles = buildSetProfiles(slots, input.candidateSet)
+
   return {
     identity: {
       candidateSetId: input.candidateSet.identity.assemblyRequestId,
@@ -79,6 +84,7 @@ export function emitRankedCandidateSet(
     },
     candidateSet: input.candidateSet,
     slots,
+    setProfiles,
     shortfallReport: input.candidateSet.shortfallReport,
     coverageSatisfaction: input.candidateSet.coverageSatisfaction,
     constraintSnapshot: input.candidateSet.constraintSnapshot,
@@ -251,4 +257,92 @@ function componentIdsFromComposite(
   composite: TieResolvedCandidate['orderingCandidate']['composite']
 ): readonly ComponentId[] {
   return composite.breakdown.contributions.map((contribution) => contribution.component.componentId)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. Candidate-centric projection (Phase 2B bridge)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Build the additive per-Set candidate-centric projection from the SAME
+ * tie-resolved data already emitted into `slots`. This is a read-only pivot:
+ * it does not mutate or reorder `slots`, `rankedCandidates`, ranks, or
+ * CompositeScores. Each questionCode appears exactly once per Set, carrying
+ * every AxisProfile for the slots it was evaluated against.
+ *
+ * Determinism (Phase 2B §3):
+ *  - setProfiles ordered by setNumber ascending.
+ *  - profiles ordered by questionCode lexical ascending (presentation/index
+ *    order only — NOT a Ranking result).
+ *  - suitabilityProfiles ordered by stable slot identity (slotId) ascending.
+ *
+ * There is intentionally NO global/aggregated candidate score on the output.
+ */
+function buildSetProfiles(
+  slots: readonly RankedSlot[],
+  candidateSet: CandidateSet
+): readonly SetCandidateProfiles[] | undefined {
+  const targetSetCount = candidateSet.constraintSnapshot.target.sets
+
+  // Build a lookup map from the slots: key = `${setNumber}\u0000${questionCode}` -> AxisProfile[]
+  const axesBySetAndCode = new Map<string, AxisProfile[]>()
+  for (const slot of slots) {
+    const setNumber = slot.slot.setNumber
+    for (const ranked of slot.rankedCandidates) {
+      const key = `${setNumber}\u0000${ranked.code}`
+      const axis: AxisProfile = {
+        slotId: slot.slotId,
+        slot: slot.slot,
+        rank: ranked.rank,
+        compositeScore: ranked.composite,
+      }
+      const existing = axesBySetAndCode.get(key)
+      if (existing === undefined) {
+        axesBySetAndCode.set(key, [axis])
+      } else {
+        existing.push(axis)
+      }
+    }
+  }
+
+  // Pre-sort candidates by code for determinism
+  const sortedCandidates = [...candidateSet.candidates].sort((a, b) =>
+    compareStrings(a.identity.questionCode, b.identity.questionCode)
+  )
+
+  const setNumbers = Array.from({ length: targetSetCount }, (_, i) => i + 1)
+  const result: SetCandidateProfiles[] = setNumbers.map((setNum) => {
+    const profiles: CandidateProfile[] = sortedCandidates.map((candidate) => {
+      const code = candidate.identity.questionCode
+      const key = `${setNum}\u0000${code}`
+      const matches = axesBySetAndCode.get(key) ?? []
+
+      const suitabilityProfiles = [...matches].sort(compareAxisProfileBySlotId)
+
+      return {
+        questionCode: code,
+        candidate,
+        suitabilityProfiles,
+      }
+    })
+
+    return {
+      setNumber: setNum as 1 | 2 | 3 | 4 | 5,
+      profiles,
+    }
+  })
+
+  return result.length > 0 ? result : undefined
+}
+
+function compareAxisProfileBySlotId(a: AxisProfile, b: AxisProfile): number {
+  return compareStrings(a.slotId, b.slotId)
+}
+
+function compareCandidateProfileByCode(a: CandidateProfile, b: CandidateProfile): number {
+  return compareStrings(a.questionCode, b.questionCode)
+}
+
+function compareStrings(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
 }

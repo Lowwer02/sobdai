@@ -61,6 +61,7 @@ import type {
   DuplicatePreventionRule,
   EnforcementLevel,
   LoDistribution,
+  PatternDistributionTarget,
   RunTarget,
   SimilarityThresholds,
   Tier,
@@ -217,6 +218,8 @@ export function buildAssemblyRequest(
     ast.similarityThresholds
   )
 
+  const patternDistributionTargets = buildPatternDistributionTargets(ast)
+
   const setsCount =
     typeof options?.targetSetCount === 'number' &&
     Number.isInteger(options.targetSetCount) &&
@@ -239,6 +242,7 @@ export function buildAssemblyRequest(
     distributionConstraints,
     coverageRules,
     loDistribution,
+    patternDistributionTargets,
     duplicatePrevention,
     exclusions: [], // Runtime-only; Stage 6 emits empty.
     meta: { specVersion: SPEC_VERSION },
@@ -369,6 +373,23 @@ function buildDuplicatePrevention(
     out.push(rule)
   }
   return out
+}
+
+/**
+ * Build pattern distribution targets array from the AST.
+ * Drops AST-only `sourceLocation` property. Returns undefined if the AST
+ * carried no pattern distribution targets.
+ */
+function buildPatternDistributionTargets(
+  ast: BlueprintAst
+): PatternDistributionTarget[] | undefined {
+  if (ast.patternDistributionTargets.length === 0) return undefined
+  return ast.patternDistributionTargets.map((pt) => ({
+    pattern: pt.pattern,
+    min: pt.min,
+    max: pt.max,
+    target: pt.target,
+  }))
 }
 
 // ─── Unused-type-arity silencer (keep helpers uniform) ──────────────────────

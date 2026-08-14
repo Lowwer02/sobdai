@@ -16,6 +16,7 @@ import type {
 } from '../generator/contracts'
 import { runGenerator } from '../generator/runtime'
 import type {
+  CandidateRankingResult,
   RankingDiagnostic,
   RankingWarning,
 } from '../ranking/contracts'
@@ -63,7 +64,11 @@ import {
   withRankedCandidateSet,
   type RuntimeState,
   type StageStatus,
+  withPhysicalSolverResult,
+  withPhysicalRankingBridge,
 } from './runtime-state'
+import { solvePhysicalAssignments } from '../solver/physical-solver-orchestrator'
+import { buildPhysicalCandidateProfiles } from '../ranking/physical-profiles'
 
 const RUNTIME_API_VERSION = '1.0'
 const ENGINE_VERSION = '1.0.0'
@@ -79,13 +84,13 @@ const RUNTIME_MODULE_VERSIONS: EngineExecutionMetadata['moduleVersions'] = {
 
 type StageExecutionOutcome =
   | {
-      readonly ok: true
-      readonly state: RuntimeState
-    }
+    readonly ok: true
+    readonly state: RuntimeState
+  }
   | {
-      readonly ok: false
-      readonly state: RuntimeState
-    }
+    readonly ok: false
+    readonly state: RuntimeState
+  }
 
 /**
  * Executes one complete Assessment Engine pipeline.
@@ -263,17 +268,17 @@ function executeReader(
         errors.length > 0
           ? errors
           : [
-              engineError({
-                category: 'Blueprint Error',
-                location: 'Reader:Blueprint source',
-                severity: 'fatal',
-                explanation:
-                  'Reader rejected the Blueprint before an AssemblyRequest could be produced.',
-                recommendation:
-                  'Provide a non-empty Blueprint that conforms to the supported Blueprint schema.',
-                module: 'Reader',
-              }),
-            ]
+            engineError({
+              category: 'Blueprint Error',
+              location: 'Reader:Blueprint source',
+              severity: 'fatal',
+              explanation:
+                'Reader rejected the Blueprint before an AssemblyRequest could be produced.',
+              recommendation:
+                'Provide a non-empty Blueprint that conforms to the supported Blueprint schema.',
+              module: 'Reader',
+            }),
+          ]
       ),
     }
   }
@@ -348,12 +353,26 @@ function executeScoring(
   }
 
   const output = runScoring(state.candidateSet)
+  let nextState = withCompositeScores(
+    state,
+    output.composites.composites
+  )
+
+  if (state.request.options.physicalSolver !== undefined) {
+    const setProfiles = buildPhysicalCandidateProfiles(
+      state.candidateSet,
+      output.composites.composites
+    )
+
+    nextState = withPhysicalRankingBridge(nextState, {
+      candidateSet: state.candidateSet,
+      setProfiles,
+    })
+  }
+
   return {
     ok: true,
-    state: withCompositeScores(
-      state,
-      output.composites.composites
-    ),
+    state: nextState,
   }
 }
 
@@ -368,22 +387,63 @@ function executeRanking(
     )
   }
 
-  const result = runRanking({
-    candidateSet: state.candidateSet,
-    compositeScores: state.compositeScores,
-  })
+  // Legacy Ranking may throw (e.g. unresolved tie overflow). The throw is
+  // captured here so the pre-tie Physical Solver bridge below still executes,
+  // then the exact legacy error semantics are reconstructed via
+  // unexpectedStageError('Ranking', ...). runRanking itself is unchanged.
+  let thrownRankingError: unknown = null
+  let rankingOutcome: CandidateRankingResult | null = null
+  try {
+    rankingOutcome = runRanking({
+      candidateSet: state.candidateSet,
+      compositeScores: state.compositeScores,
+    })
+  } catch (error: unknown) {
+    thrownRankingError = error
+  }
+
+  let nextState = state
+
+  if (
+    state.request.options.physicalSolver !== undefined &&
+    state.physicalRankingBridge !== null
+  ) {
+    const budget = {
+      maxNodesVisited:
+        state.request.options.physicalSolver.maxNodesVisited,
+    }
+    const physicalRun = solvePhysicalAssignments(
+      state.physicalRankingBridge,
+      budget
+    )
+    nextState = withPhysicalSolverResult(nextState, physicalRun)
+  }
+
+  if (thrownRankingError !== null) {
+    return {
+      ok: false,
+      state: appendRuntimeErrors(nextState, [
+        unexpectedStageError('Ranking', thrownRankingError),
+      ]),
+    }
+  }
+
+  // rankingOutcome is defined here because thrownRankingError === null means
+  // runRanking returned normally.
+  const result = rankingOutcome!
+
   if (!result.ok) {
     return {
       ok: false,
       state: appendRuntimeErrors(
-        state,
+        nextState,
         result.fatalDiagnostics.map(rankingError)
       ),
     }
   }
 
-  let nextState = withRankedCandidateSet(
-    state,
+  nextState = withRankedCandidateSet(
+    nextState,
     result.rankedCandidateSet
   )
   nextState = withModuleVersions(nextState, {
@@ -689,7 +749,7 @@ function generatorError(
 ): EngineError {
   const category: ErrorCategory =
     diagnostic.category === 'bank_unreachable' ||
-    diagnostic.category === 'missing_required_axis'
+      diagnostic.category === 'missing_required_axis'
       ? 'Dependency Error'
       : diagnostic.category === 'document_registry_mismatch'
         ? 'Blueprint Error'
@@ -788,8 +848,8 @@ function solverError(
     diagnostic.category === 'version_mismatch'
       ? 'Version Error'
       : diagnostic.category === 'runtime_inconsistency' ||
-          diagnostic.category === 'invalid_runtime_state' ||
-          diagnostic.category === 'corrupted_allocation'
+        diagnostic.category === 'invalid_runtime_state' ||
+        diagnostic.category === 'corrupted_allocation'
         ? 'Runtime Error'
         : 'Constraint Error'
 
@@ -936,6 +996,7 @@ function assembleEngineResponse(
     compositeScores: state.compositeScores,
     rankedCandidateSet: state.rankedCandidateSet,
     allocatedCandidateSet: state.allocatedCandidateSet,
+    physicalSolverResult: state.physicalSolverResult,
     warnings: state.warnings,
     errors: state.errors,
     execution: state.execution,

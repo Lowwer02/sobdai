@@ -24,6 +24,7 @@ import type {
 import type { ObservabilitySink } from '../shared/observability'
 import type { BankReadAdapter } from '../shared/question-bank'
 import type { AllocatedCandidateSet } from '../solver/contracts'
+import type { PhysicalSolverRun } from '../solver/physical-solver-orchestrator'
 
 /**
  * Application-supplied metadata about the environment in which an Engine
@@ -49,6 +50,10 @@ export interface EngineRuntimeContext {
 
   /** Optional parent span identifier associated with `traceId`. */
   readonly parentSpanId: string | null
+}
+
+export interface PhysicalSolverExecutionOptions {
+  readonly maxNodesVisited: number
 }
 
 /**
@@ -81,6 +86,9 @@ export interface EngineExecutionOptions {
 
   /** Target number of sets to produce (1–5). Defaults to 5 if omitted. */
   readonly targetSetCount?: 1 | 2 | 3 | 4 | 5
+
+  /** Configuration for the physical solver, if explicitly requested. */
+  readonly physicalSolver?: PhysicalSolverExecutionOptions
 }
 
 /**
@@ -273,6 +281,9 @@ export interface AssemblyResult {
 
   /** Solver-owned output, or `null` when Solver did not emit it. */
   readonly allocatedCandidateSet: AllocatedCandidateSet | null
+
+  /** Physical solver outputs, or `null` if physical solver did not execute. */
+  readonly physicalSolverResult: PhysicalSolverRun | null
 
   /** Normalized non-fatal issues collected from every stage that ran. */
   readonly warnings: readonly EngineWarning[]

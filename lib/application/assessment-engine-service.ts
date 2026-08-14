@@ -167,6 +167,22 @@ function validateRequest(request: EngineRequest): void {
     invalidRequest('options.targetSetCount')
   }
 
+  if (value.options.physicalSolver !== undefined) {
+    const ps = value.options.physicalSolver
+    if (!isRecord(ps)) {
+      invalidRequest('options.physicalSolver')
+    }
+    const maxNodes = ps.maxNodesVisited
+    if (
+      typeof maxNodes !== 'number' ||
+      !Number.isInteger(maxNodes) ||
+      !Number.isFinite(maxNodes) ||
+      maxNodes <= 0
+    ) {
+      invalidRequest('options.physicalSolver.maxNodesVisited')
+    }
+  }
+
   if (!isRecord(value.context)) {
     invalidRequest('context')
   }
