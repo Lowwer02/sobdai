@@ -1,7 +1,7 @@
 import { requirePermission } from '@/lib/auth/server-protect'
 import SummaryEditor from '@/components/admin/SummaryEditor'
 import { updateSummary } from '../../actions'
-import { redirect, notFound } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import {
   assertPackageIdsAvailable,
   deriveSummaryKind,
@@ -61,9 +61,6 @@ export default async function EditSummaryPage({ params }: { params: Promise<{ id
   const handleUpdate = async (data: any) => {
     'use server'
     const res = await updateSummary(id, data)
-    if (res.success) {
-      redirect('/admin/summaries')
-    }
     return res
   }
 

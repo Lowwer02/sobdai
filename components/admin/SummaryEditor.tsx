@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { SUBJECTS, UNASSIGNED_SUBJECT, getSubjectDropdownOptions } from '@/lib/subjects'
 import {
@@ -65,6 +66,7 @@ export default function SummaryEditor({
   summaryKind,
   selectedPackageIds,
 }: SummaryEditorProps) {
+  const router = useRouter()
   const initialPackages = selectedPackageIds
     ? [...selectedPackageIds]
     : initialData?.package_id
@@ -172,6 +174,7 @@ export default function SummaryEditor({
         setError(res.error || 'Failed to save summary')
       } else {
         setIsDirty(false)
+        router.push('/admin/summaries')
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Failed to save summary')

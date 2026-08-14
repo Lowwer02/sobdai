@@ -11,6 +11,14 @@ const actionsSource = readFileSync(
   join(process.cwd(), 'app/admin/summaries/actions.ts'),
   'utf8',
 )
+const createPageSource = readFileSync(
+  join(process.cwd(), 'app/admin/summaries/create/page.tsx'),
+  'utf8',
+)
+const editPageSource = readFileSync(
+  join(process.cwd(), 'app/admin/summaries/[id]/edit/page.tsx'),
+  'utf8',
+)
 const publicationDispatchSource = readFileSync(
   join(process.cwd(), 'app/admin/summaries/summary-publication-dispatch.ts'),
   'utf8',
@@ -66,4 +74,19 @@ test('Admin editor source does not expose internal membership terminology', () =
   assert.doesNotMatch(editorSource, /canonical Package/i)
   assert.doesNotMatch(editorSource, /package_summaries/i)
   assert.doesNotMatch(editorSource, /\bplacement\b/i)
+})
+
+test('successful Summary Save uses client navigation without surfacing NEXT_REDIRECT', () => {
+  const submitStart = editorSource.indexOf('const handleSubmit')
+  const renderStart = editorSource.indexOf('return (', submitStart)
+  const submitSource = editorSource.slice(submitStart, renderStart)
+
+  assert.match(editorSource, /useRouter/)
+  assert.match(submitSource, /if \(!res\.success\)[\s\S]*setError\(res\.error/)
+  assert.match(submitSource, /else \{[\s\S]*setIsDirty\(false\)[\s\S]*router\.push\('\/admin\/summaries'\)/)
+  assert.match(submitSource, /catch \(submitError\)/)
+  assert.doesNotMatch(createPageSource, /redirect\(/)
+  assert.doesNotMatch(editPageSource, /redirect\(/)
+  assert.match(createPageSource, /const res = await createSummary\(data\)[\s\S]*return res/)
+  assert.match(editPageSource, /const res = await updateSummary\(id, data\)[\s\S]*return res/)
 })
