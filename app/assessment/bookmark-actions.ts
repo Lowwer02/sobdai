@@ -22,16 +22,16 @@
  * review page; the button treats any failure as non-fatal and keeps the UI in
  * its prior state.
  *
- * NOTE on imports: the access-control constants (ACCESS_ORDER_STATUSES,
- * STAFF_ROLES) are imported from the PURE module lib/assessment/session-types
- * (the canonical source of truth — also used by session-actions.ts and the
- * exam route). They must NOT be redefined locally; a local copy would silently
- * drift from the real access gate. Only the pure id helpers (cleanId,
- * looksLikeUuid) come from saved-questions-data.ts.
+ * NOTE on imports: the paid/free access statuses remain in the pure assessment
+ * module, while the shared Owner/Admin internal Package-access helper comes
+ * from lib/auth/rbac.ts. These are not redefined locally so the customer gate
+ * cannot silently drift from the route and session gates. Only the pure id
+ * helpers (cleanId, looksLikeUuid) come from saved-questions-data.ts.
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { ACCESS_ORDER_STATUSES, STAFF_ROLES } from '@/lib/assessment/session-types'
+import { hasInternalPackageAccess } from '@/lib/auth/rbac'
+import { ACCESS_ORDER_STATUSES } from '@/lib/assessment/session-types'
 import { cleanId, looksLikeUuid } from '@/lib/assessment/saved-questions-data'
 
 // ─── Action result envelope ──────────────────────────────────────────────────
@@ -73,7 +73,7 @@ async function resolveUser(): Promise<{ id: string } | null> {
  * A learner may bookmark a question in an exam set iff ANY of:
  *   - the exam set is a sample (is_sample = true), OR
  *   - the learner has a completed order (status paid|free) for the package, OR
- *   - the learner's profile role is a staff role.
+ *   - the learner's profile role is owner or admin for internal Package access.
  *
  * Runs on the same cookie-bound client (RLS-aware). Returns true on grant,
  * false on denial. Never throws.
@@ -86,13 +86,13 @@ async function canAccessExamSet(
   // Sample sets are open to any authenticated user.
   if (examSet.is_sample) return true
 
-  // Staff bypass the order requirement.
+  // Only Owner/Admin internal Package access bypasses the order requirement.
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', userId)
     .single()
-  if (profile && (STAFF_ROLES as readonly string[]).includes(profile.role)) {
+  if (profile && hasInternalPackageAccess(profile.role)) {
     return true
   }
 
@@ -140,7 +140,7 @@ async function verifyBookmarkContext(
     return { ok: false, error: 'Exam set not found.' }
   }
 
-  // ── 2. Access gate (sample | order | staff) — same tree as the route.
+  // ── 2. Access gate (sample | paid/free order | Owner/Admin) — same tree as the route.
   const allowed = await canAccessExamSet(supabase, userId, {
     is_sample: examSet.is_sample,
     package_id: examSet.package_id,
@@ -209,7 +209,7 @@ export interface SaveBookmarkInput {
  *   - inputs are validated as non-empty uuid-shaped strings.
  *   - the question must be a member of the supplied exam set (membership gate).
  *   - the exam set must belong to the supplied package and be published.
- *   - the caller must pass the access gate (sample | order | staff).
+ *   - the caller must pass the access gate (sample | paid/free order | Owner/Admin).
  *   - when sourceAttemptId is supplied, it is verified as the caller's own
  *     completed attempt for the same exam set.
  *   - INSERT is idempotent: a repeat save for the same (question, exam_set) is

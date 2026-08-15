@@ -1,5 +1,19 @@
 export type Role = 'owner' | 'admin' | 'editor' | 'support' | 'user'
 
+/**
+ * Internal Package access is deliberately narrower than the staff boundary.
+ * These roles may bypass customer order entitlement on protected Package
+ * Summary and Exam routes; editor/support remain staff without that bypass.
+ */
+export const INTERNAL_PACKAGE_ACCESS_ROLES = ['owner', 'admin'] as const
+export type InternalPackageAccessRole = (typeof INTERNAL_PACKAGE_ACCESS_ROLES)[number]
+
+export function hasInternalPackageAccess(
+  role: string | null | undefined,
+): role is InternalPackageAccessRole {
+  return role === 'owner' || role === 'admin'
+}
+
 export type Permission = 
   // Content Management
   | 'content.read'

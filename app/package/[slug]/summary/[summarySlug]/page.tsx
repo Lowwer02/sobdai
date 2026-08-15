@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, LogIn } from 'lucide-react'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { hasInternalPackageAccess } from '@/lib/auth/rbac'
 import { getPublicSummaryRoute, listPublicPackageSummaries } from '@/lib/public-summary'
 import SummaryClient from './SummaryClient'
 import { createPageMetadata } from '@/lib/seo'
@@ -83,7 +84,7 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
 
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile && ['admin', 'owner', 'editor', 'support'].includes(profile.role)) {
+    if (profile && hasInternalPackageAccess(profile.role)) {
       hasAccess = true
     } else {
       const { data: order } = await supabase
