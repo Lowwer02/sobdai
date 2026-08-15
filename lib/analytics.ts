@@ -257,3 +257,26 @@ export function trackSocialFollowClick(params: {
     content_id: params.content_id,
   })
 }
+
+/**
+ * Track successful claiming of a free package.
+ */
+export function freePackageClaimed(
+  packageId: string | number,
+  packageName: string
+): void {
+  pushToDataLayer({
+    event: 'free_package_claimed',
+    ecommerce: {
+      currency: 'THB',
+      value: 0,
+      items: [
+        {
+          item_id: String(packageId),
+          item_name: packageName,
+          price: 0,
+        },
+      ],
+    },
+  })
+}
