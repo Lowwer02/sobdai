@@ -2,8 +2,9 @@
  * Public Summary read boundary for the frozen Legacy/KP hybrid state.
  *
  * Legacy rows are intentionally read from their grandfathered `summaries`
- * fields. KP-native rows are read from the frozen public projections, where
- * the active Package membership and published revision are resolved together.
+ * fields. KP-native Package cards are read from the locked metadata-only
+ * discovery RPC, while protected Summary content is resolved separately by
+ * the route RPC with the active membership and published-revision gates.
  * The two branches must stay separate so a KP row can never fall back to
  * `summaries.content_md` or another Legacy field for public content.
  */
@@ -111,41 +112,10 @@ const LEGACY_SUMMARY_ROUTE_COLUMNS = [
   'is_published',
 ].join(', ')
 
-// This projection deliberately contains no compatibility-marker column. All
-// active memberships are product memberships, including marker=false rows.
-const KP_PACKAGE_SUMMARY_LIST_COLUMNS = [
-  'package_id',
-  'package_slug',
-  'package_name',
-  'package_is_published',
-  'summary_id',
-  'placement_status',
-  'version_policy',
-  'pinned_summary_version_id',
-  'sort_order',
-  'display_order',
-  'released_at',
-  'navigation_label',
-  'legacy_slug',
-  'summary_code',
-  'canonical_slug',
-  'canonical_title',
-  'subject',
-  'topic',
-  'law',
-  'visibility',
-  'lifecycle_status',
-  'summary_version_id',
-  'revision_number',
-  'version_status',
-  'content_checksum',
-  'title_snapshot',
-  'subject_snapshot',
-  'topic_snapshot',
-  'law_snapshot',
-  'read_time_minutes',
-  'version_published_at',
-].join(', ')
+// Package-card discovery is deliberately separate from the protected
+// content-bearing projection. The RPC returns only the metadata required to
+// render a Package listing; route/content authorization remains downstream.
+const KP_PACKAGE_SUMMARY_CARD_RPC = 'kp_read_package_summary_cards'
 
 const KP_SUMMARY_ROUTE_FUNCTION = 'kp_read_summary_route'
 
@@ -293,6 +263,50 @@ function normalizeKpListRow(
   packageId: string,
   roots: KpRootPublicationMap,
 ): PublicSummaryListItem | null {
+  // 075 discovery rows are already filtered by the locked metadata-only RPC.
+  // They intentionally do not contain membership internals, revision IDs, or
+  // body fields. Treat a present-but-null summary_slug as malformed rather
+  // than falling back to the old protected projection shape.
+  if ('summary_slug' in row) {
+    const id = text(row.summary_id)
+    const packageRowId = text(row.package_id)
+    const packageSlug = text(row.package_slug)
+    const summaryCode = text(row.summary_code)
+    const summarySlug = text(row.summary_slug)
+    const title = text(row.title)
+    const readTime = number(row.read_time_minutes)
+    const publishedAt = dateValue(row.published_at)
+
+    if (
+      !id ||
+      packageRowId !== packageId ||
+      !packageSlug ||
+      !summaryCode ||
+      !summarySlug ||
+      !title ||
+      readTime === null ||
+      readTime < 1 ||
+      !publishedAt
+    ) {
+      return null
+    }
+
+    return {
+      id,
+      summary_code: summaryCode,
+      kind: 'kp_native',
+      title,
+      slug: summarySlug,
+      subject: text(row.subject),
+      topic: text(row.topic),
+      read_time_minutes: readTime,
+      updated_at: publishedAt,
+      created_at: publishedAt,
+      display_order: number(row.display_order) ?? 0,
+      released_at: dateValue(row.released_at),
+    }
+  }
+
   const id = text(row.summary_id)
   const packageRowId = text(row.package_id)
   const summaryCode = text(row.summary_code)
@@ -310,10 +324,10 @@ function normalizeKpListRow(
     : boolean(row.package_is_published)
   const root = id ? roots.get(id) : undefined
 
-  // `kp_read_package_summaries` has already applied the frozen publication
-  // predicates. Recheck the returned state and the separately-read root here
-  // so a divergent/corrupt row is dropped rather than rendered from a root
-  // fallback.
+  // The legacy protected-projection shape has already applied the frozen
+  // publication predicates. Recheck the returned state and the separately-
+  // read root here so a divergent/corrupt row is dropped rather than rendered
+  // from a root fallback.
   if (
     !id ||
     !root ||
@@ -590,18 +604,14 @@ async function readLegacyPackageSummaries(
   }
 }
 
-async function readKpPackageSummaries(
+async function readKpPackageSummaryCards(
   client: PublicSummaryReadClient,
   packageId: string,
 ): Promise<readonly RawRow[]> {
   try {
-    const result = await client
-      .from('kp_read_package_summaries')
-      .select(KP_PACKAGE_SUMMARY_LIST_COLUMNS)
-      .eq('package_id', packageId)
-      .order('display_order', { ascending: false })
-      .order('released_at', { ascending: false, nullsFirst: false })
-      .order('version_published_at', { ascending: false, nullsFirst: false })
+    const result = await client.rpc(KP_PACKAGE_SUMMARY_CARD_RPC, {
+      p_package_id: packageId,
+    })
 
     if (result?.error || !Array.isArray(result?.data)) return []
     return result.data as RawRow[]
@@ -640,18 +650,14 @@ export async function listPublicPackageSummaries(
 ): Promise<readonly PublicSummaryListItem[]> {
   const [legacy, kpRows] = await Promise.all([
     readLegacyPackageSummaries(client, packageId),
-    readKpPackageSummaries(client, packageId),
+    readKpPackageSummaryCards(client, packageId),
   ])
-
-  // Resolve every KP root in one batched read. Legacy listing remains an
-  // independent discriminator-scoped query and never requires KP state.
-  const kpRootRows = await readKpRootPublicationStates(client, kpRows)
 
   // A Legacy query failure must not be silently replaced with a KP-only view;
   // return the independently safe KP branch, while the route resolver below
-  // fails closed when it cannot establish Legacy collision state.
+  // still fails closed when it cannot establish Legacy collision state.
   const legacyRows = legacy.failed ? [] : legacy.rows
-  return mergePublicSummaryListRows(legacyRows, kpRows, packageId, kpRootRows)
+  return mergePublicSummaryListRows(legacyRows, kpRows, packageId, [])
 }
 
 async function readLegacyRouteCandidates(

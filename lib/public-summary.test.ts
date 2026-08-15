@@ -82,6 +82,24 @@ function kpListRow(packageId: string, overrides: Record<string, unknown> = {}) {
   }
 }
 
+function kpCardRow(packageId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    package_id: packageId,
+    package_slug: `package-${packageId.slice(-2)}`,
+    summary_id: KP_ID,
+    summary_code: 'SUM-000201',
+    summary_slug: `local-${packageId.slice(-2)}`,
+    title: 'Published Revision Title',
+    subject: 'law',
+    topic: 'published topic',
+    read_time_minutes: 9,
+    display_order: 10,
+    released_at: '2026-08-03T00:00:00.000Z',
+    published_at: '2026-08-04T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
 function kpDetailRow(packageId: string, overrides: Record<string, unknown> = {}) {
   return {
     summary_id: KP_ID,
@@ -299,6 +317,40 @@ test('A/B/C active memberships all list the shared root once with Package-local 
   }
 })
 
+test('075 discovery cards accept a secondary membership with a canonical effective slug', () => {
+  const canonical = mergePublicSummaryListRows(
+    [],
+    [kpCardRow(PACKAGE_A, { summary_slug: 'project-management-summary' })],
+    PACKAGE_A,
+    [],
+  )
+  const secondary = mergePublicSummaryListRows(
+    [],
+    [kpCardRow(PACKAGE_B, { package_slug: 'package-b', summary_slug: 'canonical-summary' })],
+    PACKAGE_B,
+    [],
+  )
+
+  assert.equal(canonical.length, 1)
+  assert.equal(canonical[0]?.slug, 'project-management-summary')
+  assert.equal(secondary.length, 1)
+  assert.equal(secondary[0]?.slug, 'canonical-summary')
+  assert.equal(secondary[0]?.kind, 'kp_native')
+})
+
+test('075 protected route rows can normalize a secondary canonical fallback slug', () => {
+  const result = resolvePublicSummaryRouteRows(
+    [],
+    [kpDetailRow(PACKAGE_B, { package_slug: 'package-b', legacy_slug: 'canonical-summary' })],
+    request(PACKAGE_B, 'package-b', 'canonical-summary'),
+    [kpRootRow()],
+  )
+
+  assert.ok(result)
+  assert.equal(result.kind, 'kp_native')
+  assert.equal(result.slug, 'canonical-summary')
+})
+
 test('hidden, archived, and non-published KP projection rows fail closed', () => {
   const base = kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a' })
   const invalidRows = [
@@ -356,19 +408,15 @@ test('same Package and slug collisions fail closed instead of resolving the wron
   assert.equal(collision, null)
 })
 
-test('repository reads KP roots in one batch for multiple candidate Summary IDs', async () => {
-  const rootBatchIds: string[][] = []
-  const rootRows = [
-    kpRootRow(),
-    kpRootRow({ id: KP_ID_2, summary_code: 'SUM-000202' }),
-  ]
-  const secondListRow = kpListRow(PACKAGE_A, {
+test('repository uses metadata-only discovery RPC for listing without protected projection or root reads', async () => {
+  const secondCardRow = kpCardRow(PACKAGE_A, {
     summary_id: KP_ID_2,
     summary_code: 'SUM-000202',
-    legacy_slug: 'local-second',
-    title_snapshot: 'Second V3 title',
+    summary_slug: 'local-second',
+    title: 'Second V3 title',
   })
   const calls: string[] = []
+  const discoveryArgs: Record<string, unknown>[] = []
   const fakeClient = {
     from(relation: string) {
       calls.push(`from:${relation}`)
@@ -380,34 +428,38 @@ test('repository reads KP roots in one batch for multiple candidate Summary IDs'
         },
         eq() { return builder },
         is() { return builder },
-        in(field: string, values: string[]) {
-          if (relation === 'summaries' && field === 'id') rootBatchIds.push([...values])
-          return builder
-        },
+        in() { return builder },
         order() { return builder },
         limit() { return builder },
         then(resolve: (value: unknown) => unknown) {
-          const data = relation === 'summaries'
-            ? selectedColumns.includes('current_published_version_id') ? rootRows : [legacyRow()]
-            : [kpListRow(PACKAGE_A), secondListRow]
+          const data = relation === 'summaries' ? [legacyRow()] : []
           return Promise.resolve({ data, error: null }).then(resolve)
         },
       }
       return builder
     },
-    rpc() {
-      return Promise.resolve({ data: [kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a1' })], error: null })
+    rpc(functionName: string, args: Record<string, unknown>) {
+      calls.push(`rpc:${functionName}`)
+      if (functionName === 'kp_read_package_summary_cards') discoveryArgs.push(args)
+      return Promise.resolve({
+        data: functionName === 'kp_read_package_summary_cards'
+          ? [kpCardRow(PACKAGE_A), secondCardRow]
+          : [kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a1' })],
+        error: null,
+      })
     },
   }
 
   const list = await listPublicPackageSummaries(fakeClient, PACKAGE_A)
 
   assert.equal(list.length, 3)
-  assert.deepEqual(rootBatchIds, [[KP_ID, KP_ID_2]])
-  assert.equal(calls.filter((call) => call === 'from:summaries').length, 2)
+  assert.ok(calls.includes('rpc:kp_read_package_summary_cards'))
+  assert.deepEqual(discoveryArgs, [{ p_package_id: PACKAGE_A }])
+  assert.equal(calls.filter((call) => call === 'from:kp_read_package_summaries').length, 0)
+  assert.equal(calls.filter((call) => call === 'from:summaries').length, 1)
 })
 
-test('repository uses the frozen KP projection and route RPC plus batched root validation', async () => {
+test('repository uses discovery for listing and keeps protected route RPC plus root validation for detail', async () => {
   const calls: string[] = []
   const fakeClient = {
     from(relation: string) {
@@ -426,7 +478,7 @@ test('repository uses the frozen KP projection and route RPC plus batched root v
         then(resolve: (value: unknown) => unknown) {
           const data = relation === 'summaries'
             ? selectedColumns.includes('current_published_version_id') ? [kpRootRow()] : [legacyRow()]
-            : [kpListRow(PACKAGE_A)]
+            : []
           return Promise.resolve({ data, error: null }).then(resolve)
         },
       }
@@ -435,7 +487,9 @@ test('repository uses the frozen KP projection and route RPC plus batched root v
     rpc(functionName: string) {
       calls.push(`rpc:${functionName}`)
       return Promise.resolve({
-        data: [kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a1' })],
+        data: functionName === 'kp_read_package_summary_cards'
+          ? [kpCardRow(PACKAGE_A)]
+          : [kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a1' })],
         error: null,
       })
     },
@@ -447,7 +501,8 @@ test('repository uses the frozen KP projection and route RPC plus batched root v
   assert.equal(list.length, 2)
   assert.ok(list.some((row) => row.id === KP_ID))
   assert.equal(detail?.kind, 'kp_native')
-  assert.ok(calls.includes('from:kp_read_package_summaries'))
+  assert.ok(calls.includes('rpc:kp_read_package_summary_cards'))
+  assert.equal(calls.includes('from:kp_read_package_summaries'), false)
   assert.ok(calls.includes('rpc:kp_read_summary_route'))
-  assert.equal(calls.filter((call) => call === 'from:summaries').length, 4)
+  assert.equal(calls.filter((call) => call === 'from:summaries').length, 3)
 })
