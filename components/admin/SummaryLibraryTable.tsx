@@ -5,14 +5,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Edit,
-  Eye,
-  EyeOff,
   GitCompare,
   Loader2,
+  RotateCcw,
+  Send,
   Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 
+import StatusBadge from '@/components/admin/StatusBadge'
 import {
   setSummaryLibraryPageSelection,
   toggleSummaryLibrarySelection,
@@ -118,73 +119,29 @@ function SelectionCheckbox({
       aria-checked={ariaChecked}
       checked={checked}
       onChange={(event) => onChange(event.target.checked)}
-      className="h-4 w-4 cursor-pointer rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] accent-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-[#0F0B07]"
+      className="h-4 w-4 cursor-pointer rounded border-[rgba(255,255,255,0.2)] bg-[#1A140E] checked:bg-[#D4AF37] checked:border-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-[#0F0B07] transition-colors"
     />
-  )
-}
-
-function PublicationControl({
-  row,
-  actingOnId,
-  onTogglePublish,
-}: {
-  readonly row: SummaryLibraryTableRow
-  readonly actingOnId: string | null
-  readonly onTogglePublish: (id: string, isPublished: boolean) => void
-}) {
-  const isActing = actingOnId === row.id
-
-  return (
-    <button
-      type="button"
-      onClick={() => onTogglePublish(row.id, row.isPublished)}
-      disabled={isActing}
-      aria-label={`${row.isPublished ? 'Unpublish' : 'Publish'} ${row.title}`}
-      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors disabled:opacity-50 ${
-        row.isPublished
-          ? 'border-[#22C55E]/30 bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20'
-          : 'border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] text-[#A1866B] hover:bg-[rgba(255,255,255,0.1)]'
-      }`}
-    >
-      {isActing ? (
-        <Loader2 size={12} className="animate-spin" aria-hidden="true" />
-      ) : row.isPublished ? (
-        <Eye size={12} aria-hidden="true" />
-      ) : (
-        <EyeOff size={12} aria-hidden="true" />
-      )}
-      {row.isPublished ? 'Published' : 'Draft'}
-    </button>
   )
 }
 
 function Classification({ row }: { readonly row: SummaryLibraryTableRow }) {
   return (
-    <div className="flex max-w-[220px] flex-col gap-1">
-      {isUnassignedSubject(row.subject) ? (
-        <span className="text-xs italic text-[#A1866B]/60">
-          {UNASSIGNED_SUBJECT.label}
-        </span>
-      ) : (
-        <span className="w-max max-w-full truncate whitespace-nowrap rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 px-2 py-1 text-xs text-[#F5E9D6]">
-          {subjectLabel(row.subject)}
-        </span>
-      )}
-      {row.document ? (
-        <span
-          className="max-w-full truncate text-[11px] text-[#A1866B]"
-          title={row.document}
-        >
-          {row.document}
-        </span>
-      ) : (
-        <span className="text-[10px] italic text-[#A1866B]/40">ไม่มี Document</span>
-      )}
-      {row.topic && (
-        <span className="text-[10px] font-bold uppercase tracking-wider text-[#A1866B]">
-          {row.topic}
-        </span>
-      )}
+    <div className="flex flex-col gap-0.5 min-w-0 max-w-[240px]">
+      <div className="text-xs text-[#F5E9D6] truncate">
+        {isUnassignedSubject(row.subject) ? (
+          <span className="italic text-[#A1866B]/60">
+            {UNASSIGNED_SUBJECT.label}
+          </span>
+        ) : (
+          subjectLabel(row.subject)
+        )}
+      </div>
+      <div
+        className="truncate text-[11px] text-[#A1866B]"
+        title={row.document ?? undefined}
+      >
+        {row.document || <span className="italic text-[#A1866B]/40">ไม่มี Document</span>}
+      </div>
     </div>
   )
 }
@@ -351,11 +308,11 @@ export default function SummaryLibraryTable({
         </div>
       )}
 
-      <div className="relative hidden min-h-[400px] overflow-x-auto md:block">
-        <table className="w-full border-collapse text-left" aria-label="Summary library">
+      <div className="relative hidden min-h-[400px] md:block">
+        <table className="w-full table-fixed border-collapse text-left" aria-label="Summary library">
           <thead>
             <tr className="border-b border-[rgba(255,255,255,0.05)] bg-[#0F0B07]/50 text-xs uppercase tracking-wider text-[#A1866B]">
-              <th scope="col" className="w-12 p-4 text-center">
+              <th scope="col" className="w-10 p-4 text-center">
                 <SelectionCheckbox
                   label="Select all summaries on this page"
                   checked={allPageSelected}
@@ -366,24 +323,24 @@ export default function SummaryLibraryTable({
                   }}
                 />
               </th>
-              <th scope="col" className="w-12 p-4 text-center font-medium">Order</th>
-              <th scope="col" className="w-[30%] p-4 font-medium">Title &amp; Slug</th>
-              <th scope="col" className="max-w-[200px] p-4 font-medium">Package</th>
-              <th scope="col" className="p-4 font-medium">Subject / Document</th>
-              <th scope="col" className="w-28 p-4 font-medium">Status</th>
-              <th scope="col" className="sticky right-0 z-20 w-36 border-l border-[rgba(255,255,255,0.08)] bg-[#0F0B07] p-4 text-right font-medium shadow-[rgba(0,0,0,0.35)_-6px_0_12px_-6px]">Actions</th>
+              <th scope="col" className="p-4 font-medium w-[34%]">Summary Name</th>
+              <th scope="col" className="p-4 font-medium w-[22%]">Package</th>
+              <th scope="col" className="p-4 font-medium w-24">Status</th>
+              <th scope="col" className="p-4 font-medium w-[22%]">Subject / Document</th>
+              <th scope="col" className="p-4 text-right font-medium w-36">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-12 text-center text-[#A1866B]">
+                <td colSpan={6} className="p-12 text-center text-[#A1866B]">
                   No summaries found.
                 </td>
               </tr>
             ) : rows.map((row) => {
               const isSelected = selectedIds.has(row.id)
               const workspaceHref = getSummaryWorkspaceHref(row.id)
+              const isActing = actingOnId === row.id
 
               return (
                 <tr
@@ -398,57 +355,83 @@ export default function SummaryLibraryTable({
                       onChange={() => handleToggleSelection(row)}
                     />
                   </td>
-                  <td className="p-4 text-center text-sm text-[#A1866B]">
-                    {row.sortOrder ?? '—'}
-                  </td>
                   <td className="p-4">
                     <Link
                       href={workspaceHref}
-                      className="block max-w-[360px] truncate text-sm font-medium text-[#F5E9D6] underline-offset-2 hover:text-[#D4AF37] hover:underline"
+                      className="block truncate text-sm font-medium text-[#F5E9D6] underline-offset-2 hover:text-[#D4AF37] hover:underline"
                       aria-label={`Open workspace for ${row.title}`}
                       title={row.title}
                     >
                       {row.title}
                     </Link>
-                    <div className="mt-1 max-w-[360px] truncate text-xs text-[#A1866B]">
+                    <div className="mt-1 truncate text-xs text-[#A1866B]" title={row.slug ? `/${row.slug}` : undefined}>
                       {row.slug ? `/${row.slug}` : '—'}
                     </div>
                   </td>
                   <td className="p-4">
                     <span
                       title={packageTitle(row)}
-                      className="block max-w-[200px] truncate rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0F0B07] px-2 py-1 text-xs text-[#A1866B]"
+                      className="block truncate rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0F0B07] px-2 py-1 text-xs text-[#A1866B]"
                     >
                       {packageLabel(row)}
                     </span>
                   </td>
-                  <td className="p-4"><Classification row={row} /></td>
                   <td className="p-4">
-                    <PublicationControl
-                      row={row}
-                      actingOnId={actingOnId}
-                      onTogglePublish={onTogglePublish}
-                    />
+                    <StatusBadge status={row.isPublished ? 'published' : 'draft'} />
                   </td>
-                  <td className="sticky right-0 z-10 border-l border-[rgba(255,255,255,0.08)] bg-[#1A140E] p-4 text-right shadow-[rgba(0,0,0,0.35)_-6px_0_12px_-6px] transition-colors group-hover:bg-[#1E170F]">
+                  <td className="p-4">
+                    <Classification row={row} />
+                  </td>
+                  <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {row.isPublished ? (
+                        <button
+                          type="button"
+                          onClick={() => onTogglePublish(row.id, row.isPublished)}
+                          disabled={isActing}
+                          className="rounded-lg p-2 text-[#EAB308] transition-colors hover:bg-[#EAB308]/10 disabled:opacity-50"
+                          title="Unpublish"
+                          aria-label={`Unpublish ${row.title}`}
+                        >
+                          {isActing ? (
+                            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                          ) : (
+                            <RotateCcw size={16} aria-hidden="true" />
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onTogglePublish(row.id, row.isPublished)}
+                          disabled={isActing}
+                          className="rounded-lg p-2 text-[#22C55E] transition-colors hover:bg-[#22C55E]/10 disabled:opacity-50"
+                          title="Publish"
+                          aria-label={`Publish ${row.title}`}
+                        >
+                          {isActing ? (
+                            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Send size={16} aria-hidden="true" />
+                          )}
+                        </button>
+                      )}
                       <Link
                         href={workspaceHref}
                         className="rounded-lg p-2 text-[#A1866B] transition-colors hover:bg-[#D4AF37]/10 hover:text-[#D4AF37]"
-                        title="Open workspace"
-                        aria-label={`Open workspace for ${row.title}`}
+                        title="Edit"
+                        aria-label={`Edit ${row.title}`}
                       >
                         <Edit size={16} aria-hidden="true" />
                       </Link>
                       <button
                         type="button"
                         onClick={() => handleDeleteRequest(row.id)}
-                        disabled={actingOnId === row.id}
+                        disabled={isActing}
                         className="rounded-lg p-2 text-[#A1866B] transition-colors hover:bg-red-400/10 hover:text-red-400 disabled:opacity-50"
                         title="Delete"
                         aria-label={`Delete ${row.title}`}
                       >
-                        {actingOnId === row.id ? (
+                        {isActing ? (
                           <Loader2 size={16} className="animate-spin" aria-hidden="true" />
                         ) : (
                           <Trash2 size={16} aria-hidden="true" />
@@ -471,6 +454,7 @@ export default function SummaryLibraryTable({
         ) : rows.map((row) => {
           const isSelected = selectedIds.has(row.id)
           const workspaceHref = getSummaryWorkspaceHref(row.id)
+          const isActing = actingOnId === row.id
 
           return (
             <article
@@ -498,11 +482,7 @@ export default function SummaryLibraryTable({
                     {row.slug ? `/${row.slug}` : '—'}
                   </p>
                 </div>
-                <PublicationControl
-                  row={row}
-                  actingOnId={actingOnId}
-                  onTogglePublish={onTogglePublish}
-                />
+                <StatusBadge status={row.isPublished ? 'published' : 'draft'} />
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[rgba(255,255,255,0.06)] pt-3 text-xs">
@@ -511,30 +491,59 @@ export default function SummaryLibraryTable({
                   <p className="mt-1 truncate text-[#F5E9D6]" title={packageTitle(row)}>{packageLabel(row)}</p>
                 </div>
                 <div>
-                  <p className="text-[#A1866B]">Order</p>
-                  <p className="mt-1 text-[#F5E9D6]">{row.sortOrder ?? '—'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="mb-1 text-[#A1866B]">Subject / Document</p>
-                  <Classification row={row} />
+                  <p className="text-[#A1866B]">Subject / Document</p>
+                  <div className="mt-1">
+                    <Classification row={row} />
+                  </div>
                 </div>
               </div>
 
               <div className="mt-4 flex items-center justify-end gap-2 border-t border-[rgba(255,255,255,0.06)] pt-3">
+                {row.isPublished ? (
+                  <button
+                    type="button"
+                    onClick={() => onTogglePublish(row.id, row.isPublished)}
+                    disabled={isActing}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#EAB308]/30 px-3 py-2 text-sm font-medium text-[#EAB308] hover:bg-[#EAB308]/10 disabled:opacity-50"
+                    aria-label={`Unpublish ${row.title}`}
+                  >
+                    {isActing ? (
+                      <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <RotateCcw size={15} aria-hidden="true" />
+                    )}
+                    Unpublish
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onTogglePublish(row.id, row.isPublished)}
+                    disabled={isActing}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#22C55E]/30 px-3 py-2 text-sm font-medium text-[#22C55E] hover:bg-[#22C55E]/10 disabled:opacity-50"
+                    aria-label={`Publish ${row.title}`}
+                  >
+                    {isActing ? (
+                      <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Send size={15} aria-hidden="true" />
+                    )}
+                    Publish
+                  </button>
+                )}
                 <Link
                   href={workspaceHref}
                   className="min-h-10 rounded-xl border border-[rgba(255,255,255,0.1)] px-3 py-2 text-sm font-medium text-[#F5E9D6] hover:border-[#D4AF37]/50 hover:text-[#D4AF37]"
                 >
-                  Open workspace
+                  Edit
                 </Link>
                 <button
                   type="button"
                   onClick={() => handleDeleteRequest(row.id)}
-                  disabled={actingOnId === row.id}
+                  disabled={isActing}
                   className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-400/10 disabled:opacity-50"
                   aria-label={`Delete ${row.title}`}
                 >
-                  {actingOnId === row.id ? (
+                  {isActing ? (
                     <Loader2 size={15} className="animate-spin" aria-hidden="true" />
                   ) : (
                     <Trash2 size={15} aria-hidden="true" />
