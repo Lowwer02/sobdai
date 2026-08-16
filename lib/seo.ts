@@ -283,3 +283,29 @@ export function buildPackageH1(pkg: PackageSeoData): string {
   return core || pkg.name?.trim() || 'แพ็กเกจข้อสอบ'
 }
 
+// ─── /news hub — keyword ownership (SEO-P2C) ────────────────────────────────
+//
+// The public news hub owns the ข่าวสอบราชการ / ข่าวสอบราชการล่าสุด / ข่าวเปิดสอบราชการ cluster.
+// Supporting intent covers เปิดสอบราชการ, สมัครสอบราชการ, and รับสมัครสอบราชการ.
+// The homepage explicitly hands this cluster to /news, so this page leads with
+// ข่าวสอบราชการ in title/H1/description and must NOT let the practice-exam intent
+// (แนวข้อสอบราชการ) become its primary keyword — that belongs to the homepage and package detail pages.
+//
+// These are the single source of truth for the hub's on-page SEO copy;
+// app/news/page.tsx imports them for both the <head> metadata and the visible
+// hero so the two can never disagree.
+
+/** Title tag — primary keyword front-loaded, cluster terms follow. */
+export const NEWS_HUB_TITLE = 'ข่าวสอบราชการ ข่าวเปิดสอบราชการล่าสุด | Sobdai'
+
+/** Meta description — front-loads the cluster, stays under ~160 chars. */
+export const NEWS_HUB_DESCRIPTION =
+  'อัปเดตข่าวสอบราชการ ข่าวเปิดสอบราชการล่าสุด และประกาศรับสมัครจากหน่วยงานราชการ พร้อมข้อมูลตำแหน่ง คุณสมบัติ และกำหนดการสมัคร'
+
+/** H1 — owns the primary keyword naturally. */
+export const NEWS_HUB_H1 = 'ข่าวสอบราชการ ข่าวเปิดสอบราชการล่าสุด'
+
+/** Hero supporting copy — reinforces the cluster without diluting the H1. */
+export const NEWS_HUB_SUBTITLE =
+  'รวมข่าวสอบราชการและข่าวเปิดสอบราชการล่าสุดจากหน่วยงานราชการ ติดตามประกาศรับสมัคร ตำแหน่ง คุณสมบัติ และกำหนดการสำคัญได้ที่นี่'
+
