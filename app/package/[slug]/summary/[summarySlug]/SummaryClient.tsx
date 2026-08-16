@@ -116,10 +116,10 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 flex flex-col lg:flex-row gap-12 items-start">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 flex flex-col xl:flex-row gap-12 items-start">
 
         {/* Main Content */}
-        <main className="flex-1 w-full max-w-[680px] mx-auto lg:mx-0">
+        <main className="flex-1 w-full max-w-[680px] mx-auto xl:mx-0">
           
           <header className="mb-12 text-center lg:text-left">
             {/* Meta tags */}
@@ -222,7 +222,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
         </main>
 
         {/* Sidebar TOC (Desktop Only) */}
-        <aside className="hidden lg:block w-64 flex-shrink-0 sticky top-24">
+        <aside className="hidden xl:block w-64 flex-shrink-0 sticky top-24">
           <div className="bg-[#1A140E] rounded-2xl p-5 border border-[rgba(212,175,55,0.15)] shadow-xl">
             <h4 className="text-[11px] uppercase font-bold text-[#A1866B] tracking-wider mb-4 flex items-center gap-2">
               <LayoutList size={14} /> สารบัญเนื้อหา
@@ -258,7 +258,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
       {/* Mobile TOC FAB */}
       <button type="button" 
         onClick={() => setShowMobileTOC(true)}
-        className="lg:hidden fixed bottom-6 right-6 z-40 bg-[#D4AF37] text-[#1A140E] w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(212,175,55,0.4)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50 active:scale-95 transition-transform"
+        className="xl:hidden fixed bottom-6 right-6 z-40 bg-[#D4AF37] text-[#1A140E] w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(212,175,55,0.4)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/50 active:scale-95 transition-transform"
         aria-label="เปิดสารบัญ"
       >
         <LayoutList size={24} />
@@ -266,7 +266,7 @@ export default function SummaryClient({ pkg, summary, prevSummary, nextSummary, 
 
       {/* Mobile TOC Bottom Sheet */}
       {showMobileTOC && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end lg:hidden">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end xl:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowMobileTOC(false)} aria-hidden="true" />
           <div className="bg-[#1A140E] w-full rounded-t-3xl p-6 relative flex flex-col max-h-[80vh] border-t border-[rgba(212,175,55,0.2)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transform transition-transform duration-300 translate-y-0">
             <div className="w-12 h-1.5 bg-[rgba(255,255,255,0.1)] rounded-full mx-auto mb-6" />
