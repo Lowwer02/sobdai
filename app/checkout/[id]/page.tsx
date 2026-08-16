@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { getHomepageSettings } from '@/lib/homepageConfig'
 import CheckoutClient from './CheckoutClient'
 import Link from 'next/link'
 import { createPageMetadata } from '@/lib/seo'
@@ -64,23 +65,29 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
     )
   }
 
-  // Fetch package details
-  const { data: pkg, error } = await supabase
-    .from('packages')
-    .select(`
-      id,
-      name,
-      slug,
-      current_price,
-      original_price,
-      is_published,
-      cover_image_url,
-      logo_url,
-      positions(name),
-      organizations(name, logo_url)
-    `)
-    .eq('id', id)
-    .single()
+  // Fetch package details and homepage settings in parallel
+  const [pkgResult, homepageSettings] = await Promise.all([
+    supabase
+      .from('packages')
+      .select(`
+        id,
+        name,
+        slug,
+        current_price,
+        original_price,
+        is_published,
+        cover_image_url,
+        logo_url,
+        positions(name),
+        organizations(name, logo_url)
+      `)
+      .eq('id', id)
+      .single(),
+    getHomepageSettings(),
+  ])
+
+  const pkg = pkgResult.data
+  const error = pkgResult.error
 
   if (error || !pkg) return notFound()
 
@@ -111,5 +118,5 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
     redirect(`/package/${pkg.slug}`)
   }
 
-  return <CheckoutClient pkg={pkg} userEmail={user.email || ''} />
+  return <CheckoutClient pkg={pkg} userEmail={user.email || ''} supportConfig={homepageSettings.support} />
 }

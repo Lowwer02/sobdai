@@ -1,28 +1,40 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, LogIn } from 'lucide-react'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
-import { applyContentOrdering } from '@/lib/contentOrdering'
+import { hasInternalPackageAccess } from '@/lib/auth/rbac'
+import { getPublicSummaryRoute, listPublicPackageSummaries } from '@/lib/public-summary'
 import SummaryClient from './SummaryClient'
 import { createPageMetadata } from '@/lib/seo'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string, summarySlug: string }> }) {
   const { slug, summarySlug } = await params
-  
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return cookieStore.getAll() } } }
-  )
 
-  const { data: summary } = await supabase
-    .from('summaries')
-    .select('title, topic, subject')
-    .eq('slug', summarySlug)
+  const supabase = await createClient()
+  const { data: pkg } = await supabase
+    .from('packages')
+    .select('id, name, slug')
+    .eq('slug', slug)
     .single()
+
+  if (!pkg) {
+    return createPageMetadata({
+      title: 'Summary Not Found | Sobdai',
+      path: `/package/${slug}/summary/${summarySlug}`,
+      noindex: true,
+    })
+  }
+
+  // Metadata and page content use the same Hybrid route resolver. In
+  // particular, KP metadata comes from the selected published revision, not
+  // from the mutable Legacy-compatible root fields.
+  const summary = await getPublicSummaryRoute(supabase, {
+    packageId: pkg.id,
+    packageSlug: pkg.slug,
+    packageName: pkg.name,
+    summarySlug,
+  })
 
   if (!summary) {
     return createPageMetadata({
@@ -42,13 +54,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function SummaryPage({ params }: { params: Promise<{ slug: string, summarySlug: string }> }) {
   const { slug, summarySlug } = await params
-  
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return cookieStore.getAll() } } }
-  )
+
+  const supabase = await createClient()
 
   // Fetch package
   const { data: pkg } = await supabase
@@ -59,15 +66,17 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
 
   if (!pkg) return notFound()
 
-  // Fetch summary
-  const { data: summary } = await supabase
-    .from('summaries')
-    .select('*')
-    .eq('package_id', pkg.id)
-    .eq('slug', summarySlug)
-    .single()
+  // Resolve Legacy and KP routes through one discriminator-aware public read
+  // boundary. KP detail content comes only from the selected published
+  // revision returned by the frozen route projection.
+  const summary = await getPublicSummaryRoute(supabase, {
+    packageId: pkg.id,
+    packageSlug: pkg.slug,
+    packageName: pkg.name,
+    summarySlug,
+  })
 
-  if (!summary || !summary.is_published) return notFound()
+  if (!summary) return notFound()
 
   // Purchase Access Control
   const { data: { user } } = await supabase.auth.getUser()
@@ -75,7 +84,7 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
 
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile && ['admin', 'owner', 'editor', 'support'].includes(profile.role)) {
+    if (profile && hasInternalPackageAccess(profile.role)) {
       hasAccess = true
     } else {
       const { data: order } = await supabase
@@ -128,14 +137,9 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
     )
   }
 
-  // Fetch previous and next summaries using Smart Content Ordering.
-  const { data: allSummaries } = await applyContentOrdering(
-    supabase
-      .from('summaries')
-      .select('id, title, slug')
-      .eq('package_id', pkg.id)
-      .eq('is_published', true)
-  )
+  // Fetch previous and next summaries through the same hybrid Package list so
+  // secondary KP memberships use their own Package-local route slug.
+  const allSummaries = await listPublicPackageSummaries(supabase, pkg.id)
 
   // Check if package has published Exam Sets (draft/archived must not trigger the CTA)
   const { count: examSetsCount } = await supabase
@@ -146,9 +150,11 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
 
   const hasExamSets = (examSetsCount || 0) > 0
 
-  const currentIndex = allSummaries?.findIndex((s: any) => s.id === summary.id) || 0
-  const prevSummary = currentIndex > 0 ? allSummaries![currentIndex - 1] : null
-  const nextSummary = allSummaries && currentIndex < allSummaries.length - 1 ? allSummaries[currentIndex + 1] : null
+  const currentIndex = allSummaries.findIndex((s) => s.id === summary.id)
+  const prevSummary = currentIndex > 0 ? allSummaries[currentIndex - 1] : null
+  const nextSummary = currentIndex >= 0 && currentIndex < allSummaries.length - 1
+    ? allSummaries[currentIndex + 1]
+    : null
 
   return (
     <SummaryClient 
@@ -156,7 +162,7 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
       summary={summary} 
       prevSummary={prevSummary} 
       nextSummary={nextSummary} 
-      allSummaries={allSummaries || []}
+      allSummaries={[...allSummaries]}
       hasExamSets={hasExamSets}
     />
   )

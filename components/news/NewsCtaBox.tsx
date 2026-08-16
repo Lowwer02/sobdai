@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import type { CtaConfig, CtaButton } from '@/lib/news'
 import { isValidInternalPath } from '@/lib/news'
+import { getVerifiedSummaryHref, type PublicSummaryTarget } from '@/lib/summary-target'
 import NewsCtaLink from './NewsCtaLink'
 
 /**
@@ -20,8 +21,7 @@ import NewsCtaLink from './NewsCtaLink'
  *       package  → /package/<slug>   (slug looked up from the live related set
  *                                     by targetId; if the related package was
  *                                     removed, the button drops — Case 5)
- *       summary  → /package/<pkgSlug>/summary/<slug>  (same live-set lookup;
- *                                                      needs a parent pkg slug)
+ *       summary  → the final href from the shared verified Summary target set
  *       exam     → the stored href, re-validated by isValidInternalPath
  *       internal → the stored href, re-validated by isValidInternalPath
  *   - A button with no resolvable href is dropped (never renders '#', never
@@ -39,13 +39,8 @@ interface RelatedPackageLite {
   id: string
   slug: string
 }
-/** Minimal slice of a related summary the box needs. `packageSlug` is required
- *  because the public summary route is nested under /package/[slug]/summary/. */
-interface RelatedSummaryLite {
-  id: string
-  slug: string
-  packageSlug?: string | null
-}
+/** The CTA consumes only a href already verified by the shared resolver. */
+type RelatedSummaryLite = Pick<PublicSummaryTarget, 'summaryId' | 'href'>
 
 interface NewsCtaBoxProps {
   config: CtaConfig | null
@@ -75,11 +70,7 @@ function resolveButtonHref(
     }
     case 'summary': {
       if (!button.targetId) return null
-      const sum = relatedSummaries.find(s => s.id === button.targetId)
-      // The public summary route needs BOTH the summary slug and its parent
-      // package slug; without the parent we can't build a valid URL.
-      if (!sum?.slug || !sum.packageSlug) return null
-      return `/package/${sum.packageSlug}/summary/${sum.slug}`
+      return getVerifiedSummaryHref(relatedSummaries, button.targetId)
     }
     case 'exam':
     case 'internal': {

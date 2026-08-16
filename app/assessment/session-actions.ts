@@ -28,9 +28,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { normalizeMode } from '@/lib/assessment/types'
+import { hasInternalPackageAccess } from '@/lib/auth/rbac'
 import {
   ACCESS_ORDER_STATUSES,
-  STAFF_ROLES,
   clampIndex,
   validateAnswers,
   validateFlagged,
@@ -82,7 +82,7 @@ async function resolveUser(): Promise<{ id: string } | null> {
  * A learner may start/resume a session on an exam set iff ANY of:
  *   - the exam set is a sample (is_sample = true), OR
  *   - the learner has a completed order (status paid|free) for the package, OR
- *   - the learner's profile role is a staff role.
+ *   - the learner's profile role is owner or admin for internal Package access.
  *
  * This must match the route's gate so a learner who can OPEN the exam can also
  * RESUME it, and vice versa. Runs on the same cookie-bound client (RLS-aware).
@@ -97,13 +97,13 @@ async function canAccessExamSet(
   // Sample sets are open to any authenticated user.
   if (examSet.is_sample) return true
 
-  // Staff bypass the order requirement.
+  // Only Owner/Admin internal Package access bypasses the order requirement.
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', userId)
     .single()
-  if (profile && (STAFF_ROLES as readonly string[]).includes(profile.role)) {
+  if (profile && hasInternalPackageAccess(profile.role)) {
     return true
   }
 
@@ -174,7 +174,7 @@ export async function getOrCreateMyAssessmentSession(
       return { success: false, error: 'Exam set not found.' }
     }
 
-    // ── 2. Access gate (sample | order | staff) — same tree as page.tsx.
+    // ── 2. Access gate (sample | paid/free order | Owner/Admin) — same tree as page.tsx.
     const allowed = await canAccessExamSet(supabase, user.id, {
       is_sample: examSet.is_sample,
       package_id: examSet.package_id,

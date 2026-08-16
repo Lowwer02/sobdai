@@ -12,8 +12,8 @@
  */
 
 import React, { useEffect, useRef } from 'react'
-import Image from 'next/image'
-import { X, Heart, Sparkles, QrCode, Building2 } from 'lucide-react'
+import { X, Heart } from 'lucide-react'
+import SupportDetails from './SupportDetails'
 import type { SupportConfig } from '@/lib/homepageConfig'
 
 /** All fields the caller must provide, forwarded from SupportConfig. */
@@ -98,9 +98,6 @@ export default function SupportModal({
 
   if (!isOpen) return null
 
-  const hasQR = Boolean(qr_image_url)
-  const hasBankInfo = Boolean(bank_name || account_number)
-
   return (
     /* Backdrop */
     <div
@@ -159,84 +156,15 @@ export default function SupportModal({
             <p id="support-modal-desc" className="text-[#A1866B] text-[13px] leading-relaxed max-w-xs">{description}</p>
           </div>
 
-          {/* ── QR Section ── */}
-          {hasQR ? (
-            <div className="flex flex-col items-center gap-3">
-              {/* QR image — lazy: only fetched when modal opens */}
-              <div
-                className="rounded-2xl p-3 flex items-center justify-center"
-                style={{
-                  background: '#FFFFFF',
-                  border: '1px solid rgba(212,175,55,0.15)',
-                  width: 220,
-                  height: 220,
-                }}
-              >
-                <Image
-                  src={qr_image_url}
-                  alt="PromptPay QR Code"
-                  width={196}
-                  height={196}
-                  loading="lazy"
-                  className="rounded-xl"
-                  style={{ objectFit: 'contain' }}
-                />
-              </div>
-
-              {/* PromptPay label */}
-              {promptpay_name && (
-                <div className="flex flex-col items-center gap-1 text-center">
-                  <div className="flex items-center gap-1.5">
-                    <QrCode size={13} className="text-[#D4AF37]/70" />
-                    <span className="text-[11px] text-[#A1866B] uppercase tracking-wider font-semibold">
-                      PromptPay
-                    </span>
-                  </div>
-                  <span className="text-[#F5E9D6] text-[15px] font-bold">{promptpay_name}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Placeholder — shown when no QR is configured */
-            <div
-              className="rounded-2xl p-5 flex flex-col items-center gap-3 text-center"
-              style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px dashed rgba(212,175,55,0.2)',
-              }}
-            >
-              <Sparkles size={22} className="text-[#D4AF37]/40" />
-              <p className="text-[#A1866B] text-[13px] leading-snug">
-                ช่องทางการสนับสนุนจะเปิดให้ใช้งานเร็วๆ นี้
-              </p>
-              <p className="text-[#A1866B]/50 text-[11px]">
-                PromptPay · บัญชีธนาคาร · ช่องทางอื่นๆ
-              </p>
-            </div>
-          )}
-
-          {/* ── Optional bank info ── */}
-          {hasBankInfo && (
-            <div
-              className="rounded-xl px-4 py-3 flex items-start gap-3"
-              style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.06)',
-              }}
-            >
-              <Building2 size={15} className="text-[#A1866B] mt-0.5 flex-shrink-0" />
-              <div className="space-y-0.5">
-                {bank_name && (
-                  <p className="text-[#A1866B] text-[12px]">{bank_name}</p>
-                )}
-                {account_number && (
-                  <p className="text-[#F5E9D6] text-[14px] font-bold tracking-widest">
-                    {account_number}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          {/* ── Support Details (Shared) ── */}
+          <SupportDetails
+            qr_image_url={qr_image_url}
+            promptpay_name={promptpay_name}
+            bank_name={bank_name}
+            account_number={account_number}
+            showPlaceholderIfEmpty={true}
+            qrSize={220}
+          />
 
           {/* ── Footer message ── */}
           {footer_message && (

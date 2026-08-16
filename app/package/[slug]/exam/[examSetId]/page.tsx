@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Lock, Clock, FileText, ChevronRight, Activity, Zap } from 'lucide-react'
 import ExamRuntime from './ExamRuntime'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { hasInternalPackageAccess } from '@/lib/auth/rbac'
 import { createPageMetadata } from '@/lib/seo'
 import { fetchBookmarkStateMap } from '@/lib/assessment/saved-questions-data'
 import { getHomepageSettings } from '@/lib/homepageConfig'
@@ -89,7 +90,7 @@ export default async function ExamSetPage({
     needsAccessCheck
       ? supabase.from('profiles').select('role').eq('id', user.id).single()
       : Promise.resolve({ data: null }),
-    // order only matters when not staff; fetch anyway to keep it parallel
+    // order only matters when not Owner/Admin internal access; fetch anyway to keep it parallel
     needsAccessCheck
       ? supabase
           .from('orders')
@@ -129,10 +130,9 @@ export default async function ExamSetPage({
 
   if (needsAccessCheck) {
     const profile = profileResult.data
-    const staffRoles = ['admin', 'owner', 'editor', 'support']
-    const isStaff = profile && staffRoles.includes(profile.role)
+    const hasInternalAccess = Boolean(profile && hasInternalPackageAccess(profile.role))
     const hasOrder = Boolean(orderResult.data)
-    if (!isStaff && !hasOrder) {
+    if (!hasInternalAccess && !hasOrder) {
       return (
         <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">

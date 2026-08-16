@@ -1,136 +1,61 @@
 'use server'
 
 import { requirePermission } from '@/lib/auth/server-protect'
+import { isSummaryBankCompatibilityWriterError } from '@/lib/application/knowledge-platform'
+import { routeSummaryImport } from '@/lib/application/knowledge-platform/summary-import-routing'
+import { createSummaryBankCompatibilityWriter } from '@/lib/infrastructure/knowledge-platform'
 
 import { revalidatePath } from 'next/cache'
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Summary import failed.'
+}
 
 export async function validateSummaryImport(metadata: any) {
   try {
-    const { supabase } = await requirePermission('content.write')
-    
-    // Find Package
-    let pkg = null
-    let resolvedBy = ''
-
-    if (metadata.package_ref_type === 'slug' || metadata.package_ref_type === 'ambiguous') {
-      const { data } = await supabase
-        .from('packages')
-        .select('id, name')
-        .eq('slug', metadata.package_ref)
-        .maybeSingle()
-      
-      if (data) {
-        pkg = data
-        resolvedBy = 'slug'
-      }
-    }
-
-    if (!pkg && (metadata.package_ref_type === 'code' || metadata.package_ref_type === 'ambiguous')) {
-      const { data } = await supabase
-        .from('packages')
-        .select('id, name')
-        .eq('package_code', metadata.package_ref)
-        .maybeSingle()
-        
-      if (data) {
-        pkg = data
-        resolvedBy = 'code'
-      }
-    }
+    await requirePermission('content.write')
+    const writer = createSummaryBankCompatibilityWriter()
+    const pkg = await writer.resolvePackage({
+      reference: metadata.package_ref,
+      referenceType: metadata.package_ref_type,
+    })
 
     if (!pkg) {
       return { success: false, error: `Package not found: ${metadata.package_ref}` }
     }
 
-    // Check Slug conflict
-    const { data: existingSummary } = await supabase
-      .from('summaries')
-      .select('id')
-      .eq('package_id', pkg.id)
-      .eq('slug', metadata.slug)
-      .single()
+    const isDuplicate = await writer.isCompatibilityLegacySlugOccupied({
+      packageId: pkg.packageId,
+      legacySlug: metadata.slug,
+    })
 
-    return { 
-      success: true, 
-      packageId: pkg.id,
-      packageName: pkg.name,
-      isDuplicate: !!existingSummary,
-      resolvedBy
+    return {
+      success: true,
+      packageId: pkg.packageId,
+      packageName: pkg.packageName,
+      isDuplicate,
+      resolvedBy: pkg.resolvedBy,
     }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err: unknown) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
 export async function commitSummaryImport(data: any, conflictResolution: 'replace' | 'new') {
   try {
-    const { supabase } = await requirePermission('content.write')
-    
-    let finalSlug = data.slug
-
-    if (conflictResolution === 'new' && data.isDuplicate) {
-      // Find a unique slug suffix
-      let suffix = 2
-      let isUnique = false
-      while (!isUnique) {
-        const testSlug = `${data.slug}-${suffix}`
-        const { data: existing } = await supabase
-          .from('summaries')
-          .select('id')
-          .eq('package_id', data.packageId)
-          .eq('slug', testSlug)
-          .single()
-        
-        if (!existing) {
-          finalSlug = testSlug
-          isUnique = true
-        } else {
-          suffix++
-        }
-      }
+    const { user } = await requirePermission('content.write')
+    const writer = createSummaryBankCompatibilityWriter()
+    return await routeSummaryImport({
+      data,
+      actorId: user.id,
+      conflictResolution,
+      writer,
+      revalidatePath,
+    })
+  } catch (err: unknown) {
+    if (isSummaryBankCompatibilityWriterError(err) && err.code === 'duplicate_legacy_slug') {
+      return { success: false, error: 'Slug already exists in this package.' }
     }
-
-    const payload = {
-      package_id: data.packageId,
-      title: data.title,
-      slug: finalSlug,
-      subject: data.subject,
-      document: data.document || null,
-      law: data.law,
-      topic: data.topic,
-      content_md: data.content_md,
-      read_time_minutes: data.read_time_minutes,
-      sort_order: data.sort,
-      is_published: data.published
-    }
-
-    let resultError = null
-    
-    if (conflictResolution === 'replace' && data.isDuplicate) {
-      // Upsert/Update based on unique constraint (package_id, slug)
-      const { error } = await supabase
-        .from('summaries')
-        .update(payload)
-        .eq('package_id', data.packageId)
-        .eq('slug', data.slug)
-      
-      resultError = error
-    } else {
-      const { error } = await supabase
-        .from('summaries')
-        .insert([payload])
-      
-      resultError = error
-    }
-
-    if (resultError) throw resultError
-
-    revalidatePath('/admin/summaries')
-    revalidatePath(`/package/${data.packageId}`)
-    
-    return { success: true, finalSlug }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+    return { success: false, error: errorMessage(err) }
   }
 }

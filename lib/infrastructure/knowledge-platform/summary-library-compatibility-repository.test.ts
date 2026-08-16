@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isDeepStrictEqual } from 'node:util'
 
 import {
   SummaryLibraryCompatibilityRepositoryError,
@@ -8,25 +7,36 @@ import {
   type SummaryLibraryCompatibilitySupabaseClient,
 } from './summary-library-compatibility-repository'
 
-const SUMMARY_ONE = '00000000-0000-4000-8000-000000000001'
-const SUMMARY_TWO = '00000000-0000-4000-8000-000000000002'
-const PACKAGE_ONE = '00000000-0000-4000-8000-000000000101'
-const RELATIONSHIP_ONE = '00000000-0000-4000-8000-000000000301'
-const DOCUMENT_ONE = '00000000-0000-4000-8000-000000000401'
-const VERSION_ONE = '00000000-0000-4000-8000-000000000501'
-const ALIAS_ONE = '00000000-0000-4000-8000-000000000601'
+const SUMMARY_LEGACY = '00000000-0000-4000-8000-000000000001'
+const SUMMARY_KP = '00000000-0000-4000-8000-000000000002'
+const SUMMARY_KP_SECONDARY = '00000000-0000-4000-8000-000000000003'
+const SUMMARY_LEGACY_RELEASE_NEW = '00000000-0000-4000-8000-000000000004'
+const SUMMARY_LEGACY_UPDATED_NEW = '00000000-0000-4000-8000-000000000005'
+const SUMMARY_LEGACY_UPDATED_OLD = '00000000-0000-4000-8000-000000000006'
+const SUMMARY_LEGACY_CREATED_NEW = '00000000-0000-4000-8000-000000000007'
+const SUMMARY_LEGACY_CREATED_OLD = '00000000-0000-4000-8000-000000000008'
+const SUMMARY_LEGACY_ID_FIRST = '00000000-0000-4000-8000-000000000009'
+const SUMMARY_LEGACY_ID_SECOND = '00000000-0000-4000-8000-000000000010'
+const SUMMARY_LEGACY_RELEASE_NULL = '00000000-0000-4000-8000-000000000011'
+const PACKAGE_ALPHA = '00000000-0000-4000-8000-000000000101'
+const PACKAGE_BETA = '00000000-0000-4000-8000-000000000102'
+const PACKAGE_GAMMA = '00000000-0000-4000-8000-000000000103'
+const DOCUMENT_ONE = '00000000-0000-4000-8000-000000000201'
+const VERSION_ONE = '00000000-0000-4000-8000-000000000301'
 
-function rootRow(
+type Row = Record<string, unknown>
+
+function kpRootRow(
   summaryId: string,
   title: string,
-  published: boolean,
   updatedAt: string,
+  published = true,
   sourceDocumentCount = 0
-) {
+): Row {
   return {
     summary_id: summaryId,
     summary_code: `SUM-${summaryId.slice(-3)}`,
-    canonical_slug: title.toLocaleLowerCase().replaceAll(' ', '-'),
+    canonical_slug: title.toLowerCase().replaceAll(' ', '-'),
     canonical_title: title,
     subject: 'law',
     topic: 'contracts',
@@ -46,31 +56,134 @@ function rootRow(
     current_revision_read_time_minutes: published ? 5 : null,
     current_revision_published_at: published ? updatedAt : null,
     current_revision_content_checksum: published ? `checksum-${summaryId}` : null,
-    package_placement_count: 1,
+    package_placement_count: summaryId === SUMMARY_KP ? 3 : 1,
     source_document_count: sourceDocumentCount,
   }
 }
 
-function placementRow(summaryId: string) {
+function legacyRootRow(overrides: Partial<Row> = {}): Row {
   return {
-    package_id: PACKAGE_ONE,
+    id: SUMMARY_LEGACY,
+    summary_code: null,
+    package_id: PACKAGE_ALPHA,
+    title: 'Legacy Administrative Act',
+    slug: 'legacy-administrative-act',
+    subject: 'law',
+    topic: 'administration',
+    law: null,
+    document: 'Legacy Administrative Act',
+    sort_order: 1,
+    display_order: 1,
+    released_at: '2026-07-01T00:00:00.000Z',
+    is_published: true,
+    created_at: '2026-07-01T00:00:00.000Z',
+    updated_at: '2026-07-02T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function legacyDefaultOrderRows(): readonly Row[] {
+  return [
+    legacyRootRow({
+      id: SUMMARY_LEGACY,
+      title: 'Zeta display order',
+      display_order: 2,
+      released_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_RELEASE_NEW,
+      title: 'Alpha release date',
+      display_order: 1,
+      released_at: '2026-12-01T00:00:00.000Z',
+      updated_at: '2026-12-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_UPDATED_NEW,
+      title: 'Bravo updated date',
+      display_order: 1,
+      released_at: '2026-11-01T00:00:00.000Z',
+      updated_at: '2026-12-31T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_UPDATED_OLD,
+      title: 'Charlie updated date',
+      display_order: 1,
+      released_at: '2026-11-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_CREATED_NEW,
+      title: 'Delta created date',
+      display_order: 1,
+      released_at: '2026-10-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-09-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_CREATED_OLD,
+      title: 'Echo created date',
+      display_order: 1,
+      released_at: '2026-10-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-08-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_ID_FIRST,
+      title: 'Foxtrot ID first',
+      display_order: 1,
+      released_at: '2026-09-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-07-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_ID_SECOND,
+      title: 'Golf ID second',
+      display_order: 1,
+      released_at: '2026-09-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-07-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_RELEASE_NULL,
+      title: 'Hotel null release',
+      display_order: 1,
+      released_at: null,
+      updated_at: '2029-01-01T00:00:00.000Z',
+      created_at: '2029-01-01T00:00:00.000Z',
+    }),
+  ]
+}
+
+function membershipRow(
+  summaryId: string,
+  packageId: string,
+  marker: boolean
+): Row {
+  return {
+    package_id: packageId,
     summary_id: summaryId,
     status: 'active',
     version_policy: 'latest_published',
     pinned_summary_version_id: null,
-    sort_order: 2,
-    display_order: 5,
-    released_at: '2026-08-04T00:00:00.000Z',
+    sort_order: packageId === PACKAGE_ALPHA ? 1 : 2,
+    display_order: packageId === PACKAGE_ALPHA ? 1 : 2,
+    released_at: '2026-08-01T00:00:00.000Z',
     navigation_label: null,
     legacy_slug: 'contract-law',
+    is_summary_bank_compatibility: marker,
     created_at: '2026-08-01T00:00:00.000Z',
-    updated_at: '2026-08-04T00:00:00.000Z',
+    updated_at: '2026-08-02T00:00:00.000Z',
   }
 }
 
-function relationshipRow(summaryId: string) {
+function sourceRow(summaryId: string): Row {
   return {
-    id: RELATIONSHIP_ONE,
+    id: `relationship-${summaryId}`,
     summary_id: summaryId,
     reference_document_id: DOCUMENT_ONE,
     reference_document_version_id: VERSION_ONE,
@@ -80,7 +193,7 @@ function relationshipRow(summaryId: string) {
   }
 }
 
-const DOCUMENT_ROW = {
+const DOCUMENT_ROW: Row = {
   id: DOCUMENT_ONE,
   document_code: 'LAW-001',
   canonical_title: 'Civil and Commercial Code',
@@ -91,7 +204,7 @@ const DOCUMENT_ROW = {
   lifecycle_status: 'active',
 }
 
-const VERSION_ROW = {
+const VERSION_ROW: Row = {
   id: VERSION_ONE,
   reference_document_id: DOCUMENT_ONE,
   version_label: '2026 edition',
@@ -101,47 +214,46 @@ const VERSION_ROW = {
   effective_to_date: null,
 }
 
-const LEGACY_DOCUMENT_ALIAS_ROW = {
-  id: ALIAS_ONE,
+const ALIAS_ROW: Row = {
+  id: '00000000-0000-4000-8000-000000000401',
   reference_document_id: DOCUMENT_ONE,
   alias_type: 'legacy_key',
-  alias_value: 'Legacy Administrative Act',
+  alias_value: 'Civil Code',
   status: 'active',
 }
 
-const PACKAGE_ROW = {
-  id: PACKAGE_ONE,
-  name: 'General Law',
-  slug: 'general-law',
-}
-
-interface PlannedResponse {
-  readonly data?: readonly unknown[] | null
-  readonly count?: number | null
-  readonly error?: {
-    readonly message: string
-    readonly code?: string
-  } | null
-}
+const PACKAGE_ROWS: readonly Row[] = [
+  { id: PACKAGE_ALPHA, name: 'Alpha Package', slug: 'alpha-package' },
+  { id: PACKAGE_BETA, name: 'Beta Package', slug: 'beta-package' },
+  { id: PACKAGE_GAMMA, name: 'Gamma Package', slug: 'gamma-package' },
+]
 
 interface Operation {
   readonly name: string
   readonly args: readonly unknown[]
 }
 
-interface RecordedCall {
+interface Call {
   readonly table: string
   readonly operations: Operation[]
 }
 
+interface QueryFailure {
+  readonly message: string
+  readonly code?: string
+}
+
 class FakeQueryBuilder implements PromiseLike<{
-  readonly data: readonly unknown[] | null
-  readonly error: PlannedResponse['error']
+  readonly data: readonly Row[] | null
+  readonly error: QueryFailure | null
   readonly count: number | null
 }> {
+  private rangeValue: readonly [number, number] | null = null
+
   public constructor(
-    private readonly response: PlannedResponse,
-    public readonly operations: Operation[]
+    private readonly rows: readonly Row[],
+    public readonly operations: Operation[],
+    private readonly failure: QueryFailure | null = null
   ) {}
 
   private record(name: string, ...args: readonly unknown[]): FakeQueryBuilder {
@@ -186,296 +298,408 @@ class FakeQueryBuilder implements PromiseLike<{
   }
 
   public range(from: number, to: number): FakeQueryBuilder {
+    this.rangeValue = [from, to]
     return this.record('range', from, to)
   }
 
-  public then<
-    TResult1 = {
-      readonly data: readonly unknown[] | null
-      readonly error: PlannedResponse['error']
-      readonly count: number | null
-    },
-    TResult2 = never,
-  >(
+  private valueFor(row: Row, column: string): unknown {
+    return row[column]
+  }
+
+  private filteredRows(applyRange = true): readonly Row[] {
+    let rows = [...this.rows]
+    for (const operation of this.operations) {
+      const [column, value] = operation.args
+      const field = String(column)
+      if (operation.name === 'eq') {
+        rows = rows.filter((row) => this.valueFor(row, field) === value)
+      } else if (operation.name === 'in') {
+        const values = Array.isArray(value) ? value : []
+        rows = rows.filter((row) => values.includes(this.valueFor(row, field)))
+      } else if (operation.name === 'is') {
+        rows = rows.filter((row) => value === null
+          ? row[field] === null || row[field] === undefined
+          : row[field] === value)
+      } else if (operation.name === 'not' && operation.args[1] === 'is' && value === null) {
+        rows = rows.filter((row) => row[field] !== null && row[field] !== undefined)
+      } else if (operation.name === 'gt') {
+        rows = rows.filter((row) => (
+          typeof row[field] === 'number' && row[field] > Number(value)
+        ))
+      } else if (operation.name === 'ilike') {
+        const needle = String(value).replaceAll('%', '').toLocaleLowerCase()
+        rows = rows.filter((row) => String(row[field] ?? '').toLocaleLowerCase().includes(needle))
+      } else if (operation.name === 'or' && field === 'subject.is.null,subject.eq.') {
+        rows = rows.filter((row) => row.subject === null || row.subject === undefined)
+      }
+    }
+
+    const orderOperations = this.operations.filter((operation) => operation.name === 'order')
+    for (const operation of [...orderOperations].reverse()) {
+      const [column, options] = operation.args
+      const ascending = typeof options === 'object' && options !== null &&
+        (options as { ascending?: boolean }).ascending !== false
+      const nullsFirst = typeof options === 'object' && options !== null &&
+        (options as { nullsFirst?: boolean }).nullsFirst === true
+      rows.sort((left, right) => {
+        const leftValue = left[String(column)]
+        const rightValue = right[String(column)]
+        if (leftValue === rightValue) return 0
+        if (leftValue === null || leftValue === undefined) return nullsFirst ? -1 : 1
+        if (rightValue === null || rightValue === undefined) return nullsFirst ? 1 : -1
+        const comparison = String(leftValue).localeCompare(String(rightValue))
+        return ascending ? comparison : -comparison
+      })
+    }
+
+    if (!applyRange || !this.rangeValue) return rows
+    const [from, to] = this.rangeValue
+    return rows.slice(from, to + 1)
+  }
+
+  public then<TResult1 = {
+    readonly data: readonly Row[] | null
+    readonly error: QueryFailure | null
+    readonly count: number | null
+  }, TResult2 = never>(
     onfulfilled?: ((value: {
-      readonly data: readonly unknown[] | null
-      readonly error: PlannedResponse['error']
+      readonly data: readonly Row[] | null
+      readonly error: QueryFailure | null
       readonly count: number | null
     }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2> {
-    return Promise.resolve({
-      data: this.response.data ?? [],
-      error: this.response.error ?? null,
-      count: this.response.count ?? null,
-    }).then(onfulfilled, onrejected)
+    const value = this.failure
+      ? { data: null, error: this.failure, count: 0 }
+      : { data: this.filteredRows(), error: null, count: this.filteredRows(false).length }
+    return Promise.resolve(value).then(onfulfilled, onrejected)
   }
 }
 
-function fakeClient(
-  plans: Readonly<Record<string, readonly PlannedResponse[]>>
+function makeClient(
+  failureTable: string | null = null,
+  overrides: Partial<Record<string, readonly Row[]>> = {}
 ): {
   readonly client: SummaryLibraryCompatibilitySupabaseClient
-  readonly calls: RecordedCall[]
+  readonly calls: readonly Call[]
 } {
-  const remaining = new Map(
-    Object.entries(plans).map(([table, responses]) => [table, [...responses]])
-  )
-  const calls: RecordedCall[] = []
+  const data: Readonly<Record<string, readonly Row[]>> = {
+    kp_read_admin_library: [
+      kpRootRow(SUMMARY_KP, 'Contract Law', '2026-08-03T00:00:00.000Z', true, 1),
+      kpRootRow(SUMMARY_KP_SECONDARY, 'Beta Administrative Law', '2026-08-04T00:00:00.000Z', false),
+    ],
+    summaries: [legacyRootRow()],
+    package_summaries: [
+      membershipRow(SUMMARY_KP, PACKAGE_ALPHA, true),
+      membershipRow(SUMMARY_KP, PACKAGE_BETA, false),
+      membershipRow(SUMMARY_KP, PACKAGE_GAMMA, false),
+      membershipRow(SUMMARY_KP_SECONDARY, PACKAGE_GAMMA, false),
+    ],
+    packages: PACKAGE_ROWS,
+    summary_reference_documents: [sourceRow(SUMMARY_KP)],
+    reference_documents: [DOCUMENT_ROW],
+    reference_document_versions: [VERSION_ROW],
+    reference_document_aliases: [ALIAS_ROW],
+    ...overrides,
+  }
+  const calls: Call[] = []
   const client = {
     from(table: string) {
       const operations: Operation[] = []
       calls.push({ table, operations })
-      const response = remaining.get(table)?.shift() ?? { data: [] }
-      return new FakeQueryBuilder(response, operations)
+      return new FakeQueryBuilder(
+        data[table] ?? [],
+        operations,
+        table === failureTable ? { message: `failed ${table}`, code: 'PGRST999' } : null
+      )
     },
   } as unknown as SummaryLibraryCompatibilitySupabaseClient
   return { client, calls }
 }
 
-function callFor(
-  calls: readonly RecordedCall[],
-  table: string,
-  index = 0
-): RecordedCall {
-  const call = calls.filter((candidate) => candidate.table === table)[index]
-  assert.ok(call, `Expected call ${index + 1} for ${table}`)
-  return call
+function callsFor(calls: readonly Call[], table: string): readonly Call[] {
+  return calls.filter((call) => call.table === table)
 }
 
 function hasOperation(
-  call: RecordedCall,
+  calls: readonly Call[],
   name: string,
-  ...args: readonly unknown[]
+  column: string,
+  value?: unknown
 ): boolean {
-  return call.operations.some((operation) => (
+  return calls.some((call) => call.operations.some((operation) => (
     operation.name === name &&
-    args.every((value, index) => isDeepStrictEqual(operation.args[index], value))
-  ))
+    operation.args[0] === column &&
+    (value === undefined || operation.args[1] === value)
+  )))
 }
 
-test('delegates legacy search, filters, count, ordering, and pagination to the server', async () => {
-  const { client, calls } = fakeClient({
-    package_summaries: [
-      { data: [placementRow(SUMMARY_TWO)], count: 1 },
-    ],
-    summary_reference_documents: [
-      { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
-      { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
-    ],
-    reference_documents: [
-      { data: [DOCUMENT_ROW], count: 1 },
-      { data: [DOCUMENT_ROW], count: 1 },
-    ],
-    reference_document_versions: [{ data: [VERSION_ROW], count: 1 }],
-    reference_document_aliases: [
-      { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
-      { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
-    ],
-    packages: [
-      { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
-      { data: [PACKAGE_ROW], count: 1 },
-    ],
-    kp_read_admin_library: [
-      { data: [rootRow(SUMMARY_TWO, 'Contract Law', false, '2026-08-03T00:00:00.000Z', 1)], count: 1 },
-    ],
-  })
-  const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
-  const result = await repository.search({
-    search: 'contract',
-    publicationStatus: 'draft',
-    hasPackages: true,
+test('reads one root row per Summary and hydrates legacy ownership plus every KP membership', async () => {
+  const { client, calls } = makeClient()
+  const result = await new SupabaseSummaryLibraryCompatibilityRepository(client).search({
+    pageSize: 10,
+    sort: { key: 'canonicalTitle', direction: 'asc' },
   })
 
-  assert.equal(result.totalItems, 1)
-  assert.equal(result.items[0]?.title, 'Contract Law')
-  assert.equal(result.items[0]?.document, 'Legacy Administrative Act')
+  assert.equal(result.totalItems, 3)
+  assert.equal(result.items.length, 3)
+  assert.deepEqual(new Set(result.items.map((item) => item.id)), new Set([
+    SUMMARY_LEGACY,
+    SUMMARY_KP,
+    SUMMARY_KP_SECONDARY,
+  ]))
 
-  const root = callFor(calls, 'kp_read_admin_library')
-  const select = root.operations.find((operation) => operation.name === 'select')
-  assert.deepEqual(select?.args[1], { count: 'exact' })
-  assert.ok(hasOperation(root, 'ilike', 'canonical_title', '%contract%'))
-  assert.ok(hasOperation(root, 'eq', 'legacy_is_published', false))
-  assert.ok(hasOperation(root, 'gt', 'package_placement_count', 0))
-  assert.ok(hasOperation(root, 'range', 0, 14))
-  assert.deepEqual(
-    root.operations.filter((operation) => operation.name === 'order').map((operation) => operation.args),
-    [
-      ['placements(display_order)', { ascending: false }],
-      ['placements(released_at)', { ascending: false, nullsFirst: false }],
-      ['updated_at', { ascending: false }],
-      ['created_at', { ascending: false }],
-      ['summary_id', { ascending: true }],
-    ]
-  )
+  const legacy = result.items.find((item) => item.id === SUMMARY_LEGACY)
+  assert.equal(legacy?.summaryKind, 'legacy')
+  assert.deepEqual(legacy?.packageIds, [PACKAGE_ALPHA])
+  assert.deepEqual(legacy?.placements, [])
+  assert.equal(legacy?.slug, 'legacy-administrative-act')
 
-  const placements = callFor(calls, 'package_summaries')
-  assert.ok(hasOperation(placements, 'select', 'package_id, summary_id, status, version_policy, pinned_summary_version_id, sort_order, display_order, released_at, navigation_label, legacy_slug, created_at, updated_at', { count: 'exact' }))
-  assert.ok(hasOperation(placements, 'range', 0, 999))
-  const relationships = callFor(calls, 'summary_reference_documents')
-  assert.ok(hasOperation(relationships, 'range', 0, 9_999))
+  const kp = result.items.find((item) => item.id === SUMMARY_KP)
+  assert.equal(kp?.summaryKind, 'kp_native')
+  assert.equal(kp?.placements.length, 3)
+  assert.deepEqual(kp?.packageIds, [PACKAGE_ALPHA, PACKAGE_BETA, PACKAGE_GAMMA])
+  assert.deepEqual(kp?.packages.map((currentPackage) => currentPackage.name), [
+    'Alpha Package',
+    'Beta Package',
+    'Gamma Package',
+  ])
 
-  assert.equal(calls.filter((call) => call.table === 'summaries').length, 0)
-  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 1)
-  assert.equal(calls.filter((call) => call.table === 'summary_reference_documents').length, 2)
+  assert.equal(hasOperation(calls, 'eq', 'is_summary_bank_compatibility', true), false)
+  assert.equal(callsFor(calls, 'summaries').length > 0, true)
+  assert.equal(callsFor(calls, 'kp_read_admin_library').length > 0, true)
 })
 
-test('applies document and Package candidates before server pagination', async () => {
-  const { client, calls } = fakeClient({
-    reference_documents: [
-      { data: [DOCUMENT_ROW], count: 1 },
-      { data: [], count: 0 },
-      { data: [DOCUMENT_ROW], count: 1 },
-      { data: [DOCUMENT_ROW], count: 1 },
-    ],
-    reference_document_aliases: [
-      { data: [], count: 0 },
-      { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
-      { data: [LEGACY_DOCUMENT_ALIAS_ROW], count: 1 },
-    ],
-    summary_reference_documents: [
-      { data: [{ summary_id: SUMMARY_TWO }], count: 1 },
-      { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
-      { data: [relationshipRow(SUMMARY_TWO)], count: 1 },
-    ],
-    package_summaries: [{ data: [placementRow(SUMMARY_TWO)], count: 1 }],
-    reference_document_versions: [{ data: [VERSION_ROW], count: 1 }],
-    kp_read_admin_library: [{
-      data: [rootRow(SUMMARY_TWO, 'Contract Law', false, '2026-08-03T00:00:00.000Z', 1)],
-      count: 2,
-    }],
-    packages: [
-      { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
-      { data: [PACKAGE_ROW], count: 1 },
-    ],
-  })
+test('package filtering matches any membership, including marker=false secondary memberships', async () => {
+  const { client, calls } = makeClient()
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
-  const result = await repository.search({
-    document: 'Legacy Administrative Act',
-    packageId: PACKAGE_ONE,
+
+  const beta = await repository.search({
+    packageId: PACKAGE_BETA,
+    search: 'contract',
+    publicationStatus: 'published',
+    pageSize: 10,
+  })
+  assert.deepEqual(beta.items.map((item) => item.id), [SUMMARY_KP])
+  assert.equal(beta.items[0]?.placements.length, 3)
+  assert.equal(hasOperation(calls, 'eq', 'package_id', PACKAGE_BETA), true)
+  assert.equal(hasOperation(calls, 'eq', 'is_summary_bank_compatibility', true), false)
+
+  const alpha = await repository.search({ packageId: PACKAGE_ALPHA, pageSize: 10 })
+  assert.deepEqual(new Set(alpha.items.map((item) => item.id)), new Set([
+    SUMMARY_LEGACY,
+    SUMMARY_KP,
+  ]))
+  assert.equal(alpha.items.length, 2)
+
+  const gamma = await repository.search({ packageId: PACKAGE_GAMMA, pageSize: 10 })
+  assert.equal(gamma.items.filter((item) => item.id === SUMMARY_KP).length, 1)
+  assert.equal(gamma.items.find((item) => item.id === SUMMARY_KP)?.placements.length, 3)
+})
+
+test('keeps root-level counts and pagination distinct across hybrid branches', async () => {
+  const { client } = makeClient()
+  const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
+
+  const pageOne = await repository.search({
+    page: 1,
+    pageSize: 1,
+    sort: { key: 'canonicalTitle', direction: 'asc' },
+  })
+  const pageTwo = await repository.search({
     page: 2,
     pageSize: 1,
     sort: { key: 'canonicalTitle', direction: 'asc' },
   })
 
-  assert.equal(result.totalItems, 2)
-  assert.equal(result.totalPages, 2)
-  assert.equal(result.page, 2)
+  assert.equal(pageOne.totalItems, 3)
+  assert.equal(pageOne.totalPages, 3)
+  assert.equal(pageTwo.totalItems, 3)
+  assert.equal(pageTwo.totalPages, 3)
+  assert.equal(pageOne.items.length, 1)
+  assert.equal(pageTwo.items.length, 1)
+  assert.notEqual(pageOne.items[0]?.id, pageTwo.items[0]?.id)
+})
 
-  const documentTitleLookup = callFor(calls, 'reference_documents')
-  assert.ok(hasOperation(documentTitleLookup, 'eq', 'canonical_title', 'Legacy Administrative Act'))
-  const documentCandidates = callFor(calls, 'summary_reference_documents')
-  assert.ok(hasOperation(documentCandidates, 'eq', 'role', 'primary'))
-  assert.ok(hasOperation(documentCandidates, 'in', 'reference_document_id', [DOCUMENT_ONE]))
+test('restores the Legacy default ordering precedence and null handling', async () => {
+  const { client, calls } = makeClient(null, {
+    kp_read_admin_library: [],
+    summaries: legacyDefaultOrderRows(),
+    package_summaries: [],
+  })
+  const result = await new SupabaseSummaryLibraryCompatibilityRepository(client).search({
+    pageSize: 100,
+  })
 
-  const root = callFor(calls, 'kp_read_admin_library')
-  assert.ok(hasOperation(root, 'in', 'summary_id', [SUMMARY_TWO]))
-  assert.ok(hasOperation(root, 'eq', 'placements.package_id', PACKAGE_ONE))
-  assert.ok(hasOperation(root, 'range', 1, 1))
+  assert.deepEqual(result.items.map((item) => item.id), [
+    SUMMARY_LEGACY,
+    SUMMARY_LEGACY_RELEASE_NEW,
+    SUMMARY_LEGACY_UPDATED_NEW,
+    SUMMARY_LEGACY_UPDATED_OLD,
+    SUMMARY_LEGACY_CREATED_NEW,
+    SUMMARY_LEGACY_CREATED_OLD,
+    SUMMARY_LEGACY_ID_FIRST,
+    SUMMARY_LEGACY_ID_SECOND,
+    SUMMARY_LEGACY_RELEASE_NULL,
+  ])
+
+  const rootCall = callsFor(calls, 'summaries').find((call) => (
+    call.operations.some((operation) => (
+      operation.name === 'select' && String(operation.args[0]).includes('display_order')
+    ))
+  ))
+  assert.ok(rootCall)
   assert.deepEqual(
-    root.operations.filter((operation) => operation.name === 'order').map((operation) => operation.args),
+    rootCall.operations
+      .filter((operation) => operation.name === 'order')
+      .map((operation) => operation.args),
     [
-      ['canonical_title', { ascending: true }],
-      ['summary_id', { ascending: true }],
+      ['display_order', { ascending: false }],
+      ['released_at', { ascending: false, nullsFirst: false }],
+      ['updated_at', { ascending: false }],
+      ['created_at', { ascending: false }],
+      ['id', { ascending: true }],
     ]
   )
-  assert.equal(calls.filter((call) => call.table === 'summaries').length, 0)
 })
 
-test('preserves the legacy compatibility document over the normalized Primary Reference Document', async () => {
-  const { client } = fakeClient({
-    package_summaries: [{ data: [placementRow(SUMMARY_ONE)], count: 1 }],
-    summary_reference_documents: [
-      { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
-      { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
-    ],
-    packages: [
-      { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
-      { data: [PACKAGE_ROW], count: 1 },
-    ],
-    reference_documents: [
-      { data: [DOCUMENT_ROW], count: 1 },
-      { data: [DOCUMENT_ROW], count: 1 },
-    ],
-    reference_document_versions: [{ data: [VERSION_ROW], count: 1 }],
-    reference_document_aliases: [
-      { data: [{ ...LEGACY_DOCUMENT_ALIAS_ROW, alias_value: 'Legacy Civil Code' }], count: 1 },
-      { data: [{ ...LEGACY_DOCUMENT_ALIAS_ROW, alias_value: 'Legacy Civil Code' }], count: 1 },
-    ],
-    kp_read_admin_library: [{
-      data: [rootRow(SUMMARY_ONE, 'Zoning Law', true, '2026-08-04T00:00:00.000Z', 1)],
-      count: 1,
-    }],
+test('keeps explicit non-default Legacy sort modes unchanged', async () => {
+  const rows = [
+    legacyRootRow({
+      id: SUMMARY_LEGACY,
+      title: 'Zulu title',
+      display_order: 9,
+      updated_at: '2026-08-01T00:00:00.000Z',
+    }),
+    legacyRootRow({
+      id: SUMMARY_LEGACY_RELEASE_NEW,
+      title: 'Alpha title',
+      display_order: 0,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    }),
+  ]
+  const { client } = makeClient(null, {
+    kp_read_admin_library: [],
+    summaries: rows,
+    package_summaries: [],
   })
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
-  const result = await repository.search({ hasPackages: true })
 
-  assert.equal(result.items[0]?.document, 'Legacy Civil Code')
-  assert.equal(result.items[0]?.sources[0]?.referenceDocumentTitle, 'Civil and Commercial Code')
-  assert.equal(result.items[0]?.sources.length, 1)
+  const canonicalTitle = await repository.search({
+    pageSize: 100,
+    sort: { key: 'canonicalTitle', direction: 'asc' },
+  })
+  assert.deepEqual(canonicalTitle.items.map((item) => item.id), [
+    SUMMARY_LEGACY_RELEASE_NEW,
+    SUMMARY_LEGACY,
+  ])
+
+  const updatedAtAscending = await repository.search({
+    pageSize: 100,
+    sort: { key: 'updatedAt', direction: 'asc' },
+  })
+  assert.deepEqual(updatedAtAscending.items.map((item) => item.id), [
+    SUMMARY_LEGACY_RELEASE_NEW,
+    SUMMARY_LEGACY,
+  ])
 })
 
-test('does not synthesize a legacy document from the normalized Reference Document title', async () => {
-  const { client } = fakeClient({
-    package_summaries: [{ data: [placementRow(SUMMARY_ONE)], count: 1 }],
-    summary_reference_documents: [
-      { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
-      { data: [relationshipRow(SUMMARY_ONE)], count: 1 },
+test('keeps hybrid default ordering stable across merge, dedupe, and pagination', async () => {
+  const { client } = makeClient(null, {
+    kp_read_admin_library: [
+      kpRootRow(SUMMARY_KP, 'KP Contract Law', '2026-08-03T00:00:00.000Z', true, 1),
+      kpRootRow(SUMMARY_KP_SECONDARY, 'KP Administrative Law', '2026-08-04T00:00:00.000Z'),
     ],
-    packages: [
-      { data: [{ id: PACKAGE_ONE, name: 'General Law' }], count: 1 },
-      { data: [PACKAGE_ROW], count: 1 },
+    summaries: [
+      legacyRootRow({
+        id: SUMMARY_LEGACY,
+        title: 'Legacy promoted',
+        display_order: 2,
+        released_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+      }),
+      legacyRootRow({
+        id: SUMMARY_LEGACY_RELEASE_NEW,
+        title: 'Legacy secondary',
+        display_order: 1,
+        released_at: '2026-02-01T00:00:00.000Z',
+        updated_at: '2026-12-01T00:00:00.000Z',
+      }),
     ],
-    reference_documents: [
-      { data: [DOCUMENT_ROW], count: 1 },
-      { data: [DOCUMENT_ROW], count: 1 },
+    package_summaries: [
+      membershipRow(SUMMARY_KP, PACKAGE_ALPHA, true),
+      membershipRow(SUMMARY_KP, PACKAGE_BETA, false),
+      membershipRow(SUMMARY_KP, PACKAGE_GAMMA, false),
+      membershipRow(SUMMARY_KP_SECONDARY, PACKAGE_GAMMA, false),
     ],
-    reference_document_versions: [{ data: [VERSION_ROW], count: 1 }],
-    reference_document_aliases: [
-      { data: [], count: 0 },
-      { data: [], count: 0 },
-    ],
-    kp_read_admin_library: [{
-      data: [rootRow(SUMMARY_ONE, 'Zoning Law', true, '2026-08-04T00:00:00.000Z', 1)],
-      count: 1,
-    }],
   })
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
-  const result = await repository.search({ hasPackages: true })
 
-  assert.equal(result.items[0]?.document, null)
-  assert.equal(result.items[0]?.sources[0]?.referenceDocumentTitle, 'Civil and Commercial Code')
+  const pagedIds: string[] = []
+  for (const page of [1, 2, 3, 4]) {
+    const result = await repository.search({ page, pageSize: 1 })
+    assert.equal(result.totalItems, 4)
+    assert.equal(result.totalPages, 4)
+    pagedIds.push(...result.items.map((item) => item.id))
+  }
+
+  const full = await repository.search({ pageSize: 100 })
+  const fullIds = full.items.map((item) => item.id)
+  assert.deepEqual(fullIds, [
+    SUMMARY_KP_SECONDARY,
+    SUMMARY_KP,
+    SUMMARY_LEGACY,
+    SUMMARY_LEGACY_RELEASE_NEW,
+  ])
+  assert.deepEqual(pagedIds, fullIds)
+  assert.equal(new Set(fullIds).size, fullIds.length)
+  assert.equal(full.items.find((item) => item.id === SUMMARY_KP)?.placements.length, 3)
 })
 
-test('returns an empty server page without issuing per-Summary reads', async () => {
-  const { client, calls } = fakeClient({
-    kp_read_admin_library: [{ data: [], count: 0 }],
-    packages: [{ data: [], count: 0 }],
-    summary_reference_documents: [{ data: [], count: 0 }],
-  })
+test('preserves publication, search, and document filters for both root families', async () => {
+  const { client } = makeClient()
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
-  const result = await repository.search({ hasPackages: true })
 
-  assert.equal(result.items.length, 0)
-  assert.equal(result.totalItems, 0)
-  assert.equal(result.totalPages, 0)
-  assert.equal(calls.filter((call) => call.table === 'kp_read_admin_library').length, 1)
-  assert.equal(calls.filter((call) => call.table === 'package_summaries').length, 0)
-  assert.equal(calls.filter((call) => call.table === 'summary_reference_documents').length, 1)
-  assert.equal(calls.filter((call) => call.table === 'summaries').length, 0)
+  const legacy = await repository.search({
+    search: 'legacy administrative',
+    publicationStatus: 'published',
+    subject: 'law',
+    document: 'Legacy Administrative Act',
+    pageSize: 10,
+  })
+  assert.deepEqual(legacy.items.map((item) => item.id), [SUMMARY_LEGACY])
+
+  const kp = await repository.search({
+    search: 'contract',
+    publicationStatus: 'published',
+    subject: 'law',
+    document: 'Civil Code',
+    pageSize: 10,
+  })
+  assert.deepEqual(kp.items.map((item) => item.id), [SUMMARY_KP])
 })
 
-test('does not suppress repository errors', async () => {
-  const { client } = fakeClient({
-    kp_read_admin_library: [{
-      error: { message: 'failed kp_read_admin_library', code: 'PGRST999' },
-      count: 0,
-    }],
-  })
+test('builds package and document facets from all product memberships and legacy roots', async () => {
+  const { client } = makeClient()
+  const result = await new SupabaseSummaryLibraryCompatibilityRepository(client).listFacets()
+
+  assert.deepEqual(result.packageOptions, [
+    { id: PACKAGE_ALPHA, name: 'Alpha Package' },
+    { id: PACKAGE_BETA, name: 'Beta Package' },
+    { id: PACKAGE_GAMMA, name: 'Gamma Package' },
+  ])
+  assert.deepEqual(result.documentOptions, [
+    'Civil Code',
+    'Legacy Administrative Act',
+  ])
+})
+
+test('returns repository errors without suppressing the failed read', async () => {
+  const { client } = makeClient('kp_read_admin_library')
   const repository = new SupabaseSummaryLibraryCompatibilityRepository(client)
 
   await assert.rejects(
-    () => repository.search({ hasPackages: true }),
+    () => repository.search({ pageSize: 10 }),
     (error: unknown) => error instanceof SummaryLibraryCompatibilityRepositoryError &&
       error.code === 'query_failed' &&
       error.source === 'kp_read_admin_library'

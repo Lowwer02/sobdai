@@ -18,6 +18,11 @@ import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { createPageMetadata, buildBreadcrumbJsonLd } from '@/lib/seo'
 import { buildNewsMetadata, buildNewsJsonLd, type CtaConfig, type GpExamRequirement } from '@/lib/news'
 import { getPackagePublicCounts } from '@/lib/publicData'
+import {
+  mapSummaryRelationsToTargets,
+  resolvePublicSummaryTargets,
+  type PublicSummaryTarget,
+} from '@/lib/summary-target'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import StructuredData from '@/components/StructuredData'
 import PackageCard, { type PackageCardData } from '@/components/PackageCard'
@@ -219,26 +224,9 @@ interface RelatedPackageRow {
   sort_order: number
 }
 
-interface RelatedSummaryRow {
-  id: string
-  title: string
-  slug: string
-  topic: string | null
-  read_time_minutes: number | null
-  sort_order: number
-  package: { slug: string } | null // parent package slug, for the nested href
-}
-
 interface RelatedContent {
   packages: PackageCardData[]
-  summaries: {
-    id: string
-    title: string
-    slug: string
-    topic: string | null
-    read_time_minutes: number | null
-    packageSlug: string | null
-  }[]
+  summaries: PublicSummaryTarget[]
 }
 
 /**
@@ -249,10 +237,10 @@ interface RelatedContent {
  *     then ONE batched getPackagePublicCounts call (the SECURITY DEFINER RPC
  *     aggregates all counts in a single SQL query) merges total_questions /
  *     total_exam_sets onto each row — exactly the app/packages/page.tsx pattern.
- *   - Summaries: join through news_summaries → summaries → packages(slug). The
- *     parent package slug is needed because the public summary route is nested
- *     at /package/[slug]/summary/[summarySlug] (there is no top-level summary
- *     route), so we join `packages!inner(slug)`.
+ *   - Summaries: read only the News → Summary root IDs from news_summaries,
+ *     then resolve all distinct IDs through the shared public-target resolver.
+ *     That resolver owns Legacy/KP authority, current revision validation,
+ *     deterministic Package membership selection, and the final href.
  *
  * Only published entities surface (RLS enforces this via the anon client:
  * packages.is_published and summaries.is_published), so an unpublished related
@@ -279,11 +267,7 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
       .order('sort_order', { ascending: true }),
     supabase
       .from('news_summaries')
-      .select(
-        `sort_order, summary_id, summaries!inner (
-          id, title, slug, topic, read_time_minutes, packages ( slug )
-        )`
-      )
+      .select('sort_order, summary_id')
       .eq('news_id', newsId)
       .order('sort_order', { ascending: true }),
   ])
@@ -316,24 +300,17 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
     positions: p.positions,
   }))
 
-  // --- summaries: flatten + resolve parent package slug for the nested href ---
+  // --- summaries: keep the junction's root IDs, then resolve once in batch ---
   const sumRows = (sumResult.data ?? []) as unknown as {
     sort_order: number
     summary_id: string
-    summaries: Omit<RelatedSummaryRow, 'sort_order' | 'package'> & {
-      packages: { slug: string } | null
-    } | null
   }[]
-  const summaries = sumRows
-    .filter(r => r.summaries)
-    .map(r => ({
-      id: r.summaries!.id,
-      title: r.summaries!.title,
-      slug: r.summaries!.slug,
-      topic: r.summaries!.topic,
-      read_time_minutes: r.summaries!.read_time_minutes,
-      packageSlug: r.summaries!.packages?.slug ?? null,
-    }))
+  const summaryIds = [...new Set(sumRows.map((row) => row.summary_id).filter(Boolean))]
+  const summaryTargets = await resolvePublicSummaryTargets(supabase, summaryIds)
+  const summaries: PublicSummaryTarget[] = mapSummaryRelationsToTargets(
+    sumRows.map((row) => row.summary_id),
+    summaryTargets,
+  )
 
   return { packages, summaries }
 })
@@ -774,17 +751,13 @@ export default async function NewsDetailPage({
                 >
                   {related.summaries.map(s => (
                     <ContentCard
-                      key={s.id}
-                      href={
-                        s.packageSlug
-                          ? `/package/${s.packageSlug}/summary/${s.slug}`
-                          : `/news/${slug}`
-                      }
+                      key={s.summaryId}
+                      href={s.href}
                       title={s.title}
                       meta={[
                         {
                           icon: <Clock size={11} aria-hidden />,
-                          text: `${s.read_time_minutes || 5} นาที`,
+                          text: `${s.readTimeMinutes || 5} นาที`,
                         },
                         ...(s.topic ? [{ text: s.topic }] : []),
                       ]}

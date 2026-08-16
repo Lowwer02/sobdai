@@ -40,14 +40,14 @@ export interface Summary {
  */
 export interface SummaryLibraryItem {
   readonly summaryId: UUID
-  readonly summaryCode: string
-  readonly canonicalSlug: string
+  readonly summaryCode: string | null
+  readonly canonicalSlug: string | null
   readonly canonicalTitle: string
   readonly subject: string | null
   readonly topic: string | null
   readonly law: string | null
-  readonly visibility: SummaryVisibility
-  readonly lifecycleStatus: SummaryLifecycleStatus
+  readonly visibility: SummaryVisibility | null
+  readonly lifecycleStatus: SummaryLifecycleStatus | null
   readonly currentPublishedVersionId: UUID | null
   readonly createdAt: string
   readonly updatedAt: string

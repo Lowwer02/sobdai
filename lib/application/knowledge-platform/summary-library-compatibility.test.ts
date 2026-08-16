@@ -7,6 +7,7 @@ import {
   SummaryLibraryCompatibilityMappingError,
   compareSummaryLibraryCompatibilityLegacyOrder,
   mapSummaryLibraryCompatibilityItem,
+  mapSummaryLibraryLegacyProjectionRow,
   mapSummaryLibraryPlacementRecord,
   mapSummaryLibraryProjectionRow,
   mapSummaryLibrarySourceRecord,
@@ -122,6 +123,13 @@ test('maps target root, Package placement, and Reference Document data without f
   assert.equal(item.slug, 'contract-law')
   assert.equal(item.packageId, PLACEMENT_RECORD.packageId)
   assert.equal(item.packageName, 'Public Administration')
+  assert.deepEqual(item.packageIds, [PLACEMENT_RECORD.packageId])
+  assert.deepEqual(item.packages, [{
+    id: PLACEMENT_RECORD.packageId,
+    name: 'Public Administration',
+    slug: 'public-administration',
+  }])
+  assert.equal(item.summaryKind, 'kp_native')
   assert.equal(item.sortOrder, 4)
   assert.equal(item.document, 'Civil and Commercial Code')
   assert.equal(item.isPublished, true)
@@ -147,7 +155,7 @@ test('preserves unassigned Package and legacy Document fallback values', () => {
 
   assert.equal(item.packageId, null)
   assert.equal(item.packageName, null)
-  assert.equal(item.slug, null)
+  assert.equal(item.slug, 'contract-law')
   assert.equal(item.sortOrder, null)
   assert.equal(item.document, 'Legacy Administrative Act')
   assert.equal(item.isPublished, false)
@@ -158,7 +166,7 @@ test('preserves unassigned Package and legacy Document fallback values', () => {
   }).document, SUMMARY_LIBRARY_UNASSIGNED_DOCUMENT)
 })
 
-test('returns typed errors for invalid projection and ambiguous placement data', () => {
+test('returns typed errors for invalid projection and keeps every KP membership', () => {
   assert.throws(
     () => mapSummaryLibraryProjectionRow({ ...ROOT_ROW, canonical_title: null }),
     (error: unknown) => error instanceof SummaryLibraryCompatibilityMappingError &&
@@ -167,14 +175,69 @@ test('returns typed errors for invalid projection and ambiguous placement data',
   )
 
   const root = mapSummaryLibraryProjectionRow(ROOT_ROW)
-  assert.throws(
-    () => mapSummaryLibraryCompatibilityItem(root, [PLACEMENT_RECORD, {
+  const item = mapSummaryLibraryCompatibilityItem(root, [PLACEMENT_RECORD, {
       ...PLACEMENT_RECORD,
       packageId: '00000000-0000-4000-8000-000000000202',
-    }], [], true),
-    (error: unknown) => error instanceof SummaryLibraryCompatibilityMappingError &&
-      error.code === 'ambiguous_placement'
+      packageName: 'Administrative Law',
+      packageSlug: 'administrative-law',
+    }, {
+      ...PLACEMENT_RECORD,
+      packageId: '00000000-0000-4000-8000-000000000203',
+      packageName: 'Constitutional Law',
+      packageSlug: 'constitutional-law',
+    }], [], true)
+
+  assert.equal(item.summaryKind, 'kp_native')
+  assert.equal(item.placements.length, 3)
+  assert.deepEqual(new Set(item.packageIds), new Set([
+    '00000000-0000-4000-8000-000000000201',
+    '00000000-0000-4000-8000-000000000202',
+    '00000000-0000-4000-8000-000000000203',
+  ]))
+})
+
+test('maps a legacy root with direct Package ownership and no Package memberships', () => {
+  const root = mapSummaryLibraryLegacyProjectionRow({
+    id: ROOT_ROW.summary_id,
+    summary_code: null,
+    package_id: PLACEMENT_RECORD.packageId,
+    title: 'Legacy Contract Law',
+    slug: 'legacy-contract-law',
+    subject: 'law',
+    topic: 'contracts',
+    law: null,
+    document: 'Civil and Commercial Code',
+    sort_order: 2,
+    display_order: 8,
+    released_at: '2026-08-03T00:00:00.000Z',
+    is_published: true,
+    created_at: '2026-07-01T00:00:00.000Z',
+    updated_at: '2026-07-02T00:00:00.000Z',
+  })
+  const item = mapSummaryLibraryCompatibilityItem(
+    root,
+    [],
+    [],
+    true,
+    'Civil and Commercial Code',
+    {
+      packageId: PLACEMENT_RECORD.packageId,
+      packageName: PLACEMENT_RECORD.packageName,
+      packageSlug: PLACEMENT_RECORD.packageSlug,
+      legacySlug: 'legacy-contract-law',
+      sortOrder: 2,
+      displayOrder: 8,
+      releasedAt: '2026-08-03T00:00:00.000Z',
+    }
   )
+
+  assert.equal(item.summaryKind, 'legacy')
+  assert.equal(item.summaryCode, null)
+  assert.equal(item.slug, 'legacy-contract-law')
+  assert.deepEqual(item.packageIds, [PLACEMENT_RECORD.packageId])
+  assert.equal(item.packages[0]?.name, PLACEMENT_RECORD.packageName)
+  assert.deepEqual(item.placements, [])
+  assert.equal(item.compatibilityWarnings.includes('no_package_placement'), false)
 })
 
 test('maps placement and source records through validated DTO boundaries', () => {

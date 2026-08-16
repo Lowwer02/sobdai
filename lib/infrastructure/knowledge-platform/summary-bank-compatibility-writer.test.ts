@@ -1,0 +1,1043 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import {
+  SummaryBankCompatibilityWriterError,
+  type SummaryBankCompatibilityCreatePersistenceCommand,
+  type SummaryBankCompatibilityEditPersistenceCommand,
+  type SummaryBankCompatibilityReplacePersistenceCommand,
+} from '../../application/knowledge-platform/summary-bank-compatibility-writer'
+import {
+  SupabaseSummaryBankCompatibilityPersistence,
+  type SummaryBankCompatibilitySupabaseClient,
+} from './summary-bank-compatibility-writer'
+
+const ACTOR_ID = '00000000-0000-4000-8000-000000000001'
+const PACKAGE_ID = '00000000-0000-4000-8000-000000000002'
+const OTHER_PACKAGE_ID = '00000000-0000-4000-8000-000000000005'
+const THIRD_PACKAGE_ID = '00000000-0000-4000-8000-000000000008'
+const SUMMARY_ID = '00000000-0000-4000-8000-000000000003'
+const OTHER_SUMMARY_ID = '00000000-0000-4000-8000-000000000006'
+const VERSION_ID = '00000000-0000-4000-8000-000000000004'
+const OTHER_VERSION_ID = '00000000-0000-4000-8000-000000000007'
+
+interface RpcError {
+  readonly code?: string
+  readonly message?: string
+  readonly details?: string
+  readonly hint?: string
+}
+
+interface RpcResponse {
+  readonly data: unknown
+  readonly error: RpcError | null
+  readonly count?: number | null
+}
+
+class FakeQuery {
+  public constructor(private readonly response: RpcResponse) {}
+
+  public select(_columns: string, _options?: unknown): this {
+    return this
+  }
+
+  public eq(_column: string, _value: unknown): this {
+    return this
+  }
+
+  public in(_column: string, _values: readonly unknown[]): this {
+    return this
+  }
+
+  public order(_column: string, _options?: unknown): this {
+    return this
+  }
+
+  public range(_from: number, _to: number): this {
+    return this
+  }
+
+  public maybeSingle(): Promise<RpcResponse> {
+    return Promise.resolve(this.response)
+  }
+
+  public then<TResult1 = RpcResponse, TResult2 = never>(
+    onfulfilled?: ((value: RpcResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve(this.response).then(onfulfilled, onrejected)
+  }
+}
+
+class FakeSupabaseClient implements SummaryBankCompatibilitySupabaseClient {
+  public readonly calls: Array<{
+    readonly functionName: string
+    readonly args: Record<string, unknown>
+  }> = []
+
+  private readonly queryQueues: Map<string, RpcResponse[]>
+
+  public constructor(
+    private readonly response: RpcResponse,
+    queries: Readonly<Record<string, readonly RpcResponse[]>> = {},
+  ) {
+    this.queryQueues = new Map(
+      Object.entries(queries).map(([table, responses]) => [table, [...responses]]),
+    )
+  }
+
+  public from(table: string): FakeQuery {
+    const queue = this.queryQueues.get(table)
+    const response = queue?.shift()
+    if (!response) throw new Error(`Unexpected table read in RPC adapter test: ${table}`)
+    return new FakeQuery(response)
+  }
+
+  public rpc(
+    functionName: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<RpcResponse> {
+    this.calls.push({ functionName, args })
+    return Promise.resolve(this.response)
+  }
+}
+
+const CREATE_COMMAND: SummaryBankCompatibilityCreatePersistenceCommand = {
+  summaryId: SUMMARY_ID,
+  versionId: VERSION_ID,
+  summaryCode: 'SUM-000123',
+  canonicalSlug: 'a-summary-sum-000123',
+  packageId: PACKAGE_ID,
+  packageIds: [PACKAGE_ID],
+  legacySlug: 'a-summary',
+  title: 'A Summary',
+  subject: 'law',
+  document: 'Document',
+  law: 'Law',
+  topic: 'Topic',
+  contentMd: 'content',
+  contentChecksum: 'a'.repeat(64),
+  readTimeMinutes: 1,
+  readTimePolicyVersion: 'summary-whitespace-200wpm-v1',
+  contentSchemaVersion: 'summary-markdown-v1',
+  sortOrder: 4,
+  displayOrder: 7,
+  navigationLabel: null,
+  actorId: ACTOR_ID,
+  isPublished: true,
+  changeNote: 'Initial Summary Bank draft',
+}
+
+const EDIT_COMMAND: SummaryBankCompatibilityEditPersistenceCommand = {
+  summaryId: SUMMARY_ID,
+  summaryKind: 'kp_native',
+  packageId: PACKAGE_ID,
+  packageIds: [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  legacySlug: 'a-summary',
+  title: 'Edited Summary',
+  subject: 'law',
+  document: 'Document',
+  law: 'Law',
+  topic: 'Topic',
+  contentMd: 'edited content',
+  contentChecksum: 'b'.repeat(64),
+  readTimeMinutes: 1,
+  readTimePolicyVersion: 'summary-whitespace-200wpm-v1',
+  contentSchemaVersion: 'summary-markdown-v1',
+  sortOrder: 2,
+  displayOrder: 3,
+  navigationLabel: null,
+  actorId: ACTOR_ID,
+  changeNote: 'Summary Bank compatibility edit',
+}
+
+const REPLACE_COMMAND: SummaryBankCompatibilityReplacePersistenceCommand = {
+  summaryId: SUMMARY_ID,
+  packageId: PACKAGE_ID,
+  legacySlug: 'a-summary',
+  replacementVersionId: VERSION_ID,
+  title: 'Imported replacement',
+  subject: 'law',
+  document: 'Document',
+  law: 'Law',
+  topic: 'Topic',
+  contentMd: 'replacement content',
+  contentChecksum: 'c'.repeat(64),
+  readTimeMinutes: 1,
+  readTimePolicyVersion: 'summary-whitespace-200wpm-v1',
+  contentSchemaVersion: 'summary-markdown-v1',
+  sortOrder: 2,
+  displayOrder: 3,
+  actorId: ACTOR_ID,
+  isPublished: true,
+  changeNote: 'Summary Bank compatibility import replace',
+}
+
+function persistence(response: RpcResponse) {
+  const client = new FakeSupabaseClient(response)
+  return {
+    client,
+    persistence: new SupabaseSummaryBankCompatibilityPersistence(client),
+  }
+}
+
+function persistenceWithQueries(
+  response: RpcResponse,
+  queries: Readonly<Record<string, readonly RpcResponse[]>>,
+) {
+  const client = new FakeSupabaseClient(response, queries)
+  return {
+    client,
+    persistence: new SupabaseSummaryBankCompatibilityPersistence(client),
+  }
+}
+
+function createResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      outcome: 'created',
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      legacy_slug: 'a-summary',
+      is_published: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function editResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      success: true,
+      outcome: 'updated',
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      legacy_slug: 'a-summary',
+      revision_created: true,
+      package_reassigned: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function publishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      idempotent_retry: false,
+      republished: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function unpublishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function legacyPublishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: null,
+      package_id: PACKAGE_ID,
+      is_published: true,
+      legacy: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function legacyUnpublishResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      summary_version_id: null,
+      package_id: PACKAGE_ID,
+      is_published: false,
+      legacy: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function deleteResponse(
+  outcome: 'deleted' | 'archived' = 'archived',
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      summary_id: SUMMARY_ID,
+      outcome,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+function replaceResponse(
+  overrides: Readonly<Record<string, unknown>> = {},
+): RpcResponse {
+  return {
+    data: {
+      outcome: 'replaced',
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      legacy_slug: 'a-summary',
+      is_published: true,
+      revision_created: true,
+      idempotent_retry: false,
+      ...overrides,
+    },
+    error: null,
+  }
+}
+
+const PUBLISHED_REVISION = {
+  id: VERSION_ID,
+  summary_id: SUMMARY_ID,
+  status: 'published',
+}
+
+const OPEN_DRAFT_REVISION = {
+  id: VERSION_ID,
+  summary_id: SUMMARY_ID,
+  status: 'draft',
+}
+
+const MARKED_PLACEMENT = {
+  package_id: PACKAGE_ID,
+  is_summary_bank_compatibility: true,
+  legacy_slug: 'a-summary',
+  status: 'draft',
+}
+
+const IMPORT_MARKED_PLACEMENT = {
+  summary_id: SUMMARY_ID,
+  package_id: PACKAGE_ID,
+  legacy_slug: 'a-summary',
+  is_summary_bank_compatibility: true,
+}
+
+const IMPORT_SECONDARY_PLACEMENT = {
+  ...IMPORT_MARKED_PLACEMENT,
+  package_id: OTHER_PACKAGE_ID,
+  legacy_slug: 'secondary-summary',
+  is_summary_bank_compatibility: false,
+}
+
+const IMPORT_KP_SUMMARY = {
+  id: SUMMARY_ID,
+  summary_code: 'SUM-000123',
+  package_id: PACKAGE_ID,
+  slug: 'a-summary',
+  lifecycle_status: 'active',
+}
+
+const SOURCE_SNAPSHOT = {
+  reference_document_id: OTHER_SUMMARY_ID,
+  reference_document_version_id: OTHER_VERSION_ID,
+  role: 'primary',
+  coverage_note: 'Section 1',
+  sort_order: 0,
+}
+
+function draftPublicationQueries(
+  overrides: Readonly<Record<string, unknown>> = {},
+) {
+  return {
+    summaries: [{
+      data: {
+        id: SUMMARY_ID,
+        current_published_version_id: null,
+        is_published: false,
+      },
+      error: null,
+    } satisfies RpcResponse],
+    package_summaries: [{
+      data: [MARKED_PLACEMENT],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+    summary_versions: [{
+      data: [{ ...OPEN_DRAFT_REVISION, ...overrides }],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+    summary_version_reference_documents: [{
+      data: [SOURCE_SNAPSHOT],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+  }
+}
+
+function republishQueries() {
+  return {
+    summaries: [{
+      data: {
+        id: SUMMARY_ID,
+        current_published_version_id: VERSION_ID,
+        is_published: false,
+      },
+      error: null,
+    } satisfies RpcResponse],
+    package_summaries: [{
+      data: [{ ...MARKED_PLACEMENT, status: 'hidden' }],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+    summary_versions: [
+      { data: PUBLISHED_REVISION, error: null },
+      { data: [], count: 0, error: null },
+    ],
+    summary_version_reference_documents: [{
+      data: [SOURCE_SNAPSHOT],
+      count: 1,
+      error: null,
+    } satisfies RpcResponse],
+  }
+}
+
+async function assertInvalid(
+  operation: () => Promise<unknown>,
+  expectedCode: 'invalid_allocator_result' | 'invalid_response' = 'invalid_response',
+) {
+  await assert.rejects(operation, (error: unknown) => {
+    assert.ok(error instanceof SummaryBankCompatibilityWriterError)
+    assert.equal(error.code, expectedCode)
+    return true
+  })
+}
+
+test('allocator accepts exactly one valid code', async () => {
+  const { client, persistence: adapter } = persistence({
+    data: ['SUM-000123'],
+    error: null,
+  })
+
+  assert.equal(await adapter.allocateSummaryCode(), 'SUM-000123')
+  assert.equal(client.calls[0]?.functionName, 'allocate_summary_codes')
+  assert.deepEqual(client.calls[0]?.args, { n: 1 })
+})
+
+for (const [label, data] of [
+  ['null data', null],
+  ['unexpected object', {}],
+  ['zero rows', []],
+  ['multiple rows', ['SUM-000123', 'SUM-000124']],
+  ['malformed code', ['NOT-A-SUMMARY-CODE']],
+] as const) {
+  test(`allocator rejects ${label}`, async () => {
+    const { persistence: adapter } = persistence({ data, error: null })
+    await assertInvalid(() => adapter.allocateSummaryCode(), 'invalid_allocator_result')
+  })
+}
+
+test('create accepts the exact migration-071 result contract', async () => {
+  const { client, persistence: adapter } = persistence(createResponse())
+  const result = await adapter.create(CREATE_COMMAND)
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+    isPublished: true,
+    idempotentRetry: false,
+  })
+  assert.deepEqual(client.calls[0]?.args.p_package_ids, [PACKAGE_ID])
+})
+
+test('create forwards the complete three-Package set to the migration-071 RPC', async () => {
+  const { client, persistence: adapter } = persistence(createResponse({
+    package_id: PACKAGE_ID,
+  }))
+  await adapter.create({
+    ...CREATE_COMMAND,
+    packageIds: [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  })
+
+  assert.deepEqual(
+    client.calls[0]?.args.p_package_ids,
+    [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  )
+})
+
+for (const [label, value] of [
+  ['missing idempotent_retry', undefined],
+  ['null idempotent_retry', null],
+] as const) {
+  test(`create rejects ${label}`, async () => {
+    const { persistence: adapter } = persistence(createResponse({ idempotent_retry: value }))
+    await assertInvalid(() => adapter.create(CREATE_COMMAND))
+  })
+}
+
+test('create rejects an unexpected outcome', async () => {
+  const { persistence: adapter } = persistence(createResponse({ outcome: 'updated' }))
+  await assertInvalid(() => adapter.create(CREATE_COMMAND))
+})
+
+for (const [field, value] of [
+  ['summary_id', OTHER_SUMMARY_ID],
+  ['summary_version_id', OTHER_VERSION_ID],
+  ['package_id', OTHER_PACKAGE_ID],
+  ['legacy_slug', 'other-summary'],
+  ['is_published', false],
+] as const) {
+  test(`create rejects a mismatched ${field}`, async () => {
+    const { persistence: adapter } = persistence(createResponse({ [field]: value }))
+    await assertInvalid(() => adapter.create(CREATE_COMMAND))
+  })
+}
+
+test('edit accepts the exact migration-072 result contract', async () => {
+  const { client, persistence: adapter } = persistence(editResponse())
+  const result = await adapter.update(EDIT_COMMAND)
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+    revisionCreated: true,
+    packageReassigned: false,
+  })
+  assert.deepEqual(
+    client.calls[0]?.args.p_package_ids,
+    [PACKAGE_ID, OTHER_PACKAGE_ID, THIRD_PACKAGE_ID],
+  )
+})
+
+test('KP edit sends an exact one-Package set to the migration-072 RPC', async () => {
+  const { client, persistence: adapter } = persistence(editResponse())
+  await adapter.update({ ...EDIT_COMMAND, packageIds: [PACKAGE_ID] })
+
+  assert.deepEqual(client.calls[0]?.args.p_package_ids, [PACKAGE_ID])
+})
+
+test('Legacy edit accepts summary_version_id=null and passes a null package set', async () => {
+  const { client, persistence: adapter } = persistence(editResponse({
+    summary_version_id: null,
+    revision_created: false,
+  }))
+  const result = await adapter.update({
+    ...EDIT_COMMAND,
+    summaryKind: 'legacy',
+    packageIds: null,
+  })
+
+  assert.equal(result.summaryVersionId, null)
+  assert.equal(client.calls[0]?.args.p_package_ids, null)
+})
+
+test('KP edit rejects a missing Package set before invoking the RPC', async () => {
+  const { client, persistence: adapter } = persistence(editResponse())
+
+  await assertInvalid(() => adapter.update({
+    ...EDIT_COMMAND,
+    packageIds: null,
+  }))
+  assert.equal(client.calls.length, 0)
+})
+
+test('edit rejects an unexpected outcome', async () => {
+  const { persistence: adapter } = persistence(editResponse({ outcome: 'created' }))
+  await assertInvalid(() => adapter.update(EDIT_COMMAND))
+})
+
+for (const [label, value] of [
+  ['missing success', undefined],
+  ['false success', false],
+] as const) {
+  test(`edit rejects ${label}`, async () => {
+    const { persistence: adapter } = persistence(editResponse({ success: value }))
+    await assertInvalid(() => adapter.update(EDIT_COMMAND))
+  })
+}
+
+for (const [field, value] of [
+  ['summary_id', OTHER_SUMMARY_ID],
+  ['package_id', OTHER_PACKAGE_ID],
+  ['legacy_slug', 'other-summary'],
+] as const) {
+  test(`edit rejects a mismatched ${field}`, async () => {
+    const { persistence: adapter } = persistence(editResponse({ [field]: value }))
+    await assertInvalid(() => adapter.update(EDIT_COMMAND))
+  })
+}
+
+test('edit rejects a malformed required boolean', async () => {
+  const { persistence: adapter } = persistence(
+    editResponse({ revision_created: 'true' }),
+  )
+  await assertInvalid(() => adapter.update(EDIT_COMMAND))
+})
+
+test('edit rejects a malformed returned revision identifier', async () => {
+  const { persistence: adapter } = persistence(
+    editResponse({ summary_version_id: 'not-a-uuid' }),
+  )
+  await assertInvalid(() => adapter.update(EDIT_COMMAND))
+})
+
+for (const [label, value] of [
+  ['null', null],
+  ['missing', undefined],
+] as const) {
+  test(`KP edit rejects a ${label} returned revision identifier`, async () => {
+    const { persistence: adapter } = persistence(editResponse({ summary_version_id: value }))
+    await assertInvalid(() => adapter.update(EDIT_COMMAND))
+  })
+}
+
+test('package lookup resolves authoritative slug and code references', async () => {
+  const slugLookup = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      packages: [{ data: { id: PACKAGE_ID, name: 'Package by slug' }, error: null }],
+    },
+  )
+  assert.deepEqual(
+    await slugLookup.persistence.resolvePackage({ reference: 'package-slug', referenceType: 'slug' }),
+    { packageId: PACKAGE_ID, packageName: 'Package by slug', resolvedBy: 'slug' },
+  )
+
+  const codeLookup = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      packages: [{ data: { id: PACKAGE_ID, name: 'Package by code' }, error: null }],
+    },
+  )
+  assert.deepEqual(
+    await codeLookup.persistence.resolvePackage({ reference: 'PKG-001', referenceType: 'code' }),
+    { packageId: PACKAGE_ID, packageName: 'Package by code', resolvedBy: 'code' },
+  )
+})
+
+test('canonical membership lookup resolves the shared KP Summary root', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{ data: [IMPORT_MARKED_PLACEMENT], count: 1, error: null }],
+      summaries: [{
+        data: [IMPORT_KP_SUMMARY],
+        count: 1,
+        error: null,
+      }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    { summaryId: SUMMARY_ID, summaryKind: 'kp_native' },
+  )
+})
+
+test('secondary marker=false membership resolves the same shared KP Summary root', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [
+        { data: [], count: 0, error: null },
+        { data: IMPORT_KP_SUMMARY, error: null },
+      ],
+      package_summaries: [{ data: [IMPORT_SECONDARY_PLACEMENT], count: 1, error: null }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: OTHER_PACKAGE_ID,
+      legacySlug: 'secondary-summary',
+    }),
+    { summaryId: SUMMARY_ID, summaryKind: 'kp_native' },
+  )
+})
+
+test('target-only placements do not consume an Import NEW slug', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [{ data: [], count: 0, error: null }],
+      package_summaries: [{ data: [], count: 0, error: null }],
+    },
+  )
+
+  assert.equal(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    null,
+  )
+})
+
+test('Legacy Summary lookup uses summaries.package_id + summaries.slug without KP state', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [{
+        data: [{
+          ...IMPORT_KP_SUMMARY,
+          summary_code: null,
+          lifecycle_status: null,
+        }],
+        count: 1,
+        error: null,
+      }],
+      package_summaries: [{ data: [], count: 0, error: null }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.findCompatibilityByLegacySlug({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    { summaryId: SUMMARY_ID, summaryKind: 'legacy' },
+  )
+})
+
+test('ambiguous Summary-root and membership matches fail closed', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [{ data: [IMPORT_KP_SUMMARY], count: 1, error: null }],
+      package_summaries: [{
+        data: [
+          { ...IMPORT_MARKED_PLACEMENT, summary_id: OTHER_SUMMARY_ID },
+          { ...IMPORT_MARKED_PLACEMENT, summary_id: SUMMARY_ID },
+        ],
+        count: 2,
+        error: null,
+      }],
+    },
+  )
+
+  await assertInvalid(() => adapter.findCompatibilityByLegacySlug({
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+  }))
+})
+
+test('replace accepts the exact migration-071 result and passes its dedicated RPC arguments', async () => {
+  const { client, persistence: adapter } = persistence(replaceResponse())
+  const result = await adapter.replace(REPLACE_COMMAND)
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+    isPublished: true,
+    revisionCreated: true,
+    idempotentRetry: false,
+  })
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_replace_compatibility_summary')
+  assert.equal(client.calls[0]?.args.p_replacement_version_id, VERSION_ID)
+  assert.equal(client.calls[0]?.args.p_document, 'Document')
+})
+
+test('Legacy replace accepts summary_version_id=null without inventing a UUID', async () => {
+  const { client, persistence: adapter } = persistence(replaceResponse({
+    summary_version_id: null,
+    is_published: false,
+    revision_created: false,
+    legacy: true,
+  }))
+  const result = await adapter.replace({
+    ...REPLACE_COMMAND,
+    replacementVersionId: null,
+    isPublished: false,
+  })
+
+  assert.equal(result.summaryVersionId, null)
+  assert.equal(client.calls[0]?.args.p_replacement_version_id, null)
+})
+
+test('replace accepts the migration-071 immutable published retry shape', async () => {
+  const { persistence: adapter } = persistence(replaceResponse({
+    is_published: true,
+    idempotent_retry: true,
+    revision_created: undefined,
+  }))
+
+  const result = await adapter.replace(REPLACE_COMMAND)
+  assert.equal(result.idempotentRetry, true)
+  assert.equal(result.revisionCreated, false)
+})
+
+test('replace accepts the draft publication state and preserves it in the RPC command', async () => {
+  const { client, persistence: adapter } = persistence({
+    data: {
+      outcome: 'replaced',
+      summary_id: SUMMARY_ID,
+      summary_version_id: VERSION_ID,
+      package_id: PACKAGE_ID,
+      legacy_slug: 'a-summary',
+      is_published: false,
+      revision_created: false,
+      idempotent_retry: false,
+    },
+    error: null,
+  })
+
+  const result = await adapter.replace({ ...REPLACE_COMMAND, isPublished: false })
+  assert.equal(result.isPublished, false)
+  assert.equal(client.calls[0]?.args.p_is_published, false)
+})
+
+for (const [field, value] of [
+  ['summary_id', OTHER_SUMMARY_ID],
+  ['summary_version_id', OTHER_VERSION_ID],
+  ['package_id', OTHER_PACKAGE_ID],
+  ['legacy_slug', 'other-summary'],
+  ['is_published', false],
+] as const) {
+  test(`replace rejects a mismatched ${field}`, async () => {
+    const { persistence: adapter } = persistence(replaceResponse({ [field]: value }))
+    await assertInvalid(() => adapter.replace(REPLACE_COMMAND))
+  })
+}
+
+test('replace rejects a malformed revision-created flag', async () => {
+  const { persistence: adapter } = persistence(replaceResponse({ revision_created: 'true' }))
+  await assertInvalid(() => adapter.replace(REPLACE_COMMAND))
+})
+
+test('replacement target resolution returns one existing editable draft', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      package_summaries: [{ data: [IMPORT_MARKED_PLACEMENT], count: 1, error: null }],
+      summaries: [{
+        data: [IMPORT_KP_SUMMARY],
+        count: 1,
+        error: null,
+      }],
+      summary_versions: [{
+        data: [{ id: VERSION_ID, summary_id: SUMMARY_ID, status: 'draft' }],
+        count: 1,
+        error: null,
+      }],
+    },
+  )
+
+  assert.deepEqual(
+    await adapter.resolveImportReplacementTarget({
+      packageId: PACKAGE_ID,
+      legacySlug: 'a-summary',
+    }),
+    {
+      summaryId: SUMMARY_ID,
+      summaryKind: 'kp_native',
+      replacementVersionId: VERSION_ID,
+    },
+  )
+})
+
+test('replacement target resolution rejects a marker/root identity mismatch', async () => {
+  const { persistence: adapter } = persistenceWithQueries(
+    { data: null, error: null },
+    {
+      summaries: [{ data: [], count: 0, error: null }],
+      package_summaries: [{
+        data: [{ ...IMPORT_MARKED_PLACEMENT, package_id: OTHER_PACKAGE_ID }],
+        count: 1,
+        error: null,
+      }],
+    },
+  )
+
+  await assertInvalid(() => adapter.resolveImportReplacementTarget({
+    packageId: PACKAGE_ID,
+    legacySlug: 'a-summary',
+  }))
+})
+
+test('publish resolves a single draft and preserves its source snapshots', async () => {
+  const { client, persistence: adapter } = persistenceWithQueries(
+    publishResponse(),
+    draftPublicationQueries(),
+  )
+
+  const result = await adapter.publish({
+    summaryId: SUMMARY_ID,
+    actorId: ACTOR_ID,
+  })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    idempotentRetry: false,
+    republished: false,
+  })
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_publish_compatibility_revision')
+  assert.deepEqual(client.calls[0]?.args.p_source_snapshots, [SOURCE_SNAPSHOT])
+})
+
+test('publish reuses the current published revision after compatibility unpublish', async () => {
+  const { client, persistence: adapter } = persistenceWithQueries(
+    publishResponse({ republished: true }),
+    republishQueries(),
+  )
+
+  const result = await adapter.publish({
+    summaryId: SUMMARY_ID,
+    actorId: ACTOR_ID,
+  })
+
+  assert.equal(result.summaryVersionId, VERSION_ID)
+  assert.equal(result.republished, true)
+  assert.equal(client.calls[0]?.args.p_version_id, VERSION_ID)
+  assert.deepEqual(client.calls[0]?.args.p_source_snapshots, [SOURCE_SNAPSHOT])
+})
+
+test('publish fails closed when multiple open revision candidates exist', async () => {
+  const queries = draftPublicationQueries()
+  queries.summary_versions[0] = {
+    data: [OPEN_DRAFT_REVISION, { ...OPEN_DRAFT_REVISION, id: OTHER_VERSION_ID }],
+    count: 2,
+    error: null,
+  }
+  const { client, persistence: adapter } = persistenceWithQueries(
+    publishResponse(),
+    queries,
+  )
+
+  await assertInvalid(() => adapter.publish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+  assert.equal(client.calls.length, 0)
+})
+
+test('publish rejects malformed RPC results and identity mismatches', async () => {
+  const malformed = persistenceWithQueries(
+    publishResponse({ republished: undefined }),
+    draftPublicationQueries(),
+  )
+  await assertInvalid(() => malformed.persistence.publish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const mismatched = persistenceWithQueries(
+    publishResponse({ summary_id: OTHER_SUMMARY_ID }),
+    draftPublicationQueries(),
+  )
+  await assertInvalid(() => mismatched.persistence.publish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+})
+
+test('unpublish accepts the migration-069 result contract', async () => {
+  const { persistence: adapter } = persistence(unpublishResponse())
+  const result = await adapter.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: VERSION_ID,
+    packageId: PACKAGE_ID,
+    idempotentRetry: false,
+  })
+})
+
+test('unpublish rejects malformed results and mismatched Summary identity', async () => {
+  const malformed = persistence(unpublishResponse({ idempotent_retry: null }))
+  await assertInvalid(() => malformed.persistence.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const mismatched = persistence(unpublishResponse({ summary_id: OTHER_SUMMARY_ID }))
+  await assertInvalid(() => mismatched.persistence.unpublish({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+})
+
+test('Legacy publish uses the frozen Legacy RPC without KP reads or state', async () => {
+  const { client, persistence: adapter } = persistence(legacyPublishResponse())
+  const result = await adapter.publishLegacy({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: null,
+    packageId: PACKAGE_ID,
+    isPublished: true,
+    idempotentRetry: false,
+  })
+  assert.equal(client.calls.length, 1)
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_publish_legacy_summary')
+  assert.deepEqual(client.calls[0]?.args, {
+    p_summary_id: SUMMARY_ID,
+    p_actor_id: ACTOR_ID,
+  })
+})
+
+test('Legacy unpublish uses the frozen Legacy RPC without KP reads or state', async () => {
+  const { client, persistence: adapter } = persistence(legacyUnpublishResponse())
+  const result = await adapter.unpublishLegacy({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+
+  assert.deepEqual(result, {
+    summaryId: SUMMARY_ID,
+    summaryVersionId: null,
+    packageId: PACKAGE_ID,
+    isPublished: false,
+    idempotentRetry: false,
+  })
+  assert.equal(client.calls.length, 1)
+  assert.equal(client.calls[0]?.functionName, 'kp_persist_unpublish_legacy_summary')
+  assert.deepEqual(client.calls[0]?.args, {
+    p_summary_id: SUMMARY_ID,
+    p_actor_id: ACTOR_ID,
+  })
+})
+
+for (const outcome of ['deleted', 'archived'] as const) {
+  test(`delete accepts the ${outcome} outcome`, async () => {
+    const { persistence: adapter } = persistence(deleteResponse(outcome))
+    const result = await adapter.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID })
+    assert.equal(result.summaryId, SUMMARY_ID)
+    assert.equal(result.outcome, outcome)
+  })
+}
+
+test('delete rejects unknown, malformed, and mismatched results', async () => {
+  const unknown = persistence(deleteResponse('archived', { outcome: 'removed' }))
+  await assertInvalid(() => unknown.persistence.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const malformed = persistence(deleteResponse('archived', { idempotent_retry: null }))
+  await assertInvalid(() => malformed.persistence.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+
+  const mismatched = persistence(deleteResponse('archived', { summary_id: OTHER_SUMMARY_ID }))
+  await assertInvalid(() => mismatched.persistence.delete({ summaryId: SUMMARY_ID, actorId: ACTOR_ID }))
+})
