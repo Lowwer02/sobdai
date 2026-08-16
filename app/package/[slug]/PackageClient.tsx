@@ -11,6 +11,7 @@ import SummaryNavigation from '@/components/SummaryNavigation'
 import ExamNavigation from '@/components/ExamNavigation'
 import SupportCard from '@/components/SupportCard'
 import type { SupportConfig } from '@/lib/homepageConfig'
+import { buildPackageH1, formatThaiDisplayYear } from '@/lib/seo'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -56,7 +57,6 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
 
 export default function PackageClient({ pkg, examSets, summaries, isPurchased, supportConfig }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean, supportConfig: SupportConfig }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
-  const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
@@ -114,12 +114,18 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-[#F5E9D6] text-[13px] mr-2">{orgName}</span>
                     <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{pkg.package_code}</span>
-                    <span className="bg-[#D4AF37]/10 text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {pkg.exam_year}</span>
+                    {/* Display year in Buddhist Era (pure presentation —
+                        stored exam_year stays Gregorian; matches the hardcoded
+                        "พ.ศ. 2569" texts on this page). */}
+                    <span className="bg-[#D4AF37]/10 text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {formatThaiDisplayYear(pkg.exam_year)}</span>
                     <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full">v{pkg.version || '1'}</span>
                   </div>
                   
+                  {/* Long-tail H1 — แนวข้อสอบ + ตำแหน่ง + หน่วยงาน + ปี
+                      (same topic core as the SEO title fallback, lib/seo.ts).
+                      Org/year badges above remain as supporting UI. */}
                   <h1 className="text-3xl md:text-[36px] font-bold font-display text-[#F5E9D6] mb-5 leading-[1.25]">
-                    {posName}
+                    {buildPackageH1(pkg)}
                   </h1>
 
                   <p className="text-[#A1866B] text-[14px] leading-[1.6] mb-6">

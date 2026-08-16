@@ -169,3 +169,117 @@ export function buildBreadcrumbJsonLd(items: BreadcrumbItem[]): Record<string, u
   }
 }
 
+/**
+ * Minimal Package shape required by the package SEO builders below. Accepts
+ * either the public `packages` row (server-side select in app/package/[slug])
+ * or the PackageClient prop — both carry these fields. All optional: builders
+ * must never throw on legacy rows with null/empty values.
+ */
+export interface PackageSeoData {
+  name?: string | null
+  description?: string | null
+  seo_title?: string | null
+  seo_description?: string | null
+  exam_year?: string | null
+  positions?: { name?: string | null } | null
+  organizations?: { name?: string | null; short_name?: string | null } | null
+}
+
+/**
+ * Convert a stored exam year to Buddhist Era (พ.ศ.) for Thai-facing display.
+ *
+ * STORAGE CONVENTION — Gregorian. Confirmed by the data contract:
+ *   - migration 006 default: `exam_year = to_char(now(), 'YYYY')` (CE)
+ *   - admin form default: `new Date().getFullYear()` (CE)
+ *   - live rows (2026), URL slugs (`...2026`) and `package_code` (`...-2026-V10`)
+ *     all embed the same Gregorian value.
+ *
+ * Conversion is DISPLAY ONLY — DB values, slugs, codes and filtering stay
+ * Gregorian. Era guard mirrors the repo's existing convention
+ * (components/news/RecruitmentStatusBadge.tsx `y < 2400 → +543`,
+ * lib/news.ts BE→CE normalization): values < 2400 are treated as Gregorian
+ * and get +543; values in 2400–3000 are treated as already-Buddhist and are
+ * returned unchanged (legacy/BE rows are never double-converted). Anything
+ * outside that band, non-numeric, or missing returns '' so callers can omit
+ * the year token — never NaN/undefined/null/3100+.
+ *
+ * Examples: 2026 → "2569" · "2025" → "2568" · 2569 → "2569" · null → ""
+ */
+export function formatThaiDisplayYear(
+  year: string | number | null | undefined
+): string {
+  if (year === null || year === undefined) return ''
+  const trimmed = String(year).trim()
+  if (!trimmed) return ''
+  const n = Number(trimmed)
+  if (!Number.isInteger(n) || n <= 0 || n > 3000) return ''
+  return String(n < 2400 ? n + 543 : n)
+}
+
+/**
+ * Shared long-tail topic core for a Package Detail page:
+ *
+ *   แนวข้อสอบ{ตำแหน่ง} {หน่วยงาน} {ปี}
+ *   e.g. แนวข้อสอบนักวิเคราะห์นโยบายและแผน สตง. 2569
+ *
+ * - position: positions.name, falling back to the package name (both can be
+ *   absent on legacy rows, in which case the part is omitted)
+ * - org: short_name (e.g. "สตง.") preferred, else the full organization name
+ * - year: exam_year converted to Buddhist Era for display via
+ *   formatThaiDisplayYear (stored value stays Gregorian — see above)
+ *
+ * Missing parts are omitted; never renders undefined/null/empty tokens or
+ * awkward punctuation. Pure & defensive.
+ */
+function buildPackageTopicCore(pkg: PackageSeoData): string {
+  const position = pkg.positions?.name?.trim() || pkg.name?.trim()
+  const org =
+    pkg.organizations?.short_name?.trim() || pkg.organizations?.name?.trim()
+  const year = formatThaiDisplayYear(pkg.exam_year)
+  const parts: string[] = []
+  if (position) parts.push(`แนวข้อสอบ${position}`)
+  if (org) parts.push(org)
+  if (year) parts.push(year)
+  return parts.join(' ')
+}
+
+/**
+ * Package Detail SEO title precedence:
+ *   1. explicit seo_title, verbatim (the admin owns its brand formatting — if
+ *      it already contains "| Sobdai" it is never re-appended)
+ *   2. "แนวข้อสอบ{ตำแหน่ง} {หน่วยงาน} {ปี} | Sobdai"
+ *   3. "{name} | Sobdai" (last resort — never an empty title)
+ */
+export function buildPackageSeoTitle(pkg: PackageSeoData): string {
+  const explicit = pkg.seo_title?.trim()
+  if (explicit) return explicit
+  const core = buildPackageTopicCore(pkg)
+  return core
+    ? `${core} | ${SITE_NAME}`
+    : `${pkg.name?.trim() || 'แพ็กเกจข้อสอบ'} | ${SITE_NAME}`
+}
+
+/**
+ * Package Detail meta description precedence:
+ *   1. explicit seo_description, verbatim
+ *   2. the package description, verbatim
+ *   3. minimal generic fallback (platform-accurate only — no invented counts,
+ *      subjects, duration, or free claims)
+ */
+export function buildPackageSeoDescription(pkg: PackageSeoData): string {
+  const explicit = pkg.seo_description?.trim()
+  if (explicit) return explicit
+  const desc = pkg.description?.trim()
+  if (desc) return desc
+  return 'แพ็กเกจข้อสอบออนไลน์สำหรับเตรียมสอบข้าราชการบน Sobdai'
+}
+
+/**
+ * Package Detail H1: the same long-tail core as the title fallback, without
+ * the brand suffix. Falls back to the package name — never an empty heading.
+ */
+export function buildPackageH1(pkg: PackageSeoData): string {
+  const core = buildPackageTopicCore(pkg)
+  return core || pkg.name?.trim() || 'แพ็กเกจข้อสอบ'
+}
+

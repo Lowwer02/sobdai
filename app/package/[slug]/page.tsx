@@ -8,7 +8,13 @@ import { listPublicPackageSummaries } from '@/lib/public-summary'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { createPageMetadata, buildBreadcrumbJsonLd } from '@/lib/seo'
+import {
+  createPageMetadata,
+  buildBreadcrumbJsonLd,
+  buildPackageSeoTitle,
+  buildPackageSeoDescription,
+  type PackageSeoData,
+} from '@/lib/seo'
 import StructuredData from '@/components/StructuredData'
 
 interface PageProps {
@@ -21,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const { data: pkg } = await supabase
     .from('packages')
-    .select('name, slug, description, logo_url, cover_image_url, is_published, organizations(name), positions(name)')
+    .select('name, slug, description, logo_url, cover_image_url, is_published, seo_title, seo_description, exam_year, organizations(name, short_name), positions(name)')
     .eq('slug', slug)
     .single()
 
@@ -33,8 +39,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     })
   }
 
-  const title = `${pkg.name} | Sobdai`
-  const description = pkg.description || 'แพ็กเกจข้อสอบออนไลน์สำหรับเตรียมสอบข้าราชการบน Sobdai'
+  // SEO precedence (lib/seo.ts): explicit seo_title/seo_description first,
+  // then a natural long-tail fallback built from real package data
+  // (แนวข้อสอบ + ตำแหน่ง + หน่วยงาน + ปี) / the package description.
+  // Cast: supabase types over-approximate nested relations as arrays even
+  // after .single() — runtime value is a single object (repo convention,
+  // cf. app/news/[slug]/page.tsx).
+  const title = buildPackageSeoTitle(pkg as PackageSeoData)
+  const description = buildPackageSeoDescription(pkg as PackageSeoData)
   const image = pkg.cover_image_url || pkg.logo_url || undefined
 
   return createPageMetadata({
@@ -61,7 +73,7 @@ export default async function PackagePage({ params }: PageProps) {
       .from('packages')
       .select(`
         *,
-        organizations(name, logo_url),
+        organizations(name, short_name, logo_url),
         positions(name)
       `)
       .eq('slug', slug)
