@@ -2,7 +2,13 @@ import { Suspense, Fragment } from 'react'
 import Link from 'next/link'
 import { Newspaper, SearchX, AlertTriangle, ArrowRight } from 'lucide-react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
-import { createPageMetadata } from '@/lib/seo'
+import {
+  createPageMetadata,
+  NEWS_HUB_DESCRIPTION,
+  NEWS_HUB_H1,
+  NEWS_HUB_SUBTITLE,
+  NEWS_HUB_TITLE,
+} from '@/lib/seo'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
 import NewsCard from '@/components/news/NewsCard'
@@ -43,10 +49,15 @@ import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
 // Static list metadata (no per-row data needed). The canonical is the bare
 // /news path so paginated/search URLs collapse to the hub for indexing,
 // matching how the packages catalog canonicalizes to /packages.
+//
+// Keyword ownership (SEO-P2C): the hub leads with ข่าวสอบราชการ and its cluster
+// (ข่าวเปิดสอบราชการล่าสุด / ประกาศรับสมัคร) — copy lives in lib/seo.ts
+// NEWS_HUB_* so <head> metadata and the visible hero share one source of truth.
+// The practice-exam intent (แนวข้อสอบราชการ) belongs to the homepage/packages
+// and is deliberately absent here.
 export const metadata = createPageMetadata({
-  title: 'ข่าวสารจากหน่วยงานราชการ | Sobdai',
-  description:
-    'ประกาศ ข่าวสาร และข้อมูลอัปเดตจากหน่วยงานราชการ เพื่อการเตรียมสอบข้าราชการ — รวบรวมข่าวและประกาศล่าสุดจากทุกกรม',
+  title: NEWS_HUB_TITLE,
+  description: NEWS_HUB_DESCRIPTION,
   path: '/news',
 })
 
@@ -188,18 +199,18 @@ export default async function NewsListPage({
               backgroundClip: 'text',
             }}
           >
-            ข่าวสารจากหน่วยงานราชการ
+            {NEWS_HUB_H1}
           </h1>
           <p
             style={{
               color: 'var(--text-muted)',
               fontSize: 15,
-              maxWidth: 520,
+              maxWidth: 560,
               margin: '0 auto',
               lineHeight: 1.6,
             }}
           >
-            ประกาศ ข่าวสาร และข้อมูลอัปเดตจากหน่วยงานราชการ เพื่อการเตรียมสอบข้าราชการ
+            {NEWS_HUB_SUBTITLE}
           </p>
         </header>
 
