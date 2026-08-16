@@ -55,7 +55,7 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
           h1: ({ node, ...props }) => {
             const id = slugifyChildren(props.children)
             return (
-              <h1
+              <h2
                 id={id}
                 className="scroll-mt-24 font-display text-3xl md:text-4xl font-bold mt-14 mb-6 text-[#F5E9D6] leading-[1.25] tracking-tight"
                 {...props}
@@ -65,7 +65,7 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
           h2: ({ node, ...props }) => {
             const id = slugifyChildren(props.children)
             return (
-              <h2
+              <h3
                 id={id}
                 className="scroll-mt-24 font-display text-2xl md:text-3xl font-bold mt-12 mb-5 text-[#F5E9D6] border-b border-[rgba(255,255,255,0.06)] pb-3 leading-[1.3]"
                 {...props}
@@ -75,7 +75,7 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
           h3: ({ node, ...props }) => {
             const id = slugifyChildren(props.children)
             return (
-              <h3
+              <h4
                 id={id}
                 className="scroll-mt-24 font-display text-xl md:text-2xl font-bold mt-10 mb-4 text-[#F5E9D6] leading-[1.35]"
                 {...props}
@@ -85,7 +85,7 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
           h4: ({ node, ...props }) => {
             const id = slugifyChildren(props.children)
             return (
-              <h4
+              <h5
                 id={id}
                 className="scroll-mt-24 text-lg md:text-xl font-bold mt-8 mb-3 text-[#F5E9D6] border-l-4 border-[#D4AF37] pl-4 py-1 bg-[rgba(212,175,55,0.04)] rounded-r-lg leading-[1.35]"
                 {...props}
@@ -95,7 +95,7 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
           h5: ({ node, ...props }) => {
             const id = slugifyChildren(props.children)
             return (
-              <h5
+              <h6
                 id={id}
                 className="scroll-mt-24 text-base font-bold mt-6 mb-2 text-[#F5E9D6] uppercase tracking-wider"
                 {...props}
