@@ -149,12 +149,16 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
           table: ({ node, ...props }) => (
             <div className="my-6 overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.06)] -mx-1 px-1">
               <div className="inline-block min-w-full align-middle">
-                <table className="w-full text-left text-sm border-collapse" {...props} />
+                {/* min-width lets wide multi-column tables overflow
+                    horizontally inside the wrapper instead of being crushed
+                    into the article column. The wrapper scrolls; the page
+                    never does. */}
+                <table className="w-full min-w-[560px] md:min-w-[720px] text-left text-sm border-collapse" {...props} />
               </div>
             </div>
           ),
           thead: ({ node, ...props }) => (
-            <thead className="sticky top-[3.5rem] z-10" {...props} />
+            <thead {...props} />
           ),
           th: ({ node, ...props }) => (
             <th className="bg-[#1A140E] p-3 md:p-4 text-[#F5E9D6] font-bold text-left border-b border-[rgba(212,175,55,0.15)] whitespace-nowrap" {...props} />
