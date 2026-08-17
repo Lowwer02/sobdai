@@ -112,13 +112,13 @@ export default async function NewsListPage({
 
   try {
     const supabase = createAnonServerClient()
-    const homepageSettings = await getHomepageSettings()
-    socialFollowPlacement = homepageSettings.social_follow.placements.news_list_banner
-    resolvedSocialChannels = resolveSocialFollowChannels(
-      homepageSettings.social_follow,
-      'news_list_banner',
-      homepageSettings.footer.social_links
-    )
+
+    // The settings read, the main list query, and the category facet are fully
+    // independent — run them concurrently instead of sequentially. The list and
+    // facet queries filter on `news` with disjoint concerns, and the settings
+    // row is a singleton read. supabase-js queries are lazy, so building them
+    // here starts no requests; Promise.all fires all three at once.
+    const homepageSettingsPromise = getHomepageSettings()
 
     // --- main list query (published only) ---
     let query: any = supabase
@@ -145,20 +145,33 @@ export default async function NewsListPage({
       .order('created_at', { ascending: false })
       .range(from, to)
 
-    const { data, count } = await query
-    news = (data ?? []) as NewsRow[]
-    total = count ?? 0
-
     // --- category facet (published scope only) ---
     // The generated client narrows `.select('category').not(...)` into a row
     // type the downstream Array/Set helpers can't satisfy, so type the rows
     // explicitly here before deriving the distinct list (mirrors the main
     // query's pragmatic typing).
-    const { data: catRows } = await supabase
+    const categoryQuery = supabase
       .from('news')
       .select('category')
       .eq('status', 'published')
       .not('category', 'is', null)
+
+    const [homepageSettings, { data, count }, { data: catRows }] = await Promise.all([
+      homepageSettingsPromise,
+      query,
+      categoryQuery,
+    ])
+
+    socialFollowPlacement = homepageSettings.social_follow.placements.news_list_banner
+    resolvedSocialChannels = resolveSocialFollowChannels(
+      homepageSettings.social_follow,
+      'news_list_banner',
+      homepageSettings.footer.social_links
+    )
+
+    news = (data ?? []) as NewsRow[]
+    total = count ?? 0
+
     const rows: { category: string | null }[] = (catRows ?? []) as { category: string | null }[]
     categories = Array.from(
       new Set(rows.map(r => r.category).filter((c): c is string => !!c))

@@ -21,9 +21,10 @@ export default function NewsLoading() {
           <div className="h-10 w-48 mx-auto bg-[#1A140E] rounded-xl" />
         </div>
 
-        {/* Card grid skeleton */}
+        {/* Card grid skeleton — matches PAGE_SIZE (9) so the layout doesn't
+            jump when the server query lands. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-pulse">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 9 }).map((_, i) => (
             <div
               key={i}
               className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl overflow-hidden"
