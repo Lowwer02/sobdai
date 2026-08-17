@@ -67,6 +67,10 @@ function verifiesGrants(): void {
   )
 }
 
+function verifiesPostgrestReload(): void {
+  assert.match(executable, /NOTIFY\s+pgrst,\s*'reload\s+schema';/i)
+}
+
 function verifiesReturnContract(): void {
   // every field consumed by PackageCardData / the /packages page is returned
   for (const column of [
@@ -93,6 +97,7 @@ const tests = [
   ['additive only (016 untouched, no schema/data changes)', verifiesAdditiveOnly],
   ['security model + publication/count/order semantics', verifiesSecurityModel],
   ['anon + authenticated execute grants', verifiesGrants],
+  ['PostgREST schema reload notification', verifiesPostgrestReload],
   ['return contract covers /packages fields', verifiesReturnContract],
 ] as const
 

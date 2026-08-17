@@ -86,3 +86,7 @@ as $$
 $$;
 
 grant execute on function public.get_public_package_catalog() to anon, authenticated;
+
+-- Notify PostgREST to pick up the new RPC (prevents the new /packages loader
+-- from 404ing until the schema cache reloads after this migration).
+NOTIFY pgrst, 'reload schema';
