@@ -16,6 +16,14 @@ const FILTER_OPTIONS = [
 
 interface PackageCatalogClientProps {
   packages: PackageCardData[]
+  /**
+   * Server-resolved initial ?q= (from the page's searchParams). Seeds useState
+   * so the SSR render matches the URL on deep links; live typing and later
+   * navigation sync through the searchParams effect below.
+   */
+  initialQuery?: string
+  /** Server-resolved initial ?filter= (raw; normalized by normalizeFilter). */
+  initialFilter?: string
 }
 
 function normalizeFilter(filter: string | undefined) {
@@ -64,11 +72,11 @@ function getSearchSuggestions(packages: PackageCardData[]) {
   return suggestions
 }
 
-export default function PackageCatalogClient({ packages }: PackageCatalogClientProps) {
+export default function PackageCatalogClient({ packages, initialQuery = '', initialFilter }: PackageCatalogClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState('all')
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [activeFilter, setActiveFilter] = useState(() => normalizeFilter(initialFilter))
 
   useEffect(() => {
     setSearchQuery(searchParams.get('q') ?? '')
