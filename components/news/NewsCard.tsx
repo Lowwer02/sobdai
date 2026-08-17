@@ -41,6 +41,10 @@ interface NewsCardProps {
   article: NewsCardData
   index?: number
   onClick?: () => void
+  /** Eager-load (priority) the first-row covers (index 0–2), which sit above
+   *  the fold on the /news 3-column desktop grid. Callers rendering the card
+   *  below the fold (homepage news strip) pass false so no covers preload. */
+  prioritizeFirstRow?: boolean
 }
 
 /** Thai-locale date string (matches the admin list's fmtDate convention). */
@@ -57,7 +61,7 @@ function formatDate(s: string | null): string {
   }
 }
 
-export default function NewsCard({ article, index = 0, onClick }: NewsCardProps) {
+export default function NewsCard({ article, index = 0, onClick, prioritizeFirstRow = true }: NewsCardProps) {
   const href = `/news/${article.slug}`
   const dateLabel = formatDate(article.published_at)
   const category = article.category || null
@@ -100,9 +104,11 @@ export default function NewsCard({ article, index = 0, onClick }: NewsCardProps)
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 360px"
               style={{ objectFit: 'cover' }}
-              // First row (index 0–2) is above the fold on desktop; let those
-              // load eagerly. Everything else is lazy by default.
-              priority={index < 3}
+              // First row (index 0–2) is above the fold on the /news desktop
+              // grid; let those load eagerly. Everything else is lazy by
+              // default. Homepage callers pass prioritizeFirstRow={false}
+              // because the news strip renders below the fold there.
+              priority={prioritizeFirstRow && index < 3}
             />
           ) : (
             <div

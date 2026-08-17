@@ -25,5 +25,8 @@ export default function HomepageNewsCard({ article, index, position }: HomepageN
     }
   }
 
-  return <NewsCard article={article} index={index} onClick={handleClick} />
+  // Homepage news strip renders below the fold on mobile and desktop, so no
+  // cover should be eager-loaded/preloaded (PERF-P0B-2). /news keeps the
+  // default first-row priority via NewsCard's prioritizeFirstRow prop.
+  return <NewsCard article={article} index={index} onClick={handleClick} prioritizeFirstRow={false} />
 }
