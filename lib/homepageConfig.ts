@@ -17,6 +17,7 @@
  * doesn't require migrations; this typed layer is what keeps it safe.
  */
 
+import { cache } from 'react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import type { SocialFollowConfig } from './socialFollowConfig'
 import { SOCIAL_FOLLOW_DEFAULTS, normalizeSocialFollowConfig } from './socialFollowConfig'
@@ -461,9 +462,16 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
  * ISR-cacheable. Merges over defaults + validates. Returns defaults on any
  * failure — the homepage must never 500 on config.
  *
+ * Wrapped in React cache(): identical calls (same arguments) within the same
+ * server render — e.g. RootLayout + generateMetadata + page — reuse one read,
+ * and nothing is persisted across requests. The optional supabase override is
+ * part of the cache key, so admin calls stay separate from public ones.
+ *
  * Optional: pass a supabase client (e.g. admin) to bypass RLS in the admin UI.
  */
-export async function getHomepageSettings(supabaseOverride?: any): Promise<HomepageSettings> {
+export const getHomepageSettings = cache(async function getHomepageSettings(
+  supabaseOverride?: any
+): Promise<HomepageSettings> {
   try {
     const supabase = supabaseOverride || createAnonServerClient()
     const { data } = await supabase
@@ -478,4 +486,4 @@ export async function getHomepageSettings(supabaseOverride?: any): Promise<Homep
     console.error('getHomepageSettings failed, using defaults:', err)
     return HOMEPAGE_DEFAULTS
   }
-}
+})
