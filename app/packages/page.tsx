@@ -1,5 +1,5 @@
-import { createAnonServerClient } from '@/lib/supabase/anon-server'
-import { getPackagePublicCounts } from '@/lib/publicData'
+import { getPublicPackageCatalog } from '@/lib/publicData'
+import type { PackageCardData } from '@/components/PackageCard'
 import PackageCatalogClient from './PackageCatalogClient'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
@@ -34,35 +34,13 @@ export default async function PackageCatalogPage({
   const q = typeof params.q === 'string' ? params.q : ''
   const filter = typeof params.filter === 'string' ? params.filter : undefined
 
-  let packages: any[] = []
+  let packages: PackageCardData[] = []
 
   try {
-    const supabase = createAnonServerClient()
-    const { data } = await supabase
-      .from('packages')
-      .select(`
-        id,
-        slug,
-        exam_year,
-        current_price,
-        original_price,
-        difficulty,
-        description,
-        logo_url,
-        organizations ( name, logo_url ),
-        positions ( name )
-      `)
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
-
-    if (data && data.length > 0) {
-      const counts = await getPackagePublicCounts(data.map((p: any) => p.id))
-      packages = data.map((pkg: any) => ({
-        ...pkg,
-        total_questions: counts[pkg.id]?.total_questions || 0,
-        total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
-      }))
-    }
+    // Single-roundtrip catalog loader (PERF-P0C-1): one RPC returns the
+    // published catalog rows plus the same public counts that previously
+    // required a second serialized get_package_public_counts call.
+    packages = await getPublicPackageCatalog()
   } catch (error) {
     console.error('Failed to fetch packages:', error)
   }

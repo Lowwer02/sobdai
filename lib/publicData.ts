@@ -1,4 +1,5 @@
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import type { PackageCardData } from '@/components/PackageCard'
 
 export interface PackageCounts {
   total_questions: number
@@ -66,5 +67,73 @@ export async function getPackagePublicCounts(
   }
 
   return counts
+}
+
+/**
+ * Raw row shape returned by the `get_public_package_catalog` RPC (migration
+ * 078). Flat columns; the loader reshapes them into PackageCardData.
+ */
+export interface PublicPackageCatalogRow {
+  id: string
+  slug: string
+  exam_year: string | null
+  current_price: number
+  original_price: number
+  difficulty: string
+  description: string | null
+  logo_url: string | null
+  organization_name: string | null
+  organization_logo_url: string | null
+  position_name: string | null
+  total_questions: number
+  total_exam_sets: number
+}
+
+/**
+ * One-roundtrip loader for the public /packages catalog (PERF-P0C-1).
+ *
+ * Replaces the previous two serialized calls (packages list → counts RPC)
+ * with a single `get_public_package_catalog()` RPC. The RPC returns only
+ * published packages ordered by created_at desc, with the same count
+ * semantics as get_package_public_counts (migration 016): published
+ * questions only, exam sets with ≥1 published question, zero-coalesced.
+ *
+ * Returns rows in the PackageCardData shape consumed by PackageCatalogClient.
+ * On RPC failure it returns [] (matching the page's established list-query
+ * failure mode — the page shows its empty state rather than misleading
+ * zero-count cards).
+ */
+export async function getPublicPackageCatalog(): Promise<PackageCardData[]> {
+  const supabase = createAnonServerClient()
+
+  // Custom Postgres RPC not covered by the auto-generated DB types, so we
+  // declare its row shape and cast through `unknown` (same pattern as
+  // getPackagePublicCounts above).
+  const { data, error } = (await (supabase as any).rpc('get_public_package_catalog')) as {
+    data: PublicPackageCatalogRow[] | null
+    error: { message: string } | null
+  }
+
+  if (error) {
+    console.error('get_public_package_catalog RPC failed:', error.message)
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    exam_year: row.exam_year ?? '',
+    current_price: Number(row.current_price) || 0,
+    original_price: Number(row.original_price) || 0,
+    difficulty: row.difficulty,
+    description: row.description,
+    logo_url: row.logo_url,
+    total_questions: Number(row.total_questions) || 0,
+    total_exam_sets: Number(row.total_exam_sets) || 0,
+    organizations: row.organization_name
+      ? { name: row.organization_name, logo_url: row.organization_logo_url }
+      : null,
+    positions: row.position_name ? { name: row.position_name } : null,
+  }))
 }
 
