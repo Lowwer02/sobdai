@@ -6,6 +6,7 @@ import { getPackagePublicCounts } from '@/lib/publicData'
 import { applyContentOrdering } from '@/lib/contentOrdering'
 import { listPublicPackageSummaries } from '@/lib/public-summary'
 import { getHomepageSettings } from '@/lib/homepageConfig'
+import { getPackageRelatedContent } from '@/lib/package-related-content'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import {
@@ -88,7 +89,7 @@ export default async function PackagePage({ params }: PageProps) {
 
   // Now that we have the package id + user, run the dependent queries in parallel.
   const user = userResult.data.user
-  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings] = await Promise.all([
+  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent] = await Promise.all([
     getPackagePublicCounts([pkg.id]),
     // Only need a profile lookup if the package is an unpublished draft
     pkg.is_published
@@ -122,6 +123,12 @@ export default async function PackagePage({ params }: PageProps) {
     // Homepage settings (ISR-cached anon read) to get supportConfig.
     // Runs in the same parallel batch — no extra sequential round-trip.
     getHomepageSettings(),
+    // SEO-P2E-B: Bounded reverse relation reads for related news + articles.
+    // Runs in parallel with the other dependencies; fails safe to empty arrays.
+    getPackageRelatedContent(pkg.id).catch((err) => {
+      console.error('Error fetching package related content:', err)
+      return { news: [], articles: [] }
+    }),
   ])
 
   // Apply counts
@@ -157,7 +164,15 @@ export default async function PackagePage({ params }: PageProps) {
     <>
       <StructuredData data={breadcrumbJsonLd} />
       <Suspense fallback={<div>Loading...</div>}>
-        <PackageClient pkg={pkg} examSets={examSetsData} summaries={[...summaries]} isPurchased={isPurchased} supportConfig={supportConfig} />
+        <PackageClient
+          pkg={pkg}
+          examSets={examSetsData}
+          summaries={[...summaries]}
+          isPurchased={isPurchased}
+          supportConfig={supportConfig}
+          relatedNews={relatedContent.news}
+          relatedArticles={relatedContent.articles}
+        />
       </Suspense>
     </>
   )

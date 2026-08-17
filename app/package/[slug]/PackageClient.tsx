@@ -4,14 +4,16 @@ import React from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft } from 'lucide-react'
+import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft, Newspaper } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import { beginCheckout, viewPackage } from '@/lib/analytics'
 import SummaryNavigation from '@/components/SummaryNavigation'
 import ExamNavigation from '@/components/ExamNavigation'
 import SupportCard from '@/components/SupportCard'
 import type { SupportConfig } from '@/lib/homepageConfig'
+import type { RelatedNewsItem, RelatedArticleItem } from '@/lib/package-related-content'
 import { buildPackageH1, formatThaiDisplayYear } from '@/lib/seo'
+import ContentCard from '@/components/ContentCard'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -55,7 +57,23 @@ function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: 
   )
 }
 
-export default function PackageClient({ pkg, examSets, summaries, isPurchased, supportConfig }: { pkg: any, examSets: any[], summaries: any[], isPurchased: boolean, supportConfig: SupportConfig }) {
+export default function PackageClient({
+  pkg,
+  examSets,
+  summaries,
+  isPurchased,
+  supportConfig,
+  relatedNews = [],
+  relatedArticles = [],
+}: {
+  pkg: any
+  examSets: any[]
+  summaries: any[]
+  isPurchased: boolean
+  supportConfig: SupportConfig
+  relatedNews?: RelatedNewsItem[]
+  relatedArticles?: RelatedArticleItem[]
+}) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
   const hasDiscount = pkg.original_price > pkg.current_price
@@ -64,6 +82,8 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+
+  const hasRelatedContent = relatedNews.length > 0 || relatedArticles.length > 0
 
   React.useEffect(() => {
     if (searchParams.get('success') === '1') {
@@ -79,7 +99,7 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
   }, [pkg?.id, pkg?.name, pkg?.current_price])
 
   return (
-    <div className="min-h-screen pb-20 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
+    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6]">
       <main className="max-w-[1360px] mx-auto px-4 py-6 md:py-8">
         
         <div className="mb-6">
@@ -114,16 +134,10 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-[#F5E9D6] text-[13px] mr-2">{orgName}</span>
                     <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{pkg.package_code}</span>
-                    {/* Display year in Buddhist Era (pure presentation —
-                        stored exam_year stays Gregorian; matches the hardcoded
-                        "พ.ศ. 2569" texts on this page). */}
                     <span className="bg-[#D4AF37]/10 text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {formatThaiDisplayYear(pkg.exam_year)}</span>
                     <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full">v{pkg.version || '1'}</span>
                   </div>
                   
-                  {/* Long-tail H1 — แนวข้อสอบ + ตำแหน่ง + หน่วยงาน + ปี
-                      (same topic core as the SEO title fallback, lib/seo.ts).
-                      Org/year badges above remain as supporting UI. */}
                   <h1 className="text-3xl md:text-[36px] font-bold font-display text-[#F5E9D6] mb-5 leading-[1.25]">
                     {buildPackageH1(pkg)}
                   </h1>
@@ -180,7 +194,6 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
                </div>
             </div>
 
-            {/* 3. PRICING STICKY (col-span-3) */}
             <div className="lg:col-span-3 bg-[#1A140E] border border-[#D4AF37]/30 rounded-[24px] p-8 shadow-[0_0_40px_rgba(212,175,55,0.05)] sticky top-6 transition-all duration-300 ease-in-out">
               <h2 className="text-[#D4AF37] font-bold text-[16px] mb-6 font-display">เลือกแพ็กเกจเพื่อเริ่มเรียน</h2>
               
@@ -253,28 +266,20 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
 
           </div>
 
-            {/* Support Card — secondary action, rendered below the top grid row,
-                outside the sticky pricing block so it scrolls naturally.
-                Conditionally rendered based on Admin config. */}
-            {supportConfig.enabled && (
-              <SupportCard
-                title={supportConfig.title}
-                description={supportConfig.description}
-                button_label={supportConfig.button_label}
-                qr_image_url={supportConfig.qr_image_url}
-                promptpay_name={supportConfig.promptpay_name}
-                bank_name={supportConfig.bank_name}
-                account_number={supportConfig.account_number}
-                footer_message={supportConfig.footer_message}
-              />
-            )}
-
-
-          {/* ================= LEARNING RESOURCES ================= */}
+          {supportConfig.enabled && (
+            <SupportCard
+              title={supportConfig.title}
+              description={supportConfig.description}
+              button_label={supportConfig.button_label}
+              qr_image_url={supportConfig.qr_image_url}
+              promptpay_name={supportConfig.promptpay_name}
+              bank_name={supportConfig.bank_name}
+              account_number={supportConfig.account_number}
+              footer_message={supportConfig.footer_message}
+            />
+          )}
 
           <div id="resources" className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            
-            {/* 4. SUMMARY BANK */}
             <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
@@ -282,11 +287,9 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
                 </div>
                 <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">สรุปเนื้อหา</h3>
               </div>
-              
               <SummaryNavigation summaries={summaries} packageSlug={pkg.slug} />
             </div>
 
-            {/* 5. EXAM SETS */}
             <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
@@ -299,10 +302,67 @@ export default function PackageClient({ pkg, examSets, summaries, isPurchased, s
                 <ExamNavigation examSets={examSets} packageSlug={pkg.slug} />
               </div>
             </div>
-
           </div>
 
-          {/* ================= BOTTOM BANNER (Row 3) ================= */}
+          {hasRelatedContent && (
+            <section
+              aria-label="อ่านเพิ่มเติมก่อนสอบ"
+              className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col gap-6"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                  <Sparkles size={20} />
+                </div>
+                <h2 className="text-[#F5E9D6] text-[20px] font-bold font-display">
+                  อ่านเพิ่มเติมก่อนสอบ
+                </h2>
+              </div>
+
+              <div className={`grid grid-cols-1 ${relatedNews.length > 0 && relatedArticles.length > 0 ? 'lg:grid-cols-2' : ''} gap-6 items-start`}>
+                {relatedNews.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-[13px] font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-2">
+                      <Newspaper size={15} />
+                      <span>ข่าวเปิดสอบที่เกี่ยวข้อง</span>
+                    </h3>
+                    <div className="flex flex-col gap-3">
+                      {relatedNews.map((n) => (
+                        <ContentCard
+                          key={n.id}
+                          href={`/news/${n.slug}`}
+                          title={n.title}
+                          meta={[...(n.category ? [{ text: n.category }] : [])]}
+                          badge={{ label: 'ข่าวเปิดสอบ', tone: 'gold' }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {relatedArticles.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-[13px] font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-2">
+                      <BookOpen size={15} />
+                      <span>บทความเตรียมสอบ</span>
+                    </h3>
+                    <div className="flex flex-col gap-3">
+                      {relatedArticles.map((a) => (
+                        <ContentCard
+                          key={a.id}
+                          href={`/articles/${a.slug}`}
+                          title={a.title}
+                          description={a.excerpt || undefined}
+                          meta={[...(a.category ? [{ text: a.category }] : [])]}
+                          badge={{ label: 'บทความ', tone: 'success' }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 flex flex-wrap xl:flex-nowrap items-center justify-between gap-6 shadow-xl">
              <FeatureItem 
                icon={<Edit3 size={24} />} 
