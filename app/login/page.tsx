@@ -1,12 +1,23 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import AuthModal from '@/components/AuthModal'
 
+// useSearchParams() during static prerender requires an explicit Suspense
+// boundary once the root app/loading.tsx boundary (which previously covered
+// it) is removed. This wrapper keeps the page behavior identical.
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  )
+}
+
+function LoginPageInner() {
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect')
   const banned = searchParams.get('banned')
