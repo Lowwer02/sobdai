@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/client'
 import dynamic from 'next/dynamic'
 import DesktopNav from './DesktopNav'
 import MobileNav from './MobileNav'
@@ -13,6 +12,22 @@ import { toastEvent } from '@/hooks/useToast'
 const AuthModal = dynamic(() => import('./AuthModal'), {
   ssr: false,
 })
+
+function hasPossibleSession(): boolean {
+  if (typeof document === 'undefined') return false
+  try {
+    if (document.cookie.includes('sb-') && document.cookie.includes('-auth-token')) {
+      return true
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        return true
+      }
+    }
+  } catch {}
+  return false
+}
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
@@ -27,9 +42,15 @@ export default function Navbar() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [hasOpenedAuth, setHasOpenedAuth] = useState(false)
   
-  const supabase = createClient()
+  const authInitializedRef = useRef(false)
 
-  useEffect(() => {
+  const initAuth = useCallback(async () => {
+    if (authInitializedRef.current) return
+    authInitializedRef.current = true
+
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+
     const fetchUserAndRole = async (sessionUser: User | null) => {
       setUser(sessionUser)
       if (sessionUser) {
@@ -46,28 +67,12 @@ export default function Navbar() {
         const primaryError = primary.error
 
         if (primaryError) {
-          // The Navbar is client-side and only a UX hint (show/hide the
-          // Admin button). Authoritative access control is enforced
-          // server-side in lib/auth/server-protect.ts + RBAC, so we must NOT
-          // let a failed profile read hide the button.
-          //
-          // Most likely cause: a stale PostgREST schema cache on production
-          // (migration 007 that adds avatar_url explicitly calls
-          // `NOTIFY pgrst, 'reload schema'`, indicating the team has hit
-          // this before). The PostgREST 400 message names the offending
-          // column, so we surface it loudly here.
           console.error(
             'Navbar: explicit profiles query failed — falling back to select(*).',
             'Offending column / reason:',
             primaryError.message
           )
 
-          // Defensive fallback: select('*') cannot 400 on a missing column,
-          // so it restores the Admin button on partially-migrated or
-          // schema-cache-stale databases. This is intentionally a RECOVERY
-          // path, not the default — the happy path stays explicit and
-          // minimal. To remove this fallback, fix the root cause surfaced
-          // by the error log above (apply migration / reload schema cache).
           const fallback = await supabase
             .from('profiles')
             .select('*')
@@ -112,18 +117,21 @@ export default function Navbar() {
 
     // Use getSession() on mount: it reads the local session synchronously
     // (no network round-trip), unlike getUser() which always hits the network.
-    // The profiles query below is the only network call needed; authoritative
-    // auth/role checks still happen server-side (proxy + server components).
     supabase.auth.getSession().then(({ data }) => fetchUserAndRole(data.session?.user ?? null))
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((_event, session) => {
       fetchUserAndRole(session?.user ?? null)
       if (session?.user) {
         setIsAuthModalOpen(false) // Close modal on successful auth
       }
     })
-    return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (hasPossibleSession()) {
+      initAuth()
+    }
+  }, [initAuth])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -136,6 +144,8 @@ export default function Navbar() {
   }
 
   const confirmSignOut = async () => {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
     setIsAdmin(false)
@@ -150,12 +160,14 @@ export default function Navbar() {
     setAuthMode('login')
     setHasOpenedAuth(true)
     setIsAuthModalOpen(true)
+    initAuth()
   }
 
   const handleRegisterClick = () => {
     setAuthMode('register')
     setHasOpenedAuth(true)
     setIsAuthModalOpen(true)
+    initAuth()
   }
 
   return (
