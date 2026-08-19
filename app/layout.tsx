@@ -18,6 +18,7 @@ const sarabun = Sarabun({
   weight: ['400', '500', '600', '700'],
   variable: '--font-sarabun',
   display: 'swap',
+  preload: false,
 })
 
 export const metadata: Metadata = {
@@ -53,7 +54,6 @@ export default async function RootLayout({
   return (
     <html lang="th" className={sarabun.variable}>
       <head>
-        <link rel="preload" href="/fonts/supermarket.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <StructuredData
           data={{
             '@context': 'https://schema.org',
