@@ -194,11 +194,11 @@ export default function Navbar() {
 
       {/* Auth Modal */}
       {hasOpenedAuth && (
-        <AuthModal 
-          isOpen={isAuthModalOpen} 
-          onClose={() => setIsAuthModalOpen(false)} 
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
           onSuccess={() => setIsAuthModalOpen(false)}
-          initialMode={authMode} 
+          initialMode={authMode}
         />
       )}
 
