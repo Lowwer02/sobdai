@@ -538,3 +538,19 @@ h1, h2, h3, .heading {
   display: none; /* Chrome/Safari */
 }
 
+/* ===================== Toast Animations ===================== */
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-enter {
+  animation: toast-enter 0.2s ease-out forwards;
+}
+

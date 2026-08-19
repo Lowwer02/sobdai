@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import AuthModal from './AuthModal'
+import dynamic from 'next/dynamic'
 import DesktopNav from './DesktopNav'
 import MobileNav from './MobileNav'
 import ConfirmDialog from './admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
+
+const AuthModal = dynamic(() => import('./AuthModal'), {
+  ssr: false,
+})
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
@@ -21,6 +25,7 @@ export default function Navbar() {
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [hasOpenedAuth, setHasOpenedAuth] = useState(false)
   
   const supabase = createClient()
 
@@ -143,11 +148,13 @@ export default function Navbar() {
 
   const handleLoginClick = () => {
     setAuthMode('login')
+    setHasOpenedAuth(true)
     setIsAuthModalOpen(true)
   }
 
   const handleRegisterClick = () => {
     setAuthMode('register')
+    setHasOpenedAuth(true)
     setIsAuthModalOpen(true)
   }
 
@@ -186,12 +193,14 @@ export default function Navbar() {
       </header>
 
       {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-        onSuccess={() => setIsAuthModalOpen(false)}
-        initialMode={authMode} 
-      />
+      {hasOpenedAuth && (
+        <AuthModal 
+          isOpen={isAuthModalOpen} 
+          onClose={() => setIsAuthModalOpen(false)} 
+          onSuccess={() => setIsAuthModalOpen(false)}
+          initialMode={authMode} 
+        />
+      )}
 
       <ConfirmDialog
         isOpen={showLogoutConfirm}
