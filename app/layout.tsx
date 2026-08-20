@@ -58,11 +58,15 @@ export default async function RootLayout({
           data={{
             '@context': 'https://schema.org',
             '@type': 'WebSite',
+            '@id': `${SITE_URL}/#website`,
             name: SITE_NAME,
             url: SITE_URL,
             description: SITE_DESCRIPTION,
             inLanguage: 'th-TH',
             image: `${SITE_URL}${DEFAULT_OG_IMAGE}`,
+            publisher: {
+              '@id': `${SITE_URL}/#organization`,
+            },
           }}
         />
       </head>

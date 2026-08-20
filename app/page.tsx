@@ -14,7 +14,8 @@ import HeroPackageSearch from '@/components/HeroPackageSearch'
 import type { HeroSearchChip } from '@/components/HeroPackageSearch'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
-import { createPageMetadata } from '@/lib/seo'
+import { createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
+import StructuredData from '@/components/StructuredData'
 import { getLatestNews } from '@/lib/news'
 import type { NewsCardData } from '@/components/news/NewsCard'
 import HomepageNewsCard from '@/components/news/HomepageNewsCard'
@@ -219,8 +220,14 @@ export default async function Home() {
   const topPromotion = homepagePromotions[0] ?? null
   const remainingPromotions = homepagePromotions.slice(1)
 
+  const organizationJsonLd = {
+    '@context': 'https://schema.org',
+    ...SITE_ORGANIZATION,
+  }
+
   return (
     <div style={{ minHeight: '100vh' }}>
+      <StructuredData data={organizationJsonLd} />
       {/* ===================== Announcement Bar ===================== */}
       <AnnouncementBar promotion={topPromotion} />
 
