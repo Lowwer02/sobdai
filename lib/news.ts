@@ -331,13 +331,13 @@ export function validateNewsForPublish(raw: any): ValidationResult {
     errors.gp_exam_requirement = 'กรุณาระบุว่าต้องผ่าน ก.พ. หรือไม่ก่อนเผยแพร่'
   }
 
-  // --- source group: if any field is set, all three must be present (accuracy)
+  // --- source group: if any field is set, source_name and valid source_url are required.
+  // source_date is optional (specified only when clearly stated in the source announcement).
   const hasSource = input.source_name || input.source_url || input.source_date
   if (hasSource) {
     if (!input.source_name) errors.source_name = 'ต้องระบุชื่อแหล่งข้อมูล'
     if (!input.source_url) errors.source_url = 'ต้องระบุ URL แหล่งข้อมูล'
     else if (!isHttpUrl(input.source_url)) errors.source_url = 'URL ไม่ถูกต้อง (ต้องเป็น http/https)'
-    if (!input.source_date) errors.source_date = 'ต้องระบุวันที่แหล่งข้อมูล'
   }
 
   // --- SEO

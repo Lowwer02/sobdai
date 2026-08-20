@@ -132,6 +132,11 @@ export default function NewsEditorClient({
     () => coerceGpExamRequirement(article?.gp_exam_requirement)
   )
 
+  // Source citation metadata group (GEO P2.2B)
+  const [sourceName, setSourceName] = useState(article?.source_name || '')
+  const [sourceUrl, setSourceUrl] = useState(article?.source_url || '')
+  const [sourceDate, setSourceDate] = useState(article?.source_date || '')
+
   // SEO group (foundation). Held in state so edits persist; on CREATE omitted
   // values correctly coerce to null in toInsertPayload.
   const [seoTitle, setSeoTitle] = useState(article?.seo_title || '')
@@ -199,7 +204,7 @@ export default function NewsEditorClient({
     gp_exam_requirement: 'ข้อกำหนดภาค ก.',
     source_name: 'ชื่อแหล่งข้อมูล',
     source_url: 'URL แหล่งข้อมูล',
-    source_date: 'วันที่แหล่งข้อมูล',
+    source_date: 'วันที่ประกาศต้นทาง',
     canonical_url: 'Canonical URL',
   }
 
@@ -321,17 +326,16 @@ export default function NewsEditorClient({
       homepage_featured: homepageFeatured,
       homepage_featured_order: homepageFeaturedOrder.trim() !== '' ? Number(homepageFeaturedOrder) : null,
       hide_from_homepage_when_expired: hideFromHomepageWhenExpired,
+      // Source citation metadata group (GEO P2.2B)
+      source_name: sourceName.trim() || null,
+      source_url: sourceUrl.trim() || null,
+      source_date: sourceDate.trim() || null,
     }
 
     if (isEdit && article) {
       // Pass through fields this editor doesn't own so toInsertPayload doesn't
       // null them out on update. Also makes the publish-readiness gate validate
-      // the full article, not just the edited subset. body_markdown + the SEO
-      // group ARE owned by this editor (set above) so they are not passed
-      // through here.
-      payload.source_name = article.source_name
-      payload.source_url = article.source_url
-      payload.source_date = article.source_date
+      // the full article, not just the edited subset.
       payload.author_id = article.author_id
     }
 
@@ -682,6 +686,71 @@ export default function NewsEditorClient({
                 </span>
               </div>
             </label>
+          </div>
+        </section>
+
+        {/* Source citation metadata */}
+        <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+          <h2 className="text-[#D4AF37] font-bold font-display">แหล่งข้อมูลต้นทาง</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* ชื่อแหล่งข้อมูล */}
+            <div>
+              <label className={labelClass}>ชื่อแหล่งข้อมูล</label>
+              <input
+                type="text"
+                value={sourceName}
+                onChange={e => {
+                  setSourceName(e.target.value)
+                  setIsDirty(true)
+                  setPublishErrors({})
+                }}
+                maxLength={200}
+                placeholder="เช่น กรมการแพทย์"
+                className={inputClass}
+              />
+              <p className="text-[10px] text-[#A1866B] mt-1">
+                ชื่อหน่วยงานหรือเจ้าของประกาศต้นทาง
+              </p>
+            </div>
+
+            {/* วันที่ประกาศต้นทาง */}
+            <div>
+              <label className={labelClass}>วันที่ประกาศต้นทาง</label>
+              <input
+                type="date"
+                value={sourceDate}
+                onChange={e => {
+                  setSourceDate(e.target.value)
+                  setIsDirty(true)
+                  setPublishErrors({})
+                }}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-[#A1866B] mt-1">
+                วันที่ออกประกาศต้นฉบับ หากระบุชัดเจน — หากไม่ทราบให้เว้นว่าง
+              </p>
+            </div>
+          </div>
+
+          {/* URL แหล่งข้อมูล */}
+          <div>
+            <label className={labelClass}>URL แหล่งข้อมูล</label>
+            <input
+              type="url"
+              value={sourceUrl}
+              onChange={e => {
+                setSourceUrl(e.target.value)
+                setIsDirty(true)
+                setPublishErrors({})
+              }}
+              maxLength={500}
+              placeholder="เช่น https://hr-dms.thaijobjob.com"
+              className={inputClass}
+            />
+            <p className="text-[10px] text-[#A1866B] mt-1">
+              ควรใช้หน้าประกาศ เอกสาร หรือเว็บไซต์ทางการของหน่วยงานต้นทาง
+            </p>
           </div>
         </section>
 
