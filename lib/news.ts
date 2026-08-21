@@ -285,7 +285,31 @@ export function validateNewsDraft(raw: any): ValidationResult {
   // Length-only checks on optional fields (so a paste of a huge body is caught
   // even at draft time, but blanks are fine).
   if (input.slug && !isValidSlug(input.slug)) errors.slug = 'Slug ใช้ได้เฉพาะ a-z, 0-9, และ -'
+  if (input.source_url && !isHttpUrl(input.source_url)) errors.source_url = 'URL แหล่งข้อมูลไม่ถูกต้อง (ต้องเป็น http/https)'
   if (input.canonical_url && !isHttpUrl(input.canonical_url)) errors.canonical_url = 'URL ไม่ถูกต้อง (ต้องเป็น http/https)'
+
+  // Guard against accidental BE-as-CE entry in drafts if provided
+  if (raw?.source_date && typeof raw.source_date === 'string' && raw.source_date.trim() !== '') {
+    const rawDate = raw.source_date.trim()
+    const yearMatch = rawDate.match(/^(\d{4})/)
+    const year = yearMatch ? Number(yearMatch[1]) : 0
+    if (year > 2400 || (year && (year < 1900 || year > 2100))) {
+      errors.source_date = 'กรุณากรอกปี ค.ศ. เช่น 2026'
+    } else if (!input.source_date) {
+      errors.source_date = 'วันที่ไม่ถูกต้อง (ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2026-08-26)'
+    }
+  }
+
+  if (raw?.application_deadline && typeof raw.application_deadline === 'string' && raw.application_deadline.trim() !== '') {
+    const rawDeadline = raw.application_deadline.trim()
+    const yearMatch = rawDeadline.match(/^(\d{4})/)
+    const year = yearMatch ? Number(yearMatch[1]) : 0
+    if (year > 2400 || (year && (year < 1900 || year > 2100))) {
+      errors.application_deadline = 'กรุณากรอกปี ค.ศ. เช่น 2026'
+    } else if (!input.application_deadline) {
+      errors.application_deadline = 'วันที่ไม่ถูกต้อง (ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2026-08-26)'
+    }
+  }
 
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors, clean: null }
@@ -331,13 +355,38 @@ export function validateNewsForPublish(raw: any): ValidationResult {
     errors.gp_exam_requirement = 'กรุณาระบุว่าต้องผ่าน ก.พ. หรือไม่ก่อนเผยแพร่'
   }
 
-  // --- source group: if any field is set, source_name and valid source_url are required.
-  // source_date is optional (specified only when clearly stated in the source announcement).
-  const hasSource = input.source_name || input.source_url || input.source_date
-  if (hasSource) {
-    if (!input.source_name) errors.source_name = 'ต้องระบุชื่อแหล่งข้อมูล'
-    if (!input.source_url) errors.source_url = 'ต้องระบุ URL แหล่งข้อมูล'
-    else if (!isHttpUrl(input.source_url)) errors.source_url = 'URL ไม่ถูกต้อง (ต้องเป็น http/https)'
+  // --- source group: source_name and valid source_url are strictly REQUIRED for publish.
+  // source_date is OPTIONAL (specified only when clearly stated in the source announcement).
+  if (!input.source_name) {
+    errors.source_name = 'กรุณาระบุชื่อแหล่งข้อมูลก่อนเผยแพร่'
+  }
+  if (!input.source_url) {
+    errors.source_url = 'กรุณาระบุ URL แหล่งข้อมูลก่อนเผยแพร่'
+  } else if (!isHttpUrl(input.source_url)) {
+    errors.source_url = 'URL แหล่งข้อมูลไม่ถูกต้อง (ต้องเป็น http/https)'
+  }
+
+  // --- date validations (CE range enforcement / BE-as-CE guardrail)
+  if (raw?.source_date && typeof raw.source_date === 'string' && raw.source_date.trim() !== '') {
+    const rawDate = raw.source_date.trim()
+    const yearMatch = rawDate.match(/^(\d{4})/)
+    const year = yearMatch ? Number(yearMatch[1]) : 0
+    if (year > 2400 || (year && (year < 1900 || year > 2100))) {
+      errors.source_date = 'กรุณากรอกปี ค.ศ. เช่น 2026'
+    } else if (!input.source_date) {
+      errors.source_date = 'วันที่ไม่ถูกต้อง (ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2026-08-26)'
+    }
+  }
+
+  if (raw?.application_deadline && typeof raw.application_deadline === 'string' && raw.application_deadline.trim() !== '') {
+    const rawDeadline = raw.application_deadline.trim()
+    const yearMatch = rawDeadline.match(/^(\d{4})/)
+    const year = yearMatch ? Number(yearMatch[1]) : 0
+    if (year > 2400 || (year && (year < 1900 || year > 2100))) {
+      errors.application_deadline = 'กรุณากรอกปี ค.ศ. เช่น 2026'
+    } else if (!input.application_deadline) {
+      errors.application_deadline = 'วันที่ไม่ถูกต้อง (ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2026-08-26)'
+    }
   }
 
   // --- SEO
@@ -638,13 +687,23 @@ function optStr(v: unknown, max: number): string | null {
 
 function parseDate(v: unknown): string | null {
   // Accept YYYY-MM-DD (from <input type=date>) or an ISO timestamp; normalize
-  // to YYYY-MM-DD. Invalid/blank → null.
+  // to YYYY-MM-DD. Rejects out-of-range years (< 1900 or > 2100) or invalid calendar dates.
   if (!v) return null
   const s = String(v).trim()
   if (!s) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [yStr] = s.split('-')
+    const y = parseInt(yStr, 10)
+    if (y < 1900 || y > 2100) return null
+    return isValidDateOnly(s) ? s : null
+  }
   const d = new Date(s)
   if (isNaN(d.getTime())) return null
-  return d.toISOString().slice(0, 10)
+  const iso = d.toISOString().slice(0, 10)
+  const [yStr] = iso.split('-')
+  const y = parseInt(yStr, 10)
+  if (y < 1900 || y > 2100) return null
+  return isValidDateOnly(iso) ? iso : null
 }
 
 function parseTags(v: unknown, maxCount: number, maxLen: number): string[] {

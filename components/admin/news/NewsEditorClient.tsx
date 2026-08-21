@@ -205,6 +205,7 @@ export default function NewsEditorClient({
     source_name: 'ชื่อแหล่งข้อมูล',
     source_url: 'URL แหล่งข้อมูล',
     source_date: 'วันที่ประกาศต้นทาง',
+    application_deadline: 'วันปิดรับสมัคร',
     canonical_url: 'Canonical URL',
   }
 
@@ -619,7 +620,7 @@ export default function NewsEditorClient({
                 className={inputClass}
               />
               <p className="text-[10px] text-[#A1866B] mt-1">
-                ข่าวจะถือว่ายังเปิดรับสมัครตลอดวันดังกล่าวตามเวลาไทย
+                ใช้ปี ค.ศ. เช่น 26/08/2026 (หน้าเว็บจะแสดงเป็น พ.ศ. อัตโนมัติ) — ข่าวจะถือว่าเปิดรับสมัครตลอดวันตามเวลาไทย
               </p>
             </div>
 
@@ -728,7 +729,7 @@ export default function NewsEditorClient({
                 className={inputClass}
               />
               <p className="text-[10px] text-[#A1866B] mt-1">
-                วันที่ออกประกาศต้นฉบับ หากระบุชัดเจน — หากไม่ทราบให้เว้นว่าง
+                วันที่ออกประกาศต้นฉบับ หากระบุชัดเจน — ใช้ปี ค.ศ. เช่น 24/07/2026 (หากไม่ทราบให้เว้นว่าง)
               </p>
             </div>
           </div>
