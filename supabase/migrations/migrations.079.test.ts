@@ -43,6 +43,31 @@ test('079 exists as a unique migration', () => {
   assert.equal(files.filter((name) => /^078_sec_profile_rbac_baseline_hardening\.sql$/.test(name)).length, 0)
 })
 
+test('079 bootstraps only the verified missing-status Production baseline', () => {
+  assert.match(executableSql, /v_status_exists\s+boolean/i)
+  assert.match(executableSql, /v_status_baseline\s+text/i)
+  assert.match(executableSql, /if\s+not\s+v_status_exists\s+then/i)
+  assert.match(
+    executableSql,
+    /deleted_at\s+is\s+not\s+null[\s\S]*?deleted_reason\s+is\s+not\s+null[\s\S]*?banned_at\s+is\s+not\s+null[\s\S]*?banned_reason\s+is\s+not\s+null/i,
+  )
+  assert.match(
+    executableSql,
+    /alter\s+table\s+public\.profiles[\s\S]*?add\s+column\s+status\s+text\s+not\s+null\s+default\s+'active'[\s\S]*?check\s*\(status\s+in\s*\(\s*'active'\s*,\s*'banned'\s*\)\)/i,
+  )
+  assert.match(executableSql, /set_config\(\s*'sobdai\.sec079_status_baseline'/i)
+  assert.match(executableSql, /array\[\s*'admin',\s*'editor',\s*'owner',\s*'support',\s*'user'\s*\]::text\[\]/i)
+  assert.match(executableSql, /role',\s*'text',\s*'NO',\s*'''user''::text'/i)
+})
+
+test('079 fails closed on incompatible status definitions and unsafe legacy state', () => {
+  assert.match(executableSql, /actual_column\.data_type\s*<>\s*'text'/i)
+  assert.match(executableSql, /actual_column\.is_nullable\s*<>\s*'NO'/i)
+  assert.match(executableSql, /actual_column\.column_default\s*<>\s*'''active''::text'/i)
+  assert.match(executableSql, /v_legacy_unsafe_count\s*>\s*0/i)
+  assert.match(executableSql, /status bootstrap refuses to normalize/i)
+})
+
 test('authenticated profile writes are limited to legitimate self-service columns', () => {
   assert.match(executableSql, /revoke\s+all\s+on\s+table\s+public\.profiles\s+from\s+public,\s*anon,\s*authenticated/i)
   assert.match(executableSql, /grant\s+select\s+on\s+table\s+public\.profiles\s+to\s+authenticated/i)
@@ -288,6 +313,12 @@ test('application authorization requires an active, non-deleted profile', () => 
 
 test('postflight assertions cover effective security state', () => {
   assert.match(executableSql, /do\s+\$profile_rbac_postflight\$/i)
+  assert.match(executableSql, /current_setting\(\s*'sobdai\.sec079_status_baseline'/i)
+  assert.match(executableSql, /status_column\.data_type\s*<>\s*'text'/i)
+  assert.match(executableSql, /status_column\.is_nullable\s*<>\s*'NO'/i)
+  assert.match(executableSql, /status_column\.column_default\s*<>\s*'''active''::text'/i)
+  assert.match(executableSql, /status is null[\s\S]*?status not in\s*\(\s*'active',\s*'banned'\s*\)/i)
+  assert.match(executableSql, /legacy profile that was not normalized to status=active/i)
   assert.match(executableSql, /has_table_privilege\(\s*'anon'[\s\S]*?public\.profiles[\s\S]*?'SELECT'/i)
   assert.match(executableSql, /has_table_privilege\(\s*'authenticated'[\s\S]*?public\.profiles[\s\S]*?'UPDATE'/i)
   assert.match(executableSql, /has_column_privilege\(/i)

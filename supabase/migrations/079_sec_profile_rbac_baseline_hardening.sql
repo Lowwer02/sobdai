@@ -15,16 +15,29 @@
 -- preserves the prior operation and role set while requiring a usable account:
 -- status = 'active' and deleted_at is null. Public/read-only policies remain
 -- independent and are not used as privileged mutation boundaries.
+--
+-- The deployed Production baseline has one verified schema-drift exception:
+-- profiles.status is absent even though migrations 004/018 and the current
+-- application contract require it. The compatibility bootstrap below accepts
+-- only that exact legacy shape, proves that legacy account-state metadata is
+-- clean, and creates the existing active/banned contract before any 079
+-- function or policy can reference it. It never makes the application
+-- tolerant of a missing status column.
 
 set local lock_timeout = '5s';
 
 do $profile_rbac_preflight$
 declare
     required_column record;
+    expected_column record;
     required_relation record;
     required_policy record;
     existing_function record;
     existing_function_owner name;
+    actual_column record;
+    v_status_exists boolean;
+    v_status_baseline text;
+    v_legacy_unsafe_count bigint;
 begin
     if to_regclass('public.profiles') is null then
         raise exception using
@@ -78,16 +91,171 @@ begin
                 message = format(
                     'SEC profile RBAC hardening requires %s.',
                     required_relation.relation_name
+            );
+        end if;
+    end loop;
+
+    -- These are the two and only two accepted profiles baselines for SEC-079:
+    -- the verified legacy shape with no status column, or the normalized SEC
+    -- shape with status already present. Validate the shared profile contract
+    -- before deciding whether a compatibility column must be added.
+    for expected_column in
+        select column_name, data_type, is_nullable, column_default
+        from (values
+            ('id', 'uuid', 'NO', null),
+            ('role', 'text', 'NO', '''user''::text'),
+            ('display_name', 'text', 'YES', null),
+            ('occupation', 'text', 'YES', null),
+            ('phone', 'text', 'YES', null),
+            ('avatar_url', 'text', 'YES', null),
+            ('last_seen_at', 'timestamp with time zone', 'YES', null),
+            ('deleted_at', 'timestamp with time zone', 'YES', null),
+            ('deleted_reason', 'text', 'YES', null),
+            ('deleted_by', 'uuid', 'YES', null),
+            ('banned_at', 'timestamp with time zone', 'YES', null),
+            ('banned_reason', 'text', 'YES', null),
+            ('banned_by', 'uuid', 'YES', null)
+        ) as expected(column_name, data_type, is_nullable, column_default)
+    loop
+        select c.data_type, c.is_nullable, c.column_default
+        into actual_column
+        from information_schema.columns c
+        where c.table_schema = 'public'
+          and c.table_name = 'profiles'
+          and c.column_name = expected_column.column_name;
+
+        if not found then
+            raise exception using
+                errcode = 'check_violation',
+                message = format(
+                    'SEC profile RBAC hardening requires public.profiles.%I.',
+                    expected_column.column_name
+                );
+        end if;
+
+        if actual_column.data_type <> expected_column.data_type
+           or actual_column.is_nullable <> expected_column.is_nullable
+           or actual_column.column_default is distinct from expected_column.column_default
+        then
+            raise exception using
+                errcode = 'check_violation',
+                message = format(
+                    'SEC profile RBAC hardening found an incompatible public.profiles.%I definition.',
+                    expected_column.column_name
                 );
         end if;
     end loop;
+
+    if not exists (
+        select 1
+        from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.profiles'::regclass
+          and c.contype = 'c'
+          and pg_catalog.pg_get_constraintdef(c.oid) ilike '%role%'
+          and (
+              select array_agg(m[1] order by m[1])
+              from pg_catalog.regexp_matches(
+                  pg_catalog.pg_get_constraintdef(c.oid),
+                  $$'([^']+)'(?:::text)?$$,
+                  'g'
+              ) as m
+          ) = array['admin', 'editor', 'owner', 'support', 'user']::text[]
+    ) then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC profile RBAC hardening requires the deployed five-value profiles.role contract.';
+    end if;
+
+    v_status_exists := exists (
+        select 1
+        from information_schema.columns c
+        where c.table_schema = 'public'
+          and c.table_name = 'profiles'
+          and c.column_name = 'status'
+    );
+
+    if not v_status_exists then
+        -- No status value can be inferred safely from a legacy ban/deletion
+        -- marker without inventing precedence semantics. Any such residue is
+        -- therefore an operator-remediation case, not an automatic active
+        -- normalization case.
+        select count(*)
+        into v_legacy_unsafe_count
+        from public.profiles p
+        where p.deleted_at is not null
+           or p.deleted_reason is not null
+           or p.deleted_by is not null
+           or p.banned_at is not null
+           or p.banned_reason is not null
+           or p.banned_by is not null;
+
+        if v_legacy_unsafe_count > 0 then
+            raise exception using
+                errcode = 'check_violation',
+                message = format(
+                    'SEC status bootstrap refuses to normalize %s legacy profile row(s) with account-state metadata.',
+                    v_legacy_unsafe_count
+                );
+        end if;
+
+        execute $sql$
+            alter table public.profiles
+                add column status text not null default 'active'
+                constraint profiles_status_check check (status in ('active', 'banned'))
+        $sql$;
+        v_status_baseline := 'legacy';
+    else
+        v_status_baseline := 'normalized';
+    end if;
+
+    perform pg_catalog.set_config(
+        'sobdai.sec079_status_baseline',
+        v_status_baseline,
+        true
+    );
+
+    select c.data_type, c.is_nullable, c.column_default
+    into actual_column
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'profiles'
+      and c.column_name = 'status';
+
+    if not found
+       or actual_column.data_type <> 'text'
+       or actual_column.is_nullable <> 'NO'
+       or actual_column.column_default <> '''active''::text'
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC profile RBAC hardening found an incompatible public.profiles.status definition.';
+    end if;
+
+    if not exists (
+        select 1
+        from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.profiles'::regclass
+          and c.contype = 'c'
+          and pg_catalog.pg_get_constraintdef(c.oid) ilike '%status%'
+          and (
+              select array_agg(m[1] order by m[1])
+              from pg_catalog.regexp_matches(
+                  pg_catalog.pg_get_constraintdef(c.oid),
+                  $$'([^']+)'(?:::text)?$$,
+                  'g'
+              ) as m
+          ) = array['active', 'banned']::text[]
+    ) then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC profile RBAC hardening requires the existing active/banned profiles.status contract.';
+    end if;
 
     for required_column in
         select column_name
         from (values
             ('id'),
             ('role'),
-            ('status'),
             ('display_name'),
             ('occupation'),
             ('phone'),
@@ -1317,10 +1485,83 @@ declare
     expected_function record;
     expected_policy record;
     profile_column record;
+    status_column record;
     function_owner name;
     function_is_security_definer boolean;
     function_config text[];
+    v_status_baseline text;
 begin
+    v_status_baseline := pg_catalog.current_setting(
+        'sobdai.sec079_status_baseline',
+        true
+    );
+
+    if v_status_baseline not in ('legacy', 'normalized') then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC postflight cannot prove the profiles.status baseline that was migrated.';
+    end if;
+
+    select c.data_type, c.is_nullable, c.column_default
+    into status_column
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'profiles'
+      and c.column_name = 'status';
+
+    if not found
+       or status_column.data_type <> 'text'
+       or status_column.is_nullable <> 'NO'
+       or status_column.column_default <> '''active''::text'
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC postflight found an invalid public.profiles.status column contract.';
+    end if;
+
+    if not exists (
+        select 1
+        from pg_catalog.pg_constraint c
+        where c.conrelid = 'public.profiles'::regclass
+          and c.contype = 'c'
+          and pg_catalog.pg_get_constraintdef(c.oid) ilike '%status%'
+          and (
+              select array_agg(m[1] order by m[1])
+              from pg_catalog.regexp_matches(
+                  pg_catalog.pg_get_constraintdef(c.oid),
+                  $$'([^']+)'(?:::text)?$$,
+                  'g'
+              ) as m
+          ) = array['active', 'banned']::text[]
+    ) then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC postflight found an invalid public.profiles.status vocabulary constraint.';
+    end if;
+
+    if exists (
+        select 1
+        from public.profiles p
+        where p.status is null
+           or p.status not in ('active', 'banned')
+    ) then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC postflight found a NULL or unsupported public.profiles.status value.';
+    end if;
+
+    if v_status_baseline = 'legacy'
+       and exists (
+           select 1
+           from public.profiles p
+           where p.status <> 'active'
+       )
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'SEC postflight found a legacy profile that was not normalized to status=active.';
+    end if;
+
     if not exists (
         select 1
         from pg_catalog.pg_class c
