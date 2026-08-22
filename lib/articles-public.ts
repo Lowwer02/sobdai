@@ -3,6 +3,8 @@ import 'server-only'
 import { cache } from 'react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 
+import { mapAuthor, type PublicArticleAuthor } from '@/lib/articles'
+
 // ─── PUBLIC TYPES & CONTRACTS ───────────────────────────────────────────────
 
 export interface PublicResult<T> {
@@ -31,6 +33,7 @@ export interface PublicArticleListItem {
   tags: string[]
   published_at: string
   updated_at: string
+  author?: PublicArticleAuthor | null
 }
 
 export interface PublicArticleDetail {
@@ -49,6 +52,8 @@ export interface PublicArticleDetail {
   seo_description: string | null
   canonical_url: string | null
   og_image_url: string | null
+  author_id?: string | null
+  author: PublicArticleAuthor | null
 }
 
 export interface PublicRelatedPackage {
@@ -73,6 +78,7 @@ export interface PublicArticlesListParams {
   category?: string
   tag?: string
   search?: string
+  authorId?: string
   page?: number
   limit?: number
 }
@@ -96,7 +102,7 @@ export const getPublishedArticlesList = cache(
       let query = supabase
         .from('articles')
         .select(
-          'id, slug, title, excerpt, cover_image_url, cover_image_alt, category, tags, published_at, updated_at',
+          'id, slug, title, excerpt, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, author_id, article_authors(id, slug, display_name, role_title, short_bio, avatar_url, is_active)',
           { count: 'exact' }
         )
         .eq('status', 'published')
@@ -107,6 +113,10 @@ export const getPublishedArticlesList = cache(
 
       if (params?.tag && params.tag.trim()) {
         query = query.contains('tags', [params.tag.trim()])
+      }
+
+      if (params?.authorId && params.authorId.trim()) {
+        query = query.eq('author_id', params.authorId.trim())
       }
 
       if (params?.search && params.search.trim()) {
@@ -149,6 +159,7 @@ export const getPublishedArticlesList = cache(
         tags: Array.isArray(row.tags) ? row.tags : [],
         published_at: row.published_at || '',
         updated_at: row.updated_at || '',
+        author: mapAuthor(row.article_authors),
       }))
 
       return {
@@ -231,7 +242,7 @@ export const getPublishedArticleBySlug = cache(
       const { data, error } = await supabase
         .from('articles')
         .select(
-          'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, seo_title, seo_description, canonical_url, og_image_url'
+          'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, seo_title, seo_description, canonical_url, og_image_url, author_id, article_authors(id, slug, display_name, role_title, short_bio, avatar_url, is_active)'
         )
         .eq('slug', slug.trim())
         .eq('status', 'published')
@@ -263,12 +274,136 @@ export const getPublishedArticleBySlug = cache(
         seo_description: row.seo_description,
         canonical_url: row.canonical_url,
         og_image_url: row.og_image_url,
+        author_id: row.author_id || null,
+        author: mapAuthor(row.article_authors),
       }
 
       return { success: true, data: detail }
     } catch (err: any) {
       console.error('Unexpected exception in getPublishedArticleBySlug:', err)
       return { success: false, data: null, error: 'เกิดข้อผิดพลาดที่ไม่คาดคิดในการโหลดข้อมูลบทความ' }
+    }
+  }
+)
+
+/**
+ * Fetch a single active author by exact slug for public author pages.
+ */
+export const getActiveAuthorBySlug = cache(
+  async (slug: string): Promise<PublicResult<PublicArticleAuthor | null>> => {
+    try {
+      if (!slug || typeof slug !== 'string' || !slug.trim()) {
+        return { success: false, data: null, error: 'Slug ผู้เขียนไม่ถูกต้อง' }
+      }
+
+      const supabase = createAnonServerClient()
+
+      const { data, error } = await supabase
+        .from('article_authors')
+        .select('id, slug, display_name, role_title, short_bio, avatar_url, is_active')
+        .eq('slug', slug.trim())
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error in getActiveAuthorBySlug:', error.message)
+        return { success: false, data: null, error: 'ไม่สามารถโหลดข้อมูลผู้เขียนได้' }
+      }
+
+      if (!data) {
+        return { success: true, data: null }
+      }
+
+      return { success: true, data: mapAuthor(data) }
+    } catch (err: any) {
+      console.error('Unexpected exception in getActiveAuthorBySlug:', err)
+      return { success: false, data: null, error: 'เกิดข้อผิดพลาดที่ไม่คาดคิดในการโหลดข้อมูลผู้เขียน' }
+    }
+  }
+)
+
+/**
+ * Fetch published articles written by a specific author.
+ */
+export const getPublishedArticlesByAuthorSlug = cache(
+  async (
+    authorSlug: string,
+    params?: PublicArticlesListParams
+  ): Promise<PublicArticlesListResult & { author: PublicArticleAuthor | null }> => {
+    try {
+      const authorRes = await getActiveAuthorBySlug(authorSlug)
+      if (!authorRes.success || !authorRes.data) {
+        return {
+          success: false,
+          data: [],
+          count: 0,
+          totalPages: 0,
+          currentPage: 1,
+          author: null,
+          error: authorRes.error || 'ไม่พบผู้เขียนนี้ หรือผู้เขียนถูกระงับการใช้งาน',
+        }
+      }
+
+      const author = authorRes.data
+      const listRes = await getPublishedArticlesList({
+        ...params,
+        authorId: author.id,
+      })
+
+      return {
+        ...listRes,
+        author,
+      }
+    } catch (err: any) {
+      console.error('Unexpected exception in getPublishedArticlesByAuthorSlug:', err)
+      return {
+        success: false,
+        data: [],
+        count: 0,
+        totalPages: 0,
+        currentPage: 1,
+        author: null,
+        error: 'เกิดข้อผิดพลาดที่ไม่คาดคิดในการโหลดบทความของผู้เขียน',
+      }
+    }
+  }
+)
+
+/**
+ * Fetch active authors with published articles for dynamic sitemap entries.
+ */
+export const getActiveAuthorsSitemapRows = cache(
+  async (): Promise<PublicResult<{ slug: string; updated_at: string }[]>> => {
+    try {
+      const supabase = createAnonServerClient()
+
+      const { data, error } = await supabase
+        .from('article_authors')
+        .select('slug, updated_at, articles!inner(id, status)')
+        .eq('is_active', true)
+        .eq('articles.status', 'published')
+
+      if (error) {
+        console.error('Error in getActiveAuthorsSitemapRows:', error.message)
+        return { success: false, data: [], error: 'ไม่สามารถโหลดข้อมูล Sitemap ของผู้เขียนได้' }
+      }
+
+      const seen = new Set<string>()
+      const rows: { slug: string; updated_at: string }[] = []
+      for (const r of (data || []) as any[]) {
+        if (r.slug && !seen.has(r.slug)) {
+          seen.add(r.slug)
+          rows.push({
+            slug: r.slug,
+            updated_at: r.updated_at || '',
+          })
+        }
+      }
+
+      return { success: true, data: rows }
+    } catch (err: any) {
+      console.error('Unexpected exception in getActiveAuthorsSitemapRows:', err)
+      return { success: false, data: [], error: 'เกิดข้อผิดพลาดที่ไม่คาดคิดในการโหลดข้อมูล Sitemap ผู้เขียน' }
     }
   }
 )

@@ -26,6 +26,16 @@ function buildArticleJsonLd(article: PublicArticleDetail): Record<string, unknow
   const canonicalUrl = absoluteUrl(article.canonical_url || `/articles/${article.slug}`)
   const description = article.seo_description || article.excerpt || SITE_DESCRIPTION
 
+  const authorJsonLd = article.author
+    ? {
+        '@type': 'Person',
+        name: article.author.display_name,
+        url: absoluteUrl(`/authors/${article.author.slug}`),
+        ...(article.author.role_title ? { jobTitle: article.author.role_title } : {}),
+        ...(article.author.avatar_url ? { image: absoluteUrl(article.author.avatar_url) } : {}),
+      }
+    : SITE_ORGANIZATION
+
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -37,7 +47,7 @@ function buildArticleJsonLd(article: PublicArticleDetail): Record<string, unknow
       '@id': canonicalUrl,
     },
     inLanguage: 'th-TH',
-    author: SITE_ORGANIZATION,
+    author: authorJsonLd,
     publisher: SITE_ORGANIZATION,
   }
 

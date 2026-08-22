@@ -33,6 +33,7 @@ import {
   normalizeSlug,
   ARTICLE_MAX_LENGTHS,
   type Article,
+  type PublicArticleAuthor,
 } from '@/lib/articles'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import ArticleMarkdownEditor from '@/components/admin/articles/ArticleMarkdownEditor'
@@ -42,10 +43,12 @@ export default function ArticleEditorClient({
   article,
   isEdit,
   initialPackageRelations = [],
+  initialAuthors = [],
 }: {
   article: Article | null
   isEdit: boolean
   initialPackageRelations?: RelatedPackageItem[]
+  initialAuthors?: PublicArticleAuthor[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -58,6 +61,8 @@ export default function ArticleEditorClient({
   // Fields
   const [title, setTitle] = useState(article?.title || '')
   const [slug, setSlug] = useState(article?.slug || '')
+  const [authorId, setAuthorId] = useState(article?.author_id || '')
+  const [authors] = useState<PublicArticleAuthor[]>(initialAuthors)
   const [excerpt, setExcerpt] = useState(article?.excerpt || '')
   const [bodyMarkdown, setBodyMarkdown] = useState(article?.body_markdown || '')
   const [category, setCategory] = useState(article?.category || '')
@@ -147,6 +152,7 @@ export default function ArticleEditorClient({
     body_markdown: bodyMarkdown || null,
     category: category || null,
     tags,
+    author_id: authorId || null,
     cover_image_url: coverImageUrl || null,
     cover_image_alt: coverImageAlt || null,
     seo_title: seoTitle || null,
@@ -512,6 +518,46 @@ export default function ArticleEditorClient({
                 placeholder="เช่น ภาพประกอบคำแนะนำการสมัครสอบราชการ"
                 className="w-full bg-[#0F0B07] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F5E9D6] focus:outline-none focus:border-[#D4AF37]"
               />
+            </div>
+          </div>
+
+          {/* Author Selection Box */}
+          <div className="bg-[#1A140E] border border-[#D4AF37]/20 p-4 sm:p-6 rounded-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-3">
+              <h2 className="text-base font-bold text-[#F5E9D6]">
+                ผู้เขียนบทความ (Author)
+              </h2>
+              <Link
+                href="/admin/articles/authors"
+                target="_blank"
+                className="text-xs text-[#D4AF37] hover:underline"
+              >
+                จัดการผู้เขียน ↗
+              </Link>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#A1866B] uppercase mb-1">
+                เลือกผู้เขียนบทความ
+              </label>
+              <select
+                value={authorId}
+                onChange={(e) => {
+                  setAuthorId(e.target.value)
+                  setIsDirty(true)
+                }}
+                className="w-full bg-[#0F0B07] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-sm text-[#F5E9D6] focus:outline-none focus:border-[#D4AF37]"
+              >
+                <option value="">ทีมบรรณาธิการ Sobdai (ค่าเริ่มต้น)</option>
+                {authors.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.display_name} {a.role_title ? `(${a.role_title})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[#A1866B] mt-1.5 leading-relaxed">
+                หากไม่ระบุ ระบบจะแสดงบทความในนาม &quot;ทีมบรรณาธิการ Sobdai&quot;
+              </p>
             </div>
           </div>
 

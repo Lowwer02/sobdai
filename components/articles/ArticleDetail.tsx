@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Calendar, Clock, RefreshCw, Tag as TagIcon, FileText } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, RefreshCw, Tag as TagIcon, FileText, User } from 'lucide-react'
 import type { PublicArticleDetail } from '@/lib/articles-public'
 import { calculateReadingTime } from '@/lib/articles'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
@@ -73,7 +73,30 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
         )}
 
         {/* Metadata row */}
-        <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-[#A1866B] pt-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-[#A1866B] pt-2">
+          {/* Author Byline */}
+          {article.author ? (
+            <div className="flex items-center gap-1.5">
+              <User size={15} className="text-[#D4AF37]" />
+              <span>เขียนโดย:</span>
+              <Link
+                href={`/authors/${article.author.slug}`}
+                className="font-medium text-[#F5E9D6] hover:text-[#D4AF37] underline decoration-[#D4AF37]/30 hover:decoration-[#D4AF37] transition-colors"
+              >
+                {article.author.display_name}
+              </Link>
+              {article.author.role_title && (
+                <span className="text-[#A1866B]/70">({article.author.role_title})</span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <User size={15} className="text-[#D4AF37]" />
+              <span>เขียนโดย:</span>
+              <span className="font-medium text-[#F5E9D6]">ทีมบรรณาธิการ Sobdai</span>
+            </div>
+          )}
+
           {publishedDateStr && (
             <div className="flex items-center gap-1.5">
               <Calendar size={15} className="text-[#D4AF37]" />

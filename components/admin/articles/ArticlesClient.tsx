@@ -15,6 +15,7 @@ import {
   Archive,
   RotateCcw,
   FileText,
+  User,
 } from 'lucide-react'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
@@ -140,13 +141,22 @@ export default function ArticlesClient({
             บทความความรู้เอเวอร์กรีน คู่มือสอบราชการ และคำแนะนำสำหรับการสอบ
           </p>
         </div>
-        <Link
-          href="/admin/articles/create"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F0B07] font-semibold rounded-lg transition-all shadow-md shadow-[#D4AF37]/10"
-        >
-          <Plus size={18} />
-          สร้างบทความใหม่
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/articles/authors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1F1913] border border-[#D4AF37]/30 hover:border-[#D4AF37] text-[#F5E9D6] font-semibold rounded-lg transition-all"
+          >
+            <User size={18} className="text-[#D4AF37]" />
+            จัดการผู้เขียน
+          </Link>
+          <Link
+            href="/admin/articles/create"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F0B07] font-semibold rounded-lg transition-all shadow-md shadow-[#D4AF37]/10"
+          >
+            <Plus size={18} />
+            สร้างบทความใหม่
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filters */}

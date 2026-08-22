@@ -7,7 +7,11 @@ import {
   ArticleStatus,
   validateArticleDraft,
   validateArticleForPublish,
-  Article,
+  validateArticleAuthor,
+  validateAuthorAssignment,
+  type Article,
+  type ArticleAuthor,
+  type PublicArticleAuthor,
 } from '@/lib/articles'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -98,6 +102,24 @@ export async function createArticle(raw: any): Promise<{ success: boolean; error
     return { success: false, error: formatErrors(errors) }
   }
 
+  // Server-side active author verification
+  if (clean.author_id) {
+    const { data: authorRow, error: authorErr } = await supabase
+      .from('article_authors')
+      .select('id, is_active')
+      .eq('id', clean.author_id)
+      .maybeSingle()
+
+    if (authorErr) {
+      return { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบผู้เขียน' }
+    }
+
+    const assignCheck = validateAuthorAssignment(clean.author_id, authorRow)
+    if (!assignCheck.ok) {
+      return { success: false, error: assignCheck.error }
+    }
+  }
+
   const payload: Record<string, unknown> = {
     id: crypto.randomUUID(),
     slug: clean.slug,
@@ -108,6 +130,7 @@ export async function createArticle(raw: any): Promise<{ success: boolean; error
     cover_image_alt: clean.cover_image_alt,
     category: clean.category,
     tags: clean.tags,
+    author_id: clean.author_id || null,
     status: 'draft',
     published_at: null,
     seo_title: clean.seo_title,
@@ -173,6 +196,24 @@ export async function updateArticle(
     return { success: false, error: formatErrors(errors) }
   }
 
+  // Server-side active author verification
+  if (clean.author_id) {
+    const { data: authorRow, error: authorErr } = await supabase
+      .from('article_authors')
+      .select('id, is_active')
+      .eq('id', clean.author_id)
+      .maybeSingle()
+
+    if (authorErr) {
+      return { success: false, error: 'เกิดข้อผิดพลาดในการตรวจสอบผู้เขียน' }
+    }
+
+    const assignCheck = validateAuthorAssignment(clean.author_id, authorRow)
+    if (!assignCheck.ok) {
+      return { success: false, error: assignCheck.error }
+    }
+  }
+
   const payload: Record<string, unknown> = {
     slug: clean.slug,
     title: clean.title,
@@ -182,6 +223,7 @@ export async function updateArticle(
     cover_image_alt: clean.cover_image_alt,
     category: clean.category,
     tags: clean.tags,
+    author_id: clean.author_id || null,
     seo_title: clean.seo_title,
     seo_description: clean.seo_description,
     canonical_url: clean.canonical_url,
@@ -627,4 +669,152 @@ export async function updateArticlePackageRelations(
   revalidatePath('/admin/articles')
   revalidatePath(`/admin/articles/${articleId}/edit`)
   return { success: true }
+}
+
+// ─── ARTICLE AUTHOR ACTIONS ──────────────────────────────────────────────────
+
+export async function listArticleAuthorsForAdmin(): Promise<{ success: boolean; data: ArticleAuthor[]; error?: string }> {
+  try {
+    const { supabase } = await requirePermission('content.read')
+
+    const { data, error } = await supabase
+      .from('article_authors')
+      .select('id, slug, display_name, role_title, short_bio, avatar_url, is_active, created_at, updated_at')
+      .order('display_name', { ascending: true })
+
+    if (error) {
+      console.error('Error in listArticleAuthorsForAdmin:', error.message)
+      return { success: false, data: [], error: 'ไม่สามารถโหลดรายชื่อผู้เขียนได้' }
+    }
+
+    return { success: true, data: (data || []) as ArticleAuthor[] }
+  } catch (err: any) {
+    console.error('Unexpected exception in listArticleAuthorsForAdmin:', err)
+    return { success: false, data: [], error: 'เกิดข้อผิดพลาดในการโหลดรายชื่อผู้เขียน' }
+  }
+}
+
+export async function listActiveArticleAuthors(): Promise<{ success: boolean; data: PublicArticleAuthor[]; error?: string }> {
+  try {
+    const { supabase } = await requirePermission('content.read')
+
+    const { data, error } = await supabase
+      .from('article_authors')
+      .select('id, slug, display_name, role_title, short_bio, avatar_url')
+      .eq('is_active', true)
+      .order('display_name', { ascending: true })
+
+    if (error) {
+      console.error('Error in listActiveArticleAuthors:', error.message)
+      return { success: false, data: [], error: 'ไม่สามารถโหลดรายชื่อผู้เขียนได้' }
+    }
+
+    return { success: true, data: (data || []) as PublicArticleAuthor[] }
+  } catch (err: any) {
+    console.error('Unexpected exception in listActiveArticleAuthors:', err)
+    return { success: false, data: [], error: 'เกิดข้อผิดพลาดในการโหลดรายชื่อผู้เขียน' }
+  }
+}
+
+export async function getArticleAuthorById(id: string): Promise<ArticleAuthor | null> {
+  try {
+    const { supabase } = await requirePermission('content.read')
+
+    const { data, error } = await supabase
+      .from('article_authors')
+      .select('id, slug, display_name, role_title, short_bio, avatar_url, is_active, created_at, updated_at')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error || !data) return null
+    return data as ArticleAuthor
+  } catch {
+    return null
+  }
+}
+
+export async function createArticleAuthor(raw: any): Promise<{ success: boolean; error?: string; author?: ArticleAuthor }> {
+  try {
+    const { supabase } = await requirePermission('content.write')
+
+    const { ok, errors, clean } = validateArticleAuthor(raw)
+    if (!ok || !clean) {
+      return { success: false, error: formatErrors(errors) }
+    }
+
+    const payload = {
+      id: crypto.randomUUID(),
+      slug: clean.slug,
+      display_name: clean.display_name,
+      role_title: clean.role_title,
+      short_bio: clean.short_bio,
+      avatar_url: clean.avatar_url,
+      is_active: clean.is_active,
+    }
+
+    const { data, error } = await supabase
+      .from('article_authors')
+      .insert(payload)
+      .select('id, slug, display_name, role_title, short_bio, avatar_url, is_active, created_at, updated_at')
+      .single()
+
+    if (error) {
+      if (isUniqueViolation(error)) {
+        return { success: false, error: 'Slug ผู้เขียนนี้ถูกใช้งานแล้ว กรุณาใช้ Slug อื่น' }
+      }
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/admin/articles')
+    revalidatePath('/admin/articles/authors')
+    return { success: true, author: data as ArticleAuthor }
+  } catch (err: any) {
+    console.error('Unexpected exception in createArticleAuthor:', err)
+    return { success: false, error: 'เกิดข้อผิดพลาดในการสร้างข้อมูลผู้เขียน' }
+  }
+}
+
+export async function updateArticleAuthor(
+  id: string,
+  raw: any
+): Promise<{ success: boolean; error?: string; author?: ArticleAuthor }> {
+  try {
+    const { supabase } = await requirePermission('content.write')
+
+    const { ok, errors, clean } = validateArticleAuthor(raw)
+    if (!ok || !clean) {
+      return { success: false, error: formatErrors(errors) }
+    }
+
+    const payload = {
+      slug: clean.slug,
+      display_name: clean.display_name,
+      role_title: clean.role_title,
+      short_bio: clean.short_bio,
+      avatar_url: clean.avatar_url,
+      is_active: clean.is_active,
+    }
+
+    const { data, error } = await supabase
+      .from('article_authors')
+      .update(payload)
+      .eq('id', id)
+      .select('id, slug, display_name, role_title, short_bio, avatar_url, is_active, created_at, updated_at')
+      .single()
+
+    if (error) {
+      if (isUniqueViolation(error)) {
+        return { success: false, error: 'Slug ผู้เขียนนี้ถูกใช้งานแล้ว กรุณาใช้ Slug อื่น' }
+      }
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/admin/articles')
+    revalidatePath('/admin/articles/authors')
+    revalidatePath(`/authors/${clean.slug}`)
+    return { success: true, author: data as ArticleAuthor }
+  } catch (err: any) {
+    console.error('Unexpected exception in updateArticleAuthor:', err)
+    return { success: false, error: 'เกิดข้อผิดพลาดในการแก้ไขข้อมูลผู้เขียน' }
+  }
 }

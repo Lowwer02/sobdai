@@ -8,6 +8,36 @@
 
 export type ArticleStatus = 'draft' | 'published' | 'archived'
 
+export interface ArticleAuthor {
+  id: string
+  slug: string
+  display_name: string
+  role_title: string | null
+  short_bio: string | null
+  avatar_url: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ArticleAuthorInput {
+  slug: string
+  display_name: string
+  role_title: string | null
+  short_bio: string | null
+  avatar_url: string | null
+  is_active: boolean
+}
+
+export interface PublicArticleAuthor {
+  id: string
+  slug: string
+  display_name: string
+  role_title: string | null
+  short_bio: string | null
+  avatar_url: string | null
+}
+
 export interface Article {
   id: string
   slug: string
@@ -24,6 +54,7 @@ export interface Article {
   seo_description: string | null
   canonical_url: string | null
   og_image_url: string | null
+  author_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -39,6 +70,7 @@ export interface ArticleInput {
   cover_image_alt: string | null
   category: string | null
   tags: string[]
+  author_id: string | null
   seo_title: string | null
   seo_description: string | null
   canonical_url: string | null
@@ -57,6 +89,12 @@ export interface ArticleValidationResult {
   ok: boolean
   errors: Record<string, string>
   clean: ArticleInput | null
+}
+
+export interface ArticleAuthorValidationResult {
+  ok: boolean
+  errors: Record<string, string>
+  clean: ArticleAuthorInput | null
 }
 
 export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
@@ -79,6 +117,11 @@ export const ARTICLE_MAX_LENGTHS = {
   seo_description: 320,
   canonical_url: 500,
   og_image_url: 500,
+  author_display_name: 100,
+  author_slug: 100,
+  author_role_title: 100,
+  author_short_bio: 500,
+  author_avatar_url: 500,
 } as const
 
 // ─── Pure Utility Helpers ───────────────────────────────────────────────────
@@ -192,6 +235,20 @@ function optStr(val: unknown): string | null {
   return str(val)
 }
 
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isValidUuid(val: string): boolean {
+  if (!val || typeof val !== 'string') return false
+  return UUID_REGEX.test(val.trim())
+}
+
+function optUuid(val: unknown): string | null {
+  if (typeof val === 'string' && isValidUuid(val)) {
+    return val.trim()
+  }
+  return null
+}
+
 function coerceInput(raw: any): ArticleInput {
   return {
     status: coerceArticleStatus(raw?.status),
@@ -203,6 +260,7 @@ function coerceInput(raw: any): ArticleInput {
     cover_image_alt: optStr(raw?.cover_image_alt),
     category: optStr(raw?.category),
     tags: cleanTags(raw?.tags),
+    author_id: optUuid(raw?.author_id),
     seo_title: optStr(raw?.seo_title),
     seo_description: optStr(raw?.seo_description),
     canonical_url: optStr(raw?.canonical_url),
@@ -237,6 +295,10 @@ export function validateArticleDraft(raw: any): ArticleValidationResult {
     errors.slug = `Slug ต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.slug} ตัวอักษร`
   } else if (!isValidSlug(input.slug)) {
     errors.slug = 'Slug ใช้ได้เฉพาะตัวอักษรไทย (ก-๙), a-z, 0-9 และ -'
+  }
+
+  if (raw?.author_id !== undefined && raw?.author_id !== null && raw?.author_id !== '' && !isValidUuid(raw.author_id)) {
+    errors.author_id = 'รหัสผู้เขียนบทความ (author_id) ไม่ถูกต้อง'
   }
 
   if (input.excerpt && input.excerpt.length > ARTICLE_MAX_LENGTHS.excerpt) {
@@ -334,6 +396,11 @@ export function validateArticleForPublish(raw: any): ArticleValidationResult {
     errors.slug = 'Slug ใช้ได้เฉพาะตัวอักษรไทย (ก-๙), a-z, 0-9 และ -'
   }
 
+  // Author id validation if provided
+  if (raw?.author_id !== undefined && raw?.author_id !== null && raw?.author_id !== '' && !isValidUuid(raw.author_id)) {
+    errors.author_id = 'รหัสผู้เขียนบทความ (author_id) ไม่ถูกต้อง'
+  }
+
   // Core Content
   if (!input.excerpt) {
     errors.excerpt = 'ต้องระบุบทสรุปย่อ (excerpt)'
@@ -413,4 +480,119 @@ export function validateArticleForPublish(raw: any): ArticleValidationResult {
   }
 
   return { ok: true, errors: {}, clean: input }
+}
+
+/**
+ * Validation for Article Author entity.
+ */
+export function validateArticleAuthor(raw: any): ArticleAuthorValidationResult {
+  const errors: Record<string, string> = {}
+
+  const display_name = str(raw?.display_name) ?? ''
+  const slug = normalizeSlug(str(raw?.slug) ?? '')
+  const role_title = optStr(raw?.role_title)
+  const short_bio = optStr(raw?.short_bio)
+  const avatar_url = optStr(raw?.avatar_url)
+  const is_active = raw?.is_active !== undefined ? Boolean(raw.is_active) : true
+
+  if (!display_name) {
+    errors.display_name = 'ต้องระบุชื่อผู้เขียน'
+  } else if (display_name.length > ARTICLE_MAX_LENGTHS.author_display_name) {
+    errors.display_name = `ชื่อผู้เขียนต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.author_display_name} ตัวอักษร`
+  }
+
+  if (!slug) {
+    errors.slug = 'ต้องระบุ Slug'
+  } else if (slug.length > ARTICLE_MAX_LENGTHS.author_slug) {
+    errors.slug = `Slug ต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.author_slug} ตัวอักษร`
+  } else if (!isValidSlug(slug)) {
+    errors.slug = 'Slug ใช้ได้เฉพาะตัวอักษรไทย (ก-๙), a-z, 0-9 และ -'
+  }
+
+  if (role_title && role_title.length > ARTICLE_MAX_LENGTHS.author_role_title) {
+    errors.role_title = `ตำแหน่ง/บทบาทต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.author_role_title} ตัวอักษร`
+  }
+
+  if (short_bio && short_bio.length > ARTICLE_MAX_LENGTHS.author_short_bio) {
+    errors.short_bio = `ประวัติย่อต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.author_short_bio} ตัวอักษร`
+  }
+
+  if (avatar_url) {
+    if (avatar_url.length > ARTICLE_MAX_LENGTHS.author_avatar_url) {
+      errors.avatar_url = `URL รูปโปรไฟล์ต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.author_avatar_url} ตัวอักษร`
+    } else if (!isValidUrl(avatar_url)) {
+      errors.avatar_url = 'URL รูปโปรไฟล์ไม่ถูกต้อง (ต้องเป็น http/https)'
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, errors, clean: null }
+  }
+
+  return {
+    ok: true,
+    errors: {},
+    clean: {
+      display_name,
+      slug,
+      role_title,
+      short_bio,
+      avatar_url,
+      is_active,
+    },
+  }
+}
+
+export interface AuthorStatusSnapshot {
+  id: string
+  is_active: boolean
+}
+
+/**
+ * Server-side validation for assigning an author to an article.
+ * Enforces:
+ *   - null / undefined author_id is allowed (defaults to Sobdai editorial team)
+ *   - non-null author_id must be a valid UUID
+ *   - author must exist in the database
+ *   - author must be active (is_active = true)
+ */
+export function validateAuthorAssignment(
+  authorId: string | null | undefined,
+  existingAuthor: AuthorStatusSnapshot | null | undefined
+): { ok: boolean; error?: string } {
+  if (!authorId) {
+    return { ok: true }
+  }
+
+  if (!isValidUuid(authorId)) {
+    return { ok: false, error: 'รหัสผู้เขียนบทความ (author_id) ไม่ถูกต้อง' }
+  }
+
+  if (!existingAuthor) {
+    return { ok: false, error: 'ไม่พบผู้เขียนที่ระบุ หรือผู้เขียนถูกลบไปแล้ว' }
+  }
+
+  if (existingAuthor.is_active === false) {
+    return { ok: false, error: 'ไม่สามารถระบุผู้เขียนที่ถูกปิดการใช้งานได้' }
+  }
+
+  return { ok: true }
+}
+
+/**
+ * Pure mapping helper that converts an author database row into a public-safe PublicArticleAuthor object.
+ * Returns null if author is inactive (is_active = false), null, or lacks essential fields.
+ */
+export function mapAuthor(rowAuthor: any): PublicArticleAuthor | null {
+  if (!rowAuthor) return null
+  if (rowAuthor.is_active === false) return null
+  if (!rowAuthor.id || !rowAuthor.slug || !rowAuthor.display_name) return null
+  return {
+    id: rowAuthor.id,
+    slug: rowAuthor.slug,
+    display_name: rowAuthor.display_name,
+    role_title: rowAuthor.role_title || null,
+    short_bio: rowAuthor.short_bio || null,
+    avatar_url: rowAuthor.avatar_url || null,
+  }
 }

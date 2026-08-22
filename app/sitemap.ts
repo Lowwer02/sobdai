@@ -1,7 +1,10 @@
 import type { MetadataRoute } from 'next'
 import { PUBLIC_STATIC_ROUTES, absoluteUrl } from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
-import { getPublishedArticleSitemapRows } from '@/lib/articles-public'
+import {
+  getPublishedArticleSitemapRows,
+  getActiveAuthorsSitemapRows,
+} from '@/lib/articles-public'
 
 type SitemapEntry = MetadataRoute.Sitemap[number]
 
@@ -16,12 +19,13 @@ type SitemapEntry = MetadataRoute.Sitemap[number]
  * Failures degrade to an empty list rather than failing the whole sitemap build.
  */
 async function getDynamicRoutes(): Promise<SitemapEntry[]> {
-  const [news, packages, articles] = await Promise.all([
+  const [news, packages, articles, authors] = await Promise.all([
     getNewsRoutes(),
     getPackageRoutes(),
     getArticleRoutes(),
+    getAuthorRoutes(),
   ])
-  return [...news, ...packages, ...articles]
+  return [...news, ...packages, ...articles, ...authors]
 }
 
 /**
@@ -129,6 +133,38 @@ async function getArticleRoutes(): Promise<SitemapEntry[]> {
         lastModified: new Date(row.updated_at || row.published_at || new Date()),
         changeFrequency: 'monthly',
         priority: 0.7,
+      })
+    }
+
+    return entries
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Active authors with published articles → /authors/[slug].
+ */
+async function getAuthorRoutes(): Promise<SitemapEntry[]> {
+  try {
+    const res = await getActiveAuthorsSitemapRows()
+    if (!res.success || !res.data) return []
+
+    const seenUrls = new Set<string>()
+    const entries: SitemapEntry[] = []
+
+    for (const row of res.data) {
+      if (!row.slug || !row.slug.trim()) continue
+      const cleanSlug = row.slug.trim()
+      const url = absoluteUrl(`/authors/${cleanSlug}`)
+      if (seenUrls.has(url)) continue
+      seenUrls.add(url)
+
+      entries.push({
+        url,
+        lastModified: new Date(row.updated_at || new Date()),
+        changeFrequency: 'monthly',
+        priority: 0.6,
       })
     }
 

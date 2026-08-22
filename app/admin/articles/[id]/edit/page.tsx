@@ -1,6 +1,10 @@
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth/server-protect'
-import { getArticleById, getArticlePackageRelations } from '@/app/admin/articles/actions'
+import {
+  getArticleById,
+  getArticlePackageRelations,
+  listActiveArticleAuthors,
+} from '@/app/admin/articles/actions'
 import ArticleEditorClient from '@/components/admin/articles/ArticleEditorClient'
 
 export default async function EditArticlePage({
@@ -11,12 +15,16 @@ export default async function EditArticlePage({
   await requirePermission('content.write')
   const { id } = await params
 
-  const article = await getArticleById(id)
+  const [article, relRes, authorsRes] = await Promise.all([
+    getArticleById(id),
+    getArticlePackageRelations(id),
+    listActiveArticleAuthors(),
+  ])
+
   if (!article) {
     notFound()
   }
 
-  const relRes = await getArticlePackageRelations(id)
   if (!relRes.success) {
     throw new Error(relRes.error || 'ไม่สามารถโหลดข้อมูลแพ็กเกจที่เกี่ยวข้องได้')
   }
@@ -26,6 +34,7 @@ export default async function EditArticlePage({
       article={article}
       isEdit={true}
       initialPackageRelations={relRes.data}
+      initialAuthors={authorsRes.data || []}
     />
   )
 }
