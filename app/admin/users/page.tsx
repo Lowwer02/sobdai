@@ -22,7 +22,7 @@ export default async function UsersPage({
   
   let query = supabase
     .from('profiles')
-    .select('*', { count: 'exact' })
+    .select('id, email, role, status, deleted_at, created_at', { count: 'exact' })
     
   if (search) {
     query = query.ilike('email', `%${search}%`)

@@ -50,7 +50,6 @@ export async function updateProfile(formData: FormData) {
       display_name: displayName,
       occupation: occupation,
       phone: phone,
-      updated_at: new Date().toISOString()
     }
 
     // Execute update against authenticated user ONLY
@@ -94,15 +93,10 @@ export async function deactivateAccount() {
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Never delete row, just set soft delete flags
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        deleted_at: new Date().toISOString(),
-        deleted_reason: 'self',
-        deleted_by: user.id
-      })
-      .eq('id', user.id)
+    // The database derives the actor from auth.uid() and exposes only the
+    // exact self-deactivation transition. The client never receives generic
+    // UPDATE permission over deleted_* columns.
+    const { error } = await supabase.rpc('deactivate_my_profile')
 
     if (error) {
       console.error('Deactivate account error:', error)

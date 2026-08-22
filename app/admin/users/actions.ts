@@ -12,33 +12,43 @@ export async function updateUserRole(userId: string, newRole: Role) {
     // Check if modifying an owner
     const { data: targetUser, error: fetchError } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, status, deleted_at')
       .eq('id', userId)
       .single()
       
     if (fetchError) throw fetchError
 
+    // The deployed profiles schema includes soft-delete state even though the
+    // repository's generated client type has not yet declared that column.
+    const targetDeletedAt = (targetUser as unknown as { deleted_at: string | null }).deleted_at
+
     // If downgrading an owner, ensure there is at least one other owner
-    if (targetUser.role === 'owner' && newRole !== 'owner') {
+    if (
+      targetUser.role === 'owner' &&
+      targetUser.status === 'active' &&
+      targetDeletedAt === null &&
+      newRole !== 'owner'
+    ) {
       const { count, error: countError } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('role', 'owner')
+        .eq('status', 'active')
+        .is('deleted_at', null)
         
       if (countError) throw countError
       if (count === null || count <= 1) {
-        throw new Error('Cannot downgrade the last owner of the system.')
+        throw new Error('Cannot downgrade the last usable owner of the system.')
       }
     }
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
-      .select('id') // Added select to force return of affected rows
+    const { data, error } = await supabase.rpc('admin_update_profile_role', {
+      p_target_user_id: userId,
+      p_new_role: newRole,
+    })
 
     if (error) throw error
-    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission to modify this profile.')
+    if (data !== true) throw new Error('Update failed. You may not have permission to modify this profile.')
 
     await logAuditEvent({
       action: 'UPDATE_ROLE',
@@ -64,51 +74,44 @@ export async function updateUserStatus(userId: string, newStatus: 'active' | 'ba
     // Check if modifying an owner
     const { data: targetUser, error: fetchError } = await supabase
       .from('profiles')
-      .select('role, status')
+      .select('role, status, deleted_at')
       .eq('id', userId)
       .single()
 
     if (fetchError) throw fetchError
 
+    const targetDeletedAt = (targetUser as unknown as { deleted_at: string | null }).deleted_at
+
     // If deactivating an owner, ensure there is at least one other owner
-    if (targetUser.role === 'owner' && newStatus !== 'active') {
+    if (
+      targetUser.role === 'owner' &&
+      targetUser.status === 'active' &&
+      targetDeletedAt === null &&
+      newStatus === 'banned'
+    ) {
       const { count, error: countError } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('role', 'owner')
         .eq('status', 'active')
+        .is('deleted_at', null)
 
       if (countError) throw countError
       if (count === null || count <= 1) {
-        throw new Error('Cannot deactivate the last active owner of the system.')
+        throw new Error('Cannot deactivate the last usable owner of the system.')
       }
     }
 
-    // Build the patch: status always flips; ban metadata is set on ban and
-    // cleared on unban so stale ban info doesn't linger after reinstatement.
-    const patch: Record<string, unknown> =
-      newStatus === 'banned'
-        ? {
-            status: 'banned',
-            banned_at: new Date().toISOString(),
-            banned_reason: reason ?? null,
-            banned_by: profile?.id ?? null,
-          }
-        : {
-            status: 'active',
-            banned_at: null,
-            banned_reason: null,
-            banned_by: null,
-          }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(patch)
-      .eq('id', userId)
-      .select('id') // Added select to force return of affected rows
+    // The database validates the actor, target, status transition, ban actor,
+    // and last-active-owner invariant atomically.
+    const { data, error } = await supabase.rpc('admin_update_profile_status', {
+      p_target_user_id: userId,
+      p_new_status: newStatus,
+      p_reason: reason ?? null,
+    })
 
     if (error) throw error
-    if (!data || data.length === 0) throw new Error('Update failed. You may not have permission to modify this profile.')
+    if (data !== true) throw new Error('Update failed. You may not have permission to modify this profile.')
 
     await logAuditEvent({
       action: 'UPDATE_STATUS',

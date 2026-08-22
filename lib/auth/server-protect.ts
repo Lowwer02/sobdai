@@ -9,6 +9,30 @@ import { forbidden, redirect } from 'next/navigation'
  */
 export const STAFF_ROLES: readonly Role[] = ['owner', 'admin', 'editor', 'support']
 
+export type UsableAccountProfile = {
+  id: string
+  email?: string | null
+  role: Role
+  status: 'active'
+  deleted_at: null
+}
+
+/**
+ * Account usability is an authorization prerequisite, not a role. Keep this
+ * check fail-closed when an older or incomplete profile shape is returned.
+ */
+export function isUsableAccountProfile(profile: unknown): profile is UsableAccountProfile {
+  if (typeof profile !== 'object' || profile === null) return false
+
+  const candidate = profile as Record<string, unknown>
+  return (
+    typeof candidate.id === 'string'
+    && typeof candidate.role === 'string'
+    && candidate.status === 'active'
+    && candidate.deleted_at === null
+  )
+}
+
 /**
  * Returns the current user and profile data, or redirects to /login if not
  * authenticated.
@@ -48,7 +72,7 @@ export async function getAdminSession() {
 export async function requireStaff() {
   const { user, profile, supabase } = await getAdminSession()
 
-  if (!STAFF_ROLES.includes(profile.role as Role)) {
+  if (!isUsableAccountProfile(profile) || !STAFF_ROLES.includes(profile.role)) {
     forbidden()
   }
 
@@ -62,7 +86,7 @@ export async function requireStaff() {
 export async function requirePermission(permission: Permission) {
   const { user, profile, supabase } = await getAdminSession()
   
-  if (!hasPermission(profile.role, permission)) {
+  if (!isUsableAccountProfile(profile) || !hasPermission(profile.role, permission)) {
     forbidden()
   }
 
@@ -76,7 +100,7 @@ export async function requirePermission(permission: Permission) {
 export async function checkPermission(permission: Permission): Promise<boolean> {
   try {
     const { profile } = await getAdminSession()
-    return hasPermission(profile.role, permission)
+    return isUsableAccountProfile(profile) && hasPermission(profile.role, permission)
   } catch {
     return false
   }
