@@ -2,7 +2,11 @@
 
 **sec-profile-rbac-db-test.mjs** is an opt-in, destructive security harness
 for the SEC Profile RBAC Baseline Hardening migration (079). It is not part of
-the normal application, build, test, or CI paths.
+the normal application, build, test, or CI paths. Before the adversarial suite,
+it invokes **sec-profile-rbac-db-bootstrap.mjs** to reconstruct the verified
+Production-like pre-079 profile baseline, prove the pre-079 self-promotion
+vulnerability, apply the working-tree 079 migration, and run the compatibility
+cases for clean legacy, normalized, unsafe, and incompatible status shapes.
 
 ## Preconditions
 
@@ -11,7 +15,6 @@ Use only a disposable Supabase-compatible project that has:
 - Supabase Auth primitives (auth.uid(), auth.users, anon,
   authenticated, and service_role);
 - the effective pre-079 profile/public-content fixture used by SEC-DB2A/2B;
-- migration 079 already applied unchanged; and
 - the `promotions` table with the named live-promotion fixture; and
 - the effective residual privileged surface: organizations, positions,
   packages, exam_sets, questions, exam_set_questions, orders, the
@@ -24,9 +27,22 @@ Use only a disposable Supabase-compatible project that has:
   sec-db2a-banned-user@example.com, and
   sec-db2a-deleted-user@example.com.
 
-This harness does not replay historical migrations, create Auth users, create
-schema, apply migration 079, or provision credentials. It resets only the
-named disposable fixture rows after the destructive-test guard passes.
+The bootstrap helper does not replay historical migrations, create Auth users,
+or provision credentials. It only operates after confirming that the target
+contains exactly the eight named disposable fixture profiles and their Auth
+users. It reconstructs the relevant pre-079 policies and profile columns,
+temporarily removes the normalized `status` column, applies the working-tree
+079 SQL, and leaves the test project on a clean post-079 fixture. It refuses
+ambiguous fixture populations.
+
+The compatibility cases prove:
+
+- missing `status` plus clean legacy metadata succeeds and normalizes all rows
+  to `active`;
+- an existing correct `status` shape succeeds;
+- missing `status` plus non-null legacy ban/deletion metadata aborts without
+  adding the column; and
+- an incompatible existing `status` definition aborts without repairing it.
 
 ## Owner product invariant
 
@@ -83,7 +99,8 @@ PostgreSQL endpoint is malformed. The PostgreSQL URL is never printed.
 
 ## Coverage
 
-The harness performs catalog/prerequisite checks, including an explicit
+The harness performs a status-bootstrap compatibility suite and then catalog/
+prerequisite checks, including an explicit
 category-A mutation inventory and a catalog-wide residual-policy assertion;
 post-079 direct profile mutation checks; low-privilege RPC checks;
 active/banned/deleted RLS probes for Package/exam/question, Orders, all three

@@ -3,6 +3,7 @@
 import pg from 'pg'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { runStatusCompatibilitySuite } from './sec-profile-rbac-db-bootstrap.mjs'
 
 const { Client } = pg
 
@@ -233,8 +234,26 @@ function asFailure(stage, error) {
   return new HarnessFailure(stage, typeof error?.code === 'string' ? error.code : null)
 }
 
-function closeQuietly(client) {
-  return client?.end().catch(() => {})
+async function closeQuietly(client) {
+  if (!client) return
+  let timer
+  let finished = false
+  try {
+    await Promise.race([
+      client.end().catch(() => {}),
+      new Promise((resolve) => {
+        timer = setTimeout(() => {
+          if (!finished) {
+            client.connection?.stream?.destroy()
+          }
+          resolve()
+        }, 3000)
+      }),
+    ])
+  } finally {
+    finished = true
+    clearTimeout(timer)
+  }
 }
 
 function errorReason(error) {
@@ -278,20 +297,29 @@ function compactOutcome(error) {
 
 async function tryQuery(client, text, params = []) {
   try {
-    const result = await client.query(text, params)
+    const result = await withTimeout(
+      client.query(text, params),
+      OPERATION_TIMEOUT_MS,
+    )
     return {
       ok: true,
       rowCount: result.rowCount ?? 0,
       rows: result.rows,
     }
   } catch (error) {
+    if (error instanceof HarnessFailure && error.stage === 'bounded_concurrency_wait_timeout') {
+      throw error
+    }
     return compactOutcome(error)
   }
 }
 
 async function queryOrThrow(client, text, params, stage) {
   try {
-    return await client.query(text, params)
+    return await withTimeout(
+      client.query(text, params),
+      OPERATION_TIMEOUT_MS,
+    )
   } catch (error) {
     throw asFailure(stage, error)
   }
@@ -385,11 +413,13 @@ function readConfiguration() {
 }
 
 function createClient(config) {
-  return new Client({
+  const client = new Client({
     connectionString: config.databaseUrl,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 10000,
   })
+  client.on('error', () => {})
+  return client
 }
 
 async function connectAdmin(config, stage = 'database_admin_connect') {
@@ -751,7 +781,10 @@ async function resetFixture(config, ids) {
       ],
       'fixture_reset_update',
     )
-    await queryOrThrow(client, 'commit', [], 'fixture_reset_commit')
+    await withTimeout(
+      queryOrThrow(client, 'commit', [], 'fixture_reset_commit'),
+      OPERATION_TIMEOUT_MS,
+    )
     const state = await fetchState(client)
     ensure(
       state.usable_owner_count === FIXTURE_BASELINE_USABLE_OWNER_COUNT,
@@ -1123,16 +1156,18 @@ async function runContentAuthorizationBoundary(config, ids, publicFixture) {
     connectAuthenticated(config, ids.ownerA),
     connectAuthenticated(config, ids.admin),
     connectAuthenticated(config, ids.editor),
+    connectAuthenticated(config, ids.support),
     connectAuthenticated(config, ids.bannedManager),
     connectAuthenticated(config, ids.deletedManager),
   ])
-  const [owner, admin, editor, bannedManager, deletedManager] = sessions
+  const [owner, admin, editor, support, bannedManager, deletedManager] = sessions
 
   try {
     const active = {
       owner: await probeContentWrite(owner, publicFixture.newsId, 'active_owner_content_write', true),
       admin: await probeContentWrite(admin, publicFixture.newsId, 'active_admin_content_write', true),
       editor: await probeContentWrite(editor, publicFixture.newsId, 'active_editor_content_write', true),
+      support: await probeContentWrite(support, publicFixture.newsId, 'active_support_content_write', false),
     }
     const inactive = {
       banned: await probeContentWrite(bannedManager, publicFixture.newsId, 'banned_manager_content_write', false),
@@ -1144,6 +1179,9 @@ async function runContentAuthorizationBoundary(config, ids, publicFixture) {
       active_owner_allowed: active.owner.ok && active.owner.rowCount === 1,
       active_admin_allowed: active.admin.ok && active.admin.rowCount === 1,
       active_editor_allowed: active.editor.ok && active.editor.rowCount === 1,
+      support_limited_content_write_denied: active.support.ok
+        ? active.support.rowCount === 0
+        : active.support.code === '42501',
       banned_manager_denied: inactive.banned.ok ? inactive.banned.rowCount === 0 : true,
       deleted_manager_denied: inactive.deleted.ok ? inactive.deleted.rowCount === 0 : true,
     }
@@ -1346,7 +1384,7 @@ async function withTimeout(promise, timeoutMs = OPERATION_TIMEOUT_MS) {
 }
 
 async function safeRollback(client) {
-  await client.query('rollback').catch(() => {})
+  await withTimeout(client.query('rollback'), OPERATION_TIMEOUT_MS).catch(() => {})
 }
 
 async function runOwnerRace(config, ids, definition) {
@@ -1783,6 +1821,7 @@ async function verifyCatalog(client) {
 
 async function runHarness() {
   const config = readConfiguration()
+  const statusCompatibility = await runStatusCompatibilitySuite(config)
   const admin = await connectAdmin(config)
   let ids = null
   let cleanupNeeded = false
@@ -1857,6 +1896,7 @@ async function runHarness() {
         primitives: prerequisites.primitives,
         fixture: prerequisites.fixture,
       },
+      status_bootstrap_compatibility: statusCompatibility,
       catalog,
       direct_profile_boundary: direct,
       owner_product_invariant: ownerMultiplicity,
@@ -1886,7 +1926,10 @@ async function runHarness() {
 function reportHarnessFailure(error) {
   const failure = error instanceof HarnessFailure
     ? error
-    : new HarnessFailure('unclassified_harness_failure', typeof error?.code === 'string' ? error.code : null)
+    : new HarnessFailure(
+        typeof error?.stage === 'string' ? error.stage : 'unclassified_harness_failure',
+        typeof error?.code === 'string' ? error.code : null,
+      )
   console.error(JSON.stringify({
     pass: false,
     failure: {
