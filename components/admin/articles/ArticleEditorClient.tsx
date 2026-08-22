@@ -16,6 +16,12 @@ import {
   RotateCcw,
   AlertTriangle,
   FileText,
+  Plus,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Link2,
+  Info,
 } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
@@ -33,6 +39,7 @@ import {
   normalizeSlug,
   ARTICLE_MAX_LENGTHS,
   type Article,
+  type ArticleSource,
   type PublicArticleAuthor,
 } from '@/lib/articles'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -63,6 +70,9 @@ export default function ArticleEditorClient({
   const [slug, setSlug] = useState(article?.slug || '')
   const [authorId, setAuthorId] = useState(article?.author_id || '')
   const [authors] = useState<PublicArticleAuthor[]>(initialAuthors)
+  const [sources, setSources] = useState<ArticleSource[]>(
+    Array.isArray(article?.sources) ? article.sources : []
+  )
   const [excerpt, setExcerpt] = useState(article?.excerpt || '')
   const [bodyMarkdown, setBodyMarkdown] = useState(article?.body_markdown || '')
   const [category, setCategory] = useState(article?.category || '')
@@ -125,6 +135,43 @@ export default function ArticleEditorClient({
     setIsDirty(true)
   }
 
+  const handleAddSource = () => {
+    setSources([...sources, { title: '', url: '', source_date: '' }])
+    setIsDirty(true)
+  }
+
+  const handleRemoveSource = (index: number) => {
+    setSources(sources.filter((_, i) => i !== index))
+    setIsDirty(true)
+  }
+
+  const handleMoveSourceUp = (index: number) => {
+    if (index <= 0) return
+    const next = [...sources]
+    const temp = next[index - 1]
+    next[index - 1] = next[index]
+    next[index] = temp
+    setSources(next)
+    setIsDirty(true)
+  }
+
+  const handleMoveSourceDown = (index: number) => {
+    if (index >= sources.length - 1) return
+    const next = [...sources]
+    const temp = next[index + 1]
+    next[index + 1] = next[index]
+    next[index] = temp
+    setSources(next)
+    setIsDirty(true)
+  }
+
+  const handleSourceChange = (index: number, field: keyof ArticleSource, value: string) => {
+    const next = [...sources]
+    next[index] = { ...next[index], [field]: value }
+    setSources(next)
+    setIsDirty(true)
+  }
+
   const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -153,6 +200,7 @@ export default function ArticleEditorClient({
     category: category || null,
     tags,
     author_id: authorId || null,
+    sources,
     cover_image_url: coverImageUrl || null,
     cover_image_alt: coverImageAlt || null,
     seo_title: seoTitle || null,
@@ -431,6 +479,122 @@ export default function ArticleEditorClient({
                 setIsDirty(true)
               }}
             />
+          </div>
+
+          {/* Structured Sources Repeater Box */}
+          <div className="bg-[#1A140E] border border-[#D4AF37]/20 p-4 sm:p-6 rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D4AF37]/10 pb-3">
+              <h2 className="text-base font-bold text-[#F5E9D6] flex items-center gap-2">
+                <Link2 size={18} className="text-[#D4AF37]" /> เอกสารและแหล่งข้อมูลอ้างอิง
+              </h2>
+              <button
+                type="button"
+                onClick={handleAddSource}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/30 font-semibold text-xs rounded-lg transition-colors w-fit"
+              >
+                <Plus size={14} /> เพิ่มแหล่งอ้างอิง
+              </button>
+            </div>
+
+            {/* Soft editorial guidance banner */}
+            <div className="bg-[#D4AF37]/5 border border-[#D4AF37]/20 p-3 rounded-lg flex items-start gap-2.5 text-xs text-[#E5D7C5]">
+              <Info size={16} className="text-[#D4AF37] shrink-0 mt-0.5" />
+              <span>หากบทความมีข้อเท็จจริงจากกฎหมาย ประกาศ มติ หรือหน่วยงานราชการ แนะนำให้เพิ่มแหล่งข้อมูลอ้างอิง</span>
+            </div>
+
+            {sources.length === 0 ? (
+              <div className="text-center py-6 border border-dashed border-[#D4AF37]/20 rounded-lg text-xs text-[#A1866B]">
+                ยังไม่มีแหล่งข้อมูลอ้างอิงที่ระบุ (ไม่บังคับสำหรับบทความทั่วไป)
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sources.map((src, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-[#0F0B07] border border-[#D4AF37]/20 rounded-lg space-y-3 relative group"
+                  >
+                    <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-2">
+                      <span className="text-xs font-semibold text-[#D4AF37]">
+                        แหล่งข้อมูล #{idx + 1}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSourceUp(idx)}
+                          disabled={idx === 0}
+                          className="p-1 text-[#A1866B] hover:text-[#D4AF37] disabled:opacity-30 disabled:hover:text-[#A1866B] transition-colors rounded"
+                          title="เลื่อนขึ้น"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSourceDown(idx)}
+                          disabled={idx === sources.length - 1}
+                          className="p-1 text-[#A1866B] hover:text-[#D4AF37] disabled:opacity-30 disabled:hover:text-[#A1866B] transition-colors rounded"
+                          title="เลื่อนลง"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSource(idx)}
+                          className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors ml-1"
+                          title="ลบแหล่งอ้างอิง"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[#A1866B] uppercase mb-1">
+                          ชื่อเอกสาร / แหล่งข้อมูล <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={src.title}
+                          onChange={(e) => handleSourceChange(idx, 'title', e.target.value)}
+                          placeholder="เช่น มติคณะรัฐมนตรี เรื่อง แผนพัฒนาระบบราชการ หรือ ระเบียบ ก.พ. ว่าด้วย..."
+                          className="w-full bg-[#1A140E] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F5E9D6] focus:outline-none focus:border-[#D4AF37]"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-[#A1866B] uppercase mb-1">
+                            URL แหล่งข้อมูล <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="url"
+                            value={src.url}
+                            onChange={(e) => handleSourceChange(idx, 'url', e.target.value)}
+                            placeholder="https://www.ocsc.go.th/..."
+                            className="w-full bg-[#1A140E] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F5E9D6] focus:outline-none focus:border-[#D4AF37]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#A1866B] uppercase mb-1">
+                            วันที่เอกสาร (ไม่บังคับ)
+                          </label>
+                          <input
+                            type="date"
+                            value={src.source_date || ''}
+                            onChange={(e) => handleSourceChange(idx, 'source_date', e.target.value)}
+                            className="w-full bg-[#1A140E] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F5E9D6] focus:outline-none focus:border-[#D4AF37]"
+                          />
+                          <p className="text-[10px] text-[#A1866B] mt-1">
+                            ใช้ปี ค.ศ. เช่น 11/08/2026 หากไม่ทราบให้เว้นว่าง
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

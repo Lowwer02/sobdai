@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 
-import { mapAuthor, type PublicArticleAuthor } from '@/lib/articles'
+import { mapAuthor, type PublicArticleAuthor, type ArticleSource } from '@/lib/articles'
 
 // ─── PUBLIC TYPES & CONTRACTS ───────────────────────────────────────────────
 
@@ -54,6 +54,7 @@ export interface PublicArticleDetail {
   og_image_url: string | null
   author_id?: string | null
   author: PublicArticleAuthor | null
+  sources: ArticleSource[]
 }
 
 export interface PublicRelatedPackage {
@@ -242,7 +243,7 @@ export const getPublishedArticleBySlug = cache(
       const { data, error } = await supabase
         .from('articles')
         .select(
-          'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, seo_title, seo_description, canonical_url, og_image_url, author_id, article_authors(id, slug, display_name, role_title, short_bio, avatar_url, is_active)'
+          'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, seo_title, seo_description, canonical_url, og_image_url, author_id, sources, article_authors(id, slug, display_name, role_title, short_bio, avatar_url, is_active)'
         )
         .eq('slug', slug.trim())
         .eq('status', 'published')
@@ -276,6 +277,7 @@ export const getPublishedArticleBySlug = cache(
         og_image_url: row.og_image_url,
         author_id: row.author_id || null,
         author: mapAuthor(row.article_authors),
+        sources: Array.isArray(row.sources) ? row.sources : [],
       }
 
       return { success: true, data: detail }

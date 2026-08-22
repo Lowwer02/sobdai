@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Clock, RefreshCw, Tag as TagIcon, FileText, User }
 import type { PublicArticleDetail } from '@/lib/articles-public'
 import { calculateReadingTime } from '@/lib/articles'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
+import ArticleReferences from '@/components/articles/ArticleReferences'
 
 interface ArticleDetailProps {
   article: PublicArticleDetail
@@ -145,6 +146,11 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
           <p className="text-sm text-[#A1866B] italic">ไม่มีเนื้อหาบทความ</p>
         )}
       </div>
+
+      {/* Structured Sources / References */}
+      {Array.isArray(article.sources) && article.sources.length > 0 && (
+        <ArticleReferences sources={article.sources} />
+      )}
 
       {/* Tags section */}
       {Array.isArray(article.tags) && article.tags.length > 0 && (

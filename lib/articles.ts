@@ -38,6 +38,12 @@ export interface PublicArticleAuthor {
   avatar_url: string | null
 }
 
+export interface ArticleSource {
+  title: string
+  url: string
+  source_date?: string | null
+}
+
 export interface Article {
   id: string
   slug: string
@@ -55,6 +61,7 @@ export interface Article {
   canonical_url: string | null
   og_image_url: string | null
   author_id: string | null
+  sources: ArticleSource[]
   created_by: string | null
   created_at: string
   updated_at: string
@@ -71,6 +78,7 @@ export interface ArticleInput {
   category: string | null
   tags: string[]
   author_id: string | null
+  sources: ArticleSource[]
   seo_title: string | null
   seo_description: string | null
   canonical_url: string | null
@@ -95,6 +103,12 @@ export interface ArticleAuthorValidationResult {
   ok: boolean
   errors: Record<string, string>
   clean: ArticleAuthorInput | null
+}
+
+export interface ArticleSourcesValidationResult {
+  ok: boolean
+  errors: Record<string, string>
+  clean: ArticleSource[]
 }
 
 export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
@@ -122,6 +136,8 @@ export const ARTICLE_MAX_LENGTHS = {
   author_role_title: 100,
   author_short_bio: 500,
   author_avatar_url: 500,
+  source_title: 300,
+  source_url: 1000,
 } as const
 
 // ─── Pure Utility Helpers ───────────────────────────────────────────────────
@@ -249,6 +265,106 @@ function optUuid(val: unknown): string | null {
   return null
 }
 
+export function parseSourceDate(val: unknown): string | null {
+  if (typeof val !== 'string') return null
+  const trimmed = val.trim()
+  if (!trimmed) return null
+  const m = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return null
+  const year = Number(m[1])
+  const month = Number(m[2])
+  const day = Number(m[3])
+  if (year < 1900 || year > 2100) return null
+  if (month < 1 || month > 12) return null
+  if (day < 1 || day > 31) return null
+  const d = new Date(Date.UTC(year, month - 1, day))
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) {
+    return null
+  }
+  return trimmed
+}
+
+export function coerceSources(raw: unknown): ArticleSource[] {
+  if (!raw || !Array.isArray(raw)) return []
+  const result: ArticleSource[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const title = typeof item.title === 'string' ? item.title.trim() : ''
+    const url = typeof item.url === 'string' ? item.url.trim() : ''
+    const source_date = typeof item.source_date === 'string' ? item.source_date.trim() : null
+    if (!title && !url && !source_date) continue
+    result.push({
+      title,
+      url,
+      source_date: source_date || null,
+    })
+  }
+  return result
+}
+
+export function validateArticleSources(rawSources: unknown): ArticleSourcesValidationResult {
+  const errors: Record<string, string> = {}
+  if (!rawSources || !Array.isArray(rawSources)) {
+    return { ok: true, errors: {}, clean: [] }
+  }
+
+  const clean: ArticleSource[] = []
+
+  for (let i = 0; i < rawSources.length; i++) {
+    const item = rawSources[i]
+    if (!item || typeof item !== 'object') continue
+
+    const rawTitle = typeof item.title === 'string' ? item.title.trim() : ''
+    const rawUrl = typeof item.url === 'string' ? item.url.trim() : ''
+    const rawDate = typeof item.source_date === 'string' ? item.source_date.trim() : ''
+
+    // Skip entirely blank row
+    if (!rawTitle && !rawUrl && !rawDate) {
+      continue
+    }
+
+    if (!rawTitle) {
+      errors[`sources[${i}].title`] = 'กรุณาระบุชื่อเอกสารหรือแหล่งข้อมูลอ้างอิง'
+    } else if (rawTitle.length > ARTICLE_MAX_LENGTHS.source_title) {
+      errors[`sources[${i}].title`] = `ชื่อแหล่งข้อมูลต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.source_title} ตัวอักษร`
+    }
+
+    if (!rawUrl) {
+      errors[`sources[${i}].url`] = 'กรุณาระบุ URL แหล่งข้อมูลอ้างอิง'
+    } else if (rawUrl.length > ARTICLE_MAX_LENGTHS.source_url) {
+      errors[`sources[${i}].url`] = `URL แหล่งข้อมูลต้องไม่เกิน ${ARTICLE_MAX_LENGTHS.source_url} ตัวอักษร`
+    } else if (!isValidUrl(rawUrl)) {
+      errors[`sources[${i}].url`] = 'URL แหล่งข้อมูลต้องเป็น http:// หรือ https:// ที่ถูกต้อง'
+    }
+
+    let validDate: string | null = null
+    if (rawDate) {
+      const yearMatch = rawDate.match(/^(\d{4})/)
+      const year = yearMatch ? Number(yearMatch[1]) : 0
+      if (year > 2400 || (year && (year < 1900 || year > 2100))) {
+        errors[`sources[${i}].source_date`] = 'กรุณากรอกปี ค.ศ. เช่น 2026'
+      } else {
+        validDate = parseSourceDate(rawDate)
+        if (!validDate) {
+          errors[`sources[${i}].source_date`] = 'วันที่ไม่ถูกต้อง (ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2026-08-11)'
+        }
+      }
+    }
+
+    clean.push({
+      title: rawTitle,
+      url: rawUrl,
+      source_date: validDate,
+    })
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, errors, clean: [] }
+  }
+
+  return { ok: true, errors: {}, clean }
+}
+
 function coerceInput(raw: any): ArticleInput {
   return {
     status: coerceArticleStatus(raw?.status),
@@ -261,6 +377,7 @@ function coerceInput(raw: any): ArticleInput {
     category: optStr(raw?.category),
     tags: cleanTags(raw?.tags),
     author_id: optUuid(raw?.author_id),
+    sources: coerceSources(raw?.sources),
     seo_title: optStr(raw?.seo_title),
     seo_description: optStr(raw?.seo_description),
     canonical_url: optStr(raw?.canonical_url),
@@ -299,6 +416,13 @@ export function validateArticleDraft(raw: any): ArticleValidationResult {
 
   if (raw?.author_id !== undefined && raw?.author_id !== null && raw?.author_id !== '' && !isValidUuid(raw.author_id)) {
     errors.author_id = 'รหัสผู้เขียนบทความ (author_id) ไม่ถูกต้อง'
+  }
+
+  const sourcesRes = validateArticleSources(raw?.sources)
+  if (!sourcesRes.ok) {
+    Object.assign(errors, sourcesRes.errors)
+  } else {
+    input.sources = sourcesRes.clean
   }
 
   if (input.excerpt && input.excerpt.length > ARTICLE_MAX_LENGTHS.excerpt) {
@@ -399,6 +523,14 @@ export function validateArticleForPublish(raw: any): ArticleValidationResult {
   // Author id validation if provided
   if (raw?.author_id !== undefined && raw?.author_id !== null && raw?.author_id !== '' && !isValidUuid(raw.author_id)) {
     errors.author_id = 'รหัสผู้เขียนบทความ (author_id) ไม่ถูกต้อง'
+  }
+
+  // Sources validation
+  const sourcesRes = validateArticleSources(raw?.sources)
+  if (!sourcesRes.ok) {
+    Object.assign(errors, sourcesRes.errors)
+  } else {
+    input.sources = sourcesRes.clean
   }
 
   // Core Content
