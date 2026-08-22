@@ -409,7 +409,7 @@ comment on function public.profile_actor_is_manager() is
     'RLS-only predicate for active Owner/Admin/Support profile management reads.';
 
 revoke all on function public.profile_actor_is_manager() from PUBLIC;
-revoke all on function public.profile_actor_is_manager() from anon, authenticated;
+revoke all on function public.profile_actor_is_manager() from anon, authenticated, service_role;
 grant execute on function public.profile_actor_is_manager() to authenticated;
 
 -- Owner/Admin role management. The actor is always auth.uid(); callers
@@ -723,15 +723,15 @@ end
 $function$;
 
 revoke all on function public.admin_update_profile_role(uuid, text) from PUBLIC;
-revoke all on function public.admin_update_profile_role(uuid, text) from anon, authenticated;
+revoke all on function public.admin_update_profile_role(uuid, text) from anon, authenticated, service_role;
 grant execute on function public.admin_update_profile_role(uuid, text) to authenticated;
 
 revoke all on function public.admin_update_profile_status(uuid, text, text) from PUBLIC;
-revoke all on function public.admin_update_profile_status(uuid, text, text) from anon, authenticated;
+revoke all on function public.admin_update_profile_status(uuid, text, text) from anon, authenticated, service_role;
 grant execute on function public.admin_update_profile_status(uuid, text, text) to authenticated;
 
 revoke all on function public.deactivate_my_profile() from PUBLIC;
-revoke all on function public.deactivate_my_profile() from anon, authenticated;
+revoke all on function public.deactivate_my_profile() from anon, authenticated, service_role;
 grant execute on function public.deactivate_my_profile() to authenticated;
 
 -- Defense in depth for any accidental future table-level UPDATE grant. The
@@ -1418,7 +1418,7 @@ as $function$
     )
 $function$;
 
-revoke all on function public.kp_is_content_editor() from PUBLIC, anon, authenticated;
+revoke all on function public.kp_is_content_editor() from PUBLIC, anon, authenticated, service_role;
 grant execute on function public.kp_is_content_editor() to authenticated;
 
 drop policy if exists kp_editor_insert on public.reference_documents;

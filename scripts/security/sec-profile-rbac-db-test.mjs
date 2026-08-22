@@ -178,36 +178,42 @@ const EXPECTED_FUNCTIONS = [
     signature: 'public.profile_actor_is_manager()',
     securityDefiner: true,
     authenticatedExecute: true,
+    serviceRoleExecute: false,
     searchPath: 'pg_catalog,public,auth,pg_temp',
   },
   {
     signature: 'public.admin_update_profile_role(uuid,text)',
     securityDefiner: true,
     authenticatedExecute: true,
+    serviceRoleExecute: false,
     searchPath: 'pg_catalog,public,auth,pg_temp',
   },
   {
     signature: 'public.admin_update_profile_status(uuid,text,text)',
     securityDefiner: true,
     authenticatedExecute: true,
+    serviceRoleExecute: false,
     searchPath: 'pg_catalog,public,auth,pg_temp',
   },
   {
     signature: 'public.deactivate_my_profile()',
     securityDefiner: true,
     authenticatedExecute: true,
+    serviceRoleExecute: false,
     searchPath: 'pg_catalog,public,auth,pg_temp',
   },
   {
     signature: 'public.protect_profile_security_fields()',
     securityDefiner: false,
     authenticatedExecute: false,
+    serviceRoleExecute: true,
     searchPath: 'pg_catalog,public,pg_temp',
   },
   {
     signature: 'public.kp_is_content_editor()',
     securityDefiner: true,
     authenticatedExecute: true,
+    serviceRoleExecute: false,
     searchPath: 'pg_catalog,public,auth,pg_temp',
   },
 ]
@@ -1751,18 +1757,19 @@ async function verifyCatalog(client) {
     const lockedPath = config.some((value) => (
       value.replace(/\s+/g, '') === 'search_path=' + expected.searchPath
     ))
-    const executeCorrect = expected.authenticatedExecute
-      ? row?.anon_execute === false
-        && row?.authenticated_execute === true
-        && row?.service_role_execute === false
-      : row?.anon_execute === false
-        && row?.authenticated_execute === false
-        && row?.service_role_execute === false
+    const executeCorrect = row?.anon_execute === false
+      && row?.authenticated_execute === expected.authenticatedExecute
+      && row?.service_role_execute === expected.serviceRoleExecute
     functionChecks[expected.signature] = {
       exists: Boolean(row),
       owner_trusted: row?.owner === currentUser.rows[0]?.current_user,
       security_definer: row?.security_definer === expected.securityDefiner,
       locked_search_path: lockedPath,
+      effective_acl: {
+        anon_execute: row?.anon_execute ?? null,
+        authenticated_execute: row?.authenticated_execute ?? null,
+        service_role_execute: row?.service_role_execute ?? null,
+      },
       execute_acl_correct: executeCorrect,
     }
   }
@@ -1801,6 +1808,7 @@ async function verifyCatalog(client) {
   return {
     pass: Object.values(checks).every(Boolean),
     checks,
+    function_checks: functionChecks,
     residual_policy_checks: residualPolicyChecks,
     residual_mutation_policy_rows: residualMutationRows.map((row) => ({
       schema: row.schemaname,

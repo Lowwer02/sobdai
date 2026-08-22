@@ -93,6 +93,7 @@ drop function if exists public.admin_update_profile_status(uuid, text, text);
 drop function if exists public.deactivate_my_profile();
 drop function if exists public.protect_profile_security_fields();
 drop function if exists public.kp_is_content_editor();
+drop function if exists public.sec079_default_acl_probe();
 
 alter table public.profiles
   drop constraint if exists profiles_status_check;
@@ -101,6 +102,9 @@ alter table public.profiles
 `
 
 const LEGACY_BASELINE_SQL = `
+alter default privileges for role postgres in schema public
+grant execute on functions to anon, authenticated, service_role;
+
 alter table public.profiles alter column role set default 'user';
 
 create policy "Public profiles are viewable by everyone."
@@ -617,6 +621,71 @@ async function prepareLegacyBaseline(config, { unsafe = false } = {}) {
   }
 }
 
+async function verifySupabaseDefaultFunctionAcl(config) {
+  const client = createClient(config)
+  try {
+    await client.connect()
+    await queryOrThrow(client, 'begin', [], 'default_function_acl_probe_begin')
+    await queryOrThrow(
+      client,
+      'drop function if exists public.sec079_default_acl_probe()',
+      [],
+      'default_function_acl_probe_teardown',
+    )
+    await queryOrThrow(
+      client,
+      [
+        'create function public.sec079_default_acl_probe()',
+        'returns boolean',
+        'language sql',
+        'as $function$ select true $function$',
+      ].join('\n'),
+      [],
+      'default_function_acl_probe_create',
+    )
+    const privileges = await queryOrThrow(
+      client,
+      [
+        'select',
+        "  has_function_privilege('anon', 'public.sec079_default_acl_probe()', 'EXECUTE') as anon_execute,",
+        "  has_function_privilege('authenticated', 'public.sec079_default_acl_probe()', 'EXECUTE') as authenticated_execute,",
+        "  has_function_privilege('service_role', 'public.sec079_default_acl_probe()', 'EXECUTE') as service_role_execute",
+      ].join('\n'),
+      [],
+      'default_function_acl_probe_lookup',
+    )
+    const row = privileges.rows[0] ?? {}
+    await queryOrThrow(
+      client,
+      'drop function public.sec079_default_acl_probe()',
+      [],
+      'default_function_acl_probe_cleanup',
+    )
+    await queryOrThrow(client, 'commit', [], 'default_function_acl_probe_commit')
+
+    const result = {
+      anon_execute: row.anon_execute === true,
+      authenticated_execute: row.authenticated_execute === true,
+      service_role_execute: row.service_role_execute === true,
+      regression_reproduced: row.anon_execute === true
+        && row.authenticated_execute === true
+        && row.service_role_execute === true,
+    }
+    if (!result.regression_reproduced) {
+      throw new BootstrapFailure('default_function_acl_not_reproduced', {
+        message: JSON.stringify(result),
+      })
+    }
+    return result
+  } catch (error) {
+    await client.query('rollback').catch(() => {})
+    if (error instanceof BootstrapFailure) throw error
+    throw new BootstrapFailure('default_function_acl_probe', error)
+  } finally {
+    await closeQuietly(client)
+  }
+}
+
 async function assertPre079SelfPromotion(config) {
   const admin = createClient(config)
   const normal = createClient(config)
@@ -812,6 +881,7 @@ export async function runStatusCompatibilitySuite(config) {
   const report = {}
 
   report.legacy_clean_baseline = await prepareLegacyBaseline(config)
+  report.round5_default_function_acl = await verifySupabaseDefaultFunctionAcl(config)
   report.pre079_self_promotion = await assertPre079SelfPromotion(config)
 
   const legacyMigration = await applyMigration(config)

@@ -104,6 +104,31 @@ test('manager predicate is non-recursive and locked down', () => {
   assert.match(executableSql, /grant\s+execute\s+on\s+function\s+public\.profile_actor_is_manager\(\)\s+to\s+authenticated/i)
 })
 
+test('SEC RPCs explicitly fence Supabase default service_role EXECUTE grants', () => {
+  for (const signature of [
+    'profile_actor_is_manager\\(\\)',
+    'admin_update_profile_role\\(uuid,\\s*text\\)',
+    'admin_update_profile_status\\(uuid,\\s*text,\\s*text\\)',
+    'deactivate_my_profile\\(\\)',
+    'kp_is_content_editor\\(\\)',
+  ]) {
+    assert.match(
+      executableSql,
+      new RegExp(`revoke\\s+all\\s+on\\s+function\\s+public\\.${signature}\\s+from\\s+(?:PUBLIC,\\s*)?anon,\\s*authenticated,\\s*service_role`, 'i'),
+      `${signature} fences service_role EXECUTE`,
+    )
+  }
+
+  assert.match(
+    executableSql,
+    /revoke\s+all\s+on\s+function\s+public\.protect_profile_security_fields\(\)\s+from\s+public,\s*anon,\s*authenticated/i,
+  )
+  assert.doesNotMatch(
+    executableSql,
+    /revoke\s+all\s+on\s+function\s+public\.protect_profile_security_fields\(\)[^;]*service_role/i,
+  )
+})
+
 test('trusted role/status transitions derive the actor and are authenticated-only RPCs', () => {
   const roleBlock = functionBlock('admin_update_profile_role\\(')
   const statusBlock = functionBlock('admin_update_profile_status\\(')

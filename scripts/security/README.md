@@ -44,6 +44,15 @@ The compatibility cases prove:
   adding the column; and
 - an incompatible existing `status` definition aborts without repairing it.
 
+The bootstrap also reproduces the relevant Supabase default function ACL for
+the `postgres` owner in `public`: newly-created functions receive EXECUTE for
+`anon`, `authenticated`, and `service_role`. Before 079 it creates a probe and
+requires all three grants, proving that the Production-like regression is
+present. The post-079 catalog report exposes the effective ACLs for every SEC
+function: the five postflight-checked functions must allow only
+`authenticated`, while `protect_profile_security_fields()` intentionally keeps
+its trusted `service_role` EXECUTE boundary.
+
 ## Owner product invariant
 
 Sobdai may have multiple usable Owners; two or more are valid and desirable.
