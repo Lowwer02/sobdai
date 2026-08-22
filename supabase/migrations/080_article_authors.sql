@@ -74,9 +74,28 @@ create policy "Public can read active article authors."
 -- Content managers full management access for article_authors
 drop policy if exists "Content managers can manage article authors." on public.article_authors;
 create policy "Content managers can manage article authors."
-  on public.article_authors for all
+  on public.article_authors
+  for all
+  to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role in ('owner', 'admin', 'editor'))
+    exists (
+      select 1
+      from public.profiles
+      where id = auth.uid()
+        and role in ('owner', 'admin', 'editor')
+        and status = 'active'
+        and deleted_at is null
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles
+      where id = auth.uid()
+        and role in ('owner', 'admin', 'editor')
+        and status = 'active'
+        and deleted_at is null
+    )
   );
 
 -- ──────────────────────────────────────────────────────────────────────────
