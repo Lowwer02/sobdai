@@ -32,6 +32,7 @@ import {
   archiveArticle,
   restoreArticle,
   uploadArticleCover,
+  updateArticlePackageRelations,
   type RelatedPackageItem,
 } from '@/app/admin/articles/actions'
 import {
@@ -70,6 +71,7 @@ export default function ArticleEditorClient({
   const [slug, setSlug] = useState(article?.slug || '')
   const [authorId, setAuthorId] = useState(article?.author_id || '')
   const [authors] = useState<PublicArticleAuthor[]>(initialAuthors)
+  const [packageRelations, setPackageRelations] = useState<RelatedPackageItem[]>(initialPackageRelations)
   const [sources, setSources] = useState<ArticleSource[]>(
     Array.isArray(article?.sources) ? article.sources : []
   )
@@ -218,20 +220,33 @@ export default function ArticleEditorClient({
         const res = await updateArticle(article.id, payload)
         if (!res.success) {
           setError(res.error || 'เกิดข้อผิดพลาดในการบันทึก')
-        } else {
-          setIsDirty(false)
-          toastEvent(
-            article.status === 'published' || article.status === 'archived'
-              ? 'บันทึกการแก้ไขเรียบร้อยแล้ว'
-              : 'บันทึกร่างเรียบร้อยแล้ว',
-            'success'
-          )
-          router.refresh()
+          toastEvent(res.error || 'เกิดข้อผิดพลาดในการบันทึก', 'error')
+          return
         }
+
+        const relRes = await updateArticlePackageRelations(
+          article.id,
+          packageRelations.map((p) => p.id)
+        )
+        if (!relRes.success) {
+          setError(relRes.error || 'เกิดข้อผิดพลาดในการบันทึกแพ็กเกจที่เกี่ยวข้อง')
+          toastEvent(relRes.error || 'เกิดข้อผิดพลาดในการบันทึกแพ็กเกจที่เกี่ยวข้อง', 'error')
+          return
+        }
+
+        setIsDirty(false)
+        toastEvent(
+          article.status === 'published' || article.status === 'archived'
+            ? 'บันทึกการแก้ไขเรียบร้อยแล้ว'
+            : 'บันทึกร่างเรียบร้อยแล้ว',
+          'success'
+        )
+        router.refresh()
       } else {
         const res = await createArticle(payload)
         if (!res.success) {
           setError(res.error || 'เกิดข้อผิดพลาดในการสร้างบทความ')
+          toastEvent(res.error || 'เกิดข้อผิดพลาดในการสร้างบทความ', 'error')
         }
       }
     })
@@ -264,9 +279,23 @@ export default function ArticleEditorClient({
         const saveRes = await updateArticle(article.id, getFormPayload())
         if (!saveRes.success) {
           setError(saveRes.error || 'ไม่สามารถบันทึกข้อมูลก่อนเปลี่ยนสถานะได้')
+          toastEvent(saveRes.error || 'ไม่สามารถบันทึกข้อมูลก่อนเปลี่ยนสถานะได้', 'error')
           setActionModal(null)
           return
         }
+
+        const relRes = await updateArticlePackageRelations(
+          article.id,
+          packageRelations.map((p) => p.id)
+        )
+        if (!relRes.success) {
+          setError(relRes.error || 'ไม่สามารถบันทึกแพ็กเกจที่เกี่ยวข้องก่อนเปลี่ยนสถานะได้')
+          toastEvent(relRes.error || 'ไม่สามารถบันทึกแพ็กเกจที่เกี่ยวข้องก่อนเปลี่ยนสถานะได้', 'error')
+          setActionModal(null)
+          return
+        }
+
+        setIsDirty(false)
       }
 
       let res: { success: boolean; error?: string }
@@ -603,7 +632,11 @@ export default function ArticleEditorClient({
           {/* Related Packages Picker */}
           <ArticlePackagePicker
             articleId={article?.id || null}
-            initialRelations={initialPackageRelations}
+            selectedPackages={packageRelations}
+            onChange={(pkgs) => {
+              setPackageRelations(pkgs)
+              setIsDirty(true)
+            }}
           />
 
           {/* Cover Upload Box */}

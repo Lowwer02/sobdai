@@ -583,7 +583,7 @@ export async function updateArticlePackageRelations(
 
   const { data: existingArticle, error: articleErr } = await supabase
     .from('articles')
-    .select('id')
+    .select('id, slug')
     .eq('id', articleId)
     .maybeSingle()
 
@@ -670,6 +670,10 @@ export async function updateArticlePackageRelations(
 
   revalidatePath('/admin/articles')
   revalidatePath(`/admin/articles/${articleId}/edit`)
+  if (existingArticle?.slug) {
+    revalidatePath(`/articles/${existingArticle.slug}`)
+  }
+  revalidatePath('/articles')
   return { success: true }
 }
 

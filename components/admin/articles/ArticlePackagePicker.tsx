@@ -22,14 +22,30 @@ import {
 
 interface ArticlePackagePickerProps {
   articleId: string | null
+  selectedPackages?: RelatedPackageItem[]
   initialRelations?: RelatedPackageItem[]
+  onChange?: (packages: RelatedPackageItem[]) => void
 }
 
 export default function ArticlePackagePicker({
   articleId,
+  selectedPackages: controlledPackages,
   initialRelations = [],
+  onChange,
 }: ArticlePackagePickerProps) {
-  const [selectedPackages, setSelectedPackages] = useState<RelatedPackageItem[]>(initialRelations)
+  const [internalPackages, setInternalPackages] = useState<RelatedPackageItem[]>(initialRelations)
+  const [relationsDirty, setRelationsDirty] = useState(false)
+  const selectedPackages = controlledPackages ?? internalPackages
+
+  const updatePackages = (next: RelatedPackageItem[]) => {
+    setRelationsDirty(true)
+    if (onChange) {
+      onChange(next)
+    } else {
+      setInternalPackages(next)
+    }
+  }
+
   const [searchResults, setSearchResults] = useState<RelatedPackageItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
@@ -37,7 +53,6 @@ export default function ArticlePackagePicker({
   const [hasSearched, setHasSearched] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
-  const [isDirty, setIsDirty] = useState(false)
 
   const requestIdRef = useRef(0)
 
@@ -82,13 +97,11 @@ export default function ArticlePackagePicker({
 
   const handleAddPackage = (pkg: RelatedPackageItem) => {
     if (selectedPackages.some((p) => p.id === pkg.id)) return
-    setSelectedPackages([...selectedPackages, pkg])
-    setIsDirty(true)
+    updatePackages([...selectedPackages, pkg])
   }
 
   const handleRemovePackage = (pkgId: string) => {
-    setSelectedPackages(selectedPackages.filter((p) => p.id !== pkgId))
-    setIsDirty(true)
+    updatePackages(selectedPackages.filter((p) => p.id !== pkgId))
   }
 
   const handleMoveUp = (index: number) => {
@@ -97,8 +110,7 @@ export default function ArticlePackagePicker({
     const temp = next[index - 1]
     next[index - 1] = next[index]
     next[index] = temp
-    setSelectedPackages(next)
-    setIsDirty(true)
+    updatePackages(next)
   }
 
   const handleMoveDown = (index: number) => {
@@ -107,8 +119,7 @@ export default function ArticlePackagePicker({
     const temp = next[index + 1]
     next[index + 1] = next[index]
     next[index] = temp
-    setSelectedPackages(next)
-    setIsDirty(true)
+    updatePackages(next)
   }
 
   const handleSaveRelations = () => {
@@ -122,7 +133,7 @@ export default function ArticlePackagePicker({
           setError(res.error || 'เกิดข้อผิดพลาดในการบันทึกแพ็กเกจที่เกี่ยวข้อง')
           toastEvent(res.error || 'เกิดข้อผิดพลาดในการบันทึกแพ็กเกจที่เกี่ยวข้อง', 'error')
         } else {
-          setIsDirty(false)
+          setRelationsDirty(false)
           toastEvent('บันทึกแพ็กเกจที่เกี่ยวข้องเรียบร้อยแล้ว', 'success')
         }
       } catch (err) {
@@ -152,7 +163,7 @@ export default function ArticlePackagePicker({
         <h2 className="text-base font-bold text-[#F5E9D6] flex items-center gap-2">
           <Package className="text-[#D4AF37]" size={18} /> แพ็กเกจที่เกี่ยวข้อง (Related Packages)
         </h2>
-        {isDirty && (
+        {relationsDirty && (
           <span className="text-xs text-amber-400 font-semibold">• มีการเปลี่ยนแปลงลำดับ/รายการ</span>
         )}
       </div>
@@ -321,7 +332,7 @@ export default function ArticlePackagePicker({
         <button
           type="button"
           onClick={handleSaveRelations}
-          disabled={isPending || !isDirty}
+          disabled={isPending || !relationsDirty}
           className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#0F0B07] font-semibold text-sm rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
