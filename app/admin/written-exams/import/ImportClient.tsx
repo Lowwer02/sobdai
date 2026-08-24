@@ -7,6 +7,7 @@ import {
   FileText,
   Loader2,
   RotateCcw,
+  Save,
   UploadCloud,
 } from 'lucide-react'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
@@ -14,12 +15,20 @@ import {
   getWrittenExamUploadErrorMessage,
   isSupportedWrittenExamFileName,
   presentWrittenExamIssue,
+  getWrittenExamSaveDraftErrorMessage,
+  type WrittenExamSaveDraftResult,
   type WrittenExamUploadResult,
 } from '@/lib/writtenExamImportPreview'
+import {
+  createWrittenExamImportController,
+  runGenerationGuardedOperation,
+  type WrittenExamImportController,
+} from '@/lib/writtenExamImportGeneration'
 import type { ParsedWrittenExamQuestion } from '@/lib/writtenExamParser'
 
 type ImportClientProps = {
   parseWrittenExamUpload: (formData: FormData) => Promise<WrittenExamUploadResult>
+  saveWrittenExamDraft: (formData: FormData) => Promise<WrittenExamSaveDraftResult>
 }
 
 type ImportState =
@@ -27,20 +36,32 @@ type ImportState =
   | { status: 'parsing'; fileName: string }
   | WrittenExamUploadResult
 
-export default function ImportClient({ parseWrittenExamUpload }: ImportClientProps) {
+export default function ImportClient({ parseWrittenExamUpload, saveWrittenExamDraft }: ImportClientProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [state, setState] = useState<ImportState>({ status: 'empty' })
+  const [sourceFile, setSourceFile] = useState<File | null>(null)
+  const [saveResult, setSaveResult] = useState<WrittenExamSaveDraftResult | null>(null)
+  const [operation, setOperation] = useState<'parse' | 'save' | null>(null)
+  const controllerRef = useRef<WrittenExamImportController | null>(null)
+  if (controllerRef.current === null) controllerRef.current = createWrittenExamImportController()
+  const controller = controllerRef.current
 
   const reset = () => {
+    const snapshot = controller.reset()
     setState({ status: 'empty' })
     setIsDragging(false)
+    setSourceFile(null)
+    setSaveResult(null)
+    setOperation(snapshot.operation)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const processFile = (file: File | undefined) => {
     if (!file) return
+
+    const requestGeneration = controller.beginParse()
 
     if (!isSupportedWrittenExamFileName(file.name)) {
       setState({
@@ -49,26 +70,73 @@ export default function ImportClient({ parseWrittenExamUpload }: ImportClientPro
         kind: 'unsupported-file',
         message: getWrittenExamUploadErrorMessage('unsupported-file'),
       })
+      setSourceFile(null)
+      setSaveResult(null)
+      if (controller.finish(requestGeneration)) setOperation(controller.snapshot().operation)
       return
     }
 
     setState({ status: 'parsing', fileName: file.name })
+    setSourceFile(null)
+    setSaveResult(null)
+    setOperation(controller.snapshot().operation)
 
     const formData = new FormData()
     formData.append('file', file, file.name)
 
-    startTransition(async () => {
-      try {
-        const result = await parseWrittenExamUpload(formData)
-        setState(result)
-      } catch {
-        setState({
-          status: 'error',
-          fileName: file.name,
-          kind: 'unreadable-file',
-          message: getWrittenExamUploadErrorMessage('unreadable-file'),
-        })
-      }
+    startTransition(() => {
+      void runGenerationGuardedOperation(
+        controller,
+        requestGeneration,
+        () => parseWrittenExamUpload(formData),
+        {
+          onSuccess: (result) => {
+          setState(result)
+          setSourceFile(result.status === 'success' ? file : null)
+          },
+          onError: () => {
+            setState({
+              status: 'error',
+              fileName: file.name,
+              kind: 'unreadable-file',
+              message: getWrittenExamUploadErrorMessage('unreadable-file'),
+            })
+            setSourceFile(null)
+          },
+          onFinish: () => setOperation(controller.snapshot().operation),
+        },
+      )
+    })
+  }
+
+  const handleSaveDraft = () => {
+    if (!sourceFile || state.status !== 'success' || controller.snapshot().operation === 'save') return
+
+    const formData = new FormData()
+    formData.append('file', sourceFile, sourceFile.name)
+    const requestGeneration = controller.beginSave()
+    setSaveResult(null)
+    setOperation(controller.snapshot().operation)
+
+    startTransition(() => {
+      void runGenerationGuardedOperation(
+        controller,
+        requestGeneration,
+        () => saveWrittenExamDraft(formData),
+        {
+          onSuccess: (result) => {
+          setSaveResult(result)
+          },
+          onError: () => {
+            setSaveResult({
+              status: 'error',
+              kind: 'unexpected',
+              message: getWrittenExamSaveDraftErrorMessage('unexpected'),
+            })
+          },
+          onFinish: () => setOperation(controller.snapshot().operation),
+        },
+      )
     })
   }
 
@@ -84,7 +152,8 @@ export default function ImportClient({ parseWrittenExamUpload }: ImportClientPro
     processFile(event.dataTransfer.files?.[0])
   }
 
-  const isParsing = state.status === 'parsing' || isPending
+  const isParsing = state.status === 'parsing' || operation === 'parse'
+  const isSaving = operation === 'save'
 
   return (
     <div className="space-y-6 pb-20">
@@ -123,7 +192,13 @@ export default function ImportClient({ parseWrittenExamUpload }: ImportClientPro
       )}
 
       {state.status === 'success' && !isParsing && (
-        <PreviewState result={state} onReset={reset} />
+        <PreviewState
+          result={state}
+          onReset={reset}
+          onSaveDraft={handleSaveDraft}
+          isSaving={isSaving}
+          saveResult={saveResult}
+        />
       )}
     </div>
   )
@@ -268,9 +343,15 @@ function ParserErrorState({
 function PreviewState({
   result,
   onReset,
+  onSaveDraft,
+  isSaving,
+  saveResult,
 }: {
   result: Extract<WrittenExamUploadResult, { status: 'success' }>
   onReset: () => void
+  onSaveDraft: () => void
+  isSaving: boolean
+  saveResult: WrittenExamSaveDraftResult | null
 }) {
   const material = result.material
   const metadata = material.metadata
@@ -316,6 +397,12 @@ function PreviewState({
         )}
       </section>
 
+      <SaveDraftPanel
+        isSaving={isSaving}
+        onSaveDraft={onSaveDraft}
+        result={saveResult}
+      />
+
       <section aria-labelledby="written-exam-preview-heading" className="space-y-5">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -333,6 +420,70 @@ function PreviewState({
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+function SaveDraftPanel({
+  isSaving,
+  onSaveDraft,
+  result,
+}: {
+  isSaving: boolean
+  onSaveDraft: () => void
+  result: WrittenExamSaveDraftResult | null
+}) {
+  return (
+    <section className="rounded-2xl border border-[#D4AF37]/25 bg-[#1A140E] p-6 shadow-xl md:p-8">
+      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#D4AF37]">Draft persistence</p>
+          <h2 className="mt-1 text-xl font-bold font-display text-[#F5E9D6]">บันทึกฉบับร่าง</h2>
+          <p className="mt-1 text-sm leading-6 text-[#A1866B]">
+            ระบบจะตรวจสอบและอ่านไฟล์ต้นฉบับซ้ำบนเซิร์ฟเวอร์ก่อนบันทึก
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onSaveDraft}
+          disabled={isSaving}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-5 py-3 text-sm font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSaving ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
+          {isSaving ? 'กำลังบันทึก…' : 'บันทึกฉบับร่าง'}
+        </button>
+      </div>
+
+      {result?.status === 'success' && (
+        <div className="mt-5 rounded-xl border border-[#22C55E]/25 bg-[#22C55E]/5 p-4" role="status" aria-live="polite">
+          <p className="font-bold text-[#86EFAC]">
+            {result.idempotentRetry ? 'ไม่มีการเปลี่ยนแปลง — ใช้ฉบับร่างเดิมแล้ว' : 'บันทึกฉบับร่างสำเร็จ'}
+          </p>
+          <dl className="mt-3 grid gap-2 text-sm text-[#D6CBB8] sm:grid-cols-2">
+            <SaveResultField label="material_id" value={result.materialId} />
+            <SaveResultField label="version_id" value={result.versionId} />
+            <SaveResultField label="revision" value={result.revisionNumber.toLocaleString()} />
+            <SaveResultField label="จำนวนข้อ" value={result.questionCount.toLocaleString()} />
+          </dl>
+        </div>
+      )}
+
+      {result?.status === 'error' && (
+        <div className="mt-5 rounded-xl border border-red-500/25 bg-red-500/5 p-4" role="alert">
+          <p className="font-bold text-red-200">บันทึกฉบับร่างไม่สำเร็จ</p>
+          <p className="mt-2 text-sm leading-6 text-[#D6CBB8]">{result.message}</p>
+          <p className="mt-2 text-xs text-[#A1866B]">ตรวจสอบไฟล์แล้วกดบันทึกอีกครั้งได้</p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SaveResultField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[#A1866B]">{label}</dt>
+      <dd className="break-all font-mono text-xs text-[#F5E9D6]">{value}</dd>
     </div>
   )
 }

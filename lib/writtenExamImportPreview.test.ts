@@ -87,7 +87,7 @@ test('upload error messages are safe and Thai-facing', () => {
   assert.match(getWrittenExamUploadErrorMessage('invalid-content'), /Parser V1/)
 })
 
-test('WE-1 has no database or save path', () => {
+test('Written Exam route uses a server action boundary without direct table DML', () => {
   const pageSource = readFileSync(
     join(process.cwd(), 'app/admin/written-exams/import/page.tsx'),
     'utf8',
@@ -96,10 +96,19 @@ test('WE-1 has no database or save path', () => {
     join(process.cwd(), 'app/admin/written-exams/import/ImportClient.tsx'),
     'utf8',
   )
+  const actionsSource = readFileSync(
+    join(process.cwd(), 'app/admin/written-exams/import/actions.ts'),
+    'utf8',
+  )
 
   assert.match(pageSource, /requirePermission\('content\.read'\)/)
-  assert.match(pageSource, /parseWrittenExamMarkdown/)
-  assert.doesNotMatch(pageSource, /supabase|revalidatePath|\.insert\(|\.update\(|\.delete\(/i)
-  assert.doesNotMatch(clientSource, /supabase|revalidatePath|\.insert\(|\.update\(|\.delete\(/i)
-  assert.doesNotMatch(clientSource, />\s*(?:Save|Import|Commit)(?:\s|<)/i)
+  assert.match(actionsSource, /parseWrittenExamUpload/)
+  assert.match(actionsSource, /saveWrittenExamDraft/)
+  assert.match(actionsSource, /rpc\(\s*['"]save_written_exam_draft['"]/i)
+  for (const source of [pageSource, clientSource, actionsSource]) {
+    assert.doesNotMatch(
+      source,
+      /\.from\(\s*['"]written_exam_(?:materials|material_versions|questions)['"]/i,
+    )
+  }
 })

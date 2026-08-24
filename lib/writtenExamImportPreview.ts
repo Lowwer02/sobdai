@@ -9,6 +9,8 @@ export const WRITTEN_EXAM_ALLOWED_FILE_EXTENSIONS = ['.md', '.markdown'] as cons
 export type WrittenExamUploadErrorKind =
   | 'unsupported-file'
   | 'unreadable-file'
+  | 'oversized-source'
+  | 'invalid-utf8'
   | 'invalid-content'
 
 export type WrittenExamUploadResult =
@@ -26,6 +28,31 @@ export type WrittenExamUploadResult =
       status: 'error'
       fileName?: string
       kind: WrittenExamUploadErrorKind
+      message: string
+    }
+
+export type WrittenExamSaveDraftErrorKind =
+  | WrittenExamUploadErrorKind
+  | 'authorization-denied'
+  | 'package-not-found'
+  | 'binding-conflict'
+  | 'database-conflict'
+  | 'unexpected'
+
+export type WrittenExamSaveDraftResult =
+  | {
+      status: 'success'
+      fileName: string
+      materialId: string
+      versionId: string
+      revisionNumber: number
+      questionCount: number
+      idempotentRetry: boolean
+    }
+  | {
+      status: 'error'
+      fileName?: string
+      kind: WrittenExamSaveDraftErrorKind
       message: string
     }
 
@@ -72,8 +99,33 @@ export function getWrittenExamUploadErrorMessage(kind: WrittenExamUploadErrorKin
       return 'รองรับเฉพาะไฟล์ .md และ .markdown เท่านั้น'
     case 'unreadable-file':
       return 'ไม่สามารถอ่านไฟล์นี้ได้ กรุณาเลือกไฟล์ Markdown ใหม่'
+    case 'oversized-source':
+      return 'ไฟล์มีขนาดเกิน 1 MiB ซึ่งเป็นขีดจำกัดของ Parser V1'
+    case 'invalid-utf8':
+      return 'ไฟล์มีการเข้ารหัส UTF-8 ไม่ถูกต้อง จึงไม่สามารถตรวจสอบเนื้อหาได้'
     case 'invalid-content':
       return 'เนื้อหาไฟล์ไม่ถูกต้อง หรือมีขนาดเกินขีดจำกัดของ Parser V1'
+  }
+}
+
+export function getWrittenExamSaveDraftErrorMessage(kind: WrittenExamSaveDraftErrorKind): string {
+  switch (kind) {
+    case 'unsupported-file':
+    case 'unreadable-file':
+    case 'oversized-source':
+    case 'invalid-utf8':
+    case 'invalid-content':
+      return getWrittenExamUploadErrorMessage(kind)
+    case 'authorization-denied':
+      return 'คุณไม่มีสิทธิ์บันทึกฉบับร่าง Written Exam'
+    case 'package-not-found':
+      return 'ไม่พบ package_code นี้ในระบบ กรุณาตรวจสอบ frontmatter แล้วลองใหม่'
+    case 'binding-conflict':
+      return 'package หรือ slug นี้ไม่ตรงกับรายการเดิม จึงไม่สามารถบันทึกฉบับร่างได้'
+    case 'database-conflict':
+      return 'ข้อมูลมีการเปลี่ยนแปลงหรือชนกับรายการเดิม กรุณาตรวจสอบแล้วลองใหม่'
+    case 'unexpected':
+      return 'ไม่สามารถบันทึกฉบับร่างได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง'
   }
 }
 
