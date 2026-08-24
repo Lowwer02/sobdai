@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import {
   Heading,
   Bold,
@@ -12,27 +12,11 @@ import {
   Code,
   Eye,
   Pencil,
+  Columns2,
 } from 'lucide-react'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 
-/**
- * Lightweight Markdown editor: a controlled textarea with a formatting
- * toolbar, an autosizing surface, a character counter, keyboard shortcuts, and
- * a live preview that reuses the canonical SummaryMarkdown renderer (the same
- * component that renders this markdown publicly — so the preview is faithful).
- *
- * No WYSIWYG / contentEditable / execCommand: per the codebase convention
- * (SummaryEditor) the editor is a plain textarea; this adds the toolbar +
- * split-view that the news body needs. All formatting is plain textarea
- * selection manipulation (setSelectionRange) — no editor framework introduced.
- *
- * Layout: split (editor | preview) on desktop (md+); a Write/Preview toggle on
- * mobile where split won't fit.
- *
- * The nominal body cap mirrors lib/news.ts MAX.body_markdown (100,000). It is
- * informational only — draft validation does not enforce a body length; the
- * counter just surfaces size.
- */
+export type EditorMode = 'edit' | 'split' | 'preview'
 
 const MAX_BODY = 100_000
 
@@ -42,15 +26,16 @@ interface MarkdownEditorProps {
   placeholder?: string
 }
 
-/** A toolbar button. type="button" so it never submits the parent form. */
 function ToolButton({
   onClick,
   title,
   children,
+  disabled = false,
 }: {
   onClick: () => void
   title: string
   children: React.ReactNode
+  disabled?: boolean
 }) {
   return (
     <button
@@ -59,7 +44,8 @@ function ToolButton({
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="p-2 text-[#A1866B] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors"
+      disabled={disabled}
+      className="p-1.5 rounded hover:bg-[#D4AF37]/10 text-[#A1866B] hover:text-[#D4AF37] transition-colors disabled:opacity-40 disabled:pointer-events-none"
     >
       {children}
     </button>
@@ -71,52 +57,46 @@ export default function MarkdownEditor({
   onChange,
   placeholder = 'เริ่มเขียนเนื้อหาที่นี่...',
 }: MarkdownEditorProps) {
-  const taRef = useRef<HTMLTextAreaElement>(null)
-  const [mobileView, setMobileView] = useState<'write' | 'preview'>('write')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [mode, setMode] = useState<EditorMode>('split')
 
-  // Autosize: grow to fit content, floor at 320px. Runs after every value change
-  // (typed or toolbar-inserted). useLayoutEffect avoids a visible height flicker.
-  useLayoutEffect(() => {
-    const ta = taRef.current
-    if (!ta) return
-    ta.style.height = 'auto'
-    ta.style.height = `${Math.max(ta.scrollHeight, 320)}px`
-  }, [value])
+  // Responsive default: Switch to 'edit' mode on small viewports (<768px) on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setMode('edit')
+    }
+  }, [])
 
-  // Restore focus + selection AFTER the controlled re-render commits. requestIdle
-  // is too late; rAF (before paint, after commit) is the standard fit here.
   const restoreSelection = (start: number, end: number) => {
     requestAnimationFrame(() => {
-      const ta = taRef.current
+      const ta = textareaRef.current
       if (!ta) return
       ta.focus()
       ta.setSelectionRange(start, end)
     })
   }
 
-  /** Wrap the current selection with `before`/`after` markers (bold/italic/code). */
-  const wrapSelection = useCallback(
-    (before: string, after: string = before) => {
-      const ta = taRef.current
-      if (!ta) return
-      const start = ta.selectionStart
-      const end = ta.selectionEnd
-      const sel = value.slice(start, end)
-      const next = value.slice(0, start) + before + sel + after + value.slice(end)
+  const insertWrap = useCallback(
+    (prefix: string, suffix: string = prefix, defaultText: string = '') => {
+      const el = textareaRef.current
+      if (!el) return
+      const start = el.selectionStart
+      const end = el.selectionEnd
+      const selected = value.slice(start, end) || defaultText
+      const replacement = `${prefix}${selected}${suffix}`
+      const next = value.slice(0, start) + replacement + value.slice(end)
       onChange(next)
-      restoreSelection(start + before.length, start + before.length + sel.length)
+      restoreSelection(start + prefix.length, start + prefix.length + selected.length)
     },
     [value, onChange]
   )
 
-  /** Prefix every line in the selection (heading/list/quote). */
-  const prefixLines = useCallback(
+  const insertLinePrefix = useCallback(
     (prefix: string) => {
-      const ta = taRef.current
-      if (!ta) return
-      const start = ta.selectionStart
-      const end = ta.selectionEnd
-      // Expand to whole lines so a partial-line selection prefixes cleanly.
+      const el = textareaRef.current
+      if (!el) return
+      const start = el.selectionStart
+      const end = el.selectionEnd
       const lineStart = value.lastIndexOf('\n', start - 1) + 1
       const nl = value.indexOf('\n', end)
       const lineEnd = nl === -1 ? value.length : nl
@@ -129,33 +109,31 @@ export default function MarkdownEditor({
     [value, onChange]
   )
 
-  /** Insert a markdown link, selecting the URL placeholder for quick replacement. */
   const applyLink = useCallback(() => {
-    const ta = taRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const sel = value.slice(start, end) || 'ข้อความลิงก์'
+    const el = textareaRef.current
+    if (!el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const selected = value.slice(start, end) || 'ข้อความลิงก์'
     const url = 'https://'
-    const insert = `[${sel}](${url})`
-    const next = value.slice(0, start) + insert + value.slice(end)
+    const replacement = `[${selected}](${url})`
+    const next = value.slice(0, start) + replacement + value.slice(end)
     onChange(next)
-    const urlStart = start + 1 + sel.length + 2 // after `](`
+    const urlStart = start + 1 + selected.length + 2 // after `](`
     restoreSelection(urlStart, urlStart + url.length)
   }, [value, onChange])
 
-  // Keyboard shortcuts: ⌘/Ctrl + B / I / K. "Where existing editor utilities
-  // allow" — there are none, so these are standard textarea-level handlers.
+  // Keyboard shortcuts: ⌘/Ctrl + B / I / K
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const mod = e.metaKey || e.ctrlKey
     if (!mod) return
     const k = e.key.toLowerCase()
     if (k === 'b') {
       e.preventDefault()
-      wrapSelection('**')
+      insertWrap('**')
     } else if (k === 'i') {
       e.preventDefault()
-      wrapSelection('*')
+      insertWrap('*')
     } else if (k === 'k') {
       e.preventDefault()
       applyLink()
@@ -163,95 +141,137 @@ export default function MarkdownEditor({
   }
 
   const overLimit = value.length > MAX_BODY
-  const showPreview = value.trim().length > 0
 
   return (
-    <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 flex-wrap bg-[#0F0B07] border border-[rgba(255,255,255,0.06)] rounded-xl px-2 py-1.5">
-        <ToolButton onClick={() => prefixLines('## ')} title="หัวข้อ (Heading)">
-          <Heading size={16} />
-        </ToolButton>
-        <ToolButton onClick={() => wrapSelection('**')} title="ตัวหนา (⌘B)">
-          <Bold size={16} />
-        </ToolButton>
-        <ToolButton onClick={() => wrapSelection('*')} title="ตัวเอียง (⌘I)">
-          <Italic size={16} />
-        </ToolButton>
-        <ToolButton onClick={applyLink} title="ลิงก์ (⌘K)">
-          <LinkIcon size={16} />
-        </ToolButton>
-        <span className="w-px h-5 bg-[rgba(255,255,255,0.08)] mx-1" />
-        <ToolButton onClick={() => prefixLines('- ')} title="รายการแบบจุด">
-          <List size={16} />
-        </ToolButton>
-        <ToolButton onClick={() => prefixLines('1. ')} title="รายการแบบตัวเลข">
-          <ListOrdered size={16} />
-        </ToolButton>
-        <ToolButton onClick={() => prefixLines('> ')} title="อ้างอิง (Quote)">
-          <Quote size={16} />
-        </ToolButton>
-        <ToolButton onClick={() => wrapSelection('`')} title="โค้ด (Code)">
-          <Code size={16} />
-        </ToolButton>
-      </div>
-
-      {/* Mobile Write/Preview toggle (split is desktop-only) */}
-      <div className="md:hidden flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setMobileView('write')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-            mobileView === 'write'
-              ? 'bg-[#D4AF37]/15 text-[#D4AF37]'
-              : 'text-[#A1866B] hover:text-[#F5E9D6]'
+    <div className="bg-[#0F0B07] border border-[#D4AF37]/20 rounded-xl overflow-hidden flex flex-col h-[68vh] min-h-[540px] max-h-[780px]">
+      {/* Sticky / Fixed Header Toolbar */}
+      <div className="shrink-0 bg-[#1A140E] border-b border-[#D4AF37]/20 px-3 py-2 flex items-center justify-between gap-2 flex-wrap z-10">
+        {/* Markdown Actions */}
+        <div
+          className={`flex items-center gap-1 flex-wrap transition-opacity duration-150 ${
+            mode === 'preview' ? 'opacity-30 pointer-events-none' : 'opacity-100'
           }`}
         >
-          <Pencil size={14} /> เขียน
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileView('preview')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-            mobileView === 'preview'
-              ? 'bg-[#D4AF37]/15 text-[#D4AF37]'
-              : 'text-[#A1866B] hover:text-[#F5E9D6]'
-          }`}
-        >
-          <Eye size={14} /> ตัวอย่าง
-        </button>
+          <ToolButton onClick={() => insertLinePrefix('## ')} title="หัวข้อ (H2)" disabled={mode === 'preview'}>
+            <Heading size={16} />
+          </ToolButton>
+          <ToolButton onClick={() => insertWrap('**')} title="ตัวหนา (⌘B)" disabled={mode === 'preview'}>
+            <Bold size={16} />
+          </ToolButton>
+          <ToolButton onClick={() => insertWrap('*')} title="ตัวเอียง (⌘I)" disabled={mode === 'preview'}>
+            <Italic size={16} />
+          </ToolButton>
+          <span className="h-4 w-[1px] bg-[#D4AF37]/20 mx-1" />
+          <ToolButton onClick={applyLink} title="ใส่ลิงก์ (⌘K)" disabled={mode === 'preview'}>
+            <LinkIcon size={16} />
+          </ToolButton>
+          <ToolButton onClick={() => insertLinePrefix('- ')} title="รายการแบบจุด" disabled={mode === 'preview'}>
+            <List size={16} />
+          </ToolButton>
+          <ToolButton onClick={() => insertLinePrefix('1. ')} title="รายการแบบลำดับ" disabled={mode === 'preview'}>
+            <ListOrdered size={16} />
+          </ToolButton>
+          <ToolButton onClick={() => insertLinePrefix('> ')} title="อ้างอิง (Quote)" disabled={mode === 'preview'}>
+            <Quote size={16} />
+          </ToolButton>
+          <ToolButton onClick={() => insertWrap('`')} title="โค้ดคำสั่ง (`code`)" disabled={mode === 'preview'}>
+            <Code size={16} />
+          </ToolButton>
+        </div>
+
+        {/* Mode Selector (Edit | Split | Preview) */}
+        <div className="flex items-center bg-[#0F0B07] p-0.5 rounded-lg border border-[#D4AF37]/20 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMode('edit')}
+            title="โหมดเขียน (Edit)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-all ${
+              mode === 'edit'
+                ? 'bg-[#D4AF37] text-[#0F0B07] font-bold shadow-sm'
+                : 'text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[#D4AF37]/10'
+            }`}
+          >
+            <Pencil size={13} />
+            <span>Edit</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('split')}
+            title="โหมดแบ่งจอ (Split)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-all ${
+              mode === 'split'
+                ? 'bg-[#D4AF37] text-[#0F0B07] font-bold shadow-sm'
+                : 'text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[#D4AF37]/10'
+            }`}
+          >
+            <Columns2 size={13} />
+            <span>Split</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('preview')}
+            title="โหมดตัวอย่าง (Preview)"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-all ${
+              mode === 'preview'
+                ? 'bg-[#D4AF37] text-[#0F0B07] font-bold shadow-sm'
+                : 'text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[#D4AF37]/10'
+            }`}
+          >
+            <Eye size={13} />
+            <span>Preview</span>
+          </button>
+        </div>
       </div>
 
-      {/* Split view: both panes on desktop; one pane on mobile per the toggle */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Editor pane */}
-        <div className={mobileView === 'preview' ? 'hidden md:block' : ''}>
-          <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden">
+      {/* Editor & Preview Workspace */}
+      <div className="flex-1 min-h-0 relative flex divide-y md:divide-y-0 md:divide-x divide-[#D4AF37]/20 overflow-hidden">
+        {/* Markdown Editor Pane */}
+        <div
+          className={`min-h-0 flex flex-col bg-[#0F0B07] ${
+            mode === 'preview'
+              ? 'hidden'
+              : mode === 'edit'
+              ? 'w-full flex-1'
+              : 'w-full md:w-1/2 flex-1 md:flex-initial'
+          }`}
+        >
+          <div className="flex-1 min-h-0 p-4 flex flex-col">
             <textarea
-              ref={taRef}
+              ref={textareaRef}
               value={value}
               onChange={e => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               spellCheck={false}
-              className="w-full bg-transparent text-[#F5E9D6] p-4 resize-none focus:outline-none font-mono text-sm leading-relaxed"
+              className="w-full flex-1 min-h-0 bg-transparent text-[#F5E9D6] font-mono text-sm leading-relaxed focus:outline-none resize-none overflow-y-auto"
             />
           </div>
-          <div className="flex justify-between items-center mt-1.5 px-1">
-            <p className="text-[10px] text-[#A1866B]">รองรับ Markdown</p>
-            <p className={`text-[10px] ${overLimit ? 'text-red-400' : 'text-[#A1866B]'}`}>
+          <div className="shrink-0 px-4 py-1.5 border-t border-[#D4AF37]/10 bg-[#140F0A]/50 flex items-center justify-between text-xs text-[#A1866B]">
+            <span className="text-[11px] text-[#A1866B]/60 hidden sm:inline">Markdown Editor</span>
+            <span className={`ml-auto text-[11px] ${overLimit ? 'text-red-400 font-semibold' : ''}`}>
               {value.length.toLocaleString()} / {MAX_BODY.toLocaleString()} ตัวอักษร
-            </p>
+            </span>
           </div>
         </div>
 
-        {/* Preview pane */}
-        <div className={mobileView === 'write' ? 'hidden md:block' : ''}>
-          <div className="min-h-[320px] bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 overflow-y-auto max-h-[640px]">
-            {showPreview ? (
+        {/* Live Preview Pane */}
+        <div
+          className={`min-h-0 flex flex-col bg-[#140F0A] ${
+            mode === 'edit'
+              ? 'hidden'
+              : mode === 'preview'
+              ? 'w-full flex-1'
+              : 'hidden md:flex md:w-1/2 md:flex-initial'
+          }`}
+        >
+          <div className="shrink-0 px-4 py-2 border-b border-[#D4AF37]/10 flex items-center justify-between text-xs text-[#A1866B]">
+            <span className="uppercase font-bold tracking-wider text-[11px]">ตัวอย่างการเรนเดอร์ (Live Preview)</span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+            {value.trim() ? (
               <SummaryMarkdown content={value} />
             ) : (
-              <p className="text-[#A1866B] italic text-sm">ยังไม่มีเนื้อหาให้แสดงตัวอย่าง</p>
+              <div className="text-sm text-[#A1866B]/50 italic">ยังไม่มีเนื้อหาสำหรับแสดงตัวอย่าง</div>
             )}
           </div>
         </div>
