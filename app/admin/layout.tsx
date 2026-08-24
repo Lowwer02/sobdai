@@ -10,6 +10,7 @@ const learningNav = [
   { name: 'Questions', href: '/admin/questions', icon: FileQuestion, permission: 'content.read' },
   { name: 'Summary Bank', href: '/admin/summaries', icon: BookOpen, permission: 'content.read' },
   { name: 'Import Center', href: '/admin/import', icon: UploadCloud, permission: 'content.write' },
+  { name: 'Written Exam', href: '/admin/written-exams', icon: FileText, permission: 'content.read' },
 ]
 
 const managementNav = [
