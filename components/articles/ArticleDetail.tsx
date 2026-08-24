@@ -5,6 +5,7 @@ import type { PublicArticleDetail } from '@/lib/articles-public'
 import { calculateReadingTime } from '@/lib/articles'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import ArticleReferences from '@/components/articles/ArticleReferences'
+import ArticleAuthorCard from '@/components/articles/ArticleAuthorCard'
 
 interface ArticleDetailProps {
   article: PublicArticleDetail
@@ -73,7 +74,7 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
           </p>
         )}
 
-        {/* Metadata row */}
+        {/* Top Metadata row */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-[#A1866B] pt-2">
           {/* Author Byline */}
           {article.author ? (
@@ -87,7 +88,7 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
                 {article.author.display_name}
               </Link>
               {article.author.role_title && (
-                <span className="text-[#A1866B]/70">({article.author.role_title})</span>
+                <span className="text-[#A1866B]/70">· {article.author.role_title}</span>
               )}
             </div>
           ) : (
@@ -150,6 +151,11 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
       {/* Structured Sources / References */}
       {Array.isArray(article.sources) && article.sources.length > 0 && (
         <ArticleReferences sources={article.sources} />
+      )}
+
+      {/* NEW Author Bio Card */}
+      {article.author && (
+        <ArticleAuthorCard author={article.author} />
       )}
 
       {/* Tags section */}

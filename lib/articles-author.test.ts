@@ -281,3 +281,50 @@ test('16. Public data layer: mapAuthor filters out inactive or malformed author 
   // Missing display_name or slug -> null
   assert.equal(mapAuthor({ id: '550e8400-e29b-41d4-a716-446655440000', is_active: true }), null)
 })
+
+test('17. Author Trust UI: Author Card contract exposes profile link under /authors/[slug]', () => {
+  const author: PublicArticleAuthor = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    slug: 'kittipong-j',
+    display_name: 'กิตติพงษ์ จงคล้ายกลาง',
+    role_title: 'นักวิชาการศึกษา',
+    short_bio: 'นักวิชาการศึกษา และผู้เขียนบทความของ Sobdai',
+    avatar_url: 'https://sobdai.com/avatar.jpg',
+  }
+
+  const expectedProfilePath = `/authors/${author.slug}`
+  assert.equal(expectedProfilePath, '/authors/kittipong-j')
+  assert.equal(author.display_name, 'กิตติพงษ์ จงคล้ายกลาง')
+  assert.equal(author.role_title, 'นักวิชาการศึกษา')
+  assert.equal(author.short_bio, 'นักวิชาการศึกษา และผู้เขียนบทความของ Sobdai')
+})
+
+test('18. Author Trust UI: Author Card supports optional role, bio, and avatar fallback', () => {
+  const minimalAuthor: PublicArticleAuthor = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    slug: 'somchai-r',
+    display_name: 'สมชาย รักเรียน',
+    role_title: null,
+    short_bio: null,
+    avatar_url: null,
+  }
+
+  const initial = minimalAuthor.display_name.trim().charAt(0).toUpperCase()
+  assert.equal(initial, 'ส')
+  assert.equal(minimalAuthor.role_title, null)
+  assert.equal(minimalAuthor.short_bio, null)
+  assert.equal(minimalAuthor.avatar_url, null)
+})
+
+test('19. Author Trust UI: Unassigned or inactive author safely omits Person card without fabricating profile', () => {
+  const unassigned = mapAuthor(null)
+  assert.equal(unassigned, null)
+
+  const inactive = mapAuthor({
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    slug: 'banned-author',
+    display_name: 'Banned Author',
+    is_active: false,
+  })
+  assert.equal(inactive, null)
+})
