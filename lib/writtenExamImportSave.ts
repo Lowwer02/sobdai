@@ -4,7 +4,7 @@ import type { ParsedWrittenExamMaterial } from './writtenExamParser'
 import { getWrittenExamSaveDraftErrorMessage, type WrittenExamSaveDraftErrorKind } from './writtenExamImportPreview.ts'
 
 export type WrittenExamSaveDraftPayload = {
-  p_material_id: null
+  p_material_id: string | null
   p_package_code: string
   p_slug: string
   p_format_version: string
@@ -34,6 +34,7 @@ export function sha256Utf8(value: string): string {
 export function buildWrittenExamSaveDraftPayload(
   material: ParsedWrittenExamMaterial,
   sourceFilename: string,
+  materialId: string | null = null,
 ): WrittenExamSaveDraftPayload {
   if (!material.isValid || !material.metadata) {
     throw new Error('Only valid Parser V1 output can be persisted.')
@@ -42,7 +43,7 @@ export function buildWrittenExamSaveDraftPayload(
   const sourceMarkdown = material.sourceMarkdown
 
   return {
-    p_material_id: null,
+    p_material_id: materialId,
     p_package_code: material.metadata.packageCode,
     p_slug: material.metadata.slug,
     p_format_version: material.metadata.formatVersion,
