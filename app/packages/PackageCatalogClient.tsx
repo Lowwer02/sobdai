@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, SearchX, X } from 'lucide-react'
 import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
+import PackagePhaseTabs, { type PackagePhase } from '@/components/packages/PackagePhaseTabs'
 
 const FILTER_OPTIONS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -24,6 +25,14 @@ interface PackageCatalogClientProps {
   initialQuery?: string
   /** Server-resolved initial ?filter= (raw; normalized by normalizeFilter). */
   initialFilter?: string
+  /** Base URL path for search resets and suggestion clicks (defaults to /packages). */
+  basePath?: string
+  title?: string
+  subtitle?: string
+  activePhase?: PackagePhase
+  showPhaseTabs?: boolean
+  showAllPhaseTab?: boolean
+  headerChildren?: React.ReactNode
 }
 
 function normalizeFilter(filter: string | undefined) {
@@ -72,7 +81,18 @@ function getSearchSuggestions(packages: PackageCardData[]) {
   return suggestions
 }
 
-export default function PackageCatalogClient({ packages, initialQuery = '', initialFilter }: PackageCatalogClientProps) {
+export default function PackageCatalogClient({
+  packages,
+  initialQuery = '',
+  initialFilter,
+  basePath = '/packages',
+  title = 'แพ็กเกจข้อสอบทั้งหมด',
+  subtitle = 'เลือกชุดข้อสอบตามกรมและตำแหน่งที่ต้องการ',
+  activePhase,
+  showPhaseTabs = false,
+  showAllPhaseTab = false,
+  headerChildren,
+}: PackageCatalogClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState(initialQuery)
@@ -117,13 +137,13 @@ export default function PackageCatalogClient({ packages, initialQuery = '', init
   function resetSearch() {
     setSearchQuery('')
     setActiveFilter('all')
-    router.replace('/packages')
+    router.replace(basePath)
   }
 
   function applySuggestedSearch(query: string) {
     setSearchQuery(query)
     setActiveFilter('all')
-    router.replace(`/packages?q=${encodeURIComponent(query)}`)
+    router.replace(`${basePath}?q=${encodeURIComponent(query)}`)
   }
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -138,7 +158,12 @@ export default function PackageCatalogClient({ packages, initialQuery = '', init
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 20px 80px' }}>
 
         {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <header style={{ textAlign: 'center', marginBottom: '36px' }}>
+          {showPhaseTabs && activePhase && (
+            <div style={{ marginBottom: '24px' }}>
+              <PackagePhaseTabs activePhase={activePhase} showAllTab={showAllPhaseTab} />
+            </div>
+          )}
           <h1
             className="font-display"
             style={{
@@ -150,11 +175,12 @@ export default function PackageCatalogClient({ packages, initialQuery = '', init
               backgroundClip: 'text',
             }}
           >
-            แพ็กเกจข้อสอบทั้งหมด
+            {title}
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '480px', margin: '0 auto' }}>
-            เลือกชุดข้อสอบตามกรมและตำแหน่งที่ต้องการ
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '540px', margin: '0 auto' }}>
+            {subtitle}
           </p>
+          {headerChildren && <div style={{ marginTop: '28px' }}>{headerChildren}</div>}
         </header>
 
         {/* Search & Filter */}

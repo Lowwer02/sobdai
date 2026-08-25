@@ -16,6 +16,8 @@ export type PublicRoute = {
 export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
   { path: '/packages', changeFrequency: 'daily', priority: 0.9 },
+  // Landing page for ภาค ข packages (all current published packages belong to ภาค ข)
+  { path: '/packages/phak-khor', changeFrequency: 'daily', priority: 0.9 },
   // News hub — a frequently-updated catalog of published articles, same tier as
   // /packages. Individual article URLs (/news/[slug]) are added dynamically by
   // app/sitemap.ts; only the hub lives in the static list.
@@ -62,6 +64,7 @@ export function createPageMetadata({
   path = '/',
   image = DEFAULT_OG_IMAGE,
   noindex = false,
+  follow,
   type = 'website',
   publishedTime,
   modifiedTime,
@@ -71,6 +74,7 @@ export function createPageMetadata({
   path?: string
   image?: string
   noindex?: boolean
+  follow?: boolean
   /**
    * OpenGraph object type. 'article' is the right value for dated, authored
    * content (news, blog posts); it enables article:published_time /
@@ -85,6 +89,8 @@ export function createPageMetadata({
 }): Metadata {
   const url = absoluteUrl(path)
   const imageUrl = absoluteUrl(image)
+  const isFollow = follow !== undefined ? follow : !noindex
+  const isIndex = !noindex
 
   // Article-only OG fields. Spread conditionally so a 'website' page never
   // emits article:* meta (which would mis-signal content type to crawlers).
@@ -125,23 +131,14 @@ export function createPageMetadata({
       description,
       images: [imageUrl],
     },
-    robots: noindex
-      ? {
-          index: false,
-          follow: false,
-          googleBot: {
-            index: false,
-            follow: false,
-          },
-        }
-      : {
-          index: true,
-          follow: true,
-          googleBot: {
-            index: true,
-            follow: true,
-          },
-        },
+    robots: {
+      index: isIndex,
+      follow: isFollow,
+      googleBot: {
+        index: isIndex,
+        follow: isFollow,
+      },
+    },
   }
 }
 
@@ -309,3 +306,26 @@ export const NEWS_HUB_H1 = 'ข่าวสอบราชการ ข่าว
 export const NEWS_HUB_SUBTITLE =
   'รวมข่าวสอบราชการและข่าวเปิดสอบราชการล่าสุดจากหน่วยงานราชการ ติดตามประกาศรับสมัคร ตำแหน่ง คุณสมบัติ และกำหนดการสำคัญได้ที่นี่'
 
+// ─── /packages cluster — keyword ownership & intents ────────────────────────
+//
+// /packages: Parent Hub owning "แนวข้อสอบราชการ" / "แพ็กเกจข้อสอบราชการ"
+// /packages/phak-k: Landing page owning "แนวข้อสอบภาค ก" / "แนวข้อสอบภาค ก ก.พ."
+// /packages/phak-khor: Landing page owning "แนวข้อสอบภาค ข" / "แนวข้อสอบภาค ข ราชการ ตามตำแหน่งและหน่วยงาน"
+
+/** /packages Parent Hub */
+export const PACKAGES_HUB_TITLE = 'แนวข้อสอบราชการ คลังแพ็กเกจข้อสอบออนไลน์ | Sobdai'
+export const PACKAGES_HUB_DESCRIPTION =
+  'เลือกชุดข้อสอบราชการตามกรมและตำแหน่งที่ต้องการ มีทั้งแนวข้อสอบภาค ก และภาค ข พร้อมเฉลยละเอียดและแบบทดสอบออนไลน์'
+export const PACKAGES_HUB_H1 = 'แพ็กเกจข้อสอบราชการทั้งหมด'
+
+/** /packages/phak-k Landing Page */
+export const PHAK_K_TITLE = 'แนวข้อสอบภาค ก ก.พ. | Sobdai'
+export const PHAK_K_DESCRIPTION =
+  'เตรียมสอบภาค ก ก.พ. รวมแนวข้อสอบความรู้ความสามารถทั่วไป ภาษาไทย ภาษาอังกฤษ และระเบียบข้าราชการที่ดี พร้อมเฉลยละเอียด'
+export const PHAK_K_H1 = 'แนวข้อสอบภาค ก ก.พ.'
+
+/** /packages/phak-khor Landing Page */
+export const PHAK_KHOR_TITLE = 'แนวข้อสอบภาค ข ราชการ ตามตำแหน่งและหน่วยงาน | Sobdai'
+export const PHAK_KHOR_DESCRIPTION =
+  'รวมแนวข้อสอบภาค ข ราชการ ตามตำแหน่งและหน่วยงาน ครบทุกวิชาเฉพาะตำแหน่ง พร้อมเฉลยละเอียดและแบบทดสอบออนไลน์'
+export const PHAK_KHOR_H1 = 'แนวข้อสอบภาค ข ราชการ'

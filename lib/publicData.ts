@@ -137,3 +137,44 @@ export async function getPublicPackageCatalog(): Promise<PackageCardData[]> {
   }))
 }
 
+/**
+ * Fetches all published packages with organizations, positions, and live
+ * question/exam-set counts. Shared across catalog pages (/packages and /packages/phak-khor)
+ * to avoid duplicate fetching logic.
+ */
+export async function getPublishedPackages(): Promise<any[]> {
+  try {
+    const supabase = createAnonServerClient()
+    const { data, error } = await supabase
+      .from('packages')
+      .select(`
+        id,
+        slug,
+        exam_year,
+        current_price,
+        original_price,
+        difficulty,
+        description,
+        logo_url,
+        organizations ( name, logo_url ),
+        positions ( name )
+      `)
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+
+    if (error || !data || data.length === 0) {
+      if (error) console.error('Failed to fetch published packages:', error)
+      return []
+    }
+
+    const counts = await getPackagePublicCounts(data.map((p: any) => p.id))
+    return data.map((pkg: any) => ({
+      ...pkg,
+      total_questions: counts[pkg.id]?.total_questions || 0,
+      total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
+    }))
+  } catch (error) {
+    console.error('Failed to fetch published packages:', error)
+    return []
+  }
+}
