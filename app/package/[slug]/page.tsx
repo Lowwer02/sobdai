@@ -7,6 +7,7 @@ import { applyContentOrdering } from '@/lib/contentOrdering'
 import { listPublicPackageSummaries } from '@/lib/public-summary'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { getPackageRelatedContent } from '@/lib/package-related-content'
+import { discoverPublishedWrittenExamMaterials } from '@/lib/writtenExamLearner'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import {
@@ -89,7 +90,7 @@ export default async function PackagePage({ params }: PageProps) {
 
   // Now that we have the package id + user, run the dependent queries in parallel.
   const user = userResult.data.user
-  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent] = await Promise.all([
+  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent, writtenExams] = await Promise.all([
     getPackagePublicCounts([pkg.id]),
     // Only need a profile lookup if the package is an unpublished draft
     pkg.is_published
@@ -128,6 +129,12 @@ export default async function PackagePage({ params }: PageProps) {
     getPackageRelatedContent(pkg.id).catch((err) => {
       console.error('Error fetching package related content:', err)
       return { news: [], articles: [] }
+    }),
+    // Discovery is deliberately metadata-only and fails closed so an
+    // unavailable WE-4 RPC cannot break the existing Package/MCQ journey.
+    discoverPublishedWrittenExamMaterials(supabase, pkg.slug).catch((err) => {
+      console.error('Error fetching published Written Exam discovery:', err)
+      return []
     }),
   ])
 
@@ -168,6 +175,7 @@ export default async function PackagePage({ params }: PageProps) {
           pkg={pkg}
           examSets={examSetsData}
           summaries={[...summaries]}
+          writtenExams={writtenExams}
           isPurchased={isPurchased}
           supportConfig={supportConfig}
           relatedNews={relatedContent.news}

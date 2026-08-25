@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft, Newspaper } from 'lucide-react'
+import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft, Newspaper, PenTool } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import { beginCheckout, viewPackage } from '@/lib/analytics'
 import SummaryNavigation from '@/components/SummaryNavigation'
@@ -14,6 +14,8 @@ import type { SupportConfig } from '@/lib/homepageConfig'
 import type { RelatedNewsItem, RelatedArticleItem } from '@/lib/package-related-content'
 import { buildPackageH1, formatThaiDisplayYear } from '@/lib/seo'
 import ContentCard from '@/components/ContentCard'
+import WrittenExamNavigation from '@/components/WrittenExamNavigation'
+import type { WrittenExamDiscovery } from '@/lib/writtenExamLearner'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -63,6 +65,7 @@ export default function PackageClient({
   summaries,
   isPurchased,
   supportConfig,
+  writtenExams = [],
   relatedNews = [],
   relatedArticles = [],
 }: {
@@ -71,6 +74,7 @@ export default function PackageClient({
   summaries: any[]
   isPurchased: boolean
   supportConfig: SupportConfig
+  writtenExams?: WrittenExamDiscovery[]
   relatedNews?: RelatedNewsItem[]
   relatedArticles?: RelatedArticleItem[]
 }) {
@@ -279,7 +283,7 @@ export default function PackageClient({
             />
           )}
 
-          <div id="resources" className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div id="resources" className={`grid grid-cols-1 ${writtenExams.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 items-start`}>
             <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
@@ -302,6 +306,21 @@ export default function PackageClient({
                 <ExamNavigation examSets={examSets} packageSlug={pkg.slug} />
               </div>
             </div>
+
+            {writtenExams.length > 0 && (
+              <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.22)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
+                <div className="flex items-start gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] flex-shrink-0">
+                    <PenTool size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">ข้อสอบอัตนัย ภาค ข</h3>
+                    <p className="mt-1 text-xs leading-5 text-[#A1866B]">อ่านและท่องจำแนวคำตอบ ไม่ใช่ชุดข้อสอบปรนัย</p>
+                  </div>
+                </div>
+                <WrittenExamNavigation materials={writtenExams} packageSlug={pkg.slug} />
+              </div>
+            )}
           </div>
 
           {hasRelatedContent && (
