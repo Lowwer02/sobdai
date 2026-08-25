@@ -1,4 +1,4 @@
-import { getPublishedPackages } from '@/lib/publicData'
+import { getPublicPackageCatalog } from '@/lib/publicData'
 import PackageCatalogClient from '../PackageCatalogClient'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
@@ -28,7 +28,7 @@ export default async function PhakKhorPage({
   const q = typeof params.q === 'string' ? params.q : ''
   const filter = typeof params.filter === 'string' ? params.filter : undefined
 
-  const packages = await getPublishedPackages()
+  const packages = await getPublicPackageCatalog()
 
   return (
     <Suspense fallback={null}>

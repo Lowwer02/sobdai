@@ -1,4 +1,4 @@
-import { getPublishedPackages } from '@/lib/publicData'
+import { getPublicPackageCatalog } from '@/lib/publicData'
 import PackageCard from '@/components/PackageCard'
 import PackagePhaseTabs from '@/components/packages/PackagePhaseTabs'
 import type { Metadata } from 'next'
@@ -25,7 +25,7 @@ export const metadata: Metadata = createPageMetadata({
  * /packages/phak-khor) to eliminate duplicate search intent and SEO cannibalization.
  */
 export default async function PackageHubPage() {
-  const packages = await getPublishedPackages()
+  const packages = await getPublicPackageCatalog()
   const previewPackages = packages.slice(0, 3)
 
   return (
