@@ -2,10 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
   Calculator,
-  BookText,
   Languages,
   Scale,
-  Sparkles,
   ArrowRight,
   Newspaper,
   CheckCircle2,
@@ -29,48 +27,32 @@ export const metadata: Metadata = createPageMetadata({
 const EXAM_SUBJECTS = [
   {
     icon: Calculator,
-    title: '1. วิชาความสามารถในการคิดวิเคราะห์',
+    title: 'วิชาความสามารถในการคิดวิเคราะห์ + วิชาภาษาไทย',
     passingScore: 'เกณฑ์ผ่าน 60% (ป.โท 65%)',
     topics: [
-      'อนุกรมและรูปแบบตัวเลข',
-      'คณิตศาสตร์ทั่วไปและโจทย์ปัญหา',
-      'โอเปอเรชัน (Operation)',
-      'การวิเคราะห์ข้อมูลและตาราง',
+      'คณิตศาสตร์ทั่วไป อนุกรม และตารางข้อมูล',
       'เงื่อนไขภาษาและเงื่อนไขสัญลักษณ์',
-    ],
-  },
-  {
-    icon: BookText,
-    title: '2. วิชาภาษาไทย',
-    passingScore: 'รวมกับวิชาคิดวิเคราะห์',
-    topics: [
       'ความเข้าใจภาษาและการจับใจความสำคัญ',
-      'การอ่านบทความสั้นและบทความยาว',
-      'การเรียงลำดับประโยคและข้อความ',
-      'การใช้คำ กลุ่มคำ และหลักภาษาไทย',
     ],
   },
   {
     icon: Languages,
-    title: '3. วิชาภาษาอังกฤษ',
+    title: 'วิชาภาษาอังกฤษ',
     passingScore: 'เกณฑ์ผ่าน 50%',
     topics: [
-      'สนทนาและการสื่อสาร (Conversation)',
-      'ไวยากรณ์และโครงสร้าง (Grammar & Structure)',
-      'คำศัพท์ (Vocabulary)',
-      'การอ่านทำความเข้าใจบทความ (Reading)',
+      'การสนทนาและการสื่อสาร (Conversation)',
+      'ไวยากรณ์และโครงสร้าง (Grammar)',
+      'คำศัพท์และการอ่านบทความ (Reading)',
     ],
   },
   {
     icon: Scale,
-    title: '4. วิชาความรู้และลักษณะการเป็นข้าราชการที่ดี',
+    title: 'วิชาความรู้และลักษณะการเป็นข้าราชการที่ดี',
     passingScore: 'เกณฑ์ผ่าน 60%',
     topics: [
-      'พ.ร.บ. ระเบียบบริหารราชการแผ่นดิน พ.ศ. 2534',
-      'พ.ร.ฎ. หลักเกณฑ์และวิธีการบริหารกิจการบ้านเมืองที่ดี พ.ศ. 2546',
-      'พ.ร.บ. วิธีปฏิบัติราชการทางปกครอง พ.ศ. 2539',
-      'พ.ร.บ. ความรับผิดทางละเมิดของเจ้าหน้าที่ พ.ศ. 2539',
-      'พ.ร.บ. มาตรฐานทางจริยธรรม พ.ศ. 2562',
+      'พ.ร.บ. ระเบียบบริหารราชการแผ่นดิน',
+      'พ.ร.ฎ. หลักเกณฑ์บริหารกิจการบ้านเมืองที่ดี',
+      'วิธีปฏิบัติราชการทางปกครอง และมาตรฐานจริยธรรม',
     ],
   },
 ]
@@ -99,7 +81,7 @@ export default function PhakKPage() {
             {PHAK_K_H1}
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '560px', margin: '0 auto' }}>
-            เตรียมความพร้อมสอบภาค ก สำนักงาน ก.พ. ครอบคลุม 4 หมวดวิชาหลักตามหลักสูตรมาตรฐาน
+            เตรียมความพร้อมสอบภาค ก สำนักงาน ก.พ. ครอบคลุม 3 หมวดวิชาหลักตามหลักสูตรมาตรฐาน
           </p>
         </header>
 
@@ -114,22 +96,6 @@ export default function PhakKPage() {
             marginBottom: '40px',
           }}
         >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'rgba(212,175,55,0.15)',
-              color: 'var(--gold)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px',
-            }}
-          >
-            <Sparkles size={22} />
-          </div>
-
           <h2 className="font-display" style={{ fontSize: '18px', color: 'var(--text-primary)', marginBottom: '8px' }}>
             คลังข้อสอบภาค ก ระบบใหม่อยู่ระหว่างการจัดเตรียม
           </h2>
@@ -172,7 +138,7 @@ export default function PhakKPage() {
           </div>
         </div>
 
-        {/* 4 Exam Subjects Overview */}
+        {/* 3 Exam Subjects Overview */}
         <section aria-labelledby="phak-k-subjects-heading">
           <h2
             id="phak-k-subjects-heading"
