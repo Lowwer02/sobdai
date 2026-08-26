@@ -14,9 +14,14 @@ test('Package integrates safe Written Exam discovery without changing MCQ entry 
   assert.match(packagePage, /discoverPublishedWrittenExamMaterials\(supabase, pkg\.slug\)/)
   assert.match(packagePage, /writtenExams=\{writtenExams\}/)
   assert.match(packageClient, /writtenExams\.length > 0/)
-  assert.match(packageClient, /ข้อสอบอัตนัย ภาค ข/)
+  assert.match(packageClient, /aria-label="ข้อสอบอัตนัย"/)
+  assert.match(packageClient, /ข้อสอบอัตนัย/)
+  assert.match(packageClient, /ฝึกวิเคราะห์โจทย์ พร้อมแนวคำตอบและเทคนิคช่วยจำ/)
+  assert.doesNotMatch(packageClient, /ข้อสอบอัตนัย ภาค ข/)
+  assert.doesNotMatch(packageClient, /lg:grid-cols-3/)
   assert.match(writtenExamNavigation, /package\/\$\{packageSlug\}\/written-exam\/\$\{material\.materialSlug\}/)
   assert.match(packageClient, /ExamNavigation examSets=\{examSets\}/)
+  assert.match(packageClient, /ExamNavigation[\s\S]*WrittenExamNavigation/)
 })
 
 test('learner page uses discovery and the 082 reader, never raw Written Exam table reads', () => {
@@ -40,6 +45,9 @@ test('reader renders all required study sections and navigation states', () => {
     assert.match(learnerReader, new RegExp(label))
   }
   assert.match(learnerReader, /aria-label="รายการคำถาม Written Exam"/)
+  assert.match(learnerReader, /ข้อสอบอัตนัย/)
+  assert.match(learnerReader, /\{discoveryQuestionCount\} ข้อ/)
+  assert.doesNotMatch(learnerReader, /Written Exam · ภาค ข/)
   assert.match(learnerReader, /disabled=\{!hasPrevious\}/)
   assert.match(learnerReader, /disabled=\{!hasNext\}/)
   assert.match(learnerReader, /overflow-y-auto/)

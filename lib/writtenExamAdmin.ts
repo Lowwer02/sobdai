@@ -87,6 +87,26 @@ export type WrittenExamLifecycleResult =
       message: string
     }
 
+export type WrittenExamTitleErrorKind =
+  | 'authorization-denied'
+  | 'invalid-material'
+  | 'material-not-found'
+  | 'invalid-title'
+  | 'database-conflict'
+  | 'unexpected'
+
+export type WrittenExamTitleResult =
+  | {
+      status: 'success'
+      materialId: string
+      title: string
+    }
+  | {
+      status: 'error'
+      kind: WrittenExamTitleErrorKind
+      message: string
+    }
+
 export type WrittenExamAdminSaveResult = WrittenExamSaveDraftResult
 
 type UnknownRecord = Record<string, unknown>
@@ -95,6 +115,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 export function isWrittenExamMaterialId(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value)
+}
+
+export function isWrittenExamTitle(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= 300
 }
 
 export function parseWrittenExamPage(value: unknown): number {
@@ -222,6 +246,19 @@ export function normalizeWrittenExamSaveDraftResponse(value: unknown): {
   }
 }
 
+export function normalizeWrittenExamTitleResponse(value: unknown): Exclude<WrittenExamTitleResult, { status: 'error' }> | null {
+  const response = asRecord(value)
+  if (typeof response?.material_id !== 'string' || typeof response.title !== 'string' || !isWrittenExamTitle(response.title)) {
+    return null
+  }
+
+  return {
+    status: 'success',
+    materialId: response.material_id,
+    title: response.title,
+  }
+}
+
 export function normalizeWrittenExamLifecycleResponse(
   action: WrittenExamLifecycleAction,
   value: unknown,
@@ -305,6 +342,43 @@ export function mapWrittenExamLifecycleError(error: unknown): WrittenExamLifecyc
   return 'unexpected'
 }
 
+export function getWrittenExamTitleErrorMessage(kind: WrittenExamTitleErrorKind): string {
+  switch (kind) {
+    case 'authorization-denied':
+      return 'คุณไม่มีสิทธิ์แก้ไขชื่อ Written Exam'
+    case 'invalid-material':
+      return 'รายการ Written Exam นี้ไม่ถูกต้อง กรุณากลับไปที่คลังแล้วลองใหม่'
+    case 'material-not-found':
+      return 'ไม่พบรายการ Written Exam นี้ หรือรายการอาจถูกนำออกจากระบบแล้ว'
+    case 'invalid-title':
+      return 'ชื่อเรื่องต้องมีความยาว 1-300 ตัวอักษร'
+    case 'database-conflict':
+      return 'ข้อมูลมีการเปลี่ยนแปลงหรือชนกับรายการเดิม กรุณารีเฟรชแล้วลองใหม่'
+    case 'unexpected':
+      return 'ไม่สามารถแก้ไขชื่อ Written Exam ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง'
+  }
+}
+
+export function mapWrittenExamTitleError(error: unknown): WrittenExamTitleErrorKind {
+  const candidate = error as { code?: unknown; message?: unknown } | null
+  const code = typeof candidate?.code === 'string' ? candidate.code : ''
+  const detail = typeof candidate?.message === 'string' ? candidate.message : ''
+  const searchable = `${code} ${detail}`.toLowerCase()
+
+  if (
+    code === '42501'
+    || /permission denied|insufficient privilege|only an active owner, admin|authenticated content editor/i.test(searchable)
+  ) return 'authorization-denied'
+
+  if (code === 'P0002' || /material does not exist/i.test(searchable)) return 'material-not-found'
+  if (code === '22023' || /invalid parameter|title is required/i.test(searchable)) return 'invalid-title'
+  if (code === '23505' || code === '55P03' || /duplicate|unique|lock timeout|serialize|conflict/i.test(searchable)) {
+    return 'database-conflict'
+  }
+
+  return 'unexpected'
+}
+
 function mapLibraryItem(
   material: UnknownRecord,
   versions: WrittenExamAdminVersion[],
@@ -317,7 +391,7 @@ function mapLibraryItem(
     id: asString(material.id) ?? '',
     package: normalizePackage(material.packages),
     slug: asString(material.slug) ?? '',
-    title: active?.title ?? asString(material.slug) ?? 'Written Exam',
+    title: asString(material.title)?.trim() || active?.title || asString(material.slug) || 'Written Exam',
     status: currentPublished?.status ?? currentDraft?.status ?? versions[0]?.status ?? 'empty',
     revisionNumber: active?.revisionNumber ?? null,
     updatedAt: latestTimestamp([
