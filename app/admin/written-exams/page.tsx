@@ -31,6 +31,7 @@ export default async function WrittenExamLibraryPage({
       id,
       package_id,
       slug,
+      title,
       created_at,
       updated_at,
       packages(id, name, package_code, slug),

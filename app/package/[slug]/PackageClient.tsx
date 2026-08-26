@@ -283,7 +283,7 @@ export default function PackageClient({
             />
           )}
 
-          <div id="resources" className={`grid grid-cols-1 ${writtenExams.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6 items-start`}>
+          <div id="resources" className="grid grid-cols-1 gap-6 items-start lg:grid-cols-2">
             <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
@@ -305,22 +305,21 @@ export default function PackageClient({
               <div className="flex-1">
                 <ExamNavigation examSets={examSets} packageSlug={pkg.slug} />
               </div>
+              {writtenExams.length > 0 && (
+                <section aria-label="ข้อสอบอัตนัย" className="mt-8 border-t border-[rgba(212,175,55,0.15)] pt-6">
+                  <div className="mb-5 flex items-start gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
+                      <PenTool size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-[18px] font-bold font-display text-[#F5E9D6]">ข้อสอบอัตนัย</h4>
+                      <p className="mt-1 text-xs leading-5 text-[#A1866B]">ฝึกวิเคราะห์โจทย์ พร้อมแนวคำตอบและเทคนิคช่วยจำ</p>
+                    </div>
+                  </div>
+                  <WrittenExamNavigation materials={writtenExams} packageSlug={pkg.slug} />
+                </section>
+              )}
             </div>
-
-            {writtenExams.length > 0 && (
-              <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.22)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
-                <div className="flex items-start gap-3 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] flex-shrink-0">
-                    <PenTool size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">ข้อสอบอัตนัย ภาค ข</h3>
-                    <p className="mt-1 text-xs leading-5 text-[#A1866B]">อ่านและท่องจำแนวคำตอบ ไม่ใช่ชุดข้อสอบปรนัย</p>
-                  </div>
-                </div>
-                <WrittenExamNavigation materials={writtenExams} packageSlug={pkg.slug} />
-              </div>
-            )}
           </div>
 
           {hasRelatedContent && (

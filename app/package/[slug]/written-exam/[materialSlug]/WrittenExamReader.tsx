@@ -70,7 +70,7 @@ export default function WrittenExamReader({
         <header className="mb-7 max-w-3xl">
           <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-bold">
             <span className="rounded-full border border-[#D4AF37]/25 bg-[#D4AF37]/10 px-3 py-1 text-[#D4AF37]">
-              Written Exam · ภาค ข
+              ข้อสอบอัตนัย
             </span>
             <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[#1A140E] px-3 py-1 text-[#A1866B]">
               {discoveryQuestionCount} ข้อ

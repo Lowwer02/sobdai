@@ -5,7 +5,7 @@ import test from 'node:test'
 // @ts-expect-error Node's strip-types test runner requires explicit .ts extensions.
 import { hasPermission } from './auth/rbac.ts'
 // @ts-expect-error Node's strip-types test runner requires explicit .ts extensions.
-import { getWrittenExamLifecycleErrorMessage, mapWrittenExamLifecycleError, mapWrittenExamLibraryRows, mapWrittenExamMaterialDetail, mergeWrittenExamVersionRows, normalizeWrittenExamLifecycleResponse, WRITTEN_EXAM_CURRENT_QUESTION_ROW_LIMIT, WRITTEN_EXAM_CURRENT_REVISION_LIMIT, WRITTEN_EXAM_HISTORY_PAGE_SIZE, WRITTEN_EXAM_LIBRARY_PAGE_SIZE } from './writtenExamAdmin.ts'
+import { getWrittenExamLifecycleErrorMessage, getWrittenExamTitleErrorMessage, isWrittenExamTitle, mapWrittenExamLifecycleError, mapWrittenExamLibraryRows, mapWrittenExamMaterialDetail, mapWrittenExamTitleError, mergeWrittenExamVersionRows, normalizeWrittenExamLifecycleResponse, normalizeWrittenExamTitleResponse, WRITTEN_EXAM_CURRENT_QUESTION_ROW_LIMIT, WRITTEN_EXAM_CURRENT_REVISION_LIMIT, WRITTEN_EXAM_HISTORY_PAGE_SIZE, WRITTEN_EXAM_LIBRARY_PAGE_SIZE } from './writtenExamAdmin.ts'
 // @ts-expect-error Node's strip-types test runner requires explicit .ts extensions.
 import { buildWrittenExamSaveDraftPayload } from './writtenExamImportSave.ts'
 // @ts-expect-error Node's strip-types test runner requires explicit .ts extensions.
@@ -95,6 +95,29 @@ test('library mapping exposes current published and draft state plus package ide
   assert.equal(materials[0]?.currentDraft?.revisionNumber, 2)
   assert.equal(materials[0]?.currentPublished?.revisionNumber, 1)
   assert.equal(materials[0]?.package?.packageCode, 'SUPPLIED-BY-SOBDAI')
+})
+
+test('material metadata title takes precedence without changing revision titles', () => {
+  const materials = mapWrittenExamLibraryRows(
+    [{
+      id: MATERIAL_ID,
+      slug: 'written-exam-set-1',
+      title: 'ชื่อเรื่องที่ผู้ดูแลแก้ไข',
+      updated_at: '2026-08-03T00:00:00.000Z',
+    }],
+    [{
+      id: PUBLISHED_ID,
+      material_id: MATERIAL_ID,
+      revision_number: 1,
+      format_version: 'written-exam-v1',
+      title: 'ชื่อจาก revision ที่เผยแพร่',
+      status: 'published',
+      updated_at: '2026-08-01T00:00:00.000Z',
+    }],
+  )
+
+  assert.equal(materials[0]?.title, 'ชื่อเรื่องที่ผู้ดูแลแก้ไข')
+  assert.equal(materials[0]?.currentPublished?.title, 'ชื่อจาก revision ที่เผยแพร่')
 })
 
 test('detail mapping preserves revision ordering and normalized question projection', () => {
@@ -254,6 +277,27 @@ test('lifecycle response and errors are normalized to safe Admin messages', () =
   assert.doesNotMatch(safeMessage, /P0002|42501|stack|at Object/i)
 })
 
+test('material title response and error contracts preserve safe boundaries', () => {
+  assert.equal(isWrittenExamTitle('ชื่อเรื่องใหม่'), true)
+  assert.equal(isWrittenExamTitle('   '), false)
+  assert.equal(isWrittenExamTitle('x'.repeat(301)), false)
+
+  const success = normalizeWrittenExamTitleResponse({
+    material_id: MATERIAL_ID,
+    title: 'ชื่อเรื่องใหม่',
+  })
+  assert.deepEqual(success, {
+    status: 'success',
+    materialId: MATERIAL_ID,
+    title: 'ชื่อเรื่องใหม่',
+  })
+  assert.equal(normalizeWrittenExamTitleResponse({ material_id: MATERIAL_ID, title: '' }), null)
+  assert.equal(mapWrittenExamTitleError({ code: '42501', message: 'permission denied' }), 'authorization-denied')
+  assert.equal(mapWrittenExamTitleError({ code: 'P0002', message: 'Written Exam material does not exist.' }), 'material-not-found')
+  assert.equal(mapWrittenExamTitleError({ code: '22023', message: 'Written Exam material title is required.' }), 'invalid-title')
+  assert.match(getWrittenExamTitleErrorMessage('authorization-denied'), /สิทธิ์/)
+})
+
 test('Admin actions keep read/write authorization and Written Exam mutations RPC-only', () => {
   const actionsSource = readFileSync(join(process.cwd(), 'app/admin/written-exams/actions.ts'), 'utf8')
   const libraryPageSource = readFileSync(join(process.cwd(), 'app/admin/written-exams/page.tsx'), 'utf8')
@@ -261,6 +305,8 @@ test('Admin actions keep read/write authorization and Written Exam mutations RPC
 
   assert.match(actionsSource, /requirePermission\('content\.write'\)/)
   assert.match(actionsSource, /requirePermission\('content\.publish'\)/)
+  assert.match(actionsSource, /export async function updateWrittenExamMaterialTitle/)
+  assert.match(actionsSource, /requirePermission\('content\.write'\)[\s\S]*?update_written_exam_material_title/)
   assert.match(actionsSource, /p_material_id: materialId/)
   assert.match(actionsSource, /save_written_exam_draft/)
   assert.match(actionsSource, /publish_written_exam/)
@@ -271,6 +317,8 @@ test('Admin actions keep read/write authorization and Written Exam mutations RPC
   assert.match(detailPageSource, /written_exam_materials/)
   assert.match(detailPageSource, /written_exam_material_versions/)
   assert.match(detailPageSource, /written_exam_questions/)
+  assert.match(detailPageSource, /select\('id, package_id, slug, title, created_at, updated_at/)
+  assert.match(detailPageSource, /updateWrittenExamTitle=\{updateWrittenExamMaterialTitle\.bind\(null, materialId\)\}/)
   assert.match(libraryPageSource, /requirePermission\('content\.read'\)/)
   assert.equal(hasPermission('editor', 'content.publish'), false)
   assert.equal(hasPermission('admin', 'content.publish'), true)
@@ -344,4 +392,7 @@ test('manage client uses the shared guarded orchestration for parse/save/publish
   assert.match(clientSource, /beginSave\(\)/)
   assert.match(clientSource, /beginPublish\(\)/)
   assert.match(clientSource, /beginArchive\(\)/)
+  assert.match(clientSource, /updateWrittenExamTitle\(nextTitle\)/)
+  assert.match(clientSource, /แก้ไขชื่อเรื่อง/)
+  assert.match(clientSource, /maxLength=\{300\}/)
 })

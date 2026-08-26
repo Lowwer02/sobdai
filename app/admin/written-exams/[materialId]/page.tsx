@@ -15,6 +15,7 @@ import {
   archiveWrittenExamMaterial,
   publishWrittenExamMaterial,
   saveWrittenExamDraftForMaterial,
+  updateWrittenExamMaterialTitle,
 } from '../actions'
 import WrittenExamManageClient from './WrittenExamManageClient'
 
@@ -37,7 +38,7 @@ export default async function WrittenExamManagePage({
   const [materialResult, currentVersionsResult, historyResult] = await Promise.all([
     supabase
       .from('written_exam_materials')
-      .select('id, package_id, slug, created_at, updated_at, packages(id, name, package_code, slug)')
+      .select('id, package_id, slug, title, created_at, updated_at, packages(id, name, package_code, slug)')
       .eq('id', materialId)
       .maybeSingle(),
     supabase
@@ -99,6 +100,7 @@ export default async function WrittenExamManagePage({
       saveWrittenExamDraft={saveWrittenExamDraftForMaterial.bind(null, materialId)}
       publishWrittenExam={publishWrittenExamMaterial.bind(null, materialId)}
       archiveWrittenExam={archiveWrittenExamMaterial.bind(null, materialId)}
+      updateWrittenExamTitle={updateWrittenExamMaterialTitle.bind(null, materialId)}
     />
   )
 }

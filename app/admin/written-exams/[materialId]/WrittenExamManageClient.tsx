@@ -11,6 +11,7 @@ import {
   FileText,
   History,
   Loader2,
+  Pencil,
   RotateCcw,
   Save,
   Send,
@@ -20,10 +21,13 @@ import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
 import {
   getWrittenExamLifecycleErrorMessage,
+  getWrittenExamTitleErrorMessage,
+  isWrittenExamTitle,
   type WrittenExamAdminVersion,
   type WrittenExamLifecycleAction,
   type WrittenExamLifecycleResult,
   type WrittenExamMaterialDetail,
+  type WrittenExamTitleResult,
 } from '@/lib/writtenExamAdmin'
 import {
   getWrittenExamSaveDraftErrorMessage,
@@ -57,6 +61,7 @@ type WrittenExamManageClientProps = {
   saveWrittenExamDraft: (formData: FormData) => Promise<WrittenExamSaveDraftResult>
   publishWrittenExam: () => Promise<WrittenExamLifecycleResult>
   archiveWrittenExam: () => Promise<WrittenExamLifecycleResult>
+  updateWrittenExamTitle: (title: string) => Promise<WrittenExamTitleResult>
 }
 
 export default function WrittenExamManageClient({
@@ -68,6 +73,7 @@ export default function WrittenExamManageClient({
   saveWrittenExamDraft,
   publishWrittenExam,
   archiveWrittenExam,
+  updateWrittenExamTitle,
 }: WrittenExamManageClientProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -77,6 +83,9 @@ export default function WrittenExamManageClient({
   const [operation, setOperation] = useState<WrittenExamImportOperation>(null)
   const [saveResult, setSaveResult] = useState<WrittenExamSaveDraftResult | null>(null)
   const [lifecycleResult, setLifecycleResult] = useState<WrittenExamLifecycleResult | null>(null)
+  const [titleResult, setTitleResult] = useState<WrittenExamTitleResult | null>(null)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(material.title)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const controllerRef = useRef<WrittenExamImportController | null>(null)
   if (controllerRef.current === null) controllerRef.current = createWrittenExamImportController()
@@ -216,6 +225,48 @@ export default function WrittenExamManageClient({
     })
   }
 
+  const handleTitleSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (isPending || operation !== null) return
+
+    const nextTitle = titleDraft.trim()
+    if (!isWrittenExamTitle(nextTitle)) {
+      setTitleResult({
+        status: 'error',
+        kind: 'invalid-title',
+        message: getWrittenExamTitleErrorMessage('invalid-title'),
+      })
+      return
+    }
+
+    setTitleResult(null)
+    startTransition(() => {
+      void updateWrittenExamTitle(nextTitle)
+        .then((result) => {
+          setTitleResult(result)
+          if (result.status === 'success') {
+            setTitleDraft(result.title)
+            setIsEditingTitle(false)
+            toastEvent('แก้ไขชื่อ Written Exam สำเร็จ')
+            router.refresh()
+          }
+        })
+        .catch(() => {
+          setTitleResult({
+            status: 'error',
+            kind: 'unexpected',
+            message: getWrittenExamTitleErrorMessage('unexpected'),
+          })
+        })
+    })
+  }
+
+  const cancelTitleEdit = () => {
+    setTitleDraft(material.title)
+    setTitleResult(null)
+    setIsEditingTitle(false)
+  }
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -236,7 +287,54 @@ export default function WrittenExamManageClient({
             กลับไปคลัง Written Exam
           </Link>
           <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-[#D4AF37]">Written Exam · Manage</p>
-          <h1 className="mt-2 break-words text-3xl font-bold font-display tracking-tight text-[#F5E9D6]">{material.title}</h1>
+          {isEditingTitle ? (
+            <form className="mt-2 flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center" onSubmit={handleTitleSave}>
+              <label htmlFor="written-exam-material-title" className="sr-only">ชื่อเรื่อง Written Exam</label>
+              <input
+                id="written-exam-material-title"
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                maxLength={300}
+                autoFocus
+                className="min-w-0 flex-1 rounded-xl border border-[#D4AF37]/40 bg-[#0F0B07] px-3 py-2 text-xl font-bold font-display text-[#F5E9D6] outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+              />
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="submit"
+                  disabled={isPending || operation !== null}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-3 py-2 text-sm font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPending ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelTitleEdit}
+                  disabled={isPending}
+                  className="rounded-xl border border-[rgba(255,255,255,0.12)] px-3 py-2 text-sm font-bold text-[#D6CBB8] transition-colors hover:border-[#D4AF37]/50 hover:text-[#F5E9D6] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="break-words text-3xl font-bold font-display tracking-tight text-[#F5E9D6]">{material.title}</h1>
+              <button
+                type="button"
+                onClick={() => {
+                  setTitleDraft(material.title)
+                  setTitleResult(null)
+                  setIsEditingTitle(true)
+                }}
+                disabled={isBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4AF37]/25 px-2.5 py-1.5 text-xs font-bold text-[#D4AF37] transition-colors hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Pencil size={14} aria-hidden="true" />
+                แก้ไขชื่อเรื่อง
+              </button>
+            </div>
+          )}
           <p className="mt-2 break-all text-sm text-[#A1866B]">/{material.slug}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -273,6 +371,12 @@ export default function WrittenExamManageClient({
       </section>
 
       {saveResult?.status === 'error' && <InlineError title="บันทึกฉบับร่างไม่สำเร็จ" message={saveResult.message} />}
+      {titleResult?.status === 'error' && <InlineError title="แก้ไขชื่อเรื่องไม่สำเร็จ" message={titleResult.message} />}
+      {titleResult?.status === 'success' && (
+        <div className="rounded-xl border border-[#22C55E]/25 bg-[#22C55E]/5 p-4 text-sm text-[#86EFAC]" role="status">
+          แก้ไขชื่อเรื่องแล้ว ระบบโหลดข้อมูลล่าสุดจากฐานข้อมูลแล้ว
+        </div>
+      )}
       {lifecycleResult?.status === 'error' && <InlineError title="เปลี่ยนสถานะไม่สำเร็จ" message={lifecycleResult.message} />}
       {lifecycleResult?.status === 'success' && (
         <div className="rounded-xl border border-[#22C55E]/25 bg-[#22C55E]/5 p-4 text-sm text-[#86EFAC]" role="status">

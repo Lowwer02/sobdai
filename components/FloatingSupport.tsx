@@ -37,6 +37,7 @@ const EXCLUDED_PREFIXES = ['/admin', '/login', '/register', '/auth', '/api']
 const EXCLUDED_PATH_PATTERNS = [
   /^\/reset-password$/,
   /^\/package\/[^/]+\/exam\//,
+  /^\/package\/[^/]+\/written-exam\//,
   /^\/assessment\//,
 ]
 

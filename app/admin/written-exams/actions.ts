@@ -3,12 +3,17 @@
 import { requirePermission } from '@/lib/auth/server-protect'
 import {
   getWrittenExamLifecycleErrorMessage,
+  getWrittenExamTitleErrorMessage,
   isWrittenExamMaterialId,
+  isWrittenExamTitle,
   mapWrittenExamLifecycleError,
+  mapWrittenExamTitleError,
   normalizeWrittenExamLifecycleResponse,
   normalizeWrittenExamSaveDraftResponse,
+  normalizeWrittenExamTitleResponse,
   type WrittenExamLifecycleAction,
   type WrittenExamLifecycleResult,
+  type WrittenExamTitleResult,
 } from '@/lib/writtenExamAdmin'
 import {
   buildWrittenExamSaveDraftPayload,
@@ -90,6 +95,55 @@ export async function publishWrittenExamMaterial(materialId: string): Promise<Wr
 
 export async function archiveWrittenExamMaterial(materialId: string): Promise<WrittenExamLifecycleResult> {
   return runWrittenExamLifecycle('archive', materialId)
+}
+
+export async function updateWrittenExamMaterialTitle(
+  materialId: string,
+  title: string,
+): Promise<WrittenExamTitleResult> {
+  try {
+    const authorization = await requirePermission('content.write')
+
+    if (!isWrittenExamMaterialId(materialId)) {
+      return {
+        status: 'error',
+        kind: 'invalid-material',
+        message: getWrittenExamTitleErrorMessage('invalid-material'),
+      }
+    }
+
+    if (!isWrittenExamTitle(title)) {
+      return {
+        status: 'error',
+        kind: 'invalid-title',
+        message: getWrittenExamTitleErrorMessage('invalid-title'),
+      }
+    }
+
+    const { data, error } = await authorization.supabase.rpc('update_written_exam_material_title', {
+      p_material_id: materialId,
+      p_title: title.trim(),
+    })
+
+    if (error) {
+      const kind = mapWrittenExamTitleError(error)
+      return { status: 'error', kind, message: getWrittenExamTitleErrorMessage(kind) }
+    }
+
+    const response = normalizeWrittenExamTitleResponse(data)
+    if (!response) {
+      return {
+        status: 'error',
+        kind: 'unexpected',
+        message: getWrittenExamTitleErrorMessage('unexpected'),
+      }
+    }
+
+    return response
+  } catch (error) {
+    const kind = mapWrittenExamTitleError(error)
+    return { status: 'error', kind, message: getWrittenExamTitleErrorMessage(kind) }
+  }
 }
 
 async function runWrittenExamLifecycle(
