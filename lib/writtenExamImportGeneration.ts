@@ -1,4 +1,4 @@
-export type WrittenExamImportOperation = 'parse' | 'save' | null
+export type WrittenExamImportOperation = 'parse' | 'save' | 'publish' | 'archive' | null
 
 export type WrittenExamImportControllerSnapshot = Readonly<{
   generation: number
@@ -10,6 +10,8 @@ export type WrittenExamImportController = {
   reset: () => WrittenExamImportControllerSnapshot
   beginParse: () => number
   beginSave: () => number
+  beginPublish: () => number
+  beginArchive: () => number
   applyIfCurrent: (requestGeneration: number, apply: () => void) => boolean
   finish: (requestGeneration: number) => boolean
 }
@@ -40,6 +42,14 @@ export function createWrittenExamImportController(): WrittenExamImportController
     },
     beginSave: () => {
       operation = 'save'
+      return generation
+    },
+    beginPublish: () => {
+      operation = 'publish'
+      return generation
+    },
+    beginArchive: () => {
+      operation = 'archive'
       return generation
     },
     applyIfCurrent: (requestGeneration, apply) => {
