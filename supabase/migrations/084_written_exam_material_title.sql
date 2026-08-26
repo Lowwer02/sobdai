@@ -103,13 +103,13 @@ alter table public.written_exam_materials
 -- Prefer the current publication, then a current draft, then the newest
 -- retained revision. Existing materials therefore receive a stable metadata
 -- title without changing any revision or question row.
-update public.written_exam_materials as m
-set title = seed.title
-from lateral (
-    select v.title
-    from public.written_exam_material_versions v
-    where v.material_id = m.id
+with seed as (
+    select distinct on (v.material_id)
+        v.material_id,
+        v.title
+    from public.written_exam_material_versions as v
     order by
+        v.material_id,
         case v.status
             when 'published' then 0
             when 'draft' then 1
@@ -117,9 +117,12 @@ from lateral (
         end,
         v.revision_number desc,
         v.id desc
-    limit 1
-) as seed
-where m.title is null;
+)
+update public.written_exam_materials as m
+set title = seed.title
+from seed
+where seed.material_id = m.id
+  and m.title is null;
 
 alter table public.written_exam_materials
     add constraint written_exam_materials_title_check

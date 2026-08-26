@@ -39,8 +39,11 @@ test('084 exists exactly once and fails closed on missing 082/083 or duplicate t
 
 test('material title is additive and backfilled without creating a revision or question mutation', () => {
   assert.match(executableSql, /alter\s+table\s+public\.written_exam_materials\s+add\s+column\s+title\s+text\s+null/i)
+  assert.match(executableSql, /with\s+seed\s+as\s*\(\s*select\s+distinct\s+on\s*\(\s*v\.material_id\s*\)\s*v\.material_id,\s*v\.title/i)
   assert.match(executableSql, /update\s+public\.written_exam_materials\s+as\s+m\s+set\s+title\s*=\s*seed\.title/i)
   assert.match(executableSql, /when\s+'published'\s+then\s+0[\s\S]*?when\s+'draft'\s+then\s+1/i)
+  assert.match(executableSql, /from\s+seed\s+where\s+seed\.material_id\s*=\s*m\.id\s+and\s+m\.title\s+is\s+null/i)
+  assert.doesNotMatch(executableSql, /from\s+lateral/i)
   assert.match(executableSql, /add\s+constraint\s+written_exam_materials_title_check/i)
 
   const titleUpdate = functionBlock('update_written_exam_material_title\\(')
