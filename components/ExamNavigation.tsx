@@ -31,6 +31,7 @@ type ExamSetWithCount = ExamSet & { qCount?: number }
 interface ExamNavigationProps {
   examSets: ExamSetWithCount[]
   packageSlug: string
+  writtenExamCount?: number
 }
 
 const FILTER_OPTIONS = [
@@ -47,7 +48,11 @@ function getCategoryFor(es: ExamSetWithCount): string {
   return es.is_sample ? SAMPLE_CATEGORY : FULL_CATEGORY
 }
 
-export default function ExamNavigation({ examSets, packageSlug }: ExamNavigationProps) {
+export default function ExamNavigation({
+  examSets,
+  packageSlug,
+  writtenExamCount = 0,
+}: ExamNavigationProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
@@ -214,7 +219,9 @@ export default function ExamNavigation({ examSets, packageSlug }: ExamNavigation
           </button>
         ))}
         <span style={{ fontSize: '11px', color: '#A1866B', marginLeft: 'auto', alignSelf: 'center' }}>
-          {totalFiltered} ชุดข้อสอบ
+          {writtenExamCount > 0
+            ? <>ปรนัย {totalFiltered} · อัตนัย {writtenExamCount}</>
+            : `${totalFiltered} ชุดข้อสอบ`}
         </span>
       </div>
 

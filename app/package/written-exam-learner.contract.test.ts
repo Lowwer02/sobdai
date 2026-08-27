@@ -5,6 +5,7 @@ import test from 'node:test'
 
 const packagePage = readFileSync(join(process.cwd(), 'app/package/[slug]/page.tsx'), 'utf8')
 const packageClient = readFileSync(join(process.cwd(), 'app/package/[slug]/PackageClient.tsx'), 'utf8')
+const examNavigation = readFileSync(join(process.cwd(), 'components/ExamNavigation.tsx'), 'utf8')
 const writtenExamNavigation = readFileSync(join(process.cwd(), 'components/WrittenExamNavigation.tsx'), 'utf8')
 const learnerPage = readFileSync(join(process.cwd(), 'app/package/[slug]/written-exam/[materialSlug]/page.tsx'), 'utf8')
 const learnerReader = readFileSync(join(process.cwd(), 'app/package/[slug]/written-exam/[materialSlug]/WrittenExamReader.tsx'), 'utf8')
@@ -14,13 +15,14 @@ test('Package integrates safe Written Exam discovery without changing MCQ entry 
   assert.match(packagePage, /discoverPublishedWrittenExamMaterials\(supabase, pkg\.slug\)/)
   assert.match(packagePage, /writtenExams=\{writtenExams\}/)
   assert.match(packageClient, /writtenExams\.length > 0/)
+  assert.match(packageClient, /writtenExamCount=\{writtenExams\.length\}/)
   assert.match(writtenExamNavigation, /aria-label="ข้อสอบอัตนัย"/)
   assert.match(writtenExamNavigation, /ข้อสอบอัตนัย/)
   assert.doesNotMatch(packageClient, /ฝึกวิเคราะห์โจทย์ พร้อมแนวคำตอบและเทคนิคช่วยจำ/)
   assert.doesNotMatch(packageClient, /ข้อสอบอัตนัย ภาค ข/)
   assert.doesNotMatch(packageClient, /lg:grid-cols-3/)
   assert.match(writtenExamNavigation, /package\/\$\{packageSlug\}\/written-exam\/\$\{material\.materialSlug\}/)
-  assert.match(packageClient, /ExamNavigation examSets=\{examSets\}/)
+  assert.match(packageClient, /ExamNavigation[\s\S]*examSets=\{examSets\}/)
   assert.match(packageClient, /ExamNavigation[\s\S]*WrittenExamNavigation/)
 })
 
@@ -41,6 +43,14 @@ test('Written Exam presentation reuses the Package content-card language', () =>
   assert.match(writtenExamNavigation, /meta=\{\[\{ text: `\$\{material\.questionCount\} ข้อ · อ่านโจทย์และท่องจำแนวคำตอบ` \}\]\}/)
   assert.match(writtenExamNavigation, /flex max-h-\[420px\] flex-col gap-2/)
   assert.doesNotMatch(writtenExamNavigation, /ArrowRight|FileText/)
+})
+
+test('Package inventory surfaces Written Exam availability while preserving MCQ-only wording', () => {
+  assert.match(examNavigation, /writtenExamCount\?: number/)
+  assert.match(examNavigation, /writtenExamCount = 0/)
+  assert.match(examNavigation, /writtenExamCount > 0/)
+  assert.match(examNavigation, /ปรนัย \{totalFiltered\} · อัตนัย \{writtenExamCount\}/)
+  assert.match(examNavigation, /`\$\{totalFiltered\} ชุดข้อสอบ`/)
 })
 
 test('learner page uses discovery and the 082 reader, never raw Written Exam table reads', () => {
