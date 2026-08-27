@@ -24,6 +24,17 @@ test('Package integrates safe Written Exam discovery without changing MCQ entry 
   assert.match(packageClient, /ExamNavigation[\s\S]*WrittenExamNavigation/)
 })
 
+test('Written Exam presentation reuses the Package content-card language', () => {
+  assert.match(packageClient, /section aria-label="ข้อสอบอัตนัย" className="mt-6 border-t/)
+  assert.match(packageClient, /text-\[14px\] font-semibold leading-5 text-\[#F5E9D6\]/)
+  assert.doesNotMatch(packageClient, /<PenTool/)
+  assert.match(writtenExamNavigation, /import ContentCard from ['"]@\/components\/ContentCard['"]/)
+  assert.match(writtenExamNavigation, /<ContentCard[\s\S]*questionCount/)
+  assert.match(writtenExamNavigation, /meta=\{\[\{ text: `\$\{material\.questionCount\} ข้อ · อ่านโจทย์และท่องจำแนวคำตอบ` \}\]\}/)
+  assert.match(writtenExamNavigation, /flex max-h-\[420px\] flex-col gap-2/)
+  assert.doesNotMatch(writtenExamNavigation, /ArrowRight|FileText/)
+})
+
 test('learner page uses discovery and the 082 reader, never raw Written Exam table reads', () => {
   assert.match(learnerPage, /discoverPublishedWrittenExamMaterials\(supabase, slug\)/)
   assert.match(learnerPage, /readPublishedWrittenExamForLearner\(supabase, slug, materialSlug\)/)
