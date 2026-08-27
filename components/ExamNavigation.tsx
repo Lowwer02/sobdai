@@ -42,7 +42,7 @@ const FILTER_OPTIONS = [
 
 // Category labels derived from the only available signal (is_sample).
 const SAMPLE_CATEGORY = 'ตัวอย่าง'
-const FULL_CATEGORY = 'เต็มรูปแบบ'
+const FULL_CATEGORY = 'ข้อสอบปรนัย'
 
 function getCategoryFor(es: ExamSetWithCount): string {
   return es.is_sample ? SAMPLE_CATEGORY : FULL_CATEGORY

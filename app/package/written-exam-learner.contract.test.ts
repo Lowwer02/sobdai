@@ -46,6 +46,7 @@ test('Written Exam presentation reuses the Package content-card language', () =>
 })
 
 test('Package inventory surfaces Written Exam availability while preserving MCQ-only wording', () => {
+  assert.match(examNavigation, /const FULL_CATEGORY = 'ข้อสอบปรนัย'/)
   assert.match(examNavigation, /writtenExamCount\?: number/)
   assert.match(examNavigation, /writtenExamCount = 0/)
   assert.match(examNavigation, /writtenExamCount > 0/)
