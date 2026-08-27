@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft, Newspaper, PenTool } from 'lucide-react'
+import { Check, ChevronLeft, PlayCircle, Lock, BookOpen, Star, Sparkles, Clock, FileText, CalendarDays, TrendingUp, Edit3, MonitorSmartphone, ShieldCheck, BookType, AlignLeft, Newspaper } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import { beginCheckout, viewPackage } from '@/lib/analytics'
 import SummaryNavigation from '@/components/SummaryNavigation'
@@ -306,15 +306,10 @@ export default function PackageClient({
                 <ExamNavigation examSets={examSets} packageSlug={pkg.slug} />
               </div>
               {writtenExams.length > 0 && (
-                <section aria-label="ข้อสอบอัตนัย" className="mt-8 border-t border-[rgba(212,175,55,0.15)] pt-6">
-                  <div className="mb-5 flex items-start gap-3">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
-                      <PenTool size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-[18px] font-bold font-display text-[#F5E9D6]">ข้อสอบอัตนัย</h4>
-                      <p className="mt-1 text-xs leading-5 text-[#A1866B]">ฝึกวิเคราะห์โจทย์ พร้อมแนวคำตอบและเทคนิคช่วยจำ</p>
-                    </div>
+                <section aria-label="ข้อสอบอัตนัย" className="mt-6 border-t border-[rgba(212,175,55,0.15)] pt-5">
+                  <div className="mb-4">
+                    <h4 className="text-[14px] font-semibold leading-5 text-[#F5E9D6]">ข้อสอบอัตนัย</h4>
+                    <p className="mt-1 text-[12px] leading-5 text-[#A1866B]">ฝึกวิเคราะห์โจทย์ พร้อมแนวคำตอบและเทคนิคช่วยจำ</p>
                   </div>
                   <WrittenExamNavigation materials={writtenExams} packageSlug={pkg.slug} />
                 </section>
