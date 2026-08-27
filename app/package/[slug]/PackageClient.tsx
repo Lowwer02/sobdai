@@ -303,7 +303,11 @@ export default function PackageClient({
               </div>
               
               <div className="flex-1">
-                <ExamNavigation examSets={examSets} packageSlug={pkg.slug} />
+                <ExamNavigation
+                  examSets={examSets}
+                  packageSlug={pkg.slug}
+                  writtenExamCount={writtenExams.length}
+                />
               </div>
               {writtenExams.length > 0 && (
                 <div className="mt-4">
