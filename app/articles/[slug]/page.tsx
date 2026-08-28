@@ -19,8 +19,21 @@ import {
 import ArticleDetail from '@/components/articles/ArticleDetail'
 import ArticleRelatedPackages from '@/components/articles/ArticleRelatedPackages'
 import StructuredData from '@/components/StructuredData'
+import AffiliateRail from '@/components/affiliate/AffiliateRail'
+import { getAffiliateRailProducts } from '@/lib/affiliate-public'
+import type { AffiliateRailProduct } from '@/lib/affiliate'
 
 export const revalidate = 300
+
+/**
+ * Viewport width where the two-column layout activates: the editorial column
+ * (max-w-4xl = 896px) + the main element's lg:px-8 gutters (64px) + 40px gap +
+ * 300px sidebar. Below this the rail flows inline after the article (Content →
+ * Affiliate → Related packages), in pure document order. MUST match the media
+ * query in the scoped style block below and the placement analytics
+ * breakpoint passed to AffiliateRail.
+ */
+const AFFILIATE_SIDEBAR_MIN_WIDTH_PX = 1300
 
 function buildArticleJsonLd(article: PublicArticleDetail): Record<string, unknown> {
   const canonicalUrl = absoluteUrl(article.canonical_url || `/articles/${article.slug}`)
@@ -172,7 +185,16 @@ export default async function ArticleDetailPage({
   }
 
   const article = res.data
-  const packagesRes = await getPublishedArticleRelatedPackages(article.id)
+  // Related packages (the Sobdai conversion path) + affiliate rail products,
+  // fetched in parallel. The rail fetch only runs when the article opted in;
+  // it no-ops for a null collection and returns [] when the collection has no
+  // published products, so the rail simply doesn't render.
+  const [packagesRes, affiliateProducts] = await Promise.all([
+    getPublishedArticleRelatedPackages(article.id),
+    article.affiliate_enabled
+      ? getAffiliateRailProducts(article.affiliate_collection_id)
+      : Promise.resolve([] as AffiliateRailProduct[]),
+  ])
 
   const articleJsonLd = buildArticleJsonLd(article)
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -185,11 +207,52 @@ export default async function ArticleDetailPage({
     <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <StructuredData data={articleJsonLd} />
       <StructuredData data={breadcrumbJsonLd} />
-      <ArticleDetail article={article} />
+      {/* Two-zone layout (affiliate M1): the editorial column keeps its exact
+          max-w-4xl width; the affiliate <aside> becomes a sticky 300px sidebar
+          on wide viewports and flows inline after the article on narrow ones.
+          Related packages stay OUTSIDE the grid so the sticky sidebar stops
+          before them naturally. Document order IS the mobile order. */}
+      <div className="article-affiliate-layout">
+        <ArticleDetail article={article} />
+        {affiliateProducts.length > 0 && (
+          <aside className="article-affiliate-aside" aria-label="สินค้าแนะนำจากพันธมิตร">
+            <AffiliateRail
+              products={affiliateProducts}
+              collectionId={article.affiliate_collection_id}
+              contentType="article"
+              contentSlug={article.slug}
+              sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
+            />
+          </aside>
+        )}
+      </div>
       <ArticleRelatedPackages
         packages={packagesRes.success ? packagesRes.data : []}
         error={!packagesRes.success ? packagesRes.error : undefined}
       />
+      {/* Scoped one-off layout rules (the same per-route <style> convention the
+          news detail page uses). MUST stay in sync with
+          AFFILIATE_SIDEBAR_MIN_WIDTH_PX above. */}
+      <style>{`
+        .article-affiliate-aside { margin-top: 48px; }
+        @media (min-width: 1300px) {
+          .article-affiliate-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 896px) 300px;
+            column-gap: 40px;
+            justify-content: center;
+            align-items: start;
+          }
+          .article-affiliate-aside {
+            margin-top: 0;
+            padding-top: 32px;
+            position: sticky;
+            top: 24px;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+          }
+        }
+      `}</style>
     </main>
   )
 }

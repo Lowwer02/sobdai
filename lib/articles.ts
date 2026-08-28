@@ -6,6 +6,8 @@
  *   - validateArticleForPublish → strict readiness gate; requires status 'published', published_at, core content & SEO
  */
 
+import { coerceAffiliateContentFields } from '@/lib/affiliate'
+
 export type ArticleStatus = 'draft' | 'published' | 'archived'
 
 export interface ArticleAuthor {
@@ -65,6 +67,9 @@ export interface Article {
   created_by: string | null
   created_at: string
   updated_at: string
+  // Affiliate rail wiring (migration 085). Default-off on legacy rows.
+  affiliate_enabled: boolean
+  affiliate_collection_id: string | null
 }
 
 export interface ArticleInput {
@@ -84,6 +89,8 @@ export interface ArticleInput {
   canonical_url: string | null
   og_image_url: string | null
   published_at: string | null
+  affiliate_enabled: boolean
+  affiliate_collection_id: string | null
 }
 
 export interface ArticlePackageRelation {
@@ -383,6 +390,9 @@ function coerceInput(raw: any): ArticleInput {
     canonical_url: optStr(raw?.canonical_url),
     og_image_url: optStr(raw?.og_image_url),
     published_at: str(raw?.published_at),
+    // Affiliate rail wiring (migration 085): strict boolean + uuid-or-null,
+    // shared with the news validator via the affiliate contract.
+    ...coerceAffiliateContentFields(raw),
   }
 }
 

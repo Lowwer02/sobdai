@@ -32,8 +32,21 @@ import GpExamRequirementBadge from '@/components/news/GpExamRequirementBadge'
 import RecruitmentStatusBadge from '@/components/news/RecruitmentStatusBadge'
 import NewsShareButtons from '@/components/news/NewsShareButtons'
 import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
+import AffiliateRail from '@/components/affiliate/AffiliateRail'
+import { getAffiliateRailProducts } from '@/lib/affiliate-public'
+import type { AffiliateRailProduct } from '@/lib/affiliate'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
+
+/**
+ * Viewport width where the two-column layout activates: the editorial column
+ * (800px incl. its 20px gutters) + 40px gap + 300px sidebar. Below this the
+ * rail flows inline after the Sobdai CTA zone (Content → CTA → Affiliate →
+ * Related), with no CSS ordering tricks — pure document order. MUST match the
+ * media query in the scoped style block below and the placement analytics
+ * breakpoint passed to AffiliateRail.
+ */
+const AFFILIATE_SIDEBAR_MIN_WIDTH_PX = 1180
 
 
 /**
@@ -105,6 +118,9 @@ interface NewsDetailRow {
   // when absent, but the column has a DB default so it's always present on live rows.
   gp_exam_requirement: GpExamRequirement
   application_deadline?: string | null
+  // Affiliate rail wiring (migration 085). Default false on legacy rows.
+  affiliate_enabled: boolean
+  affiliate_collection_id: string | null
 }
 
 interface NewsNeighbor {
@@ -150,7 +166,7 @@ const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null
   const { data } = await supabase
     .from('news')
     .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline'
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline, affiliate_enabled, affiliate_collection_id'
     )
     .eq('slug', slug)
     .eq('status', 'published')
@@ -391,9 +407,15 @@ export default async function NewsDetailPage({
 
   // Editor-curated related packages + summaries (the conversion path). Empty
   // when no relations exist — the section renders nothing in that case.
-  const [homepageSettings, related] = await Promise.all([
+  // Affiliate rail products: queried ONLY when the article opts in; the fetch
+  // itself no-ops for a null collection and returns [] when the collection has
+  // no published products, so the rail simply doesn't render.
+  const [homepageSettings, related, affiliateProducts] = await Promise.all([
     getHomepageSettings(),
     getRelatedContent(article.id),
+    article.affiliate_enabled
+      ? getAffiliateRailProducts(article.affiliate_collection_id)
+      : Promise.resolve([] as AffiliateRailProduct[]),
   ])
 
   const socialFollowPlacement = homepageSettings.social_follow.placements.news_detail_end
@@ -416,7 +438,15 @@ export default async function NewsDetailPage({
 
   return (
     <div style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <article style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 80px' }}>
+      {/* Two-zone layout (affiliate M1): the editorial column keeps its exact
+          800px reading width; the affiliate <aside> becomes a sticky 300px
+          sidebar on wide viewports and flows inline (after the Sobdai CTA /
+          social zone, before Related content) on narrow ones. Related content,
+          back link, and prev/next live in a trailing block OUTSIDE the grid so
+          the sticky sidebar naturally stops before them. Document order IS the
+          mobile order: Content → Sobdai CTA → Affiliate → Related. */}
+      <div className="news-detail-layout">
+      <article style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 0' }}>
         <StructuredData data={jsonLd} />
         <StructuredData data={breadcrumbJsonLd} />
         {/* Breadcrumb */}
@@ -684,6 +714,30 @@ export default async function NewsDetailPage({
           channels={resolvedSocialChannels}
           contentId={article.slug}
         />
+      </article>
+
+      {/* Affiliate recommendation sidebar / inline block. Rendered only when
+          the article opted in AND the assigned collection has published
+          products (AffiliateRail + the fetch above already guarantee empty →
+          nothing). Sits AFTER the Sobdai CTA zone and BEFORE Related content
+          in DOM order, so the mobile reading hierarchy needs no CSS hacks. */}
+      {affiliateProducts.length > 0 && (
+        <aside className="news-detail-aside" aria-label="สินค้าแนะนำจากพันธมิตร">
+          <AffiliateRail
+            products={affiliateProducts}
+            collectionId={article.affiliate_collection_id}
+            contentType="news"
+            contentSlug={slug}
+            sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
+          />
+        </aside>
+      )}
+      </div>
+
+      {/* Trailing editorial block — Related content, back link, prev/next.
+          Kept out of the layout grid: on wide viewports it re-centers under
+          the main column; on narrow ones it simply follows the aside. */}
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 20px 80px' }}>
 
         {/* Related content — the conversion path (News → Package → Summary).
             Editor-curated via news_packages / news_summaries. Renders NOTHING
@@ -906,7 +960,7 @@ export default async function NewsDetailPage({
             </div>
           </nav>
         )}
-      </article>
+      </div>
 
       {/* Responsive: side-by-side prev/next on wider screens.
           Kept out of inline styles (container queries / sm breakpoint) by a
@@ -925,6 +979,32 @@ export default async function NewsDetailPage({
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
           gap: 16px;
+        }
+        /* Affiliate two-zone layout (M1). Mobile-first: the aside flows inline
+           with the article's own gutters. At >= 1180px the wrapper becomes a
+           centered two-column grid — the editorial column keeps its exact
+           800px width (never squeezed), the sidebar is a 300px visually
+           secondary column, sticky within the grid so it stops before the
+           trailing Related block naturally (align-items: start is required for
+           sticky grid items). MUST stay in sync with
+           AFFILIATE_SIDEBAR_MIN_WIDTH_PX above. */
+        .news-detail-aside { margin-top: 48px; padding: 0 20px; }
+        @media (min-width: 1180px) {
+          .news-detail-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 800px) 300px;
+            column-gap: 40px;
+            justify-content: center;
+            align-items: start;
+          }
+          .news-detail-aside {
+            margin-top: 0;
+            padding: 32px 0 0;
+            position: sticky;
+            top: 24px;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+          }
         }
       `}</style>
     </div>

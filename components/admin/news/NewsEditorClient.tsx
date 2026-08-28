@@ -102,6 +102,7 @@ export default function NewsEditorClient({
   isEdit,
   initialRelatedPackages = [],
   initialRelatedSummaries = [],
+  affiliateCollections = [],
 }: {
   article: News | null
   isEdit: boolean
@@ -109,6 +110,8 @@ export default function NewsEditorClient({
   initialRelatedPackages?: RelatedItem[]
   /** Pre-related summaries (edit page loads these from news_summaries). Empty on create. */
   initialRelatedSummaries?: RelatedItem[]
+  /** Affiliate collections for the assignment select (all statuses; non-published labeled). */
+  affiliateCollections?: { id: string; name: string; status: string }[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -168,6 +171,13 @@ export default function NewsEditorClient({
     () => article?.cta_config ?? DEFAULT_CTA_CONFIG
   )
   const [ctaError, setCtaError] = useState('')
+
+  // Affiliate rail wiring (M1): enabled + assigned collection ONLY — no
+  // placement/product-count controls (those are fixed surface contracts).
+  const [affiliateEnabled, setAffiliateEnabled] = useState(article?.affiliate_enabled ?? false)
+  const [affiliateCollectionId, setAffiliateCollectionId] = useState(
+    article?.affiliate_collection_id || ''
+  )
 
   // Cover image: URL held in state (carried into the payload, not a form field).
   // Create has no row id yet (it's generated server-side), so the storage path
@@ -327,6 +337,9 @@ export default function NewsEditorClient({
       homepage_featured: homepageFeatured,
       homepage_featured_order: homepageFeaturedOrder.trim() !== '' ? Number(homepageFeaturedOrder) : null,
       hide_from_homepage_when_expired: hideFromHomepageWhenExpired,
+      // Affiliate rail wiring (M1): enabled + collection id (null when off/none).
+      affiliate_enabled: affiliateEnabled,
+      affiliate_collection_id: affiliateEnabled && affiliateCollectionId ? affiliateCollectionId : null,
       // Source citation metadata group (GEO P2.2B)
       source_name: sourceName.trim() || null,
       source_url: sourceUrl.trim() || null,
@@ -1061,6 +1074,59 @@ export default function NewsEditorClient({
                 </div>
               )}
             </div>
+          </div>
+        </section>
+
+        {/* Affiliate recommendations (M1) — enabled + collection ONLY. The
+            placement (desktop sidebar / mobile inline) and the 5-product cap
+            are fixed surface contracts, deliberately not editor controls. */}
+        <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+          <h2 className="text-[#D4AF37] font-bold font-display">สินค้าแนะนำ (Affiliate)</h2>
+
+          <label className="flex items-center gap-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl cursor-pointer hover:border-[#D4AF37]/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={affiliateEnabled}
+              onChange={e => {
+                setAffiliateEnabled(e.target.checked)
+                setIsDirty(true)
+                setPublishErrors({})
+              }}
+              className="w-4 h-4 accent-[#D4AF37]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[#F5E9D6]">แสดงสินค้าแนะนำบนหน้าข่าวนี้</span>
+              <span className="block text-xs text-[#A1866B]">
+                แสดงเฉพาะเมื่อคอลเลกชันที่เลือกเผยแพร่แล้วและมีสินค้าที่เผยแพร่อย่างน้อย 1 รายการ — กล่องแนะนำ Sobdai จะยังคงอยู่ก่อนสินค้าแนะนำเสมอ
+              </span>
+            </span>
+          </label>
+
+          <div className={affiliateEnabled ? '' : 'opacity-50 pointer-events-none'}>
+            <label className={labelClass}>คอลเลกชันสินค้า</label>
+            <select
+              value={affiliateCollectionId}
+              onChange={e => {
+                setAffiliateCollectionId(e.target.value)
+                setIsDirty(true)
+                setPublishErrors({})
+              }}
+              disabled={!affiliateEnabled}
+              className={inputClass}
+            >
+              <option value="">— เลือกคอลเลกชัน —</option>
+              {affiliateCollections.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.status !== 'published' ? ` (${c.status})` : ''}
+                </option>
+              ))}
+            </select>
+            {affiliateCollections.length === 0 && (
+              <p className="text-[10px] text-[#A1866B] mt-1">
+                ยังไม่มีคอลเลกชัน — สร้างได้ที่เมนู Affiliate
+              </p>
+            )}
           </div>
         </section>
 

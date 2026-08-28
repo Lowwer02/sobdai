@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
+import { coerceAffiliateContentFields } from '@/lib/affiliate'
 import type { NewsCardData } from '@/components/news/NewsCard'
 
 /**
@@ -154,6 +155,11 @@ export interface News {
   homepage_featured: boolean
   homepage_featured_order: number | null
   hide_from_homepage_when_expired: boolean
+  // Affiliate rail wiring (migration 085). Default-off on legacy rows; the
+  // public detail renders the rail only when enabled AND the assigned
+  // collection resolves to >=1 published product.
+  affiliate_enabled: boolean
+  affiliate_collection_id: string | null
 }
 
 /**
@@ -183,6 +189,8 @@ export interface NewsInput {
   homepage_featured: boolean
   homepage_featured_order: number | null
   hide_from_homepage_when_expired: boolean
+  affiliate_enabled: boolean
+  affiliate_collection_id: string | null
 }
 
 export const NEWS_STATUSES: { value: NewsStatus; label: string }[] = [
@@ -264,6 +272,9 @@ function coerce(raw: any): { input: NewsInput; rawSlug: string | undefined } {
       homepage_featured: raw.homepage_featured === true,
       homepage_featured_order: parsePositiveInteger(raw.homepage_featured_order),
       hide_from_homepage_when_expired: raw.hide_from_homepage_when_expired !== false,
+      // Affiliate rail wiring (migration 085): strict boolean + uuid-or-null,
+      // shared with the articles validator via the affiliate contract.
+      ...coerceAffiliateContentFields(raw),
     },
     rawSlug: str(raw.slug),
   }

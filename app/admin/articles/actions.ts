@@ -139,6 +139,10 @@ export async function createArticle(raw: any): Promise<{ success: boolean; error
     canonical_url: clean.canonical_url,
     og_image_url: clean.og_image_url,
     created_by: user.id,
+    // Affiliate rail wiring (migration 085) — strictly coerced by the shared
+    // lib contract (boolean + uuid-or-null).
+    affiliate_enabled: clean.affiliate_enabled,
+    affiliate_collection_id: clean.affiliate_collection_id,
   }
 
   const { error } = await supabase.from('articles').insert(payload)
@@ -230,6 +234,10 @@ export async function updateArticle(
     seo_description: clean.seo_description,
     canonical_url: clean.canonical_url,
     og_image_url: clean.og_image_url,
+    // Affiliate rail wiring (migration 085) — strictly coerced by the shared
+    // lib contract (boolean + uuid-or-null).
+    affiliate_enabled: clean.affiliate_enabled,
+    affiliate_collection_id: clean.affiliate_collection_id,
   }
 
   const { error, data } = await supabase

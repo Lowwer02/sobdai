@@ -12,13 +12,19 @@ export default async function EditArticlePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requirePermission('content.write')
+  const { supabase } = await requirePermission('content.write')
   const { id } = await params
 
-  const [article, relRes, authorsRes] = await Promise.all([
+  const [article, relRes, authorsRes, collectionsRes] = await Promise.all([
     getArticleById(id),
     getArticlePackageRelations(id),
     listActiveArticleAuthors(),
+    // Affiliate collections for the assignment select (all statuses — RLS
+    // gives staff full visibility; non-published ones are labeled).
+    supabase
+      .from('affiliate_collections')
+      .select('id, name, status')
+      .order('name', { ascending: true }),
   ])
 
   if (!article) {
@@ -35,6 +41,9 @@ export default async function EditArticlePage({
       isEdit={true}
       initialPackageRelations={relRes.data}
       initialAuthors={authorsRes.data || []}
+      affiliateCollections={
+        (collectionsRes.data ?? []) as { id: string; name: string; status: string }[]
+      }
     />
   )
 }

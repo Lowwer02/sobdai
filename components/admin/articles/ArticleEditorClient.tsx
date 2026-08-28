@@ -52,11 +52,14 @@ export default function ArticleEditorClient({
   isEdit,
   initialPackageRelations = [],
   initialAuthors = [],
+  affiliateCollections = [],
 }: {
   article: Article | null
   isEdit: boolean
   initialPackageRelations?: RelatedPackageItem[]
   initialAuthors?: PublicArticleAuthor[]
+  /** Affiliate collections for the assignment select (all statuses; non-published labeled). */
+  affiliateCollections?: { id: string; name: string; status: string }[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -88,6 +91,13 @@ export default function ArticleEditorClient({
   const [seoDescription, setSeoDescription] = useState(article?.seo_description || '')
   const [canonicalUrl, setCanonicalUrl] = useState(article?.canonical_url || '')
   const [ogImageUrl, setOgImageUrl] = useState(article?.og_image_url || '')
+
+  // Affiliate rail wiring (M1): enabled + assigned collection ONLY — no
+  // placement/product-count controls (those are fixed surface contracts).
+  const [affiliateEnabled, setAffiliateEnabled] = useState(article?.affiliate_enabled ?? false)
+  const [affiliateCollectionId, setAffiliateCollectionId] = useState(
+    article?.affiliate_collection_id || ''
+  )
 
   // Publish Readiness errors
   const [publishErrors, setPublishErrors] = useState<Record<string, string>>({})
@@ -209,6 +219,9 @@ export default function ArticleEditorClient({
     seo_description: seoDescription || null,
     canonical_url: canonicalUrl || null,
     og_image_url: ogImageUrl || null,
+    // Affiliate rail wiring (M1): enabled + collection id (null when off/none).
+    affiliate_enabled: affiliateEnabled,
+    affiliate_collection_id: affiliateEnabled && affiliateCollectionId ? affiliateCollectionId : null,
   })
 
   const handleSave = () => {
@@ -755,6 +768,61 @@ export default function ArticleEditorClient({
               <p className="text-[11px] text-[#A1866B] mt-1.5 leading-relaxed">
                 หากไม่ระบุ ระบบจะแสดงบทความในนาม &quot;ทีมบรรณาธิการ Sobdai&quot;
               </p>
+            </div>
+          </div>
+
+          {/* Affiliate Recommendations Box (M1) — enabled + collection ONLY.
+              The placement (desktop sidebar / mobile inline) and the
+              5-product cap are fixed surface contracts, not editor controls. */}
+          <div className="bg-[#1A140E] border border-[#D4AF37]/20 p-4 sm:p-6 rounded-xl space-y-4">
+            <h2 className="text-base font-bold text-[#F5E9D6] border-b border-[#D4AF37]/10 pb-3">
+              สินค้าแนะนำ (Affiliate)
+            </h2>
+
+            <label className="flex items-center gap-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg cursor-pointer hover:border-[#D4AF37]/30 transition-colors">
+              <input
+                type="checkbox"
+                checked={affiliateEnabled}
+                onChange={(e) => {
+                  setAffiliateEnabled(e.target.checked)
+                  setIsDirty(true)
+                }}
+                className="w-4 h-4 rounded border-[rgba(255,255,255,0.15)] bg-[#0F0B07] accent-[#D4AF37] cursor-pointer"
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#F5E9D6]">แสดงสินค้าแนะนำบนบทความนี้</span>
+                <span className="block text-xs text-[#A1866B] mt-0.5">
+                  แสดงเฉพาะเมื่อคอลเลกชันที่เลือกเผยแพร่แล้วและมีสินค้าที่เผยแพร่อย่างน้อย 1 รายการ
+                </span>
+              </span>
+            </label>
+
+            <div className={affiliateEnabled ? '' : 'opacity-50 pointer-events-none'}>
+              <label className="block text-xs font-semibold text-[#A1866B] uppercase mb-1">
+                คอลเลกชันสินค้า
+              </label>
+              <select
+                value={affiliateCollectionId}
+                onChange={(e) => {
+                  setAffiliateCollectionId(e.target.value)
+                  setIsDirty(true)
+                }}
+                disabled={!affiliateEnabled}
+                className="w-full bg-[#0F0B07] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-sm text-[#F5E9D6] focus:outline-none focus:border-[#D4AF37]"
+              >
+                <option value="">— เลือกคอลเลกชัน —</option>
+                {affiliateCollections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.status !== 'published' ? ` (${c.status})` : ''}
+                  </option>
+                ))}
+              </select>
+              {affiliateCollections.length === 0 && (
+                <p className="text-[10px] text-[#A1866B] mt-1.5">
+                  ยังไม่มีคอลเลกชัน — สร้างได้ที่เมนู Affiliate
+                </p>
+              )}
             </div>
           </div>
 

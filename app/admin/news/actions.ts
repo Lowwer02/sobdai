@@ -548,6 +548,11 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
     homepage_featured: input.homepage_featured,
     homepage_featured_order: input.homepage_featured_order,
     hide_from_homepage_when_expired: input.hide_from_homepage_when_expired,
+    // Affiliate rail wiring (migration 085). Already strictly coerced
+    // (boolean + uuid-or-null) by the shared lib contract; null preserves
+    // "no collection" for legacy/cleared rows.
+    affiliate_enabled: input.affiliate_enabled,
+    affiliate_collection_id: input.affiliate_collection_id,
   }
 
   if (isCreate) {

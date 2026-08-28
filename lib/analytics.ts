@@ -259,6 +259,32 @@ export function trackSocialFollowClick(params: {
 }
 
 /**
+ * Track a click on an outbound affiliate product link (M1). Fired only from
+ * the tiny client <AffiliateProductCard> island in onClick, immediately before
+ * the browser opens the merchant tab; never during render/hydration, so no
+ * duplicate events. placement is resolved at click time from the live viewport
+ * ('sidebar' on desktop, 'inline_mobile' below the sidebar breakpoint).
+ */
+export function trackAffiliateClick(params: {
+  merchant: string
+  product_id: string
+  collection_id: string | null
+  content_type: 'news' | 'article'
+  content_slug: string
+  placement: 'sidebar' | 'inline_mobile'
+}): void {
+  pushToDataLayer({
+    event: 'affiliate_click',
+    merchant: params.merchant,
+    product_id: params.product_id,
+    ...(params.collection_id ? { collection_id: params.collection_id } : {}),
+    content_type: params.content_type,
+    content_slug: params.content_slug,
+    placement: params.placement,
+  })
+}
+
+/**
  * Track successful claiming of a free package.
  */
 export function freePackageClaimed(

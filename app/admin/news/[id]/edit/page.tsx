@@ -71,12 +71,25 @@ export default async function EditNewsPage({
       label: r.summaries!.title || r.summaries!.slug || r.summary_id,
     }))
 
+  // Affiliate collections for the assignment select (all statuses — RLS gives
+  // staff full visibility; non-published ones are labeled in the editor).
+  const collectionsRes = await supabase
+    .from('affiliate_collections')
+    .select('id, name, status')
+    .order('name', { ascending: true })
+  const affiliateCollections = (collectionsRes.data ?? []) as {
+    id: string
+    name: string
+    status: string
+  }[]
+
   return (
     <NewsEditorClient
       article={article as News}
       isEdit
       initialRelatedPackages={relatedPackages}
       initialRelatedSummaries={relatedSummaries}
+      affiliateCollections={affiliateCollections}
     />
   )
 }

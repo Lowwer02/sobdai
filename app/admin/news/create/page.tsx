@@ -10,6 +10,20 @@ import NewsEditorClient from '@/components/admin/news/NewsEditorClient'
  * needs to know the id ahead of time.
  */
 export default async function CreateNewsPage() {
-  await requirePermission('content.write')
-  return <NewsEditorClient article={null} isEdit={false} />
+  const { supabase } = await requirePermission('content.write')
+
+  // Affiliate collections for the assignment select (all statuses — RLS gives
+  // staff full visibility; non-published ones are labeled in the editor).
+  const collectionsRes = await supabase
+    .from('affiliate_collections')
+    .select('id, name, status')
+    .order('name', { ascending: true })
+
+  return (
+    <NewsEditorClient
+      article={null}
+      isEdit={false}
+      affiliateCollections={(collectionsRes.data ?? []) as { id: string; name: string; status: string }[]}
+    />
+  )
 }

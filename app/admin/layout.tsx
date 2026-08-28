@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2 } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2, ShoppingBag } from 'lucide-react'
 import { requireStaff } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 
@@ -29,6 +29,10 @@ const managementNav = [
   // content.write), mirroring how Packages sits at content.read.
   { name: 'News', href: '/admin/news', icon: Newspaper, permission: 'content.read' },
   { name: 'Articles', href: '/admin/articles', icon: FileText, permission: 'content.read' },
+  // Affiliate CMS (M1): products + collections assigned to News/Articles.
+  // Same content.read gate as News/Articles — write/publish/delete actions
+  // gate separately on their own permissions.
+  { name: 'Affiliate', href: '/admin/affiliate', icon: ShoppingBag, permission: 'content.read' },
 ]
 
 export default async function AdminLayout({
