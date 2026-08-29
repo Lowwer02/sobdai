@@ -58,6 +58,9 @@ export interface PublicArticleDetail {
   // Affiliate rail wiring (migration 085). Default-off on legacy rows.
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
+  // AdSense Conservative (M3) per-content opt-in (migration 087). Default-off
+  // on legacy rows; the platform env config gates it a second time.
+  adsense_enabled: boolean
 }
 
 export interface PublicRelatedPackage {
@@ -246,7 +249,7 @@ export const getPublishedArticleBySlug = cache(
       const { data, error } = await supabase
         .from('articles')
         .select(
-          'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, seo_title, seo_description, canonical_url, og_image_url, author_id, sources, affiliate_enabled, affiliate_collection_id, article_authors(id, slug, display_name, role_title, short_bio, avatar_url, is_active)'
+          'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, published_at, updated_at, seo_title, seo_description, canonical_url, og_image_url, author_id, sources, affiliate_enabled, affiliate_collection_id, adsense_enabled, article_authors(id, slug, display_name, role_title, short_bio, avatar_url, is_active)'
         )
         .eq('slug', slug.trim())
         .eq('status', 'published')
@@ -283,6 +286,7 @@ export const getPublishedArticleBySlug = cache(
         sources: Array.isArray(row.sources) ? row.sources : [],
         affiliate_enabled: row.affiliate_enabled === true,
         affiliate_collection_id: row.affiliate_collection_id || null,
+        adsense_enabled: row.adsense_enabled === true,
       }
 
       return { success: true, data: detail }

@@ -179,6 +179,10 @@ export default function NewsEditorClient({
     article?.affiliate_collection_id || ''
   )
 
+  // AdSense Conservative (M3): a single opt-in ONLY — placement/format/slot
+  // are fixed surface contracts; account + slot ids are platform env config.
+  const [adsenseEnabled, setAdsenseEnabled] = useState(article?.adsense_enabled ?? false)
+
   // Cover image: URL held in state (carried into the payload, not a form field).
   // Create has no row id yet (it's generated server-side), so the storage path
   // uses a client UUID prefix on create and the article id on edit for a stable
@@ -340,6 +344,8 @@ export default function NewsEditorClient({
       // Affiliate rail wiring (M1): enabled + collection id (null when off/none).
       affiliate_enabled: affiliateEnabled,
       affiliate_collection_id: affiliateEnabled && affiliateCollectionId ? affiliateCollectionId : null,
+      // AdSense Conservative (M3): opt-in boolean only.
+      adsense_enabled: adsenseEnabled,
       // Source citation metadata group (GEO P2.2B)
       source_name: sourceName.trim() || null,
       source_url: sourceUrl.trim() || null,
@@ -1128,6 +1134,33 @@ export default function NewsEditorClient({
               </p>
             )}
           </div>
+        </section>
+
+        {/* AdSense (M3 Conservative) — opt-in ONLY. Placement (one unit at the
+            fixed editorial break before the Sobdai CTA) and the account/slot
+            ids (platform env config) are surface contracts, deliberately not
+            editor controls. No placement/density selector, no Auto Ads. */}
+        <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
+          <h2 className="text-[#D4AF37] font-bold font-display">โฆษณา (AdSense)</h2>
+
+          <label className="flex items-center gap-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-xl cursor-pointer hover:border-[#D4AF37]/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={adsenseEnabled}
+              onChange={e => {
+                setAdsenseEnabled(e.target.checked)
+                setIsDirty(true)
+                setPublishErrors({})
+              }}
+              className="w-4 h-4 accent-[#D4AF37]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[#F5E9D6]">แสดงโฆษณาบนหน้าข่าวนี้ (1 หน่วย)</span>
+              <span className="block text-xs text-[#A1866B]">
+                แสดงหนึ่งหน่วยโฆษณาในตำแหน่งที่กำหนดหลังเนื้อหา ก่อนกล่องแนะนำ Sobdai — จะปรากฏเฉพาะเมื่อระบบมีการตั้งค่า AdSense ครบถ้วน
+              </span>
+            </span>
+          </label>
         </section>
 
         {/* SEO panel */}

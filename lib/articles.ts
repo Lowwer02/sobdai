@@ -7,6 +7,7 @@
  */
 
 import { coerceAffiliateContentFields } from '@/lib/affiliate'
+import { coerceAdsenseEnabled } from '@/lib/adsense'
 
 export type ArticleStatus = 'draft' | 'published' | 'archived'
 
@@ -70,6 +71,10 @@ export interface Article {
   // Affiliate rail wiring (migration 085). Default-off on legacy rows.
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
+  // AdSense Conservative (M3) per-content opt-in (migration 087). Default-off
+  // on legacy rows; the public detail renders ONE manual unit only when this
+  // is true AND the platform env config resolves.
+  adsense_enabled: boolean
 }
 
 export interface ArticleInput {
@@ -91,6 +96,7 @@ export interface ArticleInput {
   published_at: string | null
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
+  adsense_enabled: boolean
 }
 
 export interface ArticlePackageRelation {
@@ -393,6 +399,9 @@ function coerceInput(raw: any): ArticleInput {
     // Affiliate rail wiring (migration 085): strict boolean + uuid-or-null,
     // shared with the news validator via the affiliate contract.
     ...coerceAffiliateContentFields(raw),
+    // AdSense Conservative (M3): strict per-content opt-in boolean
+    // (migration 087), shared with the news validator via lib/adsense.
+    adsense_enabled: coerceAdsenseEnabled(raw?.adsense_enabled),
   }
 }
 

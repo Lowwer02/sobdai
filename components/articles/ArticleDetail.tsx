@@ -6,6 +6,8 @@ import { calculateReadingTime } from '@/lib/articles'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import ArticleReferences from '@/components/articles/ArticleReferences'
 import ArticleAuthorCard from '@/components/articles/ArticleAuthorCard'
+import AdSenseUnit from '@/components/adsense/AdSenseUnit'
+import { getAdsenseDetailConfig, type AdsenseDetailConfig } from '@/lib/adsense'
 
 interface ArticleDetailProps {
   article: PublicArticleDetail
@@ -40,6 +42,15 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
   const showUpdated = isDifferentDate(article.published_at, article.updated_at) && Boolean(updatedDateStr)
   const readingTime = calculateReadingTime(article.body_markdown || '')
   const altText = article.cover_image_alt || article.title
+  // AdSense Conservative (M3): ONE manual display unit at the stable
+  // editorial break right after the body box. The structured references +
+  // tags that follow keep the ad separated from the affiliate rail / related
+  // flow in document order (no mid-article Markdown slicing — the renderer
+  // has no AST insertion point, and M3 explicitly excludes a renderer
+  // refactor). Renders nothing without content opt-in + platform config.
+  const detailAd: AdsenseDetailConfig | null = article.adsense_enabled
+    ? getAdsenseDetailConfig()
+    : null
 
   return (
     <article className="max-w-4xl mx-auto space-y-8 overflow-hidden break-words">
@@ -147,6 +158,11 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
           <p className="text-sm text-[#A1866B] italic">ไม่มีเนื้อหาบทความ</p>
         )}
       </div>
+
+      {/* AdSense unit (M3 Conservative) — the ONE manual display unit, at the
+          editorial break after the body box. Renders nothing (and loads no
+          AdSense script) without content opt-in + platform config. */}
+      {detailAd && <AdSenseUnit clientId={detailAd.clientId} slotId={detailAd.slotId} />}
 
       {/* Structured Sources / References */}
       {Array.isArray(article.sources) && article.sources.length > 0 && (

@@ -35,6 +35,8 @@ import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
 import AffiliateRail from '@/components/affiliate/AffiliateRail'
 import { getAffiliateRailProducts } from '@/lib/affiliate-public'
 import type { AffiliateRailProduct } from '@/lib/affiliate'
+import AdSenseUnit from '@/components/adsense/AdSenseUnit'
+import { getAdsenseDetailConfig, type AdsenseDetailConfig } from '@/lib/adsense'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
 
@@ -121,6 +123,9 @@ interface NewsDetailRow {
   // Affiliate rail wiring (migration 085). Default false on legacy rows.
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
+  // AdSense Conservative (M3) per-content opt-in (migration 087). Default
+  // false on legacy rows; the platform env config gates it a second time.
+  adsense_enabled: boolean
 }
 
 interface NewsNeighbor {
@@ -166,7 +171,7 @@ const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null
   const { data } = await supabase
     .from('news')
     .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline, affiliate_enabled, affiliate_collection_id'
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline, affiliate_enabled, affiliate_collection_id, adsense_enabled'
     )
     .eq('slug', slug)
     .eq('status', 'published')
@@ -424,6 +429,13 @@ export default async function NewsDetailPage({
     'news_detail_end',
     homepageSettings.footer.social_links
   )
+
+  // AdSense Conservative (M3): ONE manual display unit, rendered only when the
+  // article opted in (migration 087, default-off) AND the platform env config
+  // resolves. No extra query — the flag rides the existing detail fetch.
+  const detailAd: AdsenseDetailConfig | null = article.adsense_enabled
+    ? getAdsenseDetailConfig()
+    : null
 
   // NewsArticle JSON-LD (resolved once; reuses the same fallback rules as the
   // page <head> metadata via buildNewsJsonLd → resolveNewsSeo). Rendered inline
@@ -692,6 +704,14 @@ export default async function NewsDetailPage({
             shareLocation="article_footer"
           />
         </div>
+
+        {/* AdSense unit (M3 Conservative) — the ONE stable editorial break:
+            end of editorial content chrome (body → source → share), BEFORE the
+            Sobdai conversion zone. Document order reads Content → Ad → Sobdai
+            CTA → Affiliate → Related, keeping the ad clear of the affiliate
+            rail and away from any interactive control. Renders nothing (and
+            loads no AdSense script) without content opt-in + platform config. */}
+        {detailAd && <AdSenseUnit clientId={detailAd.clientId} slotId={detailAd.slotId} />}
 
         {/* Preparation CTA box — renders between the article body/source and
             the related-content section. Reads cta_config from the article row

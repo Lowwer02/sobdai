@@ -553,6 +553,9 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
     // "no collection" for legacy/cleared rows.
     affiliate_enabled: input.affiliate_enabled,
     affiliate_collection_id: input.affiliate_collection_id,
+    // AdSense Conservative (M3) per-content opt-in (migration 087). Strictly
+    // coerced boolean by lib/adsense; default false for legacy/cleared rows.
+    adsense_enabled: input.adsense_enabled,
   }
 
   if (isCreate) {

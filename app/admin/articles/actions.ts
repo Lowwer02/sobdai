@@ -143,6 +143,9 @@ export async function createArticle(raw: any): Promise<{ success: boolean; error
     // lib contract (boolean + uuid-or-null).
     affiliate_enabled: clean.affiliate_enabled,
     affiliate_collection_id: clean.affiliate_collection_id,
+    // AdSense Conservative (M3) per-content opt-in (migration 087). Strictly
+    // coerced boolean by lib/adsense; default false for legacy/cleared rows.
+    adsense_enabled: clean.adsense_enabled,
   }
 
   const { error } = await supabase.from('articles').insert(payload)
@@ -238,6 +241,9 @@ export async function updateArticle(
     // lib contract (boolean + uuid-or-null).
     affiliate_enabled: clean.affiliate_enabled,
     affiliate_collection_id: clean.affiliate_collection_id,
+    // AdSense Conservative (M3) per-content opt-in (migration 087). Strictly
+    // coerced boolean by lib/adsense; default false for legacy/cleared rows.
+    adsense_enabled: clean.adsense_enabled,
   }
 
   const { error, data } = await supabase

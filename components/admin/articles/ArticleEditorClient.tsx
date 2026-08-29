@@ -99,6 +99,10 @@ export default function ArticleEditorClient({
     article?.affiliate_collection_id || ''
   )
 
+  // AdSense Conservative (M3): a single opt-in ONLY — placement/format/slot
+  // are fixed surface contracts; account + slot ids are platform env config.
+  const [adsenseEnabled, setAdsenseEnabled] = useState(article?.adsense_enabled ?? false)
+
   // Publish Readiness errors
   const [publishErrors, setPublishErrors] = useState<Record<string, string>>({})
   const [actionModal, setActionModal] = useState<'publish' | 'archive' | 'restore' | null>(null)
@@ -222,6 +226,8 @@ export default function ArticleEditorClient({
     // Affiliate rail wiring (M1): enabled + collection id (null when off/none).
     affiliate_enabled: affiliateEnabled,
     affiliate_collection_id: affiliateEnabled && affiliateCollectionId ? affiliateCollectionId : null,
+    // AdSense Conservative (M3): opt-in boolean only.
+    adsense_enabled: adsenseEnabled,
   })
 
   const handleSave = () => {
@@ -824,6 +830,34 @@ export default function ArticleEditorClient({
                 </p>
               )}
             </div>
+          </div>
+
+          {/* AdSense Box (M3 Conservative) — opt-in ONLY. Placement (one unit
+              at the fixed editorial break) and the account/slot ids (platform
+              env config) are surface contracts, deliberately not editor
+              controls. No placement/density selector, no Auto Ads. */}
+          <div className="bg-[#1A140E] border border-[#D4AF37]/20 p-4 sm:p-6 rounded-xl space-y-4">
+            <h2 className="text-base font-bold text-[#F5E9D6] border-b border-[#D4AF37]/10 pb-3">
+              โฆษณา (AdSense)
+            </h2>
+
+            <label className="flex items-center gap-3 p-3 bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-lg cursor-pointer hover:border-[#D4AF37]/30 transition-colors">
+              <input
+                type="checkbox"
+                checked={adsenseEnabled}
+                onChange={(e) => {
+                  setAdsenseEnabled(e.target.checked)
+                  setIsDirty(true)
+                }}
+                className="w-4 h-4 rounded border-[rgba(255,255,255,0.15)] bg-[#0F0B07] accent-[#D4AF37] cursor-pointer"
+              />
+              <span>
+                <span className="block text-sm font-medium text-[#F5E9D6]">แสดงโฆษณาบนบทความนี้ (1 หน่วย)</span>
+                <span className="block text-xs text-[#A1866B] mt-0.5">
+                  แสดงหนึ่งหน่วยโฆษณาในตำแหน่งที่กำหนดหลังเนื้อหา — จะปรากฏเฉพาะเมื่อระบบมีการตั้งค่า AdSense ครบถ้วน
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Taxonomy Box */}

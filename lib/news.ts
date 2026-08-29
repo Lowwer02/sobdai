@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { coerceAffiliateContentFields } from '@/lib/affiliate'
+import { coerceAdsenseEnabled } from '@/lib/adsense'
 import type { NewsCardData } from '@/components/news/NewsCard'
 
 /**
@@ -160,6 +161,10 @@ export interface News {
   // collection resolves to >=1 published product.
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
+  // AdSense Conservative (M3) per-content opt-in (migration 087). Default-off
+  // on legacy rows; the public detail renders ONE manual unit only when this
+  // is true AND the platform env config resolves.
+  adsense_enabled: boolean
 }
 
 /**
@@ -191,6 +196,7 @@ export interface NewsInput {
   hide_from_homepage_when_expired: boolean
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
+  adsense_enabled: boolean
 }
 
 export const NEWS_STATUSES: { value: NewsStatus; label: string }[] = [
@@ -275,6 +281,9 @@ function coerce(raw: any): { input: NewsInput; rawSlug: string | undefined } {
       // Affiliate rail wiring (migration 085): strict boolean + uuid-or-null,
       // shared with the articles validator via the affiliate contract.
       ...coerceAffiliateContentFields(raw),
+      // AdSense Conservative (M3): strict per-content opt-in boolean
+      // (migration 087), shared with the articles validator via lib/adsense.
+      adsense_enabled: coerceAdsenseEnabled(raw.adsense_enabled),
     },
     rawSlug: str(raw.slug),
   }
