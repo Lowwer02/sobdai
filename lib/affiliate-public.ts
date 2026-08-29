@@ -7,6 +7,14 @@ import {
   cleanAffiliateUrl,
   type AffiliateRailProduct,
 } from '@/lib/affiliate'
+import {
+  AFFILIATE_LISTING_DEFAULTS,
+  AFFILIATE_LISTING_KEYS,
+  isAffiliateListingKey,
+  normalizeAffiliateListingSlot,
+  type AffiliateListingKey,
+  type AffiliateListingSlotConfig,
+} from '@/lib/affiliate-listing'
 
 /**
  * Public affiliate reads — the lib/articles-public.ts pattern: 'server-only'
@@ -90,6 +98,45 @@ export const getAffiliateRailProducts = cache(
     } catch (err) {
       console.error('Unexpected error in getAffiliateRailProducts:', err)
       return []
+    }
+  }
+)
+
+/**
+ * M2 listing-strip config: read BOTH listing slots in one bounded query and
+ * normalize each over its defaults. Missing rows / query errors / malformed
+ * values all resolve to the disabled defaults — the listing pages then render
+ * exactly as before M2. Callers still gate the product fetch on
+ * `enabled && collection_id` (and the item threshold) so a disabled listing
+ * costs this one tiny config read and nothing more.
+ */
+export const getAffiliateListingConfigs = cache(
+  async (): Promise<Record<AffiliateListingKey, AffiliateListingSlotConfig>> => {
+    const configs: Record<AffiliateListingKey, AffiliateListingSlotConfig> = {
+      ...AFFILIATE_LISTING_DEFAULTS,
+    }
+    try {
+      const supabase = createAnonServerClient()
+      const { data, error } = await supabase
+        .from('affiliate_listing_slots')
+        .select('listing_key, enabled, collection_id')
+        .in('listing_key', AFFILIATE_LISTING_KEYS)
+
+      if (error) {
+        console.error('getAffiliateListingConfigs query error:', error.message)
+        return configs
+      }
+
+      for (const row of (data ?? []) as any[]) {
+        const key: unknown = row?.listing_key
+        if (isAffiliateListingKey(key)) {
+          configs[key] = normalizeAffiliateListingSlot(row, key)
+        }
+      }
+      return configs
+    } catch (err) {
+      console.error('Unexpected error in getAffiliateListingConfigs:', err)
+      return configs
     }
   }
 )

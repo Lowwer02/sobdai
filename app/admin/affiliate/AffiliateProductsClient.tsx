@@ -15,6 +15,7 @@ import {
   Archive,
   RotateCcw,
   FolderOpen,
+  LayoutGrid,
 } from 'lucide-react'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
@@ -143,6 +144,12 @@ export default function AffiliateProductsClient({
             className="bg-[#1A140E] border border-[rgba(212,175,55,0.3)] hover:border-[#D4AF37] text-[#D4AF37] font-medium px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors w-fit"
           >
             <FolderOpen size={18} /> คอลเลกชัน
+          </Link>
+          <Link
+            href="/admin/affiliate/listing"
+            className="bg-[#1A140E] border border-[rgba(212,175,55,0.3)] hover:border-[#D4AF37] text-[#D4AF37] font-medium px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors w-fit"
+          >
+            <LayoutGrid size={18} /> Listing Strip
           </Link>
           <Link
             href="/admin/affiliate/create"

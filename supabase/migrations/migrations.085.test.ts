@@ -27,7 +27,6 @@ const executableSql = migration
 test('085 exists as a unique migration (next canonical number after 084)', () => {
   const files = readdirSync(migrationDir)
   assert.equal(files.filter((name) => /^085_.+\.sql$/.test(name)).length, 1)
-  assert.equal(files.filter((name) => /^086_.+\.sql$/.test(name)).length, 0)
 })
 
 test('085 creates the three affiliate tables with idempotent guards', () => {

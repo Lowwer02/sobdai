@@ -5,6 +5,13 @@ import { createPageMetadata } from '@/lib/seo'
 import { getPublishedArticlesList } from '@/lib/articles-public'
 import ArticleCard from '@/components/articles/ArticleCard'
 import ArticlePagination, { buildArticlePageHref } from '@/components/articles/ArticlePagination'
+import AffiliateListingStrip from '@/components/affiliate/AffiliateListingStrip'
+import { getAffiliateListingConfigs, getAffiliateRailProducts } from '@/lib/affiliate-public'
+import type { AffiliateRailProduct } from '@/lib/affiliate'
+import {
+  shouldRenderListingStrip,
+  splitForListingStrip,
+} from '@/lib/affiliate-listing'
 
 export const metadata = createPageMetadata({
   title: 'บทความเตรียมสอบราชการ | Sobdai',
@@ -52,6 +59,29 @@ export default async function ArticlesListPage({
   if (res.success && res.totalPages > 0 && page > res.totalPages) {
     redirect(buildArticlePageHref(res.totalPages, search, category, tag))
   }
+
+  // --- M2 listing monetization (independent guard: an affiliate failure must
+  //     never degrade the editorial list) ---
+  // Zero extra queries unless the page renders ≥7 items; then ONE config read,
+  // and the product read only when this listing's slot is enabled with a
+  // collection. Disabled/invalid/empty → stripProducts stays [] → no strip.
+  let stripProducts: AffiliateRailProduct[] = []
+  let stripCollectionId: string | null = null
+  if (res.success && shouldRenderListingStrip(res.data.length)) {
+    try {
+      const listingConfigs = await getAffiliateListingConfigs()
+      const slot = listingConfigs.articles_list
+      if (slot.enabled && slot.collection_id) {
+        stripCollectionId = slot.collection_id
+        stripProducts = await getAffiliateRailProducts(slot.collection_id)
+      }
+    } catch (err) {
+      console.error('Articles listing affiliate strip fetch failed:', err)
+    }
+  }
+  // Frozen insertion point: items 1–6 / strip / items 7+. (space-y-8 restores
+  // the grid rhythm automatically when the strip renders nothing.)
+  const stripSplit = splitForListingStrip(res.data)
 
   return (
     <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
@@ -142,11 +172,35 @@ export default async function ArticlesListPage({
 
         {res.success && res.data.length > 0 && (
           <div className="space-y-8">
+            {/* M2: two grids with the single affiliate strip between them —
+                the strip is its own full-width panel, never a fake card. */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {res.data.map((article, idx) => (
+              {stripSplit.before.map((article, idx) => (
                 <ArticleCard key={article.id} article={article} index={idx} />
               ))}
             </div>
+
+            {/* M2 listing strip: after item #6, only when ≥7 items render. */}
+            {shouldRenderListingStrip(res.data.length) && stripProducts.length > 0 && (
+              <AffiliateListingStrip
+                products={stripProducts}
+                collectionId={stripCollectionId}
+                listing="articles_list"
+              />
+            )}
+
+            {stripSplit.after.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                {stripSplit.after.map((article, idx) => (
+                  // Global index keeps the entrance stagger of the full list.
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    index={stripSplit.before.length + idx}
+                  />
+                ))}
+              </div>
+            )}
 
             <ArticlePagination
               currentPage={res.currentPage}

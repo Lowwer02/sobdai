@@ -10,6 +10,10 @@ import {
   validateAffiliateCollectionDraft,
   validateAffiliateCollectionForPublish,
 } from '@/lib/affiliate'
+import {
+  AFFILIATE_LISTING_KEYS,
+  validateAffiliateListingSettings,
+} from '@/lib/affiliate-listing'
 
 /**
  * Affiliate CMS — CRUD + lifecycle server actions (M1).
@@ -61,8 +65,11 @@ async function revalidateDependentPublicContent(collectionIds: string[]): Promis
     for (const row of (articlesRes.data ?? []) as { slug: string }[]) {
       revalidatePath(`/articles/${row.slug}`)
     }
-    if ((newsRes.data ?? []).length > 0) revalidatePath('/news')
-    if ((articlesRes.data ?? []).length > 0) revalidatePath('/articles')
+    // M2: collection mutations also affect the listing strips, which read a
+    // collection WITHOUT any content row referencing it. The listing pages are
+    // dynamic (searchParams-driven) so this is cheap insurance either way.
+    revalidatePath('/news')
+    revalidatePath('/articles')
   } catch (err) {
     console.error('revalidateDependentPublicContent failed (ISR self-heals in 300s):', err)
   }
@@ -541,4 +548,38 @@ export async function listAffiliateCollectionsForContent(): Promise<{
     return { success: false, data: [], error: 'ไม่สามารถโหลดรายการคอลเลกชันได้' }
   }
   return { success: true, data: (data ?? []) as { id: string; name: string; status: string }[] }
+}
+
+// ─── LISTING STRIP SETTINGS (M2) ─────────────────────────────────────────────
+
+/**
+ * Save the /news + /articles listing-strip config (one row per listing key in
+ * affiliate_listing_slots). The form always submits BOTH slots, so the two
+ * listings are saved atomically in ONE upsert while staying independently
+ * configurable. Position/threshold are frozen in code — nothing here can
+ * change them. Upsert (not update) so a missing seed row heals itself.
+ */
+export async function saveAffiliateListingSettings(
+  raw: unknown
+): Promise<{ success: boolean; error?: string }> {
+  const { supabase } = await requirePermission('content.write')
+
+  const { ok, errors, clean } = validateAffiliateListingSettings(raw)
+  if (!ok || !clean) return { success: false, error: formatErrors(errors) }
+
+  const rows = AFFILIATE_LISTING_KEYS.map((key) => ({
+    listing_key: key,
+    enabled: clean[key].enabled,
+    collection_id: clean[key].collection_id,
+  }))
+
+  const { error } = await supabase
+    .from('affiliate_listing_slots')
+    .upsert(rows, { onConflict: 'listing_key' })
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/affiliate/listing')
+  revalidatePath('/news')
+  revalidatePath('/articles')
+  return { success: true }
 }
