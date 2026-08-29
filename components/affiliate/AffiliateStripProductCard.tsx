@@ -60,12 +60,8 @@ export default function AffiliateStripProductCard({
       target="_blank"
       rel="nofollow sponsored noopener noreferrer"
       onClick={handleClick}
-      className="affiliate-strip-product-card focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-xl"
+      className="affiliate-strip-product-card affiliate-strip-card focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-xl"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        padding: 10,
         borderRadius: 12,
         border: '1px solid var(--border-card)',
         backgroundColor: 'var(--bg-card-2)',
@@ -73,14 +69,13 @@ export default function AffiliateStripProductCard({
         transition: 'border-color 0.2s, background-color 0.2s',
       }}
     >
-      {/* Thumbnail: reserved 1:1 box, lazy, never LCP-priority (the listing's
-          editorial cards own the LCP). */}
+      {/* Thumbnail: reserved 1:1 box (affiliate-listing-strip.css), lazy, never
+          LCP-priority (the listing's editorial cards own the LCP). Mobile keeps
+          the approved image-top layout; lg+ flips this card horizontal. */}
       <span
         aria-hidden
+        className="affiliate-strip-thumb"
         style={{
-          position: 'relative',
-          width: '100%',
-          aspectRatio: '1 / 1',
           borderRadius: 8,
           overflow: 'hidden',
           backgroundColor: 'var(--bg-card)',
@@ -104,7 +99,7 @@ export default function AffiliateStripProductCard({
         )}
       </span>
 
-      <span style={{ minWidth: 0, display: 'block' }}>
+      <span className="affiliate-strip-info">
         <span
           className="line-clamp-2"
           style={{

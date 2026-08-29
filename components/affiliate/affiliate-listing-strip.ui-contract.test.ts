@@ -21,6 +21,7 @@ import test from 'node:test'
 const componentDir = dirname(fileURLToPath(import.meta.url))
 const card = readFileSync(join(componentDir, 'AffiliateStripProductCard.tsx'), 'utf8')
 const strip = readFileSync(join(componentDir, 'AffiliateListingStrip.tsx'), 'utf8')
+const stripCss = readFileSync(join(componentDir, 'affiliate-listing-strip.css'), 'utf8')
 const appRoot = join(componentDir, '..', '..')
 const newsPage = readFileSync(join(appRoot, 'app', 'news', 'page.tsx'), 'utf8')
 const articlesPage = readFileSync(join(appRoot, 'app', 'articles', 'page.tsx'), 'utf8')
@@ -67,8 +68,30 @@ test('strip product images are lazy, non-priority, with reserved dimensions', ()
   assert.doesNotMatch(card, /from 'next\/image'/)
   assert.doesNotMatch(card, /\bpriority\b\s*[=}/]/)
   assert.match(card, /onError=\{\(\) => setImageFailed\(true\)\}/)
-  // Reserved aspect-ratio box so a failing/slow image cannot shift layout.
-  assert.match(card, /aspectRatio: '1 \/ 1'/)
+  // Reserved aspect-ratio box lives in affiliate-listing-strip.css so a
+  // failing/slow image cannot shift layout.
+  assert.match(card, /className="affiliate-strip-thumb"/)
+  assert.match(stripCss, /\.affiliate-strip-thumb\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1/)
+})
+
+test('desktop compaction is a mobile-first CSS-only transformation (QA refinement)', () => {
+  // Mobile-first base reproduces the approved mobile layout…
+  assert.match(stripCss, /\.affiliate-strip-products\s*\{[^}]*repeat\(auto-fit,\s*minmax\(150px,\s*1fr\)\)/)
+  assert.match(stripCss, /\.affiliate-strip-card\s*\{[^}]*flex-direction:\s*column/)
+  // …and exactly ONE desktop breakpoint flips to compact horizontal cells.
+  const mediaBlocks = stripCss.match(/@media[^{]+/g) ?? []
+  assert.equal(mediaBlocks.length, 1)
+  assert.match(mediaBlocks[0], /min-width:\s*1024px/) // the Tailwind `lg` breakpoint
+  const lgBlock = stripCss.slice(stripCss.indexOf('@media'))
+  assert.match(lgBlock, /flex:\s*1\s+1\s+200px/)
+  assert.match(lgBlock, /flex-direction:\s*row/)
+  assert.match(lgBlock, /align-items:\s*center/)
+  assert.match(lgBlock, /width:\s*96px/)
+  assert.match(lgBlock, /height:\s*96px/)
+  assert.match(lgBlock, /flex-shrink:\s*0/)
+  // The card consumes the classes; no brittle inline layout remains.
+  assert.match(card, /className="affiliate-strip-product-card affiliate-strip-card /)
+  assert.doesNotMatch(card, /flexDirection/)
 })
 
 test('the strip is a server component with hide-when-empty and the M1 disclosure', () => {

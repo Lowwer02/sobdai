@@ -3,6 +3,7 @@ import type { AffiliateRailProduct } from '@/lib/affiliate'
 import { AFFILIATE_LISTING_CONTENT, type AffiliateListingKey } from '@/lib/affiliate-listing'
 import AffiliateStripProductCard from './AffiliateStripProductCard'
 import { AFFILIATE_DISCLOSURE_TEXT } from './AffiliateRail'
+import './affiliate-listing-strip.css'
 
 /**
  * M2 — the ONE editorial affiliate strip for the public listing pages
@@ -81,15 +82,10 @@ export default function AffiliateListingStrip({
           อุปกรณ์สำหรับคนเตรียมสอบ
         </h2>
 
-        {/* Horizontal strip cells: auto-fit keeps 3–5 compact products on one
-            row on desktop and wraps naturally on mobile. */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: 10,
-          }}
-        >
+        {/* Strip cells: mobile keeps the approved auto-fit grid of vertical
+            cards; lg+ (affiliate-listing-strip.css) becomes compact horizontal
+            cells that fill the available width and wrap only when required. */}
+        <div className="affiliate-strip-products">
           {products.map((product) => (
             <AffiliateStripProductCard
               key={product.id}
