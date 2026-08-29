@@ -15,6 +15,14 @@ import NewsCard from '@/components/news/NewsCard'
 import NewsPagination, { buildNewsPageHref } from '@/components/news/NewsPagination'
 import NewsListControls from '@/components/news/NewsListControls'
 import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
+import AffiliateListingStrip from '@/components/affiliate/AffiliateListingStrip'
+import { getAffiliateListingConfigs, getAffiliateRailProducts } from '@/lib/affiliate-public'
+import type { AffiliateRailProduct } from '@/lib/affiliate'
+import {
+  AFFILIATE_LISTING_CONTENT,
+  shouldRenderListingStrip,
+  splitForListingStrip,
+} from '@/lib/affiliate-listing'
 
 
 /**
@@ -181,6 +189,29 @@ export default async function NewsListPage({
     fetchError = true
   }
 
+  // --- M2 listing monetization (independent guard: an affiliate failure must
+  //     never degrade the editorial list, so it lives OUTSIDE the try above) ---
+  // Zero extra queries unless the page renders ≥7 items; then ONE config read,
+  // and the product read only when this listing's slot is enabled with a
+  // collection. Disabled/invalid/empty → stripProducts stays [] → no strip.
+  let stripProducts: AffiliateRailProduct[] = []
+  let stripCollectionId: string | null = null
+  if (news.length > 0 && shouldRenderListingStrip(news.length)) {
+    try {
+      const listingConfigs = await getAffiliateListingConfigs()
+      const slot = listingConfigs.news_list
+      if (slot.enabled && slot.collection_id) {
+        stripCollectionId = slot.collection_id
+        stripProducts = await getAffiliateRailProducts(slot.collection_id)
+      }
+    } catch (err) {
+      console.error('News listing affiliate strip fetch failed:', err)
+    }
+  }
+  // Frozen insertion point: items 1–6 stay in the untouched card grid, the
+  // strip renders between the two grids, items 7+ continue after it.
+  const stripSplit = splitForListingStrip(news)
+
   const totalPages = total > 0 ? Math.ceil(total / PAGE_SIZE) : 0
   // Clamp an out-of-range ?page= so the pager + count stay consistent.
   const safePage = Math.min(page, Math.max(1, totalPages || 1))
@@ -293,32 +324,69 @@ export default async function NewsListPage({
               </div>
             )}
 
-            {/* Grid or empty state */}
+            {/* Grid or empty state. M2: the list renders as two grids with the
+                single affiliate strip between them — the strip is its own
+                full-width panel, never a fake news card inside the grid. */}
             {news.length > 0 ? (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                  gap: 20,
-                }}
-              >
-                {news.map((article, i) => (
-                  <Fragment key={article.id}>
-                    <NewsCard article={article} index={i} />
-                    {i === 2 && news.length >= 3 && (
-                      <div className="col-span-full" style={{ gridColumn: '1 / -1' }}>
-                        <NewsSocialFollowBox
-                          heading={socialFollowPlacement.heading}
-                          description={socialFollowPlacement.description}
-                          channels={resolvedSocialChannels}
-                          placement="news_list_banner"
-                          contentId="news-list"
-                        />
-                      </div>
-                    )}
-                  </Fragment>
-                ))}
-              </div>
+              <>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    gap: 20,
+                  }}
+                >
+                  {stripSplit.before.map((article, i) => (
+                    <Fragment key={article.id}>
+                      <NewsCard article={article} index={i} />
+                      {i === 2 && news.length >= 3 && (
+                        <div className="col-span-full" style={{ gridColumn: '1 / -1' }}>
+                          <NewsSocialFollowBox
+                            heading={socialFollowPlacement.heading}
+                            description={socialFollowPlacement.description}
+                            channels={resolvedSocialChannels}
+                            placement="news_list_banner"
+                            contentId="news-list"
+                          />
+                        </div>
+                      )}
+                    </Fragment>
+                  ))}
+                </div>
+
+                {/* M2 listing strip: after item #6, only when ≥7 items render.
+                    Disabled/invalid/empty → keep the grid's row rhythm instead. */}
+                {shouldRenderListingStrip(news.length) &&
+                  (stripProducts.length > 0 ? (
+                    <AffiliateListingStrip
+                      products={stripProducts}
+                      collectionId={stripCollectionId}
+                      listing="news_list"
+                    />
+                  ) : (
+                    <div aria-hidden style={{ height: 20 }} />
+                  ))}
+
+                {stripSplit.after.length > 0 && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                      gap: 20,
+                    }}
+                  >
+                    {stripSplit.after.map((article, i) => (
+                      // Global index keeps the entrance stagger (and the
+                      // above-the-fold image priority of the first 3 cards).
+                      <NewsCard
+                        key={article.id}
+                        article={article}
+                        index={stripSplit.before.length + i}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               // Empty state
               <div className="card" style={{ padding: '42px 20px', textAlign: 'center', minHeight: 300 }}>

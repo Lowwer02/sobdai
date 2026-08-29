@@ -264,6 +264,10 @@ export function trackSocialFollowClick(params: {
  * the browser opens the merchant tab; never during render/hydration, so no
  * duplicate events. placement is resolved at click time from the live viewport
  * ('sidebar' on desktop, 'inline_mobile' below the sidebar breakpoint).
+ *
+ * M2 adds 'listing_strip': the /news + /articles listing strips report ONE
+ * stable placement (no viewport resolution) and identify their surface through
+ * content_type + content_slug ('news-list' / 'articles-list').
  */
 export function trackAffiliateClick(params: {
   merchant: string
@@ -271,7 +275,7 @@ export function trackAffiliateClick(params: {
   collection_id: string | null
   content_type: 'news' | 'article'
   content_slug: string
-  placement: 'sidebar' | 'inline_mobile'
+  placement: 'sidebar' | 'inline_mobile' | 'listing_strip'
 }): void {
   pushToDataLayer({
     event: 'affiliate_click',
