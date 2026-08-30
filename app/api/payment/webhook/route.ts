@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     .select('id')
     .eq('user_id', user_id)
     .eq('package_id', package_id)
+    .eq('payment_provider', 'omise')
     .neq('status', ORDER_STATUS.PAID)
     .neq('status', ORDER_STATUS.FREE)
     .maybeSingle()
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       .select('id')
       .eq('user_id', user_id)
       .eq('package_id', package_id)
+      .eq('payment_provider', 'omise')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -70,6 +72,7 @@ export async function POST(request: NextRequest) {
         .from('orders')
         .update({ status: ORDER_STATUS.PAID })
         .eq('id', pendingOrder.id)
+        .eq('payment_provider', 'omise')
     } else {
       // Fallback: create a new order just in case it wasn't saved
       // But we don't have the amount, so we just query package

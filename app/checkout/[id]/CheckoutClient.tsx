@@ -8,24 +8,43 @@ import { ChevronLeft, ShieldCheck, CreditCard, QrCode, CheckCircle2, PlayCircle,
 import SupportDetails from '@/components/SupportDetails'
 import { freePackageClaimed } from '@/lib/analytics'
 import type { SupportConfig } from '@/lib/homepageConfig'
+import {
+  isPaymentSlipMimeType,
+  PAYMENT_SLIP_MAX_BYTES,
+  sanitizeOriginalFilename,
+  type PaymentSubmissionStatus,
+} from '@/lib/payment/manual'
+
+export interface ManualPaymentOrder {
+  id: string
+  amount: number
+  status: 'pending'
+  submissionStatus: PaymentSubmissionStatus | null
+  rejectionReason: string | null
+}
 
 interface CheckoutClientProps {
   pkg: any
   userEmail: string
   supportConfig?: SupportConfig
+  initialManualOrder?: ManualPaymentOrder | null
 }
 
 declare global {
   interface Window { OmiseCard: any }
 }
 
-export default function CheckoutClient({ pkg, userEmail, supportConfig }: CheckoutClientProps) {
+export default function CheckoutClient({ pkg, userEmail, supportConfig, initialManualOrder = null }: CheckoutClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [omiseLoaded, setOmiseLoaded] = useState(false)
   const [payMethod, setPayMethod] = useState<'card' | 'promptpay'>('card')
   const [claimedSuccess, setClaimedSuccess] = useState(false)
+  const [manualOrder, setManualOrder] = useState<ManualPaymentOrder | null>(initialManualOrder)
+  const [slipFile, setSlipFile] = useState<File | null>(null)
+  const [slipSubmitting, setSlipSubmitting] = useState(false)
+  const [fileInputKey, setFileInputKey] = useState(0)
 
   const discount = pkg.original_price > pkg.current_price 
     ? Math.round(((pkg.original_price - pkg.current_price) / pkg.original_price) * 100) 
@@ -40,6 +59,11 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig }: Checko
   }, [])
 
   const handleCardPayment = () => {
+    if (manualOrder?.submissionStatus === 'submitted') {
+      setError('ระบบได้รับสลิป PromptPay แล้ว กรุณารอการตรวจสอบ')
+      return
+    }
+
     if (!omiseLoaded || !window.OmiseCard) {
       setError('กำลังโหลดระบบชำระเงิน กรุณารอสักครู่')
       return
@@ -80,8 +104,89 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig }: Checko
     })
   }
 
-  const handlePromptPay = () => {
-    setError('ระบบ PromptPay อยู่ระหว่างการพัฒนา กรุณาใช้บัตรเครดิต/เดบิต')
+  const handlePromptPay = async () => {
+    if (loading || manualOrder) return
+
+    if (!supportConfig?.qr_image_url?.trim()) {
+      setError('ช่องทาง PromptPay ยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/payment/manual/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId: pkg.id }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setError(data.error || 'ไม่สามารถสร้างคำสั่งซื้อ PromptPay ได้')
+        return
+      }
+
+      setManualOrder({
+        id: data.orderId,
+        amount: Number(data.amount),
+        status: 'pending',
+        submissionStatus: null,
+        rejectionReason: null,
+      })
+    } catch {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSlipSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!manualOrder || slipSubmitting || manualOrder.submissionStatus === 'submitted') return
+
+    if (!slipFile) {
+      setError('กรุณาเลือกไฟล์สลิป')
+      return
+    }
+
+    if (!isPaymentSlipMimeType(slipFile.type) || slipFile.size <= 0 || slipFile.size > PAYMENT_SLIP_MAX_BYTES) {
+      setError('รองรับไฟล์ JPG, PNG, WEBP หรือ PDF ขนาดไม่เกิน 4 MB')
+      return
+    }
+
+    setSlipSubmitting(true)
+    setError('')
+
+    try {
+      const formData = new FormData()
+      formData.append('orderId', manualOrder.id)
+      formData.append('idempotencyKey', crypto.randomUUID())
+      formData.append('file', slipFile, sanitizeOriginalFilename(slipFile.name))
+
+      const res = await fetch('/api/payment/manual/slip', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setError(data.error || 'ไม่สามารถส่งสลิปได้ กรุณาลองใหม่')
+        return
+      }
+
+      setManualOrder((current) => current
+        ? { ...current, submissionStatus: 'submitted', rejectionReason: null }
+        : current)
+      setSlipFile(null)
+      setFileInputKey((key) => key + 1)
+    } catch {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+    } finally {
+      setSlipSubmitting(false)
+    }
   }
 
   const handleFreeCheckout = async () => {
@@ -336,11 +441,74 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig }: Checko
               <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
             </div>
 
+            {payMethod === 'promptpay' && manualOrder ? (
+              <div className="space-y-5 rounded-xl border border-[#D4AF37]/20 bg-[#0F0B07] p-4">
+                <div className="text-center">
+                  <h3 className="text-lg font-bold text-[#F5E9D6]">โอนเงินผ่าน PromptPay</h3>
+                  <p className="mt-1 text-sm text-[#A1866B]">กรุณาโอนยอดให้ตรงกับคำสั่งซื้อ</p>
+                  <p className="mt-2 text-3xl font-bold text-[#D4AF37]">฿{manualOrder.amount.toLocaleString()}</p>
+                </div>
+
+                {supportConfig?.qr_image_url ? (
+                  <SupportDetails
+                    qr_image_url={supportConfig.qr_image_url}
+                    promptpay_name={supportConfig.promptpay_name}
+                    bank_name={supportConfig.bank_name}
+                    account_number={supportConfig.account_number}
+                    showPlaceholderIfEmpty={false}
+                    qrSize={220}
+                  />
+                ) : (
+                  <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-center text-sm text-red-300">
+                    ไม่พบ QR สำหรับรับชำระเงิน กรุณาติดต่อผู้ดูแลระบบ
+                  </div>
+                )}
+
+                {manualOrder.submissionStatus === 'submitted' ? (
+                  <div className="rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 p-4 text-center text-sm text-[#F1D17A]">
+                    ได้รับสลิปแล้ว กำลังรอผู้ดูแลตรวจสอบ คุณจะได้รับสิทธิ์หลังการอนุมัติ
+                  </div>
+                ) : (
+                  <>
+                    {manualOrder.submissionStatus === 'rejected' && (
+                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300">
+                        สลิปก่อนหน้าถูกปฏิเสธ{manualOrder.rejectionReason ? `: ${manualOrder.rejectionReason}` : ''} กรุณาโอนใหม่และส่งหลักฐานอีกครั้ง
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSlipSubmit} className="space-y-3">
+                      <label htmlFor="payment-slip" className="block text-sm font-semibold text-[#F5E9D6]">
+                        แนบสลิปการโอนเงิน
+                      </label>
+                      <input
+                        key={fileInputKey}
+                        id="payment-slip"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        onChange={(event) => {
+                          setSlipFile(event.target.files?.[0] || null)
+                          setError('')
+                        }}
+                        className="block w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#1A140E] p-2 text-sm text-[#A1866B] file:mr-3 file:rounded-md file:border-0 file:bg-[#D4AF37] file:px-3 file:py-2 file:font-semibold file:text-[#1A140E]"
+                      />
+                      <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG, WEBP หรือ PDF ขนาดไม่เกิน 4 MB</p>
+                      <button
+                        type="submit"
+                        disabled={slipSubmitting || !slipFile}
+                        className="w-full rounded-lg bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {slipSubmitting ? 'กำลังอัปโหลดสลิป...' : 'ส่งสลิปให้ผู้ดูแลตรวจสอบ'}
+                      </button>
+                    </form>
+                  </>
+                )}
+              </div>
+            ) : (
             <button type="button"
               onClick={payMethod === 'card' ? handleCardPayment : handlePromptPay}
-              disabled={loading || !omiseLoaded}
+              disabled={loading || (payMethod === 'card' && !omiseLoaded)}
               className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
-                loading || !omiseLoaded
+                loading || (payMethod === 'card' && !omiseLoaded)
                   ? 'bg-[#A1866B] cursor-not-allowed opacity-70'
                   : 'bg-[#D4AF37] hover:bg-[#F1D17A] shadow-[0_0_20px_rgba(212,175,55,0.3)]'
               }`}
@@ -353,14 +521,17 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig }: Checko
                   </svg>
                   กำลังดำเนินการ...
                 </>
+              ) : payMethod === 'promptpay' ? (
+                'สร้างคำสั่งซื้อและแสดง QR PromptPay'
               ) : (
                 `ชำระเงิน ฿${pkg.current_price.toLocaleString()}`
               )}
             </button>
+            )}
 
             <p className="text-center text-xs text-[#A1866B] mt-6 leading-relaxed">
-              ระบบชำระเงินมีความปลอดภัยระดับโลกด้วยมาตรฐาน PCI DSS Level 1 <br/>
-              ข้อมูลบัตรของคุณจะไม่ถูกจัดเก็บไว้บนเซิร์ฟเวอร์ของเรา
+              ระบบจะตรวจสอบยอดและหลักฐานก่อนเปิดสิทธิ์แพ็กเกจ <br/>
+              กรุณาเก็บสลิปไว้จนกว่าการตรวจสอบจะเสร็จสิ้น
             </p>
           </div>
         )}
