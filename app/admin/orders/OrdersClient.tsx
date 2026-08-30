@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
 import { ORDER_STATUS } from '@/lib/orderUtils'
@@ -154,6 +155,7 @@ export default function OrdersClient({
               <option value={ORDER_STATUS.CANCELLED}>Cancelled</option>
               <option value="refunded">Refunded</option>
               <option value="revoked">Revoked</option>
+              <option value="payment_submitted">Payment Review</option>
             </select>
           </div>
         </div>
@@ -210,10 +212,18 @@ export default function OrdersClient({
                     }`}>
                       {order.status.toUpperCase()}
                     </span>
+                    {order.manual_payment_status && (
+                      <div className={`mt-2 text-[11px] font-semibold ${
+                        order.manual_payment_status === 'submitted' ? 'text-[#D4AF37]' :
+                        order.manual_payment_status === 'approved' ? 'text-[#22C55E]' : 'text-red-400'
+                      }`}>
+                        Slip: {order.manual_payment_status}
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {order.status === ORDER_STATUS.PENDING && (
+                      {order.status === ORDER_STATUS.PENDING && order.payment_provider !== 'promptpay_manual' && (
                         <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'complete' })}
                           disabled={actingOnId === order.id}
@@ -221,6 +231,18 @@ export default function OrdersClient({
                         >
                           Mark Paid
                         </button>
+                      )}
+                      {order.payment_provider === 'promptpay_manual' && (
+                        <Link
+                          href={`/admin/orders/${order.id}`}
+                          className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${
+                            order.manual_payment_status === 'submitted'
+                              ? 'bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20'
+                              : 'bg-[#0F0B07] text-[#A1866B] hover:text-[#F5E9D6]'
+                          }`}
+                        >
+                          {order.manual_payment_status === 'submitted' ? 'Review' : 'Details'}
+                        </Link>
                       )}
                       {(order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
                         <button type="button" 

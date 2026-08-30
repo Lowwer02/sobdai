@@ -2,8 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
 import { getHomepageSettings } from '@/lib/homepageConfig'
-import CheckoutClient from './CheckoutClient'
+import CheckoutClient, { type ManualPaymentOrder } from './CheckoutClient'
 import Link from 'next/link'
 import { createPageMetadata } from '@/lib/seo'
 
@@ -118,5 +119,43 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
     redirect(`/package/${pkg.slug}`)
   }
 
-  return <CheckoutClient pkg={pkg} userEmail={user.email || ''} supportConfig={homepageSettings.support} />
+  let manualOrder: ManualPaymentOrder | null = null
+
+  if (Number(pkg.current_price) > 0) {
+    const { data: pendingManualOrder } = await supabase
+      .from('orders')
+      .select('id, amount, status, payment_provider')
+      .eq('user_id', user.id)
+      .eq('package_id', id)
+      .eq('status', 'pending')
+      .eq('payment_provider', MANUAL_PAYMENT_PROVIDER)
+      .maybeSingle()
+
+    if (pendingManualOrder) {
+      const { data: latestSubmission } = await supabase
+        .from('payment_submissions')
+        .select('status, rejection_reason')
+        .eq('order_id', pendingManualOrder.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      manualOrder = {
+        id: pendingManualOrder.id,
+        amount: Number(pendingManualOrder.amount),
+        status: 'pending',
+        submissionStatus: (latestSubmission?.status as ManualPaymentOrder['submissionStatus']) || null,
+        rejectionReason: latestSubmission?.rejection_reason || null,
+      }
+    }
+  }
+
+  return (
+    <CheckoutClient
+      pkg={pkg}
+      userEmail={user.email || ''}
+      supportConfig={homepageSettings.support}
+      initialManualOrder={manualOrder}
+    />
+  )
 }
