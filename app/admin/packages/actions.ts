@@ -83,6 +83,7 @@ export async function createPackageAction(formData: FormData) {
   }
 
   revalidatePath('/admin/packages')
+  revalidatePath('/packages')
   revalidatePath('/')
   redirect('/admin/packages')
 }
@@ -150,6 +151,7 @@ export async function updatePackageAction(id: string, formData: FormData) {
   }
 
   revalidatePath('/admin/packages')
+  revalidatePath('/packages')
   revalidatePath(`/package/${formData.get('slug')}`) // revalidate public page too
   revalidatePath('/') // featured_homepage may have changed
   redirect('/admin/packages')
@@ -164,6 +166,7 @@ export async function deletePackageAction(id: string) {
     if (!data || data.length === 0) throw new Error('Delete failed. You may not have permission.')
 
     revalidatePath('/admin/packages')
+    revalidatePath('/packages')
     return { success: true }
   } catch (error: any) {
     console.error('Delete error:', error)
