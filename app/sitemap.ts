@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { PUBLIC_STATIC_ROUTES, absoluteUrl } from '@/lib/seo'
+import { PUBLIC_STATIC_ROUTES, absoluteUrl, isSelfCanonicalNewsArticle } from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import {
   getPublishedArticleSitemapRows,
@@ -77,13 +77,17 @@ async function getPackageRoutes(): Promise<SitemapEntry[]> {
  * (anon client, status = 'published') and ordering so the freshest articles
  * lead. lastModified falls back through updated_at → published_at → created_at
  * so a row always yields a valid timestamp.
+ *
+ * Rows whose editor-set canonical_url points at another URL are aliases of
+ * that target, not independent pages — they are filtered out so the sitemap
+ * only ever emits self-canonical URLs.
  */
 async function getNewsRoutes(): Promise<SitemapEntry[]> {
   try {
     const supabase = createAnonServerClient()
     const { data, error } = await supabase
       .from('news')
-      .select('slug, updated_at, published_at, created_at')
+      .select('slug, canonical_url, updated_at, published_at, created_at')
       .eq('status', 'published')
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('updated_at', { ascending: false })
@@ -92,17 +96,20 @@ async function getNewsRoutes(): Promise<SitemapEntry[]> {
 
     const rows = data as unknown as {
       slug: string
+      canonical_url: string | null
       updated_at: string | null
       published_at: string | null
       created_at: string
     }[]
 
-    return rows.map<SitemapEntry>((row) => ({
-      url: absoluteUrl(`/news/${row.slug}`),
-      lastModified: new Date(row.updated_at || row.published_at || row.created_at),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    }))
+    return rows
+      .filter((row) => isSelfCanonicalNewsArticle(row.slug, row.canonical_url))
+      .map<SitemapEntry>((row) => ({
+        url: absoluteUrl(`/news/${row.slug}`),
+        lastModified: new Date(row.updated_at || row.published_at || row.created_at),
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      }))
   } catch {
     return []
   }

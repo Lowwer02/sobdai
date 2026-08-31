@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { absoluteUrl, createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
+import { createPageMetadata, resolveNewsCanonicalUrl, SITE_ORGANIZATION } from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { coerceAffiliateContentFields } from '@/lib/affiliate'
 import { coerceAdsenseEnabled } from '@/lib/adsense'
@@ -472,14 +472,10 @@ export function resolveNewsSeo(
   canonical: string
   image: string | undefined
 } {
-  const publicPath = `/news/${article.slug}`
   return {
     title: article.seo_title?.trim() || article.title,
     description: article.seo_description?.trim() || article.excerpt?.trim() || undefined,
-    // canonical_url may already be absolute; absoluteUrl() passes http(s) through.
-    canonical: article.canonical_url?.trim()
-      ? absoluteUrl(article.canonical_url.trim())
-      : absoluteUrl(publicPath),
+    canonical: resolveNewsCanonicalUrl(article.slug, article.canonical_url),
     image: article.og_image_url?.trim() || article.cover_image_url?.trim() || undefined,
   }
 }

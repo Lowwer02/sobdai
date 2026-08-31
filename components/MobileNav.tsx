@@ -13,7 +13,9 @@ const NAV_LINKS = [
   { href: '/news', label: 'ข่าวสาร' },
   { href: '/exams', label: 'แดชบอร์ด' },
   { href: '/articles', label: 'บทความ' },
-  { href: '/downloads', label: 'คลังสื่อการเรียน' },
+  // '/downloads' (คลังสื่อการเรียน) is temporarily unlinked while the
+  // learning-media feature is unfinished; /downloads also 307s to /articles
+  // (next.config.ts). Restore this entry when the feature ships.
 ]
 
 interface MobileNavProps {

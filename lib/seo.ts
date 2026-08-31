@@ -24,7 +24,6 @@ export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
   { path: '/news', changeFrequency: 'daily', priority: 0.9 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.6 },
-  { path: '/downloads', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/cookies', changeFrequency: 'yearly', priority: 0.3 },
@@ -33,6 +32,39 @@ export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
 export function absoluteUrl(path = '/'): string {
   if (path.startsWith('http://') || path.startsWith('https://')) return path
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+/**
+ * Resolve a news row's canonical URL from its editor-set canonical_url, using
+ * the platform-wide fallback rule: blank → the row's own /news/<slug> URL.
+ *
+ * The SINGLE source of that normalization — lib/news.ts resolveNewsSeo (the
+ * page's <link rel="canonical">) and app/sitemap.ts (the sitemap filter) both
+ * read from here, so the rendered canonical and the sitemap can never
+ * disagree.
+ */
+export function resolveNewsCanonicalUrl(
+  slug: string,
+  canonical_url?: string | null
+): string {
+  // canonical_url may already be absolute; absoluteUrl() passes http(s) through.
+  return canonical_url?.trim()
+    ? absoluteUrl(canonical_url.trim())
+    : absoluteUrl(`/news/${slug}`)
+}
+
+/**
+ * Whether a news row's own /news/<slug> URL is also its canonical URL — i.e.
+ * the editor left canonical_url blank (self default) or pointed it back at
+ * this exact slug. A row canonicalizing elsewhere is an alias of that target,
+ * not an independent page, and must stay out of sitemap.xml: submitting a
+ * cross-canonical URL tells crawlers to index something the page disowns.
+ */
+export function isSelfCanonicalNewsArticle(
+  slug: string,
+  canonical_url?: string | null
+): boolean {
+  return resolveNewsCanonicalUrl(slug, canonical_url) === absoluteUrl(`/news/${slug}`)
 }
 
 /**

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { NEWS_HUB_DESCRIPTION, NEWS_HUB_H1, NEWS_HUB_SUBTITLE, NEWS_HUB_TITLE, SITE_NAME } from './seo.ts'
+import { NEWS_HUB_DESCRIPTION, NEWS_HUB_H1, NEWS_HUB_SUBTITLE, NEWS_HUB_TITLE, SITE_NAME, resolveNewsCanonicalUrl, isSelfCanonicalNewsArticle } from './seo.ts'
 
 /**
  * SEO-P2C — /news keyword-ownership contract.
@@ -50,4 +50,43 @@ test('practice-exam intent (แนวข้อสอบราชการ) is ab
   assert.equal(NEWS_HUB_H1.includes('แนวข้อสอบราชการ'), false)
   assert.equal(NEWS_HUB_DESCRIPTION.includes('แนวข้อสอบราชการ'), false)
   assert.equal(NEWS_HUB_SUBTITLE.includes('แนวข้อสอบราชการ'), false)
+})
+
+// ─── Sitemap canonical hygiene (AdSense readiness P0) ────────────────────────
+//
+// sitemap.xml must only ever list self-canonical news URLs. A row whose
+// editor-set canonical_url points at another slug is an alias of that target
+// (e.g. /news/led-recruitment-2026-1 → /news/led-recruitment-2026) and is
+// filtered out of the sitemap by isSelfCanonicalNewsArticle, which shares its
+// normalization with the page canonical via resolveNewsCanonicalUrl.
+
+test('news canonical resolver falls back to the row own /news/<slug> URL when canonical_url is blank', () => {
+  assert.equal(resolveNewsCanonicalUrl('led-recruitment-2026', null), 'https://sobdai.com/news/led-recruitment-2026')
+  assert.equal(resolveNewsCanonicalUrl('led-recruitment-2026', ''), 'https://sobdai.com/news/led-recruitment-2026')
+  assert.equal(resolveNewsCanonicalUrl('led-recruitment-2026', '   '), 'https://sobdai.com/news/led-recruitment-2026')
+  assert.equal(resolveNewsCanonicalUrl('led-recruitment-2026', undefined), 'https://sobdai.com/news/led-recruitment-2026')
+})
+
+test('news canonical resolver passes an editor-set canonical through trimmed (path or absolute)', () => {
+  assert.equal(resolveNewsCanonicalUrl('a', ' /news/b '), 'https://sobdai.com/news/b')
+  assert.equal(resolveNewsCanonicalUrl('a', 'https://external.example.com/story'), 'https://external.example.com/story')
+})
+
+test('a news row with blank canonical_url is self-canonical', () => {
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026', null), true)
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026', ''), true)
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026', undefined), true)
+})
+
+test('a news row canonicalizing back to its own URL is self-canonical', () => {
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026', '/news/led-recruitment-2026'), true)
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026', '  /news/led-recruitment-2026  '), true)
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026', 'https://sobdai.com/news/led-recruitment-2026'), true)
+})
+
+test('a news row canonicalizing elsewhere is NOT self-canonical (sitemap alias case)', () => {
+  // The audited production case: the alias slug canonicalizes to the real slug.
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026-1', '/news/led-recruitment-2026'), false)
+  assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026-1', 'https://sobdai.com/news/led-recruitment-2026'), false)
+  assert.equal(isSelfCanonicalNewsArticle('a', 'https://external.example.com/source-article'), false)
 })
