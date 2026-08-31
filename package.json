@@ -9,6 +9,7 @@
     "test:security-db": "node scripts/security/sec-profile-rbac-db-test.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1121.0",
     "@next/third-parties": "^16.2.12",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
@@ -26,6 +27,7 @@
     "remark-gfm": "^4.0.1",
     "remark-github-alerts": "^0.1.1",
     "remark-parse": "^11.0.0",
+    "sharp": "^0.35.4",
     "unified": "^11.0.0"
   },
   "devDependencies": {
