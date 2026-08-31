@@ -63,12 +63,25 @@ test('CheckoutClient prevents double claim once claim is pending or successful',
   assert.match(checkoutClientSource, /if \(loading \|\| claimedSuccess\) return/)
 })
 
-test('CheckoutClient preserves card checkout and uses the manual PromptPay flow', () => {
-  // Paid card payment still redirects to /package/${pkg.slug}?success=1
+test('CheckoutClient shows PromptPay as the only paid payment method', () => {
+  assert.match(checkoutClientSource, /useState<\'card\' \| \'promptpay\'>\(\'promptpay\'\)/)
+  assert.doesNotMatch(checkoutClientSource, /CreditCard|บัตรเครดิต\/เดบิต/)
+  assert.match(checkoutClientSource, /<QrCode size=\{24\}/)
+  assert.match(checkoutClientSource, /<span className="text-sm font-bold">พร้อมเพย์<\/span>/)
+  // Card/legacy behavior remains server-supported but is not exposed as a customer method.
   assert.match(checkoutClientSource, /handleCardPayment[\s\S]*router\.push\(`\/package\/\$\{pkg\.slug\}\?success=1`\)/)
   // PromptPay creates the server-owned order before showing the upload flow
   assert.match(checkoutClientSource, /fetch\('\/api\/payment\/manual\/order'/)
   assert.match(checkoutClientSource, /fetch\('\/api\/payment\/manual\/slip'/)
+  assert.match(checkoutClientSource, /สร้าง QR PromptPay เพื่อชำระเงิน/)
+  assert.doesNotMatch(checkoutClientSource, /สร้างคำสั่งซื้อและแสดง QR PromptPay/)
+})
+
+test('CheckoutClient copy limits lifetime access to the purchased package', () => {
+  assert.match(checkoutClientSource, /สิทธิ์ใช้งานแพ็กเกจนี้ตลอดชีพ/)
+  assert.match(checkoutClientSource, /ชำระครั้งเดียว ไม่มีค่ารายเดือน/)
+  assert.doesNotMatch(checkoutClientSource, /ซื้อครั้งเดียวใช้งานได้ตลอดชีพ/)
+  assert.doesNotMatch(checkoutClientSource, /12\s*(?:เดือน|month(?:s)?)/i)
 })
 
 test('SupportModal reuses extracted SupportDetails component with placeholder fallback', () => {

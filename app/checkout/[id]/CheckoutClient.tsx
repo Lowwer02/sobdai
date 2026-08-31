@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ChevronLeft, ShieldCheck, CreditCard, QrCode, CheckCircle2, PlayCircle, Heart } from 'lucide-react'
+import { ChevronLeft, ShieldCheck, QrCode, CheckCircle2, PlayCircle, Heart } from 'lucide-react'
 import SupportDetails from '@/components/SupportDetails'
 import { freePackageClaimed } from '@/lib/analytics'
 import type { SupportConfig } from '@/lib/homepageConfig'
@@ -39,7 +39,7 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [omiseLoaded, setOmiseLoaded] = useState(false)
-  const [payMethod, setPayMethod] = useState<'card' | 'promptpay'>('card')
+  const [payMethod, setPayMethod] = useState<'card' | 'promptpay'>('promptpay')
   const [claimedSuccess, setClaimedSuccess] = useState(false)
   const [manualOrder, setManualOrder] = useState<ManualPaymentOrder | null>(initialManualOrder)
   const [slipFile, setSlipFile] = useState<File | null>(null)
@@ -277,9 +277,17 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
             <ShieldCheck size={18} className="flex-shrink-0" />
             <div>
               <span className="font-bold">
-                {claimedSuccess ? 'เปิดใช้งานสิทธิ์เรียบร้อยแล้ว' : 'ซื้อครั้งเดียวใช้งานได้ตลอดชีพ'}
+                {claimedSuccess
+                  ? 'เปิดใช้งานสิทธิ์เรียบร้อยแล้ว'
+                  : pkg.current_price === 0
+                    ? 'แพ็กเกจนี้เปิดให้ใช้งานฟรี'
+                    : 'สิทธิ์ใช้งานแพ็กเกจนี้ตลอดชีพ'}
               </span>
-              <div className="text-xs opacity-80">ปลดล็อคเนื้อหาทั้งหมดในแพ็กเกจนี้ทันที</div>
+              <div className="text-xs opacity-80">
+                {pkg.current_price === 0
+                  ? 'ปลดล็อคเนื้อหาทั้งหมดในแพ็กเกจนี้ทันที'
+                  : 'ชำระครั้งเดียว ไม่มีค่ารายเดือน'}
+              </div>
             </div>
           </div>
         </div>
@@ -407,17 +415,6 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
 
             <div className="flex gap-3 mb-6">
               <button type="button"
-                onClick={() => setPayMethod('card')}
-                className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
-                  payMethod === 'card'
-                    ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]'
-                    : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] text-[#A1866B] hover:border-[#D4AF37]/50'
-                }`}
-              >
-                <CreditCard size={24} />
-                <span className="text-sm font-bold">บัตรเครดิต/เดบิต</span>
-              </button>
-              <button type="button"
                 onClick={() => setPayMethod('promptpay')}
                 className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
                   payMethod === 'promptpay'
@@ -522,7 +519,7 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
                   กำลังดำเนินการ...
                 </>
               ) : payMethod === 'promptpay' ? (
-                'สร้างคำสั่งซื้อและแสดง QR PromptPay'
+                'สร้าง QR PromptPay เพื่อชำระเงิน'
               ) : (
                 `ชำระเงิน ฿${pkg.current_price.toLocaleString()}`
               )}
