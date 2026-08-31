@@ -63,11 +63,12 @@ test('CheckoutClient prevents double claim once claim is pending or successful',
   assert.match(checkoutClientSource, /if \(loading \|\| claimedSuccess\) return/)
 })
 
-test('CheckoutClient preserves paid checkout flow exactly', () => {
+test('CheckoutClient preserves card checkout and uses the manual PromptPay flow', () => {
   // Paid card payment still redirects to /package/${pkg.slug}?success=1
   assert.match(checkoutClientSource, /handleCardPayment[\s\S]*router\.push\(`\/package\/\$\{pkg\.slug\}\?success=1`\)/)
-  // PromptPay placeholder unchanged
-  assert.match(checkoutClientSource, /handlePromptPay[\s\S]*ระบบ PromptPay อยู่ระหว่างการพัฒนา/)
+  // PromptPay creates the server-owned order before showing the upload flow
+  assert.match(checkoutClientSource, /fetch\('\/api\/payment\/manual\/order'/)
+  assert.match(checkoutClientSource, /fetch\('\/api\/payment\/manual\/slip'/)
 })
 
 test('SupportModal reuses extracted SupportDetails component with placeholder fallback', () => {
