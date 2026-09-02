@@ -110,22 +110,46 @@ function verifies_complete_pipeline_and_single_bank_read(): void {
 }
 
 function verifies_component_fatal_is_forwarded(): void {
+  // A wholly-absent learningObjective column still fails loud. (The
+  // question_pattern universal-null hotfix removed the Pattern axis from the
+  // Fatal path, so the LO axis isolates the missing-axis forwarding here.)
   const row = eligibleRow('Q-000001')
   const {
-    questionPattern: omittedQuestionPattern,
-    ...rowWithoutQuestionPattern
+    learningObjective: omittedLearningObjective,
+    ...rowWithoutLearningObjective
   } = row
-  void omittedQuestionPattern
+  void omittedLearningObjective
 
   const result = runGenerator({
     assemblyRequest: minimalRequest(),
-    bank: new CountingBankAdapter([rowWithoutQuestionPattern]),
+    bank: new CountingBankAdapter([rowWithoutLearningObjective]),
     identity: IDENTITY,
   })
 
   assert.equal(result.ok, false)
   if (result.ok) return
   assert.equal(result.fatalDiagnostics[0]?.category, 'missing_required_axis')
+}
+
+function verifies_universal_null_pattern_is_not_fatal_and_classified_unavailable(): void {
+  // question_pattern universal-null hotfix: every row lacking questionPattern
+  // must NOT halt generation — rows are retained and the emitted CandidateSet
+  // carries patternAvailability 'UNAVAILABLE' (degraded pattern semantics).
+  const rows = [
+    eligibleRow('Q-000001', { questionPattern: null }),
+    eligibleRow('Q-000002', { questionPattern: null }),
+  ]
+
+  const result = runGenerator({
+    assemblyRequest: minimalRequest(),
+    bank: new CountingBankAdapter(rows),
+    identity: IDENTITY,
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.candidateSet.candidates.length, 2)
+  assert.equal(result.candidateSet.patternAvailability, 'UNAVAILABLE')
 }
 
 function verifies_bank_failure_is_structured(): void {
@@ -202,6 +226,10 @@ const tests: readonly { readonly name: string; readonly fn: () => void }[] = [
   {
     name: 'forwards component fatal diagnostics',
     fn: verifies_component_fatal_is_forwarded,
+  },
+  {
+    name: 'universal-null question_pattern does not fatal and classifies UNAVAILABLE',
+    fn: verifies_universal_null_pattern_is_not_fatal_and_classified_unavailable,
   },
   {
     name: 'surfaces Bank read failures as bank_unreachable',

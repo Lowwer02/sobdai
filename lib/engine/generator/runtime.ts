@@ -24,6 +24,8 @@ import {
   type DiscoveryContext,
 } from './discovery'
 import {
+  classifyPatternAvailability,
+  deriveStructuralPatternPool,
   InMemoryBankAdapter,
   runFilters,
 } from './metadata-filters'
@@ -122,11 +124,29 @@ export function runGenerator(
       ctx: context,
       options: input.expansionOptions,
     })
+
+    const initialStructuralRows = deriveStructuralPatternPool(bankRows.rows, plan)
+    const expansionActivated =
+      expansionResult.expansionReport.phasesRun.includes('search_window')
+    const supplementalStructuralRows =
+      expansionActivated && input.supplementalRows && input.supplementalRows.length > 0
+        ? deriveStructuralPatternPool(input.supplementalRows, plan)
+        : []
+    const combinedStructuralPool = [
+      ...initialStructuralRows,
+      ...supplementalStructuralRows,
+    ]
+    const patternAvailability =
+      combinedStructuralPool.length > 0
+        ? classifyPatternAvailability(combinedStructuralPool)
+        : undefined
+
     const candidateSet = emitCandidateSet({
       expansion: expansionResult,
       exclusionsLog: filterResult.rejectionLog,
       identity: input.identity,
       constraintSnapshot: projectConstraintSnapshot(request),
+      patternAvailability,
     })
 
     return {

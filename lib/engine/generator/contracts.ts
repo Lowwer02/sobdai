@@ -101,6 +101,15 @@ export type GeneratorSeverity = 'Pass' | 'Warning' | 'Blocking' | 'Fatal'
 export type ConfidenceLevel = 'full' | 'reduced'
 
 /**
+ * Pattern availability state for the filtered structural eligible pool.
+ *
+ * - 'FULL'       — every row in the pool has a usable non-null questionPattern.
+ * - 'PARTIAL'    — at least one row has a usable pattern, AND at least one row has NULL/absent.
+ * - 'UNAVAILABLE'— every row has NULL/absent questionPattern.
+ */
+export type PatternAvailability = 'FULL' | 'PARTIAL' | 'UNAVAILABLE'
+
+/**
  * Per-axis completeness flag (§5.2, §9.2). Binary per axis: a Candidate's
  * metadata is either `complete` or `incomplete` for each IG-2 axis.
  *
@@ -622,6 +631,7 @@ export interface CandidateSet {
   readonly statistics: CandidateStatistics
   readonly exclusionsLog: readonly ExclusionEntry[]
   readonly meta: CandidateSetMeta
+  readonly patternAvailability?: PatternAvailability
 }
 
 /**

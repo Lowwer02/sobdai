@@ -424,20 +424,20 @@ function property_stable_ordering_statistics_stable(): void {
 //    (§4.2 / §11.2 / §11.4)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function property_fail_loud_missing_required_pattern_axis_is_fatal(): void {
-  // If EVERY row lacks the IG-2 question_pattern axis, the Pattern Filter goes
-  // Fatal (§11.2) — it must NOT silently skip the filter (§11.4 No Silent
-  // Weakening). runFilters returns ok:false with a 'missing_required_axis'.
+function property_fail_loud_missing_required_pattern_axis_is_not_fatal(): void {
+  // question_pattern universal-null hotfix: if EVERY row lacks the IG-2
+  // question_pattern axis, the Pattern Filter must NOT fatal anymore — rows
+  // are retained and the pool classifies as UNAVAILABLE (degraded semantics).
+  // learningObjective is populated so the LO filter doesn't fatal instead.
   const request = minimalRequest()
   const plan = planQuery(request)
   const adapter = new InMemoryBankAdapter(
-    okRows(3, { questionPattern: undefined }) // entirely absent column
+    okRows(3, { questionPattern: undefined, learningObjective: 'LO1' })
   )
   const result = runFilters(adapter, plan)
-  assert.equal(result.ok, false, 'entirely-absent pattern axis is Fatal')
-  if (!result.ok) {
-    assert.equal(result.fatalDiagnostics[0]!.category, 'missing_required_axis')
-    assert.equal(result.fatalDiagnostics[0]!.severity, 'Fatal')
+  assert.equal(result.ok, true, 'entirely-absent pattern axis is not Fatal')
+  if (result.ok) {
+    assert.equal(result.rows.length, 3)
   }
 }
 
@@ -721,7 +721,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'Stable Ordering: emitted order stable across runs', fn: property_stable_ordering_no_input_order_leak },
   { name: 'Stable Ordering: statistics stable', fn: property_stable_ordering_statistics_stable },
   // 6. Fail Loud
-  { name: 'Fail Loud: entirely-absent pattern axis is Fatal', fn: property_fail_loud_missing_required_pattern_axis_is_fatal },
+  { name: 'universal-null hotfix: entirely-absent pattern axis is NOT Fatal', fn: property_fail_loud_missing_required_pattern_axis_is_not_fatal },
   { name: 'Fail Loud: entirely-absent LO axis is Fatal', fn: property_fail_loud_missing_required_lo_axis_is_fatal },
   { name: 'Fail Loud: partial-null axis is NOT fatal', fn: property_fail_loud_partial_null_axis_not_fatal },
   { name: 'Fail Loud: conflicting duplicate Code is Fatal', fn: property_fail_loud_duplicate_code_conflict_is_fatal },

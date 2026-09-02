@@ -38,6 +38,8 @@ import {
   patternFilter,
   runFilters,
   statusFilter,
+  classifyPatternAvailability,
+  deriveStructuralPatternPool,
 } from './metadata-filters'
 import { FILTER_EXECUTION_ORDER } from './contracts'
 import type { QueryPlan } from './contracts'
@@ -374,19 +376,19 @@ function verifies_pattern_rejects_out_of_enum(): void {
 }
 
 /**
- * Session 6.26A refinement: the standalone patternFilter now PRESERVES the
- * IG-2 Fatal outcome (previously it was silently flattened to empty kept[]).
- * A wholly-absent pattern column surfaces as `{kind:'fatal', axis}` at the
- * standalone API level — exactly the outcome runFilters turns into the
- * `ok:false` FilterStageResult. This is strictly better coverage; runtime
- * behaviour is unchanged (runFilters still halts Fatal on the same condition).
+ * question_pattern universal-null hotfix: a wholly-absent pattern column is
+ * NO longer a Fatal outcome at the standalone API level. The rows are
+ * retained through this axis (universal-null bypass) and the runtime
+ * classifies the pool as 'UNAVAILABLE' (degraded pattern semantics). The
+ * Learning Objective axis remains fail-loud (see its counterpart below).
  */
-function verifies_pattern_exposes_fatal_at_standalone_level(): void {
+function verifies_pattern_universal_null_is_not_fatal_at_standalone_level(): void {
   const rows = buildBankRows(2) // default: questionPattern null on every row
   const o = patternFilter(rows, defaultPlan())
-  assert.equal(o.kind, 'fatal')
-  if (o.kind !== 'fatal') return
-  assert.equal(o.axis, 'question_pattern')
+  assert.equal(o.kind, 'result')
+  if (o.kind !== 'result') return
+  assert.equal(o.kept.length, 2)
+  assert.equal(o.rejected.length, 0)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -539,21 +541,17 @@ function verifies_runFilters_noop_sink_default_does_not_throw(): void {
 // IG-2 fail-loud
 // ═══════════════════════════════════════════════════════════════════════════
 
-function verifies_runFilters_fatal_when_pattern_column_absent(): void {
-  // Every row has questionPattern === null (the field's default). Per §11.2 the
-  // Generator halts Fatal — it must NOT silently skip the Pattern Filter.
-  const rows = buildBankRows(3) // default: questionPattern null/undefined
+function verifies_runFilters_admits_wholly_absent_pattern_column(): void {
+  // Every row has questionPattern === null. This must NOT fatal: the rows are
+  // retained and the pool's pattern availability is UNAVAILABLE (degraded).
+  // learningObjective is populated so the LO filter doesn't fatal instead.
+  const rows = buildBankRows(3, { learningObjective: 'LO1' })
   const adapter = new InMemoryBankAdapter(rows)
   const r = runFilters(adapter, singleDocPlan())
-  assert.equal(r.ok, false)
-  if (r.ok) return
-  assert.equal(r.fatalDiagnostics.length, 1)
-  assert.equal(r.fatalDiagnostics[0]!.category, 'missing_required_axis')
-  assert.equal(r.fatalDiagnostics[0]!.severity, 'Fatal')
-  assert.ok(
-    r.fatalDiagnostics[0]!.explanation.includes('question_pattern'),
-    'Fatal explanation must name the missing axis'
-  )
+  assert.equal(r.ok, true)
+  if (!r.ok) return
+  assert.equal(r.rows.length, 3)
+  assert.equal(r.rejectionLog.length, 0)
 }
 
 function verifies_runFilters_fatal_when_lo_column_absent(): void {
@@ -680,6 +678,110 @@ function stripComments(src: string): string {
 
 // ─── runner ─────────────────────────────────────────────────────────────────
 
+// ─── question_pattern universal-null hotfix: availability classifier ───────
+
+function verifies_pattern_classifier_all_populated_is_full() {
+  const rows = [
+    buildBankRow({ questionCode: 'Q1', questionPattern: 'Positive' }),
+    buildBankRow({ questionCode: 'Q2', questionPattern: 'Negative' }),
+  ]
+  assert.strictEqual(classifyPatternAvailability(rows), 'FULL')
+}
+
+function verifies_pattern_classifier_mixed_is_partial() {
+  const rows = [
+    buildBankRow({ questionCode: 'Q1', questionPattern: 'Positive' }),
+    buildBankRow({ questionCode: 'Q2', questionPattern: null }),
+  ]
+  assert.strictEqual(classifyPatternAvailability(rows), 'PARTIAL')
+}
+
+function verifies_pattern_classifier_all_null_is_unavailable() {
+  const rows = [
+    buildBankRow({ questionCode: 'Q1', questionPattern: null }),
+    buildBankRow({ questionCode: 'Q2', questionPattern: undefined }),
+  ]
+  assert.strictEqual(classifyPatternAvailability(rows), 'UNAVAILABLE')
+}
+
+function verifies_pattern_classifier_empty_throws() {
+  assert.throws(
+    () => classifyPatternAvailability([]),
+    (err: unknown) => (err as Error).message.includes('precondition failed')
+  )
+}
+
+function verifies_pattern_classifier_does_not_mutate_input() {
+  const row = buildBankRow({ questionCode: 'Q1', questionPattern: 'Positive' })
+  const rows = [row]
+  const beforeStr = stableStringify(rows)
+  classifyPatternAvailability(rows)
+  assert.strictEqual(stableStringify(rows), beforeStr)
+}
+
+function verifies_transient_exclusions_do_not_distort_availability() {
+  const rows = [
+    okRow('Q-000001', { questionPattern: 'Positive', learningObjective: 'LO1' }),
+    okRow('Q-000002', { questionPattern: null, learningObjective: 'LO1' }),
+  ]
+  const planWithExcl = planQuery(
+    buildAssemblyRequest({
+      documentRegistry: [{ id: 'LAW-ACT-HED-2562', name: 'LAW-ACT-HED-2562', tier: 1 }],
+      exclusions: ['Q-000001'],
+    })
+  )
+  const pool = deriveStructuralPatternPool(rows, planWithExcl)
+  assert.strictEqual(classifyPatternAvailability(pool), 'PARTIAL')
+}
+
+function verifies_structural_pool_availability_full_partial_unavailable() {
+  const plan = singleDocPlan()
+
+  // FULL
+  const fullRows = [
+    okRow('Q-000001', { questionPattern: 'Positive', learningObjective: 'LO1' }),
+    okRow('Q-000002', { questionPattern: 'Negative', learningObjective: 'LO1' }),
+  ]
+  const poolFull = deriveStructuralPatternPool(fullRows, plan)
+  assert.strictEqual(classifyPatternAvailability(poolFull), 'FULL')
+
+  // PARTIAL
+  const partialRows = [
+    okRow('Q-000001', { questionPattern: 'Positive', learningObjective: 'LO1' }),
+    okRow('Q-000002', { questionPattern: null, learningObjective: 'LO1' }),
+  ]
+  const poolPartial = deriveStructuralPatternPool(partialRows, plan)
+  assert.strictEqual(classifyPatternAvailability(poolPartial), 'PARTIAL')
+
+  // UNAVAILABLE
+  const unavailRows = [
+    okRow('Q-000001', { questionPattern: null, learningObjective: 'LO1' }),
+    okRow('Q-000002', { questionPattern: null, learningObjective: 'LO1' }),
+  ]
+  const poolUnavail = deriveStructuralPatternPool(unavailRows, plan)
+  assert.strictEqual(classifyPatternAvailability(poolUnavail), 'UNAVAILABLE')
+}
+
+function verifies_wrong_document_and_unpublished_rows_do_not_affect_availability() {
+  const plan = singleDocPlan()
+
+  // Wrong document has Pattern, permitted document has null Pattern
+  const wrongDocRows = [
+    okRow('Q-000001', { document: 'OTHER-DOC', questionPattern: 'Positive', learningObjective: 'LO1' }),
+    okRow('Q-000002', { document: 'LAW-ACT-HED-2562', questionPattern: null, learningObjective: 'LO1' }),
+  ]
+  const pool1 = deriveStructuralPatternPool(wrongDocRows, plan)
+  assert.strictEqual(classifyPatternAvailability(pool1), 'UNAVAILABLE')
+
+  // Unpublished row has Pattern, Published row has null Pattern
+  const unpubRows = [
+    okRow('Q-000001', { status: 'Draft', questionPattern: 'Positive', learningObjective: 'LO1' }),
+    okRow('Q-000002', { status: 'Published', questionPattern: null, learningObjective: 'LO1' }),
+  ]
+  const pool2 = deriveStructuralPatternPool(unpubRows, plan)
+  assert.strictEqual(classifyPatternAvailability(pool2), 'UNAVAILABLE')
+}
+
 const tests: Array<{ name: string; fn: () => void }> = [
   // Exclusion
   { name: 'exclusion: drops listed Codes', fn: verifies_exclusion_drops_listed_codes },
@@ -704,7 +806,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'pattern: admits valid values (incl. two-word Matching Concept)', fn: verifies_pattern_admits_valid_values },
   { name: 'pattern: admits null axis (Maximum Recall)', fn: verifies_pattern_admits_null_axis },
   { name: 'pattern: rejects out-of-enum', fn: verifies_pattern_rejects_out_of_enum },
-  { name: 'pattern (6.26A): standalone filter preserves the Fatal outcome', fn: verifies_pattern_exposes_fatal_at_standalone_level },
+  { name: 'pattern: standalone filter does not fatal on universal null', fn: verifies_pattern_universal_null_is_not_fatal_at_standalone_level },
   // Learning Objective
   { name: 'LO: admits LO1..LO4', fn: verifies_lo_admits_valid_values },
   { name: 'LO: admits null axis (Maximum Recall)', fn: verifies_lo_admits_null_axis },
@@ -718,9 +820,18 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'runFilters: emits one counter per reducing filter', fn: verifies_runFilters_emits_counter_per_reducing_filter },
   { name: 'runFilters: noop sink default does not throw', fn: verifies_runFilters_noop_sink_default_does_not_throw },
   // IG-2 fail-loud
-  { name: 'IG-2 fail-loud: wholly-absent pattern column → Fatal missing_required_axis', fn: verifies_runFilters_fatal_when_pattern_column_absent },
+  { name: 'IG-2: wholly-absent pattern column does not fatal', fn: verifies_runFilters_admits_wholly_absent_pattern_column },
   { name: 'IG-2 fail-loud: wholly-absent LO column → Fatal missing_required_axis', fn: verifies_runFilters_fatal_when_lo_column_absent },
   { name: 'IG-2: partial axis presence is NOT fatal (nulls admitted)', fn: verifies_runFilters_partial_axis_presence_is_not_fatal },
+  // Pattern availability classifier (question_pattern universal-null hotfix)
+  { name: 'classifier: all populated → FULL', fn: verifies_pattern_classifier_all_populated_is_full },
+  { name: 'classifier: mixed → PARTIAL', fn: verifies_pattern_classifier_mixed_is_partial },
+  { name: 'classifier: all null → UNAVAILABLE', fn: verifies_pattern_classifier_all_null_is_unavailable },
+  { name: 'classifier: empty pool → throws (precondition)', fn: verifies_pattern_classifier_empty_throws },
+  { name: 'classifier: immutability (does not mutate input rows)', fn: verifies_pattern_classifier_does_not_mutate_input },
+  { name: 'structural availability: transient exclusions do not distort availability', fn: verifies_transient_exclusions_do_not_distort_availability },
+  { name: 'structural availability: FULL / PARTIAL / UNAVAILABLE propagation', fn: verifies_structural_pool_availability_full_partial_unavailable },
+  { name: 'structural availability: wrong-document/unpublished rows do not affect availability', fn: verifies_wrong_document_and_unpublished_rows_do_not_affect_availability },
   // Determinism + immutability
   { name: 'determinism: same input → same FilterStageResult', fn: verifies_runFilters_is_deterministic },
   { name: 'immutability: runFilters does not mutate input rows', fn: verifies_runFilters_does_not_mutate_input_rows },
