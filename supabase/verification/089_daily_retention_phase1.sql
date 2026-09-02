@@ -150,4 +150,12 @@ where exp_earned not between 0 and 50
 -- terminal-answer count disagrees with the JSON object cardinality; expected 0.
 select count(*) as inconsistent_daily_answer_counts
 from public.user_daily_progress
-where questions_answered <> jsonb_object_length(answers);
+where questions_answered <> (
+    select count(*)
+    from jsonb_object_keys(
+        case
+            when jsonb_typeof(answers) = 'object' then answers
+            else '{}'::jsonb
+        end
+    ) as answer_key
+);
