@@ -41,7 +41,7 @@ export default function HomeFeaturedExams({ packages, config }: HomeFeaturedExam
             {config.title || 'เลือกแนวข้อสอบราชการตามหน่วยงานและตำแหน่ง'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
-            {config.subtitle || 'แต่ละชุดข้อสอบมาพร้อมสรุปเนื้อหา แบบฝึกหัด เฉลยละเอียด และการติดตามความพร้อม'}
+            {config.subtitle || 'แต่ละชุดข้อสอบมาพร้อมแบบฝึกหัด เฉลยละเอียด และระบบติดตามความพร้อมรายบุคคล'}
           </p>
         </div>
 
