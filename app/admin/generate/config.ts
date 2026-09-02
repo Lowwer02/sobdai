@@ -1,10 +1,10 @@
 export const ADMIN_ASSESSMENT_BLUEPRINTS = [
   {
-    key: 'bma-education-specialist@3.0.0',
+    key: 'bma-education-specialist@3.0.1',
     id: 'bma-education-specialist',
-    version: '3.0.0',
+    version: '3.0.1',
     title: 'นักวิชาการศึกษา — กรุงเทพมหานคร',
-    description: 'Simulation Blueprint v3.0 · 5 sets · 100 questions per set',
+    description: 'Simulation Blueprint v3.0.1 · 5 sets · 100 questions per set',
     sourcePath: 'Blueprint/simulation_exam_blueprint.md',
     packageCode: 'KSB-EDU-2026-V10',
   },

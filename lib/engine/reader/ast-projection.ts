@@ -566,8 +566,20 @@ function projectLoDistributionTargets(
     if (lo === null) continue
     const range = parseRange(cells[1]!)
     if (range === null) continue
-    // Midpoint as the representative target percent.
-    const targetPercent = Math.round((range.min + range.max) / 2)
+    // Authored exact Target (optional trailing column, mirroring the Pattern
+    // Distribution Target table's Min/Max/Target convention). A Blueprint that
+    // authors a Target pins the representative percent verbatim. Legacy
+    // 4-column rows — and rows whose trailing cell is not an integer — keep
+    // the midpoint derivation unchanged.
+    const explicitTarget = parseInt(
+      cells[cells.length - 1]!.replace(/\*\*/g, ''),
+      10
+    )
+    const targetPercent =
+      cells.length >= 5 && Number.isFinite(explicitTarget)
+        ? explicitTarget
+        : // Midpoint as the representative target percent (legacy).
+          Math.round((range.min + range.max) / 2)
     out.push({
       lo,
       minPercent: range.min,

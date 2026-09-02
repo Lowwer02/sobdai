@@ -148,6 +148,55 @@ function verifies_lo_distribution_targets_midpoint(): void {
   assert.equal(lo1!.targetPercent, 23)
 }
 
+function verifies_lo_distribution_explicit_target_column_pins_target(): void {
+  // An authored exact Target column (the Pattern Distribution Target table's
+  // Min/Max/Target convention) pins the representative percent verbatim. The
+  // authored range stays on minPercent/maxPercent, and the integers total 100
+  // — the Solver's LO distribution contract.
+  const legacy = buildStage5CompleteBlueprint()
+  const withTargets = legacy.replace(
+    [
+      '| LO | สัดส่วน | จำนวน/ชุด | เหตุผล |',
+      '|---|---|---|---|',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน |',
+      '| LO2 | 30–35% | 30–35 | แกนหลัก |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ |',
+      '| LO4 | 15–20% | 15–20 | คิดสูง |',
+    ].join('\n'),
+    [
+      '| LO | สัดส่วน | จำนวน/ชุด | เหตุผล | Target |',
+      '|---|---|---|---|---|',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน | 24 |',
+      '| LO2 | 30–35% | 30–35 | แกนหลัก | 34 |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ | 24 |',
+      '| LO4 | 15–20% | 15–20 | คิดสูง | 18 |',
+      '| **รวม** | — | — | — | **100** |',
+    ].join('\n')
+  )
+  assert.notEqual(withTargets, legacy, 'fixture replacement must apply')
+  const r = loadBlueprint(withTargets)
+  if (!r.ok) throw new Error(`load failed: ${r.reason}`)
+  const ast = projectToBlueprintAst(r.document, normalizeMetadata(r.document.metadata))
+  assert.equal(ast.loDistributionTargets.length, 4)
+  const expected: Record<string, number> = { LO1: 24, LO2: 34, LO3: 24, LO4: 18 }
+  for (const t of ast.loDistributionTargets) {
+    assert.equal(
+      t.targetPercent,
+      expected[t.lo],
+      `${t.lo} target is the authored exact value`
+    )
+    assert.ok(
+      t.targetPercent >= t.minPercent && t.targetPercent <= t.maxPercent,
+      `${t.lo} target lies inside the authored range`
+    )
+  }
+  const total = ast.loDistributionTargets.reduce(
+    (sum, t) => sum + t.targetPercent,
+    0
+  )
+  assert.equal(total, 100, 'authored targets total 100')
+}
+
 // ─── Pattern Definitions + Distribution + Correspondence ────────────────────
 
 function verifies_pattern_definitions_all_six_including_matching_concept(): void {
@@ -295,6 +344,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'CR-2 binding extracts 70% threshold', fn: verifies_cr2_extracts_seventy_percent },
   { name: 'LO Definitions: 4 LOs with LO↔Type map', fn: verifies_lo_definitions_parse_with_type_map },
   { name: 'LO Distribution Targets: midpoint computed from range', fn: verifies_lo_distribution_targets_midpoint },
+  { name: 'LO Distribution Targets: explicit Target column pins the target', fn: verifies_lo_distribution_explicit_target_column_pins_target },
   { name: 'Pattern Definitions: ALL 6 including Matching Concept (D-6 regression)', fn: verifies_pattern_definitions_all_six_including_matching_concept },
   { name: 'Pattern Distribution Targets: 6 with min/max/target', fn: verifies_pattern_distribution_targets_all_six },
   { name: 'Pattern × Type correspondence marks Primary cells', fn: verifies_pattern_type_correspondence_marks_primary },
