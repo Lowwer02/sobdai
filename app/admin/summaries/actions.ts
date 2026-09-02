@@ -7,9 +7,11 @@ import {
   assertPackageIdsAvailable,
   buildCreateSelection,
   buildEditSelection,
+  buildSummaryRevalidationPaths,
   deriveSummaryKind,
   hydrateCurrentPackageIds,
   requiredSummaryIdentifier,
+  shouldRepublishEditedSummary,
   stripEditPublicationState,
   type AdminSummaryKind,
 } from './summary-action-logic'
@@ -52,11 +54,14 @@ async function resolveSummaryForEdit(
   readonly id: string
   readonly summary_code: unknown
   readonly package_id: unknown
+  readonly slug: unknown
+  /** Server-resolved pre-edit publication state; never client-supplied. */
+  readonly wasPublished: boolean
 }> {
   const resolvedSummaryId = requiredSummaryIdentifier(summaryId, 'summaryId')
   const { data, error } = await supabase
     .from('summaries')
-    .select('id, summary_code, package_id')
+    .select('id, summary_code, package_id, slug, is_published')
     .eq('id', resolvedSummaryId)
     .maybeSingle()
 
@@ -77,6 +82,8 @@ async function resolveSummaryForEdit(
     id: resolvedId,
     summary_code: data.summary_code,
     package_id: data.package_id,
+    slug: data.slug,
+    wasPublished: data.is_published === true,
   }
 }
 
@@ -86,11 +93,13 @@ async function resolveSummaryForPublication(
 ): Promise<{
   readonly id: string
   readonly summary_code: unknown
+  readonly package_id: unknown
+  readonly slug: unknown
 }> {
   const resolvedSummaryId = requiredSummaryIdentifier(summaryId, 'summaryId')
   const { data, error } = await supabase
     .from('summaries')
-    .select('id, summary_code')
+    .select('id, summary_code, package_id, slug')
     .eq('id', resolvedSummaryId)
     .maybeSingle()
 
@@ -104,7 +113,13 @@ async function resolveSummaryForPublication(
     throw new Error('Summary state could not be resolved safely.')
   }
 
-  return summary
+  const record = data as Record<string, unknown>
+  return {
+    id: resolvedId,
+    summary_code: summary.summary_code,
+    package_id: record.package_id,
+    slug: record.slug,
+  }
 }
 
 async function readCurrentPackageIds(
@@ -131,18 +146,51 @@ async function readCurrentPackageIds(
   return hydrateCurrentPackageIds('kp_native', summaryPackageId, data)
 }
 
-function revalidateSummaryPackages(
+interface RevalidationPackageRow {
+  readonly slug?: unknown
+}
+
+/**
+ * Best-effort Package slug resolution for public route invalidation. A lookup
+ * failure must never fail an already-committed mutation, so it degrades to an
+ * empty result and the caller falls back to layout-level invalidation.
+ */
+async function resolveRevalidationPackages(
+  supabase: AdminSupabase,
   packageIds: readonly string[],
-  slug: unknown,
-): void {
+): Promise<readonly RevalidationPackageRow[]> {
+  if (packageIds.length === 0) return []
+  try {
+    const { data, error } = await supabase
+      .from('packages')
+      .select('id, slug')
+      .in('id', [...new Set(packageIds)])
+
+    if (error || !Array.isArray(data)) return []
+    return data as readonly RevalidationPackageRow[]
+  } catch {
+    return []
+  }
+}
+
+async function revalidateSummaryPackages(
+  supabase: AdminSupabase,
+  packageIds: readonly string[],
+  summarySlugs: readonly unknown[],
+): Promise<void> {
   revalidatePath('/admin/summaries')
 
-  const normalizedSlug = typeof slug === 'string' ? slug : ''
-  for (const packageId of new Set(packageIds)) {
-    revalidatePath(`/package/${packageId}`)
-    if (normalizedSlug !== '') {
-      revalidatePath(`/package/${packageId}/summary/${normalizedSlug}`)
-    }
+  const packages = await resolveRevalidationPackages(supabase, packageIds)
+  const paths = buildSummaryRevalidationPaths(packages, summarySlugs)
+  if (paths.length === 0) {
+    // Without resolved slugs no targeted route can be addressed, so fall back
+    // to the layout-level Package invalidation (same hammer the support and
+    // social-follow admin actions use) and let every Package page re-render.
+    revalidatePath('/package', 'layout')
+    return
+  }
+  for (const path of paths) {
+    revalidatePath(path)
   }
 }
 
@@ -170,7 +218,7 @@ export async function createSummary(data: unknown) {
       isPublished: input.is_published as boolean,
     })
 
-    revalidateSummaryPackages(selection.packageIds, input.slug)
+    revalidateSummaryPackages(supabase, selection.packageIds, [input.slug])
     return { success: true, id: result.summaryId }
   } catch (err: unknown) {
     if (isSummaryBankCompatibilityWriterError(err) && err.code === 'duplicate_legacy_slug') {
@@ -225,11 +273,40 @@ export async function updateSummary(id: string, data: unknown) {
         summaryKind: 'kp_native',
         packageIds: selection.packageIds,
       })
+
+      // Public Package reads render only the current published revision, so a
+      // saved edit of a published KP-native Summary would otherwise never
+      // reach the public title/content. Promote the revision the edit just
+      // wrote through the same central publication dispatch the Publish
+      // control uses; the Summary stays published the whole time and Draft
+      // Summaries are left untouched.
+      if (shouldRepublishEditedSummary(selection.summaryKind, summary.wasPublished)) {
+        try {
+          await dispatchSummaryPublication({
+            summary,
+            actorId: user.id,
+            isPublished: true,
+            writer,
+          })
+        } catch (publishError) {
+          // The edit itself is committed; report honestly instead of letting
+          // the admin believe the public pages already show the new content.
+          return {
+            success: false,
+            error: 'Summary saved, but publishing the updated revision failed. '
+              + `Retry saving or use Publish: ${errorMessage(publishError)}`,
+          }
+        }
+      }
     }
 
-    revalidateSummaryPackages(
+    // Old and new memberships plus the old and new Summary slug: a save can
+    // move the Summary between Packages and rename its slug at once, so
+    // removed/added Package pages cannot stay stale either.
+    await revalidateSummaryPackages(
+      supabase,
       [...new Set([...currentPackageIds, ...packageIdsToValidate])],
-      input.slug,
+      [summary.slug, input.slug],
     )
     return { success: true }
   } catch (err: unknown) {
@@ -260,6 +337,7 @@ export async function toggleSummaryPublish(id: string, isPublished: boolean) {
   try {
     const { user, supabase } = await requirePermission('content.publish')
     const summary = await resolveSummaryForPublication(supabase, id)
+    const summaryKind = deriveSummaryKind(summary.summary_code)
     const writer = createSummaryBankCompatibilityWriter()
     const result = await dispatchSummaryPublication({
       summary,
@@ -268,7 +346,15 @@ export async function toggleSummaryPublish(id: string, isPublished: boolean) {
       writer,
     })
 
-    revalidatePath('/admin/summaries')
+    // Publication moves a Summary in or out of every Package page that lists
+    // it, so those public routes must be invalidated like an edit is.
+    const affectedPackageIds = await readCurrentPackageIds(
+      supabase,
+      summary.id,
+      summaryKind,
+      summary.package_id,
+    )
+    await revalidateSummaryPackages(supabase, affectedPackageIds, [summary.slug])
     return {
       success: true,
       outcome: result.outcome,

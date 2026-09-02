@@ -157,3 +157,55 @@ export function buildEditSelection(
     packageIds,
   }
 }
+
+export interface SummaryRevalidationPackage {
+  readonly slug?: unknown
+}
+
+function nonEmptySlug(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
+
+/**
+ * Public Package routes are addressed by Package slug, never by Package ID.
+ * One save can move a Summary between Packages and rename its slug at the
+ * same time, so every old/new Package slug crossed with every old/new
+ * Summary slug is invalidated. Paths that never existed are harmless no-ops.
+ */
+export function buildSummaryRevalidationPaths(
+  packages: readonly SummaryRevalidationPackage[],
+  summarySlugs: readonly unknown[],
+): string[] {
+  const paths = new Set<string>()
+  const routeSlugs = summarySlugs
+    .map((summarySlug) => nonEmptySlug(summarySlug))
+    .filter((summarySlug): summarySlug is string => summarySlug !== null)
+
+  for (const pkg of packages) {
+    const packageSlug = nonEmptySlug(pkg?.slug)
+    if (!packageSlug) continue
+    paths.add(`/package/${packageSlug}`)
+    for (const summarySlug of routeSlugs) {
+      paths.add(`/package/${packageSlug}/summary/${summarySlug}`)
+    }
+  }
+
+  return [...paths]
+}
+
+/**
+ * Public Package reads render only the current published revision of a
+ * KP-native Summary, so an edit reaches the public title/content only after
+ * the edited revision is promoted. Published KP-native edits therefore go
+ * live on save through the same publication RPC as the Publish control —
+ * matching Legacy edits, which already update their public fields in place.
+ * Draft Summaries must stay drafts.
+ */
+export function shouldRepublishEditedSummary(
+  summaryKind: AdminSummaryKind,
+  wasPublished: boolean,
+): boolean {
+  return summaryKind === 'kp_native' && wasPublished
+}
