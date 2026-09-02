@@ -76,7 +76,7 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
             lineHeight: 1.65,
           }}
         >
-          {cta.final_subtitle || 'เลือกชุดข้อสอบตำแหน่งที่ต้องการ แล้วเริ่มฝึกทำข้อสอบได้ทันที'}
+          {cta.final_subtitle || 'เลือกแนวข้อสอบราชการตามตำแหน่งที่ต้องการ แล้วเริ่มฝึกทำข้อสอบออนไลน์ได้ทันที'}
         </p>
 
         <div
