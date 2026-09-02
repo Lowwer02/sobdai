@@ -1,12 +1,14 @@
-import type { DailyAnswers, DailyChoice, DailyLifetimeProgress, DailyProgressSnapshot } from './types'
-
-const DAILY_CHOICE_KEYS = ['A', 'B', 'C', 'D'] as const
+import type {
+  DailyAnswers,
+  DailyChoice,
+  DailyLifetimeProgress,
+  DailyProgressSnapshot,
+  DailyQuestionResult,
+} from './types'
 
 export const DAILY_REWARDS = {
   dailyCompletion: 50,
-  scoreQuest: 20,
-  bothQuests: 30,
-  maximumPerDay: 100,
+  maximumPerDay: 50,
 } as const
 
 export const DAILY_QUESTS = [
@@ -15,22 +17,18 @@ export const DAILY_QUESTS = [
     label: 'ทำ Daily 5 ให้ครบ',
     rewardExp: DAILY_REWARDS.dailyCompletion,
   },
-  {
-    id: 'score-three-of-five',
-    label: 'ทำถูกอย่างน้อย 3/5',
-    rewardExp: DAILY_REWARDS.scoreQuest,
-  },
 ] as const
+
+const DAILY_CHOICE_KEYS = ['A', 'B', 'C', 'D'] as const
 
 export function isDailyChoice(value: unknown): value is DailyChoice {
   return typeof value === 'string' && (DAILY_CHOICE_KEYS as readonly string[]).includes(value)
 }
 
 /**
- * The browser is allowed to send only a compact answer snapshot. The server
- * still validates the question IDs against today's persisted challenge and
- * reads correctness from the database; this helper only rejects malformed
- * transport input early.
+ * Only terminal answers are sent to the database. This helper rejects
+ * malformed transport input; the RPC still validates challenge membership and
+ * reads correctness from the database.
  */
 export function sanitizeDailyAnswers(value: unknown): DailyAnswers | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -55,9 +53,9 @@ function dateToUtcDay(dateKey: string): number | null {
   const timestamp = Date.UTC(year, month - 1, day)
   const date = new Date(timestamp)
   if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
   ) return null
   return timestamp
 }
@@ -74,36 +72,50 @@ export function getPreviousDateKey(dateKey: string): string | null {
 export interface StreakTransition {
   currentStreak: number
   longestStreak: number
-  lastQualifiedDate: string
+  lastQualifiedDate: string | null
 }
 
 /**
- * Pure model of the database streak transition. The RPC applies the same
- * rules while holding the user's lifetime row lock.
+ * Recomputes streaks from the authoritative set of completed Daily dates.
+ * Supplying the same set in either completion order therefore produces the
+ * same result, while the stored longest streak and last date never decrease.
  */
-export function computeStreakTransition(
+export function recomputeStreakTransition(
   lifetime: Pick<DailyLifetimeProgress, 'currentStreak' | 'longestStreak' | 'lastQualifiedDate'>,
-  today: string,
+  completedDates: readonly string[],
 ): StreakTransition {
-  const yesterday = getPreviousDateKey(today)
-  if (!yesterday) throw new Error('Invalid Bangkok date key')
+  const dates = [...new Set(completedDates)]
+    .filter((dateKey) => dateToUtcDay(dateKey) !== null)
+    .sort()
 
-  if (lifetime.lastQualifiedDate === today) {
-    return {
-      currentStreak: lifetime.currentStreak,
-      longestStreak: lifetime.longestStreak,
-      lastQualifiedDate: today,
+  if (dates.length === 0) return { ...lifetime }
+
+  let runLength = 1
+  let longestStreak = 1
+  for (let index = 1; index < dates.length; index += 1) {
+    if (getPreviousDateKey(dates[index]) === dates[index - 1]) {
+      runLength += 1
+    } else {
+      runLength = 1
     }
+    longestStreak = Math.max(longestStreak, runLength)
   }
 
-  const currentStreak = lifetime.lastQualifiedDate === yesterday
-    ? lifetime.currentStreak + 1
-    : 1
+  let currentStreak = 1
+  for (let index = dates.length - 1; index > 0; index -= 1) {
+    if (getPreviousDateKey(dates[index]) !== dates[index - 1]) break
+    currentStreak += 1
+  }
+
+  const latestDate = dates[dates.length - 1]
+  const lastQualifiedDate = lifetime.lastQualifiedDate && lifetime.lastQualifiedDate > latestDate
+    ? lifetime.lastQualifiedDate
+    : latestDate
 
   return {
     currentStreak,
-    longestStreak: Math.max(lifetime.longestStreak, currentStreak),
-    lastQualifiedDate: today,
+    longestStreak: Math.max(lifetime.longestStreak, longestStreak),
+    lastQualifiedDate,
   }
 }
 
@@ -114,8 +126,8 @@ export interface DailyCompletionTransition {
 }
 
 /**
- * Pure idempotency/reward model used by focused tests and presentation code.
- * The production authority is the daily_finalize branch in the SQL RPC.
+ * Pure model of the one consistency reward. Correct answers remain
+ * informational and never influence EXP or streak eligibility.
  */
 export function applyDailyCompletion(
   progress: DailyProgressSnapshot,
@@ -126,32 +138,99 @@ export function applyDailyCompletion(
     return { progress, lifetime, expDelta: 0 }
   }
 
-  if (progress.questionsAnswered !== 5) {
-    throw new Error('Daily 5 must have five answered questions before completion')
+  if (progress.questionsAnswered !== 5 || Object.keys(progress.answers).length !== 5) {
+    throw new Error('Daily 5 must have five terminal answers before completion')
   }
 
-  const scoreQuestCompleted = progress.correctAnswers >= 3
-  const expDelta = DAILY_REWARDS.dailyCompletion
-    + (scoreQuestCompleted ? DAILY_REWARDS.scoreQuest : 0)
-    + (scoreQuestCompleted ? DAILY_REWARDS.bothQuests : 0)
-  const streak = computeStreakTransition(lifetime, localDate)
-
+  const streak = recomputeStreakTransition(
+    lifetime,
+    lifetime.lastQualifiedDate ? [lifetime.lastQualifiedDate, localDate] : [localDate],
+  )
   const nextProgress: DailyProgressSnapshot = {
     ...progress,
     dailyCompleted: true,
-    questOneCompleted: true,
-    questTwoCompleted: scoreQuestCompleted,
-    bothQuestsCompleted: scoreQuestCompleted,
-    expEarned: progress.expEarned + expDelta,
+    expEarned: DAILY_REWARDS.dailyCompletion,
     completedAt: progress.completedAt ?? `${localDate}T00:00:00.000Z`,
   }
   const nextLifetime: DailyLifetimeProgress = {
     ...lifetime,
     ...streak,
-    totalExp: lifetime.totalExp + expDelta,
+    totalExp: lifetime.totalExp + DAILY_REWARDS.dailyCompletion,
     totalDailyQuestions: lifetime.totalDailyQuestions + 5,
     totalDailyCorrect: lifetime.totalDailyCorrect + progress.correctAnswers,
   }
 
-  return { progress: nextProgress, lifetime: nextLifetime, expDelta }
+  return {
+    progress: nextProgress,
+    lifetime: nextLifetime,
+    expDelta: DAILY_REWARDS.dailyCompletion,
+  }
+}
+
+export interface DailyAnswerTransition {
+  progress: DailyProgressSnapshot
+  lifetime: DailyLifetimeProgress
+  expDelta: number
+  idempotent: boolean
+  result: DailyQuestionResult
+}
+
+/**
+ * Pure model of one terminal answer mutation. The SQL RPC is the production
+ * authority; this model protects the merge/idempotency contract in focused
+ * tests without creating an answer-event ledger.
+ */
+export function applyDailyAnswer(
+  progress: DailyProgressSnapshot,
+  lifetime: DailyLifetimeProgress,
+  questionId: string,
+  selected: DailyChoice,
+  correctAnswersById: Readonly<Record<string, DailyChoice>>,
+  challengeQuestionIds: readonly string[],
+  nextIndex: number,
+  localDate: string,
+  explanation: string | null = null,
+): DailyAnswerTransition {
+  if (!challengeQuestionIds.includes(questionId)) {
+    throw new Error('Answer is outside today\'s challenge')
+  }
+
+  const correctAnswer = correctAnswersById[questionId]
+  if (!isDailyChoice(correctAnswer)) throw new Error('Correct answer is unavailable')
+
+  const result: DailyQuestionResult = {
+    id: questionId,
+    selected,
+    correctAnswer,
+    isCorrect: selected === correctAnswer,
+    explanation,
+  }
+  const existing = progress.answers[questionId]
+  if (existing) {
+    if (existing !== selected) throw new Error('Answer is already terminal')
+    return { progress, lifetime, expDelta: 0, idempotent: true, result }
+  }
+
+  const answers: DailyAnswers = { ...progress.answers, [questionId]: selected }
+  const correctAnswers = Object.entries(answers)
+    .filter(([id, choice]) => correctAnswersById[id] === choice)
+    .length
+  const nextProgress: DailyProgressSnapshot = {
+    ...progress,
+    currentIndex: nextIndex,
+    answers,
+    questionsAnswered: Object.keys(answers).length,
+    correctAnswers,
+  }
+
+  if (nextProgress.questionsAnswered !== challengeQuestionIds.length) {
+    return { progress: nextProgress, lifetime, expDelta: 0, idempotent: false, result }
+  }
+
+  const completion = applyDailyCompletion(nextProgress, lifetime, localDate)
+  return {
+    ...completion,
+    idempotent: false,
+    result,
+  }
 }

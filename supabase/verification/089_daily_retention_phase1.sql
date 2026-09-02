@@ -20,7 +20,7 @@ begin
     foreach required_function in array array[
         'public.daily_get_or_create_challenge()',
         'public.daily_get_state()',
-        'public.daily_save_progress(jsonb, integer, boolean)'
+        'public.daily_submit_answer(uuid, text, integer)'
     ] loop
         if to_regprocedure(required_function) is null then
             raise exception 'Missing Daily RPC: %', required_function;
@@ -32,6 +32,20 @@ begin
             raise exception 'Unexpected Daily RPC ACL: %', required_function;
         end if;
     end loop;
+
+    if to_regprocedure('public.daily_save_progress(jsonb, integer, boolean)') is not null then
+        raise exception 'Obsolete snapshot Daily RPC is still installed.';
+    end if;
+
+    if exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'user_daily_progress'
+          and column_name in ('quest_one_completed', 'quest_two_completed', 'both_quests_completed')
+    ) then
+        raise exception 'Obsolete multi-quest Daily columns are still installed.';
+    end if;
 
     if not exists (
         select 1
@@ -46,14 +60,15 @@ begin
         raise exception 'Daily challenge immutability trigger is missing.';
     end if;
 
-    if has_table_privilege('authenticated', 'public.user_daily_progress', 'INSERT')
+    if has_table_privilege('authenticated', 'public.daily_challenges', 'SELECT')
+       or has_table_privilege('authenticated', 'public.user_daily_progress', 'INSERT')
        or has_table_privilege('authenticated', 'public.user_daily_progress', 'UPDATE')
        or has_table_privilege('authenticated', 'public.user_daily_progress', 'DELETE')
        or has_table_privilege('authenticated', 'public.user_progress', 'INSERT')
        or has_table_privilege('authenticated', 'public.user_progress', 'UPDATE')
        or has_table_privilege('authenticated', 'public.user_progress', 'DELETE')
     then
-        raise exception 'Authenticated direct Daily progress writes are still granted.';
+        raise exception 'Authenticated direct Daily challenge reads or progress writes are still granted.';
     end if;
 end
 $verify_daily$;
@@ -124,12 +139,15 @@ where q1.id is null or q2.id is null or q3.id is null or q4.id is null or q5.id 
    or q3.status <> 'Published' or q4.status <> 'Published'
    or q5.status <> 'Published';
 
--- Current user rows should remain aggregate-only. The following reports any
--- impossible reward totals; expected result is zero.
+-- Daily is consistency-only: an incomplete row has zero EXP and a completed
+-- row has exactly +50, independent of its informational accuracy count.
 select count(*) as impossible_daily_reward_rows
 from public.user_daily_progress
-where exp_earned not between 0 and 100
-   or exp_earned <>
-      (case when quest_one_completed then 50 else 0 end)
-      + (case when quest_two_completed then 20 else 0 end)
-      + (case when both_quests_completed then 30 else 0 end);
+where exp_earned not between 0 and 50
+   or exp_earned <> case when daily_completed then 50 else 0 end;
+
+-- The answers object is one aggregate map. This reports rows whose stored
+-- terminal-answer count disagrees with the JSON object cardinality; expected 0.
+select count(*) as inconsistent_daily_answer_counts
+from public.user_daily_progress
+where questions_answered <> jsonb_object_length(answers);

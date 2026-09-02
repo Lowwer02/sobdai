@@ -1,8 +1,8 @@
 /**
- * Static contract tests for Daily Retention Phase 1 (089).
+ * Static contract tests for the Daily Retention Phase 1 follow-up (089).
  *
  * These checks intentionally do not connect to Production. They protect the
- * migration's state-only, authenticated-RPC, server-authoritative contract.
+ * state-only, authenticated-RPC, consistency-reward contract.
  * Run with:
  *   node --experimental-strip-types supabase/migrations/migrations.089.test.ts
  */
@@ -33,23 +33,23 @@ test('089 is the unique next migration and verification companion exists', () =>
   const files = readdirSync(migrationDir)
   assert.equal(files.filter((name) => /^089_.+\.sql$/.test(name)).length, 1)
   assert.equal(files.includes('089_daily_retention_phase1.sql'), true)
-  assert.equal(
-    readFileSync(join(migrationDir, '..', 'verification', '089_daily_retention_phase1.sql'), 'utf8').includes('verification-only'),
-    true,
+  assert.match(
+    readFileSync(join(migrationDir, '..', 'verification', '089_daily_retention_phase1.sql'), 'utf8'),
+    /verification-only/,
   )
 })
 
-test('Daily persists state only and contains exactly two rewards', () => {
+test('Daily persists one aggregate reward state with exactly one quest', () => {
   assert.match(executableSql, /create table public\.daily_challenges/i)
   assert.match(executableSql, /create table public\.user_daily_progress/i)
   assert.match(executableSql, /create table public\.user_progress/i)
-  assert.match(executableSql, /local_date date primary key/i)
   assert.match(executableSql, /primary key \(user_id, local_date\)/i)
-  assert.match(executableSql, /total_exp integer/i)
-  assert.match(executableSql, /current_streak integer/i)
-  assert.match(executableSql, /longest_streak integer/i)
   assert.match(executableSql, /exp_earned integer/i)
-  assert.match(executableSql, /exp_earned between 0 and 100/i)
+  assert.match(executableSql, /exp_earned between 0 and 50/i)
+  assert.match(executableSql, /exp_earned = case when daily_completed then 50 else 0 end/i)
+  assert.match(executableSql, /jsonb_typeof\(answers\) = 'object'/i)
+  assert.doesNotMatch(executableSql, /quest_one_completed|quest_two_completed|both_quests_completed|score-three-of-five/i)
+  assert.doesNotMatch(executableSql, /then 20 else 0 end|then 30 else 0 end/i)
   assert.doesNotMatch(executableSql, /create table public\.(?:daily_answers|daily_events|daily_exp_ledger|daily_review_tracking)/i)
   assert.doesNotMatch(executableSql, /level\s+(?:integer|text|numeric)|total_level/i)
 })
@@ -68,13 +68,14 @@ test('Daily 5 is Published-only, deterministic, distinct, and no-random', () => 
   assert.match(executableSql, /daily_challenges_distinct_questions_check/i)
   assert.match(executableSql, /create trigger daily_challenges_immutable[\s\S]*?before update or delete on public\.daily_challenges/i)
   assert.match(functionBlock('daily_get_state'), /challenge-invalid/i)
+  assert.match(functionBlock('daily_submit_answer'), /persisted challenge is invalid/i)
 })
 
 test('RPCs derive the user/date and expose only authenticated execution', () => {
   for (const name of [
     'daily_get_or_create_challenge',
     'daily_get_state',
-    'daily_save_progress',
+    'daily_submit_answer',
   ]) {
     const block = functionBlock(name)
     assert.match(block, /security\s+definer/i)
@@ -86,7 +87,7 @@ test('RPCs derive the user/date and expose only authenticated execution', () => 
   for (const [name, args] of [
     ['daily_get_or_create_challenge', ''],
     ['daily_get_state', ''],
-    ['daily_save_progress', 'jsonb, integer, boolean'],
+    ['daily_submit_answer', 'uuid, text, integer'],
   ]) {
     assert.match(
       executableSql,
@@ -94,44 +95,50 @@ test('RPCs derive the user/date and expose only authenticated execution', () => 
     )
   }
 
+  assert.match(executableSql, /revoke all on table public\.daily_challenges from public, anon, authenticated/i)
   assert.match(executableSql, /revoke all on table public\.user_daily_progress from public, anon, authenticated/i)
   assert.match(executableSql, /revoke all on table public\.user_progress from public, anon, authenticated/i)
   assert.doesNotMatch(executableSql, /grant\s+(?:insert|update|delete)[\s\S]*?user_daily_progress/i)
   assert.doesNotMatch(executableSql, /grant\s+(?:insert|update|delete)[\s\S]*?user_progress/i)
 })
 
-test('Progress save computes correctness from the database and finalization is idempotent', () => {
-  const saveBlock = functionBlock('daily_save_progress')
-  assert.match(saveBlock, /p_answers\s*\?\s*\(q\.id::text\)/i)
-  assert.match(saveBlock, /p_answers\s*->>\s*\(q\.id::text\)\s*\)\s*=\s*q\.correct_answer::text/i)
-  assert.match(saveBlock, /p_finalize/i)
-  assert.match(saveBlock, /All five Daily questions must be answered/i)
-  assert.match(saveBlock, /for update/i)
-  assert.match(saveBlock, /v_was_completed\s*:=\s*v_daily_completed/i)
-  assert.match(saveBlock, /if v_was_completed then/i)
-  assert.match(saveBlock, /v_exp_delta\s*:=\s*50/i)
-  assert.match(saveBlock, /then 20 else 0 end/i)
-  assert.match(saveBlock, /then 30 else 0 end/i)
-  assert.match(saveBlock, /v_total_exp\s*\+\s*v_exp_delta/i)
-  assert.match(saveBlock, /v_today - 1/i)
-  assert.match(saveBlock, /total_daily_questions\s*=\s*v_total_daily_questions\s*\+\s*5/i)
+test('Each answer is terminal, merged, DB-scored, and retry-idempotent', () => {
+  const submitBlock = functionBlock('daily_submit_answer')
+  assert.match(submitBlock, /p_question_id\s+uuid/i)
+  assert.match(submitBlock, /p_choice\s+text/i)
+  assert.match(submitBlock, /p_next_index\s+integer/i)
+  assert.match(submitBlock, /for v_lock_question_id in[\s\S]*?order by ids\.id[\s\S]*?for update/i)
+  assert.match(submitBlock, /public\.daily_question_is_valid\(q\)/i)
+  assert.match(submitBlock, /select q\.\*[\s\S]*?from public\.questions q[\s\S]*?for update/i)
+  assert.match(submitBlock, /jsonb_set\([\s\S]*?p_question_id::text[\s\S]*?true/i)
+  assert.match(submitBlock, /if v_answers \? \(p_question_id::text\) then/i)
+  assert.match(submitBlock, /v_existing_choice <> p_choice/i)
+  assert.match(submitBlock, /v_idempotent := true/i)
+  assert.match(submitBlock, /v_questions_answered = 5/i)
+  assert.match(submitBlock, /v_exp_delta := 50/i)
+  assert.match(submitBlock, /correctAnswer.*v_selected_question\.correct_answer/i)
+  assert.doesNotMatch(submitBlock, /p_(?:score|accuracy|correct|exp|streak|quest|is_correct)\b/i)
 })
 
-test('concurrent first creation and finalization have database convergence guards', () => {
-  const challengeBlock = functionBlock('daily_get_or_create_challenge')
-  const saveBlock = functionBlock('daily_save_progress')
-  assert.match(challengeBlock, /on conflict \(local_date\) do nothing/i)
-  assert.match(challengeBlock, /select array\[[\s\S]*?from public\.daily_challenges/i)
-  assert.match(saveBlock, /insert into public\.user_daily_progress[\s\S]*?on conflict \(user_id, local_date\) do nothing/i)
-  assert.match(saveBlock, /from public\.user_daily_progress[\s\S]*?for update/i)
-  assert.match(saveBlock, /insert into public\.user_progress[\s\S]*?on conflict \(user_id\) do nothing/i)
-  assert.match(saveBlock, /from public\.user_progress[\s\S]*?for update/i)
-  assert.match(saveBlock, /if v_was_completed then[\s\S]*?v_exp_delta := 0/i)
+test('Streaks recompute from completed dates under a consistent user lock', () => {
+  const streakBlock = functionBlock('daily_recompute_user_streaks')
+  const submitBlock = functionBlock('daily_submit_answer')
+  assert.match(streakBlock, /from public\.user_daily_progress p[\s\S]*p\.daily_completed/i)
+  assert.match(streakBlock, /row_number\(\) over \(order by p\.local_date\)/i)
+  assert.match(streakBlock, /order by run_end desc/i)
+  assert.match(streakBlock, /greatest\(v_existing_longest/i)
+  assert.match(submitBlock, /insert into public\.user_progress[\s\S]*?on conflict \(user_id\) do nothing/i)
+  assert.match(submitBlock, /from public\.user_progress p[\s\S]*?for update/i)
+  assert.match(submitBlock, /perform public\.daily_recompute_user_streaks\(v_user_id\)/i)
 })
 
-test('No client-authored score, EXP, streak, quest, or correctness inputs exist', () => {
-  const saveSignature = /daily_save_progress\(\s*p_answers\s+jsonb,\s*p_current_index\s+integer,\s*p_finalize\s+boolean/i
-  assert.match(executableSql, saveSignature)
+test('No client-authored answer snapshot or reward inputs exist', () => {
+  const actions = readFileSync(join(migrationDir, '..', '..', 'app', 'daily', 'actions.ts'), 'utf8')
+  const runtime = readFileSync(join(migrationDir, '..', '..', 'components', 'daily', 'DailyRuntime.tsx'), 'utf8')
+  assert.match(actions, /submitDailyAnswer/i)
+  assert.match(actions, /daily_submit_answer/i)
+  assert.doesNotMatch(actions, /saveDailyProgress|p_answers|p_finalize/i)
+  assert.match(runtime, /draftAnswers/i)
+  assert.doesNotMatch(runtime, /setTimeout|persistSnapshot|saveDailyProgress|p_answers|p_finalize/i)
   assert.doesNotMatch(executableSql, /p_(?:score|accuracy|correct|exp|streak|quest|is_correct)\b/i)
-  assert.doesNotMatch(executableSql, /create table public\.(?:daily_answers|daily_events|daily_exp_ledger)/i)
 })
