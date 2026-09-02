@@ -51,6 +51,7 @@ import type {
   ExclusionEntry,
   FatalDiagnostic,
   FilterId,
+  PatternAvailability,
   QueryPlan,
   QuestionStatus,
 } from './contracts'
@@ -608,6 +609,27 @@ export function patternFilter(
   rows: readonly BankMetadataRow[],
   _plan: QueryPlan
 ): Ig2FilterOutcome {
+  // Universal-null pattern column (every row NULL/absent) is NOT fatal: the
+  // rows are retained through this axis and the runtime classifies the pool's
+  // availability as 'UNAVAILABLE' (degraded pattern semantics downstream).
+  // Only a PARTIALLY populated column still runs the per-row enum filter, and
+  // the other IG-2 axis (learning_objective) remains fail-loud.
+  let anyPresent = false
+  for (const row of rows) {
+    if (!axisAbsent(row.questionPattern)) {
+      anyPresent = true
+      break
+    }
+  }
+  if (!anyPresent) {
+    return {
+      kind: 'result',
+      kept: rows,
+      rejected: [],
+      stats: statsOf(rows.length, rows.length),
+    }
+  }
+
   return ig2AxisFilter(
     rows,
     'pattern',
@@ -806,3 +828,56 @@ function deriveRunId(plan: QueryPlan): string {
 // (row-count reduction via PerFilterReport.stats + CounterEvent emission); the
 // timing half is deferred by design, not cut. This is the spec-consistent
 // reading of F-2.2.2.1.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 9. Pattern Availability Classifier (question_pattern universal-null hotfix)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Pure derivation of the structural pattern pool:
+ * Raw Bank rows -> Status Filter -> Document Filter.
+ *
+ * Ignores transient exclusions, coverage, difficulty, pattern, and LO filters.
+ */
+export function deriveStructuralPatternPool(
+  rows: readonly BankMetadataRow[],
+  plan: QueryPlan
+): readonly BankMetadataRow[] {
+  const statusKept = statusFilter(rows, plan).kept
+  return documentFilter(statusKept, plan).kept
+}
+
+/**
+ * Pure classifier for Pattern availability in a structural eligible pool.
+ *
+ * - FULL: Every row has a usable non-null questionPattern.
+ * - PARTIAL: At least one row has a usable pattern, AND at least one row has NULL/absent pattern.
+ * - UNAVAILABLE: Every row has NULL/absent questionPattern.
+ *
+ * Empty pool semantic: Handled defensively via explicit precondition.
+ * A completely empty pool is structurally unreachable at this boundary because
+ * downstream components (Pool Expansion / Shortfall) intercept empty pools before
+ * Pattern measurement.
+ */
+export function classifyPatternAvailability(
+  rows: readonly BankMetadataRow[]
+): PatternAvailability {
+  if (rows.length === 0) {
+    throw new Error('classifyPatternAvailability precondition failed: structural eligible pool cannot be empty')
+  }
+
+  let hasUsable = false
+  let hasNull = false
+
+  for (const row of rows) {
+    if (axisAbsent(row.questionPattern)) {
+      hasNull = true
+    } else {
+      hasUsable = true
+    }
+  }
+
+  if (hasUsable && hasNull) return 'PARTIAL'
+  if (hasUsable) return 'FULL'
+  return 'UNAVAILABLE'
+}

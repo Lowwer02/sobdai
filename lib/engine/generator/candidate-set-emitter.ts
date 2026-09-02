@@ -115,6 +115,7 @@ import type {
   ExclusionEntry,
   GeneratorWarning,
   BlueprintSlot,
+  PatternAvailability,
   SlotIndex,
 } from './contracts'
 import type { PoolExpansionResult } from './pool-expansion'
@@ -211,6 +212,8 @@ export interface CandidateSetEmissionInput {
   readonly identity: CandidateSetIdentity
   /** Read-only AssemblyRequest constraint projection carried to the Solver. */
   readonly constraintSnapshot: ConstraintSnapshot
+  /** Optional runtime Pattern availability state for the structural pool. */
+  readonly patternAvailability?: PatternAvailability
   /** Optional generatorVersion override; specVersion is constant, not overridable. */
   readonly meta?: { readonly generatorVersion?: string }
 }
@@ -513,5 +516,6 @@ export function emitCandidateSet(input: CandidateSetEmissionInput): CandidateSet
     statistics,
     exclusionsLog,
     meta,
+    patternAvailability: input.patternAvailability,
   }
 }
