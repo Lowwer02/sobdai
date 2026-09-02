@@ -16,7 +16,7 @@ export default function HomeLatestNews({ news, config }: HomeLatestNewsProps) {
     <section
       id="news"
       style={{
-        padding: '40px 20px 80px',
+        padding: 'clamp(28px, 4vw, 40px) 20px clamp(40px, 6vw, 80px)',
         maxWidth: '1160px',
         margin: '0 auto',
       }}
@@ -28,7 +28,7 @@ export default function HomeLatestNews({ news, config }: HomeLatestNewsProps) {
           alignItems: 'flex-end',
           flexWrap: 'wrap',
           gap: '16px',
-          marginBottom: '32px',
+          marginBottom: 'clamp(20px, 3vw, 32px)',
         }}
       >
         <div>

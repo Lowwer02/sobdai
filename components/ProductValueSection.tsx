@@ -30,7 +30,7 @@ export default function ProductValueSection() {
   return (
     <section
       style={{
-        padding: '80px 20px 88px',
+        padding: 'clamp(44px, 6vw, 80px) 20px clamp(44px, 6vw, 88px)',
         background: 'radial-gradient(ellipse at 50% 0%, rgba(212, 168, 67, 0.05) 0%, transparent 70%)',
       }}
     >
@@ -40,7 +40,7 @@ export default function ProductValueSection() {
           margin: '0 auto',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
-          gap: '56px',
+          gap: 'clamp(32px, 5vw, 56px)',
           alignItems: 'center',
         }}
       >
@@ -135,7 +135,7 @@ export default function ProductValueSection() {
         <div
           className="card-glass"
           style={{
-            padding: '28px',
+            padding: 'clamp(18px, 3vw, 28px)',
             borderRadius: 'var(--radius-xl)',
             border: '1px solid rgba(212, 168, 67, 0.25)',
             boxShadow: '0 16px 40px rgba(0, 0, 0, 0.65)',

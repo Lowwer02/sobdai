@@ -28,13 +28,13 @@ export default function CandidateJourneySection() {
   return (
     <section
       style={{
-        padding: '72px 20px 88px',
+        padding: 'clamp(40px, 6vw, 72px) 20px clamp(44px, 6vw, 88px)',
         maxWidth: '1160px',
         margin: '0 auto',
       }}
     >
       {/* Section Header */}
-      <div style={{ textAlign: 'center', marginBottom: '44px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'clamp(24px, 4vw, 44px)' }}>
         <div style={{ marginBottom: '12px' }}>
           <span
             className="badge badge-gold"
@@ -72,14 +72,14 @@ export default function CandidateJourneySection() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '24px',
+          gap: 'clamp(14px, 2.5vw, 24px)',
         }}
       >
         {steps.map((step) => (
           <div
             key={step.num}
             style={{
-              padding: '28px 24px',
+              padding: 'clamp(20px, 3vw, 28px) clamp(18px, 3vw, 24px)',
               borderRadius: 'var(--radius-lg)',
               background: 'rgba(26, 18, 8, 0.6)',
               border: '1px solid var(--border-card)',

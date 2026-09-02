@@ -55,7 +55,7 @@ export default function HomeProof() {
   return (
     <section
       style={{
-        padding: '0 20px 48px',
+        padding: '0 20px clamp(28px, 4vw, 48px)',
         maxWidth: '1160px',
         margin: '0 auto',
       }}
@@ -64,7 +64,7 @@ export default function HomeProof() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '16px',
+          gap: 'clamp(12px, 2vw, 16px)',
         }}
       >
         {pillars.map((item, index) => (
@@ -72,7 +72,7 @@ export default function HomeProof() {
             key={index}
             className="card-glass"
             style={{
-              padding: '20px 18px',
+              padding: 'clamp(16px, 2.5vw, 20px) clamp(14px, 2vw, 18px)',
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border-card)',
               display: 'flex',

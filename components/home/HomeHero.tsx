@@ -14,7 +14,7 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
     <section
       style={{
         position: 'relative',
-        padding: '64px 20px 72px',
+        padding: 'clamp(44px, 5vw, 64px) 20px clamp(48px, 6vw, 72px)',
         overflow: 'hidden',
       }}
     >
@@ -42,7 +42,7 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
           zIndex: 1,
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))',
-          gap: '48px',
+          gap: 'clamp(32px, 5vw, 48px)',
           alignItems: 'center',
         }}
       >

@@ -8,13 +8,13 @@ interface HomeFinalCTAProps {
 
 export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
   return (
-    <section style={{ padding: '72px 20px 120px' }}>
+    <section style={{ padding: 'clamp(44px, 6vw, 72px) 20px clamp(56px, 8vw, 120px)' }}>
       <div
         className="card-gold"
         style={{
           maxWidth: '860px',
           margin: '0 auto',
-          padding: '64px 40px',
+          padding: 'clamp(36px, 5vw, 64px) clamp(20px, 4vw, 40px)',
           textAlign: 'center',
           borderRadius: 'var(--radius-xl)',
           position: 'relative',

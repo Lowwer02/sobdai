@@ -10,13 +10,13 @@ export default function HomeInsightShowcase() {
   return (
     <section
       style={{
-        padding: '32px 20px 96px',
+        padding: 'clamp(24px, 4vw, 32px) 20px clamp(48px, 7vw, 96px)',
         maxWidth: '1160px',
         margin: '0 auto',
       }}
     >
       {/* Section Header */}
-      <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'clamp(24px, 4vw, 48px)' }}>
         <div style={{ marginBottom: '12px' }}>
           <span
             className="badge badge-gold"
@@ -54,7 +54,7 @@ export default function HomeInsightShowcase() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))',
-          gap: '24px',
+          gap: 'clamp(16px, 2.5vw, 24px)',
           alignItems: 'stretch',
         }}
       >
@@ -62,7 +62,7 @@ export default function HomeInsightShowcase() {
         <div
           className="card-glass"
           style={{
-            padding: '32px 28px',
+            padding: 'clamp(20px, 4vw, 32px) clamp(18px, 3vw, 28px)',
             borderRadius: 'var(--radius-xl)',
             border: '1px solid rgba(212, 168, 67, 0.28)',
             display: 'flex',

@@ -11,13 +11,13 @@ export default function HomeExamShowcase() {
     <section
       id="showcase"
       style={{
-        padding: '72px 20px 88px',
+        padding: 'clamp(40px, 6vw, 72px) 20px clamp(44px, 6vw, 88px)',
         maxWidth: '1160px',
         margin: '0 auto',
       }}
     >
       {/* Section Header */}
-      <div style={{ textAlign: 'center', marginBottom: '44px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'clamp(24px, 4vw, 44px)' }}>
         <div style={{ marginBottom: '12px' }}>
           <span
             className="badge badge-gold"
@@ -64,7 +64,7 @@ export default function HomeExamShowcase() {
         <div
           style={{
             background: 'var(--bg-card-2)',
-            padding: '18px 28px',
+            padding: 'clamp(12px, 2.5vw, 18px) clamp(16px, 3vw, 28px)',
             borderBottom: '1px solid var(--border-card)',
             display: 'flex',
             flexWrap: 'wrap',
@@ -126,7 +126,7 @@ export default function HomeExamShowcase() {
         </div>
 
         {/* Question Body */}
-        <div style={{ padding: '32px 28px' }}>
+        <div style={{ padding: 'clamp(20px, 4vw, 32px) clamp(16px, 3vw, 28px)' }}>
           {/* Navigator Bar Demo */}
           <div
             style={{
