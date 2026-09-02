@@ -432,7 +432,7 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     },
     seo: {
       title: cleanString(seoRaw.title, d.seo.title, 120).replace('พร้อมเฉลยละเอียดทุกข้อ', 'พร้อมเฉลยละเอียด'),
-      description: (cleanString(seoRaw.description, d.seo.description, 300).match(/1\s*ปี|365\s*วัน|ทุกข้อ/) ? d.seo.description : cleanString(seoRaw.description, d.seo.description, 300)),
+      description: (cleanString(seoRaw.description, d.seo.description, 300).match(/1\s*ปี|365\s*วัน|เฉลยละเอียดทุกข้อ/) ? d.seo.description : cleanString(seoRaw.description, d.seo.description, 300)),
       og_image_url: cleanString(seoRaw.og_image_url, '', 500),
     },
     package_explorer: {
