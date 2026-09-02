@@ -182,23 +182,25 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     featured_count: 6,
   },
   hero: {
-    badge: 'คลังข้อสอบราชการ 2569',
-    title: 'เตรียมสอบข้าราชการ\nอย่างมีระบบ',
-    subtitle: 'ฝึกทำข้อสอบจริง เข้าใจเหตุผล พร้อมสอบมั่นใจ',
+    // Keyword-ownership copy (SEO-P0B): the homepage owns แนวข้อสอบราชการ.
+    // The aspirational line lives on in the subtitle as supporting copy.
+    badge: 'คลังข้อสอบราชการ',
+    title: 'แนวข้อสอบราชการออนไลน์\nพร้อมเฉลยละเอียดทุกข้อ',
+    subtitle: 'เริ่มต้นเส้นทางสู่ข้าราชการในฝัน ฝึกทำแนวข้อสอบราชการทีละข้อ พร้อมสรุปและเฉลยละเอียด',
     search_placeholder: 'ค้นหาตำแหน่ง เช่น นักวิชาการศึกษา, นิติกร',
     search_chip_label: 'ค้นหายอดนิยม:',
     browse_cta_label: 'ดูชุดข้อสอบทั้งหมด',
     stats: [
-      { value: '100+', label: 'ข้อสอบ/ชุด' },
-      { value: '1 ปี', label: 'สิทธิ์ใช้งาน' },
-      { value: 'ทันที', label: 'หลังชำระ' },
+      { value: 'ตรงจุด', label: 'ตามเกณฑ์สอบ' },
+      { value: 'ละเอียด', label: 'เฉลยทุกข้อ' },
+      { value: 'วิเคราะห์', label: 'ชี้จุดอ่อน' },
     ],
   },
   cta: {
     primary: { label: 'ดูชุดข้อสอบ', href: '#exams', type: 'internal', open_in_new_tab: false },
     secondary: { label: 'ทดลองทำฟรี', href: '#exams', type: 'internal', open_in_new_tab: false },
     final_title: 'พร้อมเริ่มติวสอบแล้วใช่ไหม',
-    final_subtitle: 'ซื้อชุดข้อสอบที่ต้องการ แล้วเริ่มทำได้ทันที ไม่ต้องรอ',
+    final_subtitle: 'เลือกชุดข้อสอบที่ต้องการ แล้วเริ่มฝึกทำได้ทันที',
     final_button: { label: 'ดูชุดข้อสอบ', href: '#exams', type: 'internal', open_in_new_tab: false },
   },
   sections: {
@@ -210,19 +212,22 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     cta: true,
   },
   seo: {
-    title: 'Sobdai — เตรียมสอบข้าราชการอย่างมีระบบ',
-    description: 'ฝึกทำข้อสอบทีละข้อแบบ Flashcard มีคำใบ้และเฉลยละเอียดทุกข้อ ซื้อขาดต่อชุดข้อสอบ ใช้ได้ 1 ปี',
+    // SEO-P0B: homepage owns the แนวข้อสอบราชการ practice-exam intent; the
+    // news/recruitment intent belongs to /news and must not lead here.
+    title: 'แนวข้อสอบราชการออนไลน์ พร้อมเฉลย | Sobdai',
+    description: 'ฝึกทำแนวข้อสอบราชการออนไลน์ พร้อมเฉลยละเอียดทุกข้อ เลือกชุดข้อสอบตามหน่วยงานและตำแหน่งที่ต้องการ มีระบบวิเคราะห์จุดอ่อนและตัวอย่างให้ลองทำฟรี',
     og_image_url: '',
   },
   package_explorer: {
-    title: 'เลือกเส้นทางเตรียมสอบของคุณ',
+    title: 'เลือกแนวข้อสอบราชการตามหน่วยงานและตำแหน่ง',
     subtitle: 'แต่ละชุดข้อสอบมาพร้อมสรุปเนื้อหา แบบฝึกหัด เฉลยละเอียด และการติดตามความพร้อม',
     cta_label: 'ดูเส้นทางเตรียมสอบทั้งหมด',
     empty_title: 'กำลังเตรียมชุดข้อสอบใหม่',
     empty_description: 'ทีมงานกำลังอัปเดตคลังข้อสอบและสรุปเนื้อหาสำหรับปีล่าสุด กลับมาเช็คใหม่เร็วๆ นี้นะครับ',
   },
   latest_news: {
-    title: 'ข่าวสอบราชการล่าสุด',
+    // Supporting discovery module only — the ข่าวสอบราชการ cluster belongs to /news.
+    title: 'ข่าวและประกาศล่าสุด',
     subtitle: 'ติดตามข่าวเปิดรับสมัคร กำหนดการสอบ และประกาศสำคัญ',
     cta_label: 'ดูข่าวทั้งหมด',
     limit: 3,
@@ -235,16 +240,15 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     ],
   },
   features: [
-    { icon: 'exam', title: 'ข้อสอบรายตำแหน่ง', description: 'คลังข้อสอบเฉพาะกรมและตำแหน่ง ตรงประเด็นกว่าหนังสือทั่วไป' },
+    { icon: 'exam', title: 'ข้อสอบรายตำแหน่ง', description: 'คลังข้อสอบตรงตามหน่วยงานและตำแหน่ง คัดสรรตรงประเด็น' },
     { icon: 'hint', title: 'คำใบ้ทุกข้อ', description: 'กดดูคำใบ้ได้เมื่อต้องการ ช่วยให้คิดเป็นระบบก่อนดูเฉลย' },
     { icon: 'explain', title: 'เฉลยละเอียด', description: 'ทุกข้อมีคำอธิบายเหตุผล ไม่ใช่แค่บอกว่าข้อไหนถูก' },
-    { icon: 'lock', title: 'ซื้อขาด 1 ปี', description: 'ไม่มีสมาชิกรายเดือน ซื้อครั้งเดียวใช้ได้ 365 วัน' },
+    { icon: 'lock', title: 'บันทึกและทบทวน', description: 'เลือกบันทึกข้อที่น่าสนใจ และทบทวนข้อที่ตอบผิดได้ตลอดเวลา' },
   ],
   howto: [
-    { num: '01', title: 'เลือกชุดข้อสอบ', desc: 'เลือกกรมและตำแหน่งที่ต้องการสมัคร มีให้ครบทุกหน่วยงาน' },
-    { num: '02', title: 'ชำระเงิน', desc: 'ชำระผ่าน PromptPay หรือบัตรเครดิต ได้สิทธิ์ทันที 1 ปี' },
-    { num: '03', title: 'ทำข้อสอบทีละข้อ', desc: 'ระบบ Flashcard ทำทีละข้อ มีคำใบ้ช่วย + เฉลยละเอียดทุกข้อ' },
-    { num: '04', title: 'ติดตามผล', desc: 'ดูสถิติคะแนน วิเคราะห์จุดอ่อน ฝึกซ้ำจนแม่นยำ' },
+    { num: '01', title: 'เลือกข้อสอบที่ใช่', desc: 'ค้นหาตามหน่วยงานและตำแหน่งที่เปิดสอบ ตรงตามเกณฑ์จริง' },
+    { num: '02', title: 'ฝึกทำเหมือนสอบจริง', desc: 'ฝึกทำทีละข้อ พร้อมระบบจับเวลา คำใบ้ และเฉลยละเอียดทันที' },
+    { num: '03', title: 'วิเคราะห์และพัฒนา', desc: 'ดูสถิติคะแนน วิเคราะห์จุดอ่อน และทบทวนเพื่อพัฒนาความพร้อม' },
   ],
   support: {
     enabled: true,

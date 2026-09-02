@@ -1,91 +1,33 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
 import { getHomepagePromotions } from '@/lib/homepagePromotions'
 import type { HomepagePromotion } from '@/lib/homepagePromotions'
-import PackageCard from '@/components/PackageCard'
 import type { PackageCardData } from '@/components/PackageCard'
 import PromotionSection from '@/components/PromotionSection'
 import AnnouncementBar from '@/components/AnnouncementBar'
 import ProductValueSection from '@/components/ProductValueSection'
 import CandidateJourneySection from '@/components/CandidateJourneySection'
-import HeroPackageSearch from '@/components/HeroPackageSearch'
 import type { HeroSearchChip } from '@/components/HeroPackageSearch'
 import { getHomepageSettings } from '@/lib/homepageConfig'
-import type { FeatureItem, CtaButton } from '@/lib/homepageConfig'
 import { createPageMetadata, SITE_ORGANIZATION } from '@/lib/seo'
 import StructuredData from '@/components/StructuredData'
 import { getLatestNews } from '@/lib/news'
 import type { NewsCardData } from '@/components/news/NewsCard'
-import HomepageNewsCard from '@/components/news/HomepageNewsCard'
-import HomepageNewsViewAllLink from '@/components/news/HomepageNewsViewAllLink'
+
+// Home V2 Components
+import HomeHero from '@/components/home/HomeHero'
+import HomeProof from '@/components/home/HomeProof'
+import HomeExamShowcase from '@/components/home/HomeExamShowcase'
+import HomeInsightShowcase from '@/components/home/HomeInsightShowcase'
+import HomeFeaturedExams from '@/components/home/HomeFeaturedExams'
+import HomeLatestNews from '@/components/home/HomeLatestNews'
+import HomeFinalCTA from '@/components/home/HomeFinalCTA'
 
 // Homepage shows public package data + homepage settings that change
 // infrequently. Cache server-side (ISR) and revalidate every 5 minutes.
 // Admin saves call revalidatePath('/') to refresh within this window.
 export const revalidate = 300
-
-// Developer-owned icon allowlist. The admin only picks an icon KEY (from the
-// dropdown); the actual SVG lives here, controlled by the developer. This
-// keeps design control out of admin hands while letting them choose an icon.
-const ICONS: Record<string, React.ReactNode> = {
-  exam: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  ),
-  hint: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  ),
-  explain: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  ),
-  lock: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  ),
-}
-
-// Render a CTA button from config. Supports internal (Link) + external (a).
-function CtaLink({ cta, className, style }: { cta: CtaButton; className?: string; style?: React.CSSProperties }) {
-  if (!cta.label || !cta.href) return null
-  const linkStyle: React.CSSProperties = {
-    ...style,
-    textDecoration: 'none',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }
-  if (cta.type === 'external') {
-    return (
-      <a
-        href={cta.href}
-        target={cta.open_in_new_tab ? '_blank' : undefined}
-        rel={cta.open_in_new_tab ? 'noopener noreferrer' : undefined}
-        className={className}
-        style={linkStyle}
-      >
-        {cta.label}
-      </a>
-    )
-  }
-  return (
-    <Link href={cta.href} className={className} style={linkStyle}>
-      {cta.label}
-    </Link>
-  )
-}
 
 function addUniqueChip(chips: HeroSearchChip[], labels: Set<string>, label: string, href: string, maxChips = 5) {
   const cleanLabel = label.trim()
@@ -152,12 +94,7 @@ export default async function Home() {
     const supabase = createAnonServerClient()
     const count = settings.general.featured_count
 
-    // Query: featured packages first, ordered by the dedicated homepage
-    // ordering chain. NOTE: this intentionally does NOT use
-    // applyContentOrdering() — that helper sorts on display_order/released_at,
-    // which exist on summaries/exam_sets but NOT on packages (that mismatch
-    // caused a PostgREST 400 + empty homepage). Packages use their own
-    // homepage_order column instead.
+    // Query: featured packages first, ordered by dedicated homepage_order
     let featuredData: any[] = []
     const featuredQuery = supabase
       .from('packages')
@@ -198,13 +135,6 @@ export default async function Home() {
     heroSearchChips = buildHeroSearchChips(chipPackagesResult.data || [])
     latestNews = latestNewsResult
 
-    // BUSINESS RULE: the homepage renders ONLY packages where
-    // is_published = true AND featured_homepage = true. No exceptions.
-    // The previous fallback/top-up query injected non-featured packages
-    // (featured_homepage = false) when fewer than `count` were featured —
-    // that violated the rule and caused non-featured packages to appear.
-    // Removed: no fallback may include non-featured packages.
-
     if (featuredData.length > 0) {
       const counts = await getPackagePublicCounts(featuredData.map((p: any) => p.id))
       livePackages = featuredData.map((pkg: any) => ({
@@ -228,254 +158,49 @@ export default async function Home() {
   return (
     <div style={{ minHeight: '100vh' }}>
       <StructuredData data={organizationJsonLd} />
+
       {/* ===================== Announcement Bar ===================== */}
       <AnnouncementBar promotion={topPromotion} />
 
-      {/* ===================== Hero ===================== */}
-      {sections.hero && (
-        <section
-          style={{
-            position: 'relative',
-            padding: '72px 20px 64px',
-            textAlign: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Background glow */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              top: '-40px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '600px',
-              height: '400px',
-              background: 'radial-gradient(ellipse at center, rgba(212, 168, 67, 0.08) 0%, transparent 70%)',
-              pointerEvents: 'none',
-            }}
-          />
+      {/* ===================== 1. Product-First Hero ===================== */}
+      {sections.hero && <HomeHero hero={hero} searchChips={heroSearchChips} />}
 
-          <div style={{ maxWidth: '680px', margin: '0 auto', position: 'relative' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <span className="badge badge-gold" style={{ fontSize: '13px', padding: '4px 14px' }}>
-                {hero.badge}
-              </span>
-            </div>
+      {/* ===================== 2. Verified Platform Proof ===================== */}
+      <HomeProof />
 
-            <h1
-              className="font-display"
-              style={{
-                fontSize: 'clamp(36px, 7vw, 64px)',
-                lineHeight: 1.15,
-                marginBottom: '18px',
-                background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                whiteSpace: 'pre-line',
-              }}
-            >
-              {hero.title}
-            </h1>
-
-            <p
-              style={{
-                fontSize: '17.5px',
-                color: 'var(--text-secondary)',
-                lineHeight: 1.6,
-                marginBottom: '32px',
-                maxWidth: '520px',
-                margin: '0 auto 32px',
-                whiteSpace: 'pre-line',
-              }}
-            >
-              {hero.subtitle}
-            </p>
-
-            <HeroPackageSearch
-              chips={heroSearchChips}
-              placeholder={hero.search_placeholder}
-              chipLabel={hero.search_chip_label}
-            />
-
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <Link
-                href="/packages"
-                className="btn-outline"
-                style={{
-                  padding: '12px 28px',
-                  fontSize: '14px',
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {hero.browse_cta_label}
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ===================== Product Value Section =====================
-          Positions Sobdai's learning outcomes over passive reading/video watching.
-          Placed above Package Explorer to build intent before package selection. */}
+      {/* ===================== 3. Why Sobdai / Product Value ===================== */}
       {sections.features && <ProductValueSection />}
 
-      {/* ===================== Package Explorer ===================== */}
-      {sections.featured && (
-        <section id="exams" style={{ padding: '40px 20px 80px', maxWidth: '1100px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '32px' }}>
-            <div>
-              <h2 className="font-display" style={{ fontSize: 'clamp(22px, 3.5vw, 32px)', marginBottom: '6px', color: 'var(--text-primary)' }}>
-                {package_explorer.title}
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
-                {package_explorer.subtitle}
-              </p>
-            </div>
-            <Link
-              href="/packages"
-              style={{
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--gold-light)',
-                fontSize: '14px',
-                fontWeight: 600,
-              }}
-              className="group"
-            >
-              <span>{package_explorer.cta_label}</span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200 group-hover:translate-x-1">
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
+      {/* ===================== 4. Large Exam Product Showcase ===================== */}
+      <HomeExamShowcase />
 
-          {livePackages.length > 0 ? (
-            <>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                  gap: '20px',
-                }}
-              >
-                {livePackages.map((pkg, i) => (
-                  <PackageCard key={pkg.id} pkg={pkg} index={i} />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="card" style={{ padding: '48px 20px', textAlign: 'center', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', marginBottom: '24px' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M12 8v8" />
-                  <path d="m8 12 4 4 4-4" />
-                </svg>
-              </div>
-              <h3 className="font-display" style={{ fontSize: '20px', marginBottom: '8px', color: 'var(--text-primary)' }}>{package_explorer.empty_title}</h3>
-              <p style={{ color: 'var(--text-muted)', maxWidth: '400px' }}>{package_explorer.empty_description}</p>
-            </div>
-          )}
-        </section>
-      )}
+      {/* ===================== 5. Insight & Diagnostic Showcase ===================== */}
+      <HomeInsightShowcase />
 
-      {/* ===================== Latest News ===================== */}
-      {sections.news && latestNews.length > 0 && (
-        <section
-          id="news"
-          style={{
-            padding: '40px 20px 80px',
-            maxWidth: '1100px',
-            margin: '0 auto',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-end',
-              flexWrap: 'wrap',
-              gap: '16px',
-              marginBottom: '32px',
-            }}
-          >
-            <div>
-              <h2
-                className="font-display"
-                style={{
-                  fontSize: 'clamp(22px, 3.5vw, 32px)',
-                  marginBottom: '6px',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {latest_news.title}
-              </h2>
-              {latest_news.subtitle && (
-                <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
-                  {latest_news.subtitle}
-                </p>
-              )}
-            </div>
-            <HomepageNewsViewAllLink label={latest_news.cta_label} />
-          </div>
+      {/* =========================================================================
+          FUTURE SOBDAI DAILY INTEGRATION BOUNDARY
+          A dedicated task owns /daily, Daily 5, Streak, EXP, Quests.
+          The homepage is Daily-Ready but Daily-Independent.
+          ========================================================================= */}
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
-              gap: '20px',
-            }}
-          >
-            {latestNews.map((article, i) => (
-              <HomepageNewsCard
-                key={article.id}
-                article={article}
-                index={i}
-                position={i + 1}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ===================== Candidate Journey ===================== */}
+      {/* ===================== 6. Learning Journey ===================== */}
       {sections.howto && <CandidateJourneySection />}
 
-      {/* ===================== Promotions =====================
-          Renders remaining live promotions in cards banner (highest priority promo
-          is rendered in the Announcement Bar above Hero). */}
+      {/* ===================== 7. Featured / Popular Exam Sets ===================== */}
+      {sections.featured && (
+        <HomeFeaturedExams packages={livePackages} config={package_explorer} />
+      )}
+
+      {/* ===================== 8. Latest Government Exam News ===================== */}
+      {sections.news && latestNews.length > 0 && (
+        <HomeLatestNews news={latestNews} config={latest_news} />
+      )}
+
+      {/* ===================== 9. Remaining Promotions ===================== */}
       {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
 
-      {/* ===================== CTA ===================== */}
-      {sections.cta && (
-        <section style={{ padding: '60px 20px 100px' }}>
-          <div
-            className="card-gold"
-            style={{
-              maxWidth: '600px',
-              margin: '0 auto',
-              padding: '48px 40px',
-              textAlign: 'center',
-            }}
-          >
-            <h2 className="font-display" style={{ fontSize: 'clamp(22px, 4vw, 32px)', marginBottom: '12px' }}>
-              {cta.final_title}
-            </h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', lineHeight: 1.65 }}>
-              {cta.final_subtitle}
-            </p>
-            <CtaLink cta={cta.final_button} className="btn-primary animate-pulse-gold" style={{ padding: '14px 36px', fontSize: '16px' }} />
-          </div>
-        </section>
-      )}
+      {/* ===================== 10. Final Conversion CTA ===================== */}
+      {sections.cta && <HomeFinalCTA cta={cta} />}
     </div>
   )
 }
