@@ -4,21 +4,20 @@ import React from 'react'
  * HomeExamShowcase — Dedicated large visual Exam Runner product showcase.
  *
  * Pure Server Component. Rendered with id="showcase".
- * Clearly labeled with "ตัวอย่างหน้าจอ" badge so demonstration data
- * is never mistaken for authenticated visitor account data.
+ * Clearly labeled with "ตัวอย่างหน้าจอ" badge. Zero decorative emoji.
  */
 export default function HomeExamShowcase() {
   return (
     <section
       id="showcase"
       style={{
-        padding: '60px 20px 80px',
+        padding: '72px 20px 88px',
         maxWidth: '1160px',
         margin: '0 auto',
       }}
     >
       {/* Section Header */}
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '44px' }}>
         <div style={{ marginBottom: '12px' }}>
           <span
             className="badge badge-gold"
@@ -30,8 +29,8 @@ export default function HomeExamShowcase() {
         <h2
           className="font-display"
           style={{
-            fontSize: 'clamp(24px, 4vw, 36px)',
-            marginBottom: '10px',
+            fontSize: 'clamp(24px, 4vw, 38px)',
+            marginBottom: '12px',
             color: 'var(--text-primary)',
             lineHeight: 1.25,
           }}
@@ -41,7 +40,7 @@ export default function HomeExamShowcase() {
         <p
           style={{
             color: 'var(--text-muted)',
-            fontSize: '15px',
+            fontSize: '15.5px',
             maxWidth: '560px',
             margin: '0 auto',
             lineHeight: 1.6,
@@ -56,16 +55,16 @@ export default function HomeExamShowcase() {
         className="card-glass"
         style={{
           borderRadius: 'var(--radius-xl)',
-          border: '1px solid rgba(212, 168, 67, 0.25)',
+          border: '1px solid rgba(212, 168, 67, 0.28)',
           overflow: 'hidden',
-          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)',
         }}
       >
         {/* Mock Runner Top Bar */}
         <div
           style={{
             background: 'var(--bg-card-2)',
-            padding: '16px 24px',
+            padding: '18px 28px',
             borderBottom: '1px solid var(--border-card)',
             display: 'flex',
             flexWrap: 'wrap',
@@ -82,10 +81,10 @@ export default function HomeExamShowcase() {
                 borderRadius: '50%',
                 background: 'var(--gold)',
                 display: 'inline-block',
-                boxShadow: '0 0 8px var(--gold)',
+                boxShadow: '0 0 6px var(--gold)',
               }}
             />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
               นักวิเคราะห์นโยบายและแผน ปฏิบัติการ • ชุดที่ 1
             </span>
           </div>
@@ -99,7 +98,7 @@ export default function HomeExamShowcase() {
                 fontSize: '12.5px',
                 color: 'var(--gold-light)',
                 background: 'var(--bg-input)',
-                padding: '4px 10px',
+                padding: '5px 12px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border-card)',
               }}
@@ -114,7 +113,7 @@ export default function HomeExamShowcase() {
             <span
               className="badge"
               style={{
-                fontSize: '10px',
+                fontSize: '10.5px',
                 padding: '3px 8px',
                 background: 'rgba(255, 235, 180, 0.08)',
                 color: 'var(--text-muted)',
@@ -127,14 +126,14 @@ export default function HomeExamShowcase() {
         </div>
 
         {/* Question Body */}
-        <div style={{ padding: '28px 24px' }}>
+        <div style={{ padding: '32px 28px' }}>
           {/* Navigator Bar Demo */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              marginBottom: '20px',
+              gap: '8px',
+              marginBottom: '24px',
               flexWrap: 'wrap',
             }}
           >
@@ -199,10 +198,10 @@ export default function HomeExamShowcase() {
           {/* Question Text */}
           <div
             style={{
-              fontSize: '15.5px',
+              fontSize: '16px',
               lineHeight: 1.6,
               color: 'var(--text-primary)',
-              marginBottom: '20px',
+              marginBottom: '24px',
               fontWeight: 500,
             }}
           >
@@ -213,10 +212,10 @@ export default function HomeExamShowcase() {
           </div>
 
           {/* Choices Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', marginBottom: '22px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '24px' }}>
             <div
               style={{
-                padding: '12px 16px',
+                padding: '14px 18px',
                 borderRadius: 'var(--radius-md)',
                 background: 'var(--bg-input)',
                 border: '1.5px solid var(--border-card)',
@@ -234,7 +233,7 @@ export default function HomeExamShowcase() {
             {/* Selected Correct Choice */}
             <div
               style={{
-                padding: '12px 16px',
+                padding: '14px 18px',
                 borderRadius: 'var(--radius-md)',
                 background: 'rgba(76, 175, 125, 0.12)',
                 border: '1.5px solid #4caf7d',
@@ -278,7 +277,7 @@ export default function HomeExamShowcase() {
 
             <div
               style={{
-                padding: '12px 16px',
+                padding: '14px 18px',
                 borderRadius: 'var(--radius-md)',
                 background: 'var(--bg-input)',
                 border: '1.5px solid var(--border-card)',
@@ -294,14 +293,14 @@ export default function HomeExamShowcase() {
             </div>
           </div>
 
-          {/* Hint Demonstration Box */}
+          {/* Hint Demonstration Box (No Emoji) */}
           <div
             style={{
               background: 'var(--hint-bg)',
               border: '1px solid rgba(124, 159, 212, 0.25)',
               borderRadius: 'var(--radius-md)',
-              padding: '12px 16px',
-              marginBottom: '16px',
+              padding: '14px 18px',
+              marginBottom: '18px',
               fontSize: '13px',
               color: 'var(--hint)',
               display: 'flex',
@@ -309,7 +308,14 @@ export default function HomeExamShowcase() {
               gap: '10px',
             }}
           >
-            <span style={{ fontWeight: 700, flexShrink: 0 }}>💡 คำใบ้:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>คำใบ้:</span>
+            </div>
             <span>การมอบอำนาจในราชการส่วนภูมิภาค ต้องมอบให้แก่ข้าราชการสังกัดราชการส่วนภูมิภาคในจังหวัดนั้น</span>
           </div>
 
@@ -319,7 +325,7 @@ export default function HomeExamShowcase() {
               background: 'rgba(45, 122, 79, 0.08)',
               border: '1px solid rgba(45, 122, 79, 0.25)',
               borderRadius: 'var(--radius-md)',
-              padding: '18px 20px',
+              padding: '20px 22px',
               fontSize: '13.5px',
               lineHeight: 1.65,
             }}

@@ -4,8 +4,9 @@ import React from 'react'
  * HomeHeroPreview — High-fidelity representative product demonstration preview.
  *
  * Pure Server Component. Rendered in the Hero right-hand column.
- * Visibly labeled with "ตัวอย่างหน้าจอ" badges to ensure demonstration data
- * is never mistaken for authenticated visitor account data.
+ * Designed with high visual prominence, generous spacing, and zero clutter
+ * so core product capabilities are immediately readable at a glance.
+ * Visibly labeled with "ตัวอย่างหน้าจอ" badges.
  */
 export default function HomeHeroPreview() {
   return (
@@ -13,21 +14,21 @@ export default function HomeHeroPreview() {
       style={{
         position: 'relative',
         width: '100%',
-        maxWidth: '560px',
+        maxWidth: '520px',
         margin: '0 auto',
       }}
     >
-      {/* Ambient background glow behind demo cards */}
+      {/* Ambient warm gold radial glow */}
       <div
         aria-hidden
         style={{
           position: 'absolute',
-          top: '20%',
-          left: '30%',
-          width: '320px',
-          height: '240px',
+          top: '10%',
+          left: '20%',
+          width: '360px',
+          height: '260px',
           background: 'radial-gradient(ellipse at center, rgba(212, 168, 67, 0.12) 0%, transparent 70%)',
-          filter: 'blur(30px)',
+          filter: 'blur(36px)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
@@ -39,200 +40,118 @@ export default function HomeHeroPreview() {
         style={{
           position: 'relative',
           zIndex: 1,
-          padding: '20px',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid rgba(212, 168, 67, 0.25)',
-          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.65)',
+          padding: '24px',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid rgba(212, 168, 67, 0.28)',
+          boxShadow: '0 16px 44px rgba(0, 0, 0, 0.7)',
         }}
       >
-        {/* Demonstration Indicator Badge */}
+        {/* Header Bar */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '14px',
+            marginBottom: '18px',
             borderBottom: '1px solid var(--border-card)',
-            paddingBottom: '10px',
+            paddingBottom: '14px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
               style={{
-                width: '8px',
-                height: '8px',
+                width: '7px',
+                height: '7px',
                 borderRadius: '50%',
                 background: 'var(--gold)',
                 display: 'inline-block',
-                boxShadow: '0 0 8px var(--gold)',
+                boxShadow: '0 0 6px var(--gold)',
               }}
             />
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '12px',
                 fontWeight: 600,
-                color: 'var(--gold-light)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                color: 'var(--text-primary)',
               }}
             >
-              ระบบฝึกทำข้อสอบจริง
+              สำนักงาน ก.พ. • ภาค ก.
             </span>
           </div>
-          <span
-            className="badge"
-            style={{
-              fontSize: '10px',
-              padding: '2px 8px',
-              background: 'rgba(255, 235, 180, 0.06)',
-              color: 'var(--text-muted)',
-              border: '1px solid rgba(255, 235, 180, 0.12)',
-            }}
-          >
-            ตัวอย่างหน้าจอ
-          </span>
-        </div>
 
-        {/* Exam Title & Scope Header */}
-        <div style={{ marginBottom: '14px' }}>
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--gold-muted)',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              marginBottom: '2px',
-            }}
-          >
-            สำนักงาน ก.พ. • ภาค ก.
-          </div>
-          <div
-            className="font-display"
-            style={{
-              fontSize: '15px',
-              color: 'var(--text-primary)',
-              fontWeight: 700,
-              lineHeight: 1.3,
-            }}
-          >
-            วิชาความรู้และลักษณะการเป็นข้าราชการที่ดี
-          </div>
-        </div>
-
-        {/* Progress & Meta Bar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '12px',
-            color: 'var(--text-secondary)',
-            background: 'var(--bg-input)',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '14px',
-            border: '1px solid var(--border-card)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--gold-light)' }}>
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>01:32:45</span>
-          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontWeight: 600, color: 'var(--gold-light)' }}>ข้อ 63 / 80</span>
-            <span
+            <div
               style={{
-                fontSize: '11px',
-                color: 'var(--gold-muted)',
-                background: 'var(--gold-tint)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                border: '1px solid rgba(212, 168, 67, 0.2)',
+                fontSize: '12px',
+                color: 'var(--gold-light)',
+                fontFamily: 'monospace',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
               }}
             >
-              โหมดฝึกฝน
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>01:32:45</span>
+            </div>
+            <span
+              className="badge"
+              style={{
+                fontSize: '10px',
+                padding: '2px 8px',
+                background: 'rgba(255, 235, 180, 0.06)',
+                color: 'var(--text-muted)',
+                border: '1px solid rgba(255, 235, 180, 0.12)',
+              }}
+            >
+              ตัวอย่างหน้าจอ
             </span>
           </div>
         </div>
 
-        {/* Question Navigator Pill Strip (Visual Demo) */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            marginBottom: '16px',
-            overflowX: 'hidden',
-          }}
-        >
-          {[61, 62].map((num) => (
-            <div
-              key={num}
-              style={{
-                width: '32px',
-                height: '26px',
-                borderRadius: '6px',
-                background: 'rgba(76, 175, 125, 0.15)',
-                color: '#4caf7d',
-                fontSize: '11.5px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(76, 175, 125, 0.3)',
-              }}
-            >
-              {num}
-            </div>
-          ))}
+        {/* Progress Tracker (Clean & Readable) */}
+        <div style={{ marginBottom: '18px' }}>
           <div
             style={{
-              width: '36px',
-              height: '26px',
-              borderRadius: '6px',
-              background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-muted) 100%)',
-              color: '#1a1208',
-              fontSize: '12px',
-              fontWeight: 700,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 10px rgba(212, 168, 67, 0.4)',
+              justifyContent: 'space-between',
+              fontSize: '12.5px',
+              color: 'var(--text-secondary)',
+              marginBottom: '6px',
             }}
           >
-            63
+            <span style={{ fontWeight: 600, color: 'var(--gold-light)' }}>ข้อ 63 จาก 80 ข้อ</span>
+            <span style={{ color: 'var(--text-muted)' }}>วิชาความรู้ข้าราชการที่ดี</span>
           </div>
-          {[64, 65, 66, 67].map((num) => (
+          <div
+            style={{
+              height: '4px',
+              background: 'var(--bg-card-2)',
+              borderRadius: '999px',
+              overflow: 'hidden',
+            }}
+          >
             <div
-              key={num}
               style={{
-                width: '32px',
-                height: '26px',
-                borderRadius: '6px',
-                background: 'var(--bg-input)',
-                color: 'var(--text-muted)',
-                fontSize: '11.5px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid var(--border-card)',
+                width: '78%',
+                height: '100%',
+                background: 'linear-gradient(90deg, var(--green) 0%, var(--gold) 100%)',
+                borderRadius: '999px',
               }}
-            >
-              {num}
-            </div>
-          ))}
+            />
+          </div>
         </div>
 
-        {/* Question Stem */}
+        {/* Question Stem (Prominent & Clear) */}
         <div
           style={{
-            fontSize: '13.5px',
-            lineHeight: 1.55,
+            fontSize: '14.5px',
+            lineHeight: 1.6,
             color: 'var(--text-primary)',
-            marginBottom: '14px',
+            marginBottom: '18px',
             fontWeight: 500,
           }}
         >
@@ -240,25 +159,26 @@ export default function HomeHeroPreview() {
           ตาม พ.ร.บ. ระเบียบบริหารราชการแผ่นดิน พ.ศ. 2534 การจัดระเบียบบริหารราชการส่วนกลาง ประกอบด้วยข้อใดต่อไปนี้?
         </div>
 
-        {/* Choices Demo */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+        {/* Choices (Simplified to 2 key states for immediate readability) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
+          {/* Unselected Choice */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-sm)',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-md)',
               background: 'var(--bg-input)',
               border: '1px solid var(--border-card)',
-              fontSize: '13px',
+              fontSize: '13.5px',
               color: 'var(--text-secondary)',
             }}
           >
             <span
               style={{
-                width: '22px',
-                height: '22px',
+                width: '24px',
+                height: '24px',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -275,26 +195,26 @@ export default function HomeHeroPreview() {
             <span>กระทรวง, ทบวง, กรม, จังหวัด</span>
           </div>
 
-          {/* Correct Choice (Highlighted) */}
+          {/* Selected Correct Choice */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '10px',
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-sm)',
+              gap: '12px',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-md)',
               background: 'rgba(76, 175, 125, 0.12)',
               border: '1.5px solid #4caf7d',
-              fontSize: '13px',
+              fontSize: '13.5px',
               color: 'var(--text-primary)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span
                 style={{
-                  width: '22px',
-                  height: '22px',
+                  width: '24px',
+                  height: '24px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -312,59 +232,27 @@ export default function HomeHeroPreview() {
             </div>
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '11.5px',
                 fontWeight: 700,
                 color: '#4caf7d',
                 background: 'rgba(76, 175, 125, 0.2)',
                 padding: '2px 8px',
                 borderRadius: '999px',
+                flexShrink: 0,
               }}
             >
               ถูกต้อง
             </span>
           </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-input)',
-              border: '1px solid var(--border-card)',
-              fontSize: '13px',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <span
-              style={{
-                width: '22px',
-                height: '22px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: 700,
-                border: '1px solid var(--text-muted)',
-                color: 'var(--text-muted)',
-                flexShrink: 0,
-              }}
-            >
-              ค
-            </span>
-            <span>จังหวัด, อำเภอ, องค์การบริหารส่วนจังหวัด</span>
-          </div>
         </div>
 
-        {/* Detailed Explanation Snippet Demo */}
+        {/* Explanation Snippet (Clean & Punchy) */}
         <div
           style={{
             background: 'rgba(45, 122, 79, 0.08)',
             border: '1px solid rgba(45, 122, 79, 0.25)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '12px 14px',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 16px',
             fontSize: '12.5px',
             lineHeight: 1.6,
           }}
@@ -376,7 +264,7 @@ export default function HomeHeroPreview() {
               gap: '6px',
               color: 'var(--gold-light)',
               fontWeight: 700,
-              marginBottom: '4px',
+              marginBottom: '3px',
               fontSize: '12px',
             }}
           >
@@ -387,26 +275,26 @@ export default function HomeHeroPreview() {
             เฉลยละเอียดและเหตุผล
           </div>
           <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-            ตามมาตรา 7 ระเบียบบริหารราชการส่วนกลาง ได้แก่ (1) สำนักนายกรัฐมนตรี (2) กระทรวง (3) ทบวง และ (4) กรม โดยจังหวัดและอำเภอจัดเป็นราชการส่วนภูมิภาค
+            ตามมาตรา 7 ระเบียบบริหารราชการส่วนกลาง ได้แก่ สำนักนายกรัฐมนตรี กระทรวง ทบวง และกรม โดยจังหวัดและอำเภอจัดเป็นราชการส่วนภูมิภาค
           </p>
         </div>
       </div>
 
-      {/* Floating Diagnostic Insight Widget */}
+      {/* Floating Diagnostic Insight Card (Cleaned & Prominent) */}
       <div
         className="card-gold"
         style={{
           position: 'relative',
-          marginTop: '-16px',
+          marginTop: '-18px',
           marginLeft: 'auto',
           marginRight: '12px',
-          width: '88%',
+          width: '90%',
           zIndex: 2,
-          padding: '14px 16px',
+          padding: '16px 18px',
           borderRadius: 'var(--radius-md)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
+          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.75)',
           border: '1px solid rgba(212, 168, 67, 0.35)',
-          background: 'linear-gradient(135deg, rgba(30, 21, 16, 0.98) 0%, rgba(20, 14, 8, 0.98) 100%)',
+          background: 'linear-gradient(135deg, rgba(28, 20, 12, 0.98) 0%, rgba(18, 12, 8, 0.98) 100%)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -415,38 +303,46 @@ export default function HomeHeroPreview() {
               <circle cx="12" cy="12" r="10" />
               <path d="m9 12 2 2 4-4" />
             </svg>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              วิเคราะห์ความพร้อมรายหัวข้อ
+            <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              วิเคราะห์ความพร้อม
             </span>
           </div>
-          <span
-            className="badge"
-            style={{
-              fontSize: '9.5px',
-              padding: '1px 6px',
-              background: 'rgba(212, 168, 67, 0.12)',
-              color: 'var(--gold-light)',
-              border: '1px solid rgba(212, 168, 67, 0.25)',
-            }}
-          >
-            ตัวอย่างหน้าจอ
-          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#4caf7d',
+                background: 'rgba(76, 175, 125, 0.15)',
+                padding: '2px 7px',
+                borderRadius: '999px',
+              }}
+            >
+              84% ผ่านเกณฑ์
+            </span>
+            <span
+              style={{
+                fontSize: '9.5px',
+                color: 'var(--text-muted)',
+                background: 'rgba(255, 235, 180, 0.06)',
+                padding: '1px 6px',
+                borderRadius: '3px',
+              }}
+            >
+              ตัวอย่างหน้าจอ
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11.5px' }}>
-          <div style={{ background: 'var(--bg-input)', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-card)' }}>
-            <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>กฎหมายระเบียบแผ่นดิน</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ color: '#4caf7d', fontWeight: 700 }}>85%</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>แม่นยำ</span>
-            </div>
+        {/* Weak Topic Progress Bar */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '4px' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>จุดอ่อนที่ควรทบทวน: พ.ร.บ. ข้อมูลข่าวสารฯ</span>
+            <span style={{ color: '#e05c5c', fontWeight: 600 }}>45% ต้องทบทวน</span>
           </div>
-          <div style={{ background: 'var(--bg-input)', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-card)' }}>
-            <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>พ.ร.บ. ข้อมูลข่าวสารฯ</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ color: '#e05c5c', fontWeight: 700 }}>45%</span>
-              <span style={{ color: '#e05c5c', fontSize: '10px', fontWeight: 600 }}>ต้องทบทวน</span>
-            </div>
+          <div style={{ height: '4px', background: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: '45%', height: '100%', background: '#e05c5c' }} />
           </div>
         </div>
       </div>

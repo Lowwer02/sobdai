@@ -14,21 +14,21 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
     <section
       style={{
         position: 'relative',
-        padding: '56px 20px 64px',
+        padding: '64px 20px 72px',
         overflow: 'hidden',
       }}
     >
-      {/* Top ambient radial gradient */}
+      {/* Ambient background glow */}
       <div
         aria-hidden
         style={{
           position: 'absolute',
-          top: '-60px',
+          top: '-80px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '800px',
-          height: '480px',
-          background: 'radial-gradient(ellipse at center, rgba(212, 168, 67, 0.09) 0%, transparent 70%)',
+          width: '840px',
+          height: '520px',
+          background: 'radial-gradient(ellipse at center, rgba(212, 168, 67, 0.08) 0%, transparent 70%)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
@@ -42,18 +42,18 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
           zIndex: 1,
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))',
-          gap: '40px',
+          gap: '48px',
           alignItems: 'center',
         }}
       >
-        {/* Left Column: Value Proposition & Discovery */}
+        {/* Left Column: Clear Reading Order (H1 -> Value Prop -> CTAs -> Search -> Chips) */}
         <div>
           {/* Badge */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '18px' }}>
             <span
               className="badge badge-gold"
               style={{
-                fontSize: '12.5px',
+                fontSize: '12px',
                 padding: '4px 14px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
@@ -63,11 +63,11 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
             </span>
           </div>
 
-          {/* H1 SEO Anchor */}
+          {/* 1. H1 SEO Anchor */}
           <h1
             className="font-display"
             style={{
-              fontSize: 'clamp(32px, 5.5vw, 54px)',
+              fontSize: 'clamp(32px, 5.5vw, 52px)',
               lineHeight: 1.18,
               marginBottom: '18px',
               color: 'var(--text-primary)',
@@ -78,7 +78,7 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
             {hero.title || 'แนวข้อสอบราชการออนไลน์\nพร้อมเฉลยละเอียดทุกข้อ'}
           </h1>
 
-          {/* Subtitle */}
+          {/* 2. Concise Value Proposition */}
           <p
             style={{
               fontSize: '16px',
@@ -93,21 +93,21 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
               'ฝึกทำข้อสอบตรงตามระเบียบการสอบราชการทีละข้อ พร้อมระบบเฉลยละเอียด วิเคราะห์จุดอ่อน และวางแผนทบทวนได้ตรงจุด'}
           </p>
 
-          {/* Action CTAs */}
+          {/* 3. Primary / Secondary Action CTAs */}
           <div
             style={{
               display: 'flex',
               flexWrap: 'wrap',
               gap: '12px',
               alignItems: 'center',
-              marginBottom: '28px',
+              marginBottom: '32px',
             }}
           >
             <Link
               href="/packages"
               className="btn-primary"
               style={{
-                padding: '12px 26px',
+                padding: '13px 28px',
                 fontSize: '15px',
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -116,7 +116,7 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
               }}
             >
               <span>{hero.browse_cta_label || 'ดูชุดข้อสอบทั้งหมด'}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14" />
                 <path d="m12 5 7 7-7 7" />
               </svg>
@@ -126,7 +126,7 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
               href="#showcase"
               className="btn-outline"
               style={{
-                padding: '11px 22px',
+                padding: '12px 24px',
                 fontSize: '14.5px',
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -134,59 +134,24 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
                 gap: '6px',
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
               <span>ดูตัวอย่างระบบ</span>
             </a>
           </div>
 
-          {/* Keyword Search & Chips */}
-          <div style={{ maxWidth: '520px', marginBottom: '24px' }}>
+          {/* 4. Search Input with Dynamic Position Chips */}
+          <div style={{ maxWidth: '520px' }}>
             <HeroPackageSearch
               chips={searchChips}
               placeholder={hero.search_placeholder}
               chipLabel={hero.search_chip_label}
             />
           </div>
-
-          {/* Micro Trust Bullets */}
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '16px',
-              fontSize: '12.5px',
-              color: 'var(--text-muted)',
-              borderTop: '1px solid var(--border-card)',
-              paddingTop: '16px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--gold-light)' }}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              <span>เฉลยละเอียดอธิบายทุกข้อ</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--gold-light)' }}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              <span>มีคำใบ้ช่วยคิด</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--gold-light)' }}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              <span>วิเคราะห์จุดอ่อนอัตโนมัติ</span>
-            </div>
-          </div>
         </div>
 
-        {/* Right Column: High-Fidelity UI Demonstration Preview */}
+        {/* Right Column: High-Prominence Representative UI Demonstration */}
         <div>
           <HomeHeroPreview />
         </div>

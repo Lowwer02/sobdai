@@ -8,67 +8,60 @@ interface HomeFinalCTAProps {
 
 export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
   return (
-    <section style={{ padding: '40px 20px 100px' }}>
+    <section style={{ padding: '72px 20px 120px' }}>
       <div
         className="card-gold"
         style={{
-          maxWidth: '820px',
+          maxWidth: '860px',
           margin: '0 auto',
-          padding: '48px 36px',
+          padding: '64px 40px',
           textAlign: 'center',
           borderRadius: 'var(--radius-xl)',
           position: 'relative',
           overflow: 'hidden',
-          background: 'linear-gradient(135deg, rgba(212, 168, 67, 0.1) 0%, rgba(26, 18, 8, 0.98) 70%)',
-          border: '1px solid rgba(212, 168, 67, 0.3)',
-          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(212, 168, 67, 0.1)',
+          background: 'linear-gradient(145deg, rgba(30, 21, 14, 0.98) 0%, rgba(18, 12, 8, 0.98) 100%)',
+          border: '1px solid rgba(212, 168, 67, 0.35)',
+          boxShadow: '0 20px 56px rgba(0, 0, 0, 0.75), 0 0 40px rgba(212, 168, 67, 0.12)',
         }}
       >
-        {/* Background glow */}
+        {/* Ambient background glow */}
         <div
           aria-hidden
           style={{
             position: 'absolute',
-            top: '-50%',
+            top: '-40%',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '400px',
-            height: '300px',
-            background: 'radial-gradient(ellipse at center, rgba(212, 168, 67, 0.15) 0%, transparent 70%)',
+            width: '500px',
+            height: '350px',
+            background: 'radial-gradient(ellipse at center, rgba(212, 168, 67, 0.14) 0%, transparent 70%)',
             pointerEvents: 'none',
           }}
         />
 
-        {/* Icon */}
-        <div
-          style={{
-            width: '56px',
-            height: '56px',
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-muted) 100%)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#1a1208',
-            marginBottom: '20px',
-            boxShadow: '0 4px 16px rgba(212, 168, 67, 0.3)',
-          }}
-        >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 14 4-4" />
-            <path d="M3.34 19a10 10 0 1 1 17.32 0" />
-            <path d="M12 2v2" />
-            <path d="M12 20v2" />
-          </svg>
+        {/* Brand Insignia / Shield Badge */}
+        <div style={{ marginBottom: '20px' }}>
+          <span
+            className="badge badge-gold"
+            style={{
+              fontSize: '12.5px',
+              padding: '5px 16px',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+            }}
+          >
+            ก้าวสู่ข้าราชการอย่างมั่นใจ
+          </span>
         </div>
 
         <h2
           className="font-display"
           style={{
-            fontSize: 'clamp(24px, 4.5vw, 36px)',
-            marginBottom: '12px',
+            fontSize: 'clamp(28px, 5vw, 44px)',
+            marginBottom: '16px',
             color: 'var(--text-primary)',
-            lineHeight: 1.25,
+            lineHeight: 1.2,
+            letterSpacing: '0.01em',
           }}
         >
           {cta.final_title || 'พร้อมเริ่มเตรียมสอบและพัฒนาตัวเองแล้วใช่ไหม?'}
@@ -77,10 +70,10 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
         <p
           style={{
             color: 'var(--text-secondary)',
-            fontSize: '15.5px',
-            maxWidth: '520px',
-            margin: '0 auto 28px',
-            lineHeight: 1.6,
+            fontSize: '16.5px',
+            maxWidth: '540px',
+            margin: '0 auto 36px',
+            lineHeight: 1.65,
           }}
         >
           {cta.final_subtitle || 'เลือกชุดข้อสอบตำแหน่งที่ต้องการ แล้วเริ่มฝึกทำข้อสอบได้ทันที'}
@@ -91,7 +84,7 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
             display: 'flex',
             flexWrap: 'wrap',
             justifyContent: 'center',
-            gap: '12px',
+            gap: '14px',
             alignItems: 'center',
           }}
         >
@@ -99,8 +92,8 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
             href="/packages"
             className="btn-primary animate-pulse-gold"
             style={{
-              padding: '13px 32px',
-              fontSize: '15.5px',
+              padding: '14px 36px',
+              fontSize: '16px',
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -118,7 +111,7 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
             href="#showcase"
             className="btn-outline"
             style={{
-              padding: '12px 24px',
+              padding: '13px 26px',
               fontSize: '15px',
               textDecoration: 'none',
               display: 'inline-flex',
