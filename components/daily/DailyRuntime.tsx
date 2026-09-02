@@ -1,13 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Flame, LockKeyhole, Sparkles, Target, Trophy, Zap } from 'lucide-react'
-import { saveDailyProgress } from '@/app/daily/actions'
+import { submitDailyAnswer } from '@/app/daily/actions'
 import type {
   DailyAnswers,
   DailyChoice,
   DailyQuestionResult,
-  DailySubmissionResult,
   DailyState,
 } from '@/lib/daily/types'
 
@@ -62,6 +61,19 @@ function QuestCard({
   )
 }
 
+function AnswerFeedback({ result }: { result: DailyQuestionResult }) {
+  return (
+    <div className={`mt-5 rounded-2xl border p-4 ${result.isCorrect
+      ? 'border-[#3D9D66]/40 bg-[#2D7A4F]/10'
+      : 'border-[#E05C5C]/40 bg-[#E05C5C]/10'}`}>
+      <div className={`font-semibold ${result.isCorrect ? 'text-[#4CAF7D]' : 'text-[#E05C5C]'}`}>
+        {result.isCorrect ? 'ถูกต้อง' : `คำตอบที่ถูก ${result.correctAnswer}`}
+      </div>
+      {result.explanation && <p className="mt-2 text-sm leading-6 text-[#A1866B]">{result.explanation}</p>}
+    </div>
+  )
+}
+
 function ResultList({
   questions,
   results,
@@ -100,96 +112,70 @@ function ResultList({
 
 export default function DailyRuntime({ initialState }: { initialState: DailyState }) {
   const [state, setState] = useState(initialState)
-  const [answers, setAnswers] = useState<DailyAnswers>(initialState.progress.answers)
   const [currentIndex, setCurrentIndex] = useState(initialState.progress.currentIndex)
-  const [submission, setSubmission] = useState<DailySubmissionResult | null>(null)
+  const [draftAnswers, setDraftAnswers] = useState<DailyAnswers>({})
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const lastPersistedSnapshotRef = useRef(JSON.stringify({ answers: initialState.progress.answers, currentIndex: initialState.progress.currentIndex }))
-  const persistSequenceRef = useRef(0)
-
-  const persistSnapshot = useCallback(async (
-    nextAnswers: DailyAnswers,
-    nextIndex: number,
-    finalize: boolean,
-  ) => {
-    const requestSequence = ++persistSequenceRef.current
-    if (finalize) setIsSubmitting(true)
-    else setIsSaving(true)
-    setSaveMessage(null)
-
-    const result = await saveDailyProgress({
-      answers: nextAnswers,
-      currentIndex: nextIndex,
-      finalize,
-    })
-
-    const isLatestRequest = requestSequence === persistSequenceRef.current
-    if (result.status === 'ready') {
-      // Partial saves only acknowledge the submitted snapshot. Keeping local
-      // input as-is prevents an older in-flight autosave from reverting a
-      // newer answer. A terminal response is authoritative and may replace
-      // local state, including when another tab completed the same day.
-      if (isLatestRequest) {
-        lastPersistedSnapshotRef.current = JSON.stringify({ answers: nextAnswers, currentIndex: nextIndex })
-        if (result.result.finalized) {
-          setState(result.result.state)
-          setAnswers(result.result.state.progress.answers)
-          setCurrentIndex(result.result.state.progress.currentIndex)
-          setSubmission(result.result)
-        }
-      }
-    } else if (isLatestRequest && result.status === 'unauthenticated') {
-      setSaveMessage('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง')
-    } else if (isLatestRequest && result.status === 'error') {
-      setSaveMessage(result.message)
-    }
-
-    if (finalize) setIsSubmitting(false)
-    else setIsSaving(false)
-    return result
-  }, [])
-
-  // Persist only the latest compact snapshot. This is resume state, not an
-  // activity/event stream. The server revalidates every key and answer.
-  useEffect(() => {
-    if (state.progress.dailyCompleted || submission || isSubmitting) return
-    const snapshot = JSON.stringify({ answers, currentIndex })
-    if (snapshot === lastPersistedSnapshotRef.current) return
-
-    const timeout = window.setTimeout(() => {
-      void persistSnapshot(answers, currentIndex, false)
-    }, 450)
-    return () => window.clearTimeout(timeout)
-  }, [answers, currentIndex, isSubmitting, persistSnapshot, state.progress.dailyCompleted, submission])
 
   const question = state.questions[currentIndex]
-  const answeredCount = Object.keys(answers).length
-  const allAnswered = state.questions.every((item) => Boolean(answers[item.id]))
-  const isComplete = state.progress.dailyCompleted || Boolean(submission)
-  const displayedResults = submission?.results ?? []
+  const persistedChoice = state.progress.answers[question.id]
+  const draftChoice = draftAnswers[question.id]
+  const selectedChoice = persistedChoice ?? draftChoice
+  const currentResult = state.results.find((result) => result.id === question.id) ?? null
+  const isComplete = state.progress.dailyCompleted
 
   const summary = useMemo(() => ({
-    correct: submission?.state.progress.correctAnswers ?? state.progress.correctAnswers,
-    answered: submission?.state.progress.questionsAnswered ?? state.progress.questionsAnswered,
-    expDelta: submission?.expDelta ?? 0,
-  }), [state.progress.correctAnswers, state.progress.questionsAnswered, submission])
+    correct: state.progress.correctAnswers,
+    answered: state.progress.questionsAnswered,
+    expEarned: state.progress.expEarned,
+  }), [state.progress.correctAnswers, state.progress.expEarned, state.progress.questionsAnswered])
 
   function selectAnswer(choice: DailyChoice) {
-    if (isComplete || isSubmitting) return
-    setAnswers((previous) => ({ ...previous, [question.id]: choice }))
+    if (isComplete || isSubmitting || persistedChoice) return
+    setDraftAnswers((previous) => ({ ...previous, [question.id]: choice }))
     setSaveMessage(null)
   }
 
   function goTo(index: number) {
+    if (isSubmitting) return
     setCurrentIndex(Math.min(4, Math.max(0, index)))
     setSaveMessage(null)
   }
 
-  async function submitDaily() {
-    if (!allAnswered || isSubmitting || isComplete) return
-    await persistSnapshot(answers, currentIndex, true)
+  async function submitCurrentAnswer() {
+    if (isComplete || isSubmitting || persistedChoice || !draftChoice) return
+
+    setIsSubmitting(true)
+    setSaveMessage(null)
+    const result = await submitDailyAnswer({
+      questionId: question.id,
+      choice: draftChoice,
+      nextIndex: currentIndex,
+    })
+
+    if (result.status === 'ready') {
+      setState(result.result.state)
+      setDraftAnswers((previous) => {
+        const next = { ...previous }
+        delete next[question.id]
+        return next
+      })
+      setSaveMessage(result.result.idempotent ? 'คำตอบนี้ถูกบันทึกไว้แล้ว' : 'ตรวจคำตอบและบันทึกแล้ว')
+    } else if (result.status === 'unauthenticated') {
+      setSaveMessage('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง')
+    } else {
+      setSaveMessage(result.message)
+    }
+    setIsSubmitting(false)
+  }
+
+  function handleNext() {
+    if (isSubmitting) return
+    if (persistedChoice) {
+      if (currentIndex < 4) goTo(currentIndex + 1)
+      return
+    }
+    void submitCurrentAnswer()
   }
 
   return (
@@ -201,7 +187,7 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
               <Sparkles size={17} /> DAILY RETENTION PHASE 1
             </div>
             <h1 className="text-4xl font-bold font-display md:text-5xl">Daily 5</h1>
-            <p className="mt-2 text-[#A1866B]">ข้อสอบ 5 ข้อประจำวัน · {formatDate(state.localDate)} · สุ่มชุดเดิมตลอดวันนี้</p>
+            <p className="mt-2 text-[#A1866B]">ข้อสอบ 5 ข้อประจำวัน · {formatDate(state.localDate)} · ชุดเดิมตลอดวันนี้</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#1A140E] px-4 py-3">
             <Flame className="text-[#D4AF37]" size={22} />
@@ -221,7 +207,7 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                     <div className="text-sm text-[#A1866B]">ความคืบหน้า</div>
                     <div className="mt-1 text-lg font-bold">ข้อที่ {currentIndex + 1} / 5</div>
                   </div>
-                  <div className="text-right text-sm text-[#A1866B]">ตอบแล้ว {answeredCount}/5</div>
+                  <div className="text-right text-sm text-[#A1866B]">ตอบแล้ว {state.progress.questionsAnswered}/5</div>
                 </div>
                 <div className="mb-8 h-2 overflow-hidden rounded-full bg-[#2A1E12]">
                   <div className="h-full rounded-full bg-[#D4AF37] transition-all" style={{ width: `${((currentIndex + 1) / 5) * 100}%` }} />
@@ -235,13 +221,14 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
 
                 <div className="space-y-3">
                   {CHOICES.map((choice) => {
-                    const selected = answers[question.id] === choice
+                    const selected = selectedChoice === choice
                     return (
                       <button
                         key={choice}
                         type="button"
                         className={`choice-btn ${selected ? 'border-[#D4AF37] bg-[rgba(212,168,67,0.12)]' : ''}`}
                         aria-pressed={selected}
+                        disabled={Boolean(persistedChoice) || isSubmitting}
                         onClick={() => selectAnswer(choice)}
                       >
                         <span className="choice-badge">{choice}</span>
@@ -251,25 +238,32 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                   })}
                 </div>
 
+                {currentResult && <AnswerFeedback result={currentResult} />}
+
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-                  <button type="button" className="btn-outline inline-flex items-center gap-2" disabled={currentIndex === 0} onClick={() => goTo(currentIndex - 1)}>
+                  <button type="button" className="btn-outline inline-flex items-center gap-2" disabled={currentIndex === 0 || isSubmitting} onClick={() => goTo(currentIndex - 1)}>
                     <ChevronLeft size={17} /> ก่อนหน้า
                   </button>
-                  {currentIndex < 4 ? (
-                    <button type="button" className="btn-primary inline-flex items-center gap-2" disabled={!answers[question.id]} onClick={() => goTo(currentIndex + 1)}>
-                      ข้อต่อไป <ChevronRight size={17} />
-                    </button>
-                  ) : (
-                    <button type="button" className="btn-primary inline-flex items-center gap-2" disabled={!allAnswered || isSubmitting} onClick={() => void submitDaily()}>
-                      {isSubmitting ? 'กำลังตรวจคำตอบ...' : 'ส่ง Daily 5'} <Trophy size={17} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn-primary inline-flex items-center gap-2"
+                    disabled={isSubmitting || (!persistedChoice && !draftChoice) || (persistedChoice && currentIndex === 4)}
+                    onClick={handleNext}
+                  >
+                    {isSubmitting
+                      ? 'กำลังตรวจคำตอบ...'
+                      : persistedChoice
+                        ? 'ข้อต่อไป'
+                        : currentIndex === 4
+                          ? 'ส่งคำตอบ'
+                          : 'ตรวจคำตอบและไปต่อ'}
+                    {currentIndex === 4 ? <Trophy size={17} /> : <ChevronRight size={17} />}
+                  </button>
                 </div>
-                {(isSaving || saveMessage) && (
-                  <div className="mt-5 text-right text-xs text-[#A1866B]">
-                    {saveMessage ?? 'บันทึกความคืบหน้าแล้ว'}
-                  </div>
+                {persistedChoice && currentIndex === 4 && state.progress.questionsAnswered < 5 && (
+                  <div className="mt-5 text-right text-xs text-[#A1866B]">กลับไปตอบข้อที่ยังไม่ส่งให้ครบ 5 ข้อ</div>
                 )}
+                {saveMessage && <div className="mt-5 text-right text-xs text-[#A1866B]">{saveMessage}</div>}
               </div>
             ) : (
               <div className="quiz-card">
@@ -278,10 +272,10 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                     <Check size={34} />
                   </div>
                   <div className="text-sm font-semibold text-[#3D9D66]">Daily 5 สำเร็จแล้ว</div>
-                  <h2 className="mt-2 text-3xl font-bold font-display">{summary.correct}/{summary.answered} คะแนน</h2>
-                  <p className="mt-2 text-[#A1866B]">วันนี้คุณได้รับ {summary.expDelta || state.progress.expEarned} EXP จาก Daily</p>
+                  <h2 className="mt-2 text-3xl font-bold font-display">ถูก {summary.correct}/{summary.answered} ข้อ</h2>
+                  <p className="mt-2 text-[#A1866B]">วันนี้คุณได้รับ {summary.expEarned} EXP จาก Daily</p>
                 </div>
-                {displayedResults.length > 0 && <ResultList questions={state.questions} results={displayedResults} />}
+                <ResultList questions={state.questions} results={state.results} />
               </div>
             )}
           </section>
@@ -312,7 +306,7 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
 
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[rgba(212,168,67,0.06)] p-4 text-sm leading-6 text-[#A1866B]">
               <div className="mb-2 flex items-center gap-2 font-semibold text-[#D4AF37]"><LockKeyhole size={15} /> กติกา Daily</div>
-              Streak จะเพิ่มเมื่อทำ Daily 5 ครบเท่านั้น การเปิดหน้าเว็บหรือเข้าสู่ระบบไม่นับเป็นการทำสำเร็จ
+              Streak และ EXP จะเพิ่มเมื่อส่งคำตอบ Daily 5 ครบทั้ง 5 ข้อเท่านั้น ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น
             </div>
           </aside>
         </div>

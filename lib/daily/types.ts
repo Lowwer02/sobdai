@@ -16,9 +16,6 @@ export interface DailyProgressSnapshot {
   questionsAnswered: number
   correctAnswers: number
   dailyCompleted: boolean
-  questOneCompleted: boolean
-  questTwoCompleted: boolean
-  bothQuestsCompleted: boolean
   expEarned: number
   completedAt: string | null
 }
@@ -43,9 +40,9 @@ export interface DailyStats {
 }
 
 export interface DailyQuest {
-  id: 'complete-daily-five' | 'score-three-of-five'
+  id: 'complete-daily-five'
   label: string
-  rewardExp: 50 | 20
+  rewardExp: 50
   completed: boolean
 }
 
@@ -56,7 +53,8 @@ export interface DailyState {
   progress: DailyProgressSnapshot
   lifetime: DailyLifetimeProgress
   stats: DailyStats
-  quests: [DailyQuest, DailyQuest]
+  results: DailyQuestionResult[]
+  quests: [DailyQuest]
 }
 
 export interface DailyUnavailableState {
@@ -71,10 +69,10 @@ export type DailyLoadResult =
   | { status: 'unavailable'; state: DailyUnavailableState }
   | { status: 'ready'; state: DailyState }
 
-export interface SaveDailyProgressInput {
-  answers: unknown
-  currentIndex: unknown
-  finalize: boolean
+export interface SubmitDailyAnswerInput {
+  questionId: unknown
+  choice: unknown
+  nextIndex: unknown
 }
 
 export interface DailyQuestionResult {
@@ -90,7 +88,7 @@ export interface DailySubmissionResult {
   idempotent: boolean
   expDelta: number
   state: DailyState
-  results: DailyQuestionResult[]
+  result: DailyQuestionResult
 }
 
 export type DailyMutationResult =
