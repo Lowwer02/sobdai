@@ -210,6 +210,24 @@ function verifies_missing_lo_definitions_fails_closed(): void {
   assert.equal(r.code, 'missing_lo_distribution')
 }
 
+function verifies_invalid_authored_lo_target_fails_closed(): void {
+  const { ast, meta } = buildFromFixture()
+  // An authored Target outside its range refuses the build (fail closed) —
+  // the builder must not fall back to the midpoint or pass the row through.
+  const invalidAst: BlueprintAst = {
+    ...ast,
+    loDistributionTargets: ast.loDistributionTargets.map((t) =>
+      t.lo === 'LO1'
+        ? { ...t, targetPercent: 10, authoredTargetInvalidReason: 'out_of_range' as const }
+        : t
+    ),
+  }
+  const r = buildAssemblyRequest(invalidAst, meta)
+  assert.equal(r.ok, false)
+  if (r.ok) return
+  assert.equal(r.code, 'invalid_lo_target')
+}
+
 /**
  * Verify EVERY failure code is reachable — pins the discriminated union so a
  * future code path doesn't silently swallow a failure mode. Enumerates the
@@ -223,6 +241,7 @@ function verifies_every_failure_code_reachable(): void {
     'missing_distribution_constraints', // documented; not currently emitted
     'missing_lo_distribution',
     'missing_duplicate_prevention', // documented; not currently emitted
+    'invalid_lo_target',
   ]
   // The currently-emitted set is a subset; the documented-but-not-emitted
   // codes are kept in the union for forward compat. This test just verifies
@@ -295,6 +314,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'fail-closed: missing positionId → typed failure', fn: verifies_missing_position_id_fails_closed },
   { name: 'fail-closed: empty Document Registry → typed failure', fn: verifies_empty_document_registry_fails_closed },
   { name: 'fail-closed: missing LO Definitions → typed failure', fn: verifies_missing_lo_definitions_fails_closed },
+  { name: 'fail-closed: invalid authored LO Target → typed failure', fn: verifies_invalid_authored_lo_target_fails_closed },
   { name: 'BuildFailureCode union stable (no silent code removal)', fn: verifies_every_failure_code_reachable },
   { name: 'determinism: byte-identical AST → byte-identical request', fn: verifies_builder_is_deterministic },
   { name: 'immutability: builder does not mutate input AST', fn: verifies_builder_does_not_mutate_input_ast },

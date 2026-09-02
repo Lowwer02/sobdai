@@ -197,6 +197,45 @@ function verifies_lo_distribution_explicit_target_column_pins_target(): void {
   assert.equal(total, 100, 'authored targets total 100')
 }
 
+function verifies_lo_distribution_invalid_explicit_target_is_flagged(): void {
+  // An authored Target cell that is non-integer or outside the authored range
+  // is FLAGGED for Stage 6 to refuse the build — it must never silently fall
+  // back to the midpoint. Legacy rows without a Target column are untouched.
+  const legacy = buildStage5CompleteBlueprint()
+  const load = (source: string): BlueprintAst => {
+    const r = loadBlueprint(source)
+    if (!r.ok) throw new Error(`load failed: ${r.reason}`)
+    return projectToBlueprintAst(r.document, normalizeMetadata(r.document.metadata))
+  }
+
+  // Out-of-range: LO1's authored Target 10 is below its authored min 20.
+  const outOfRange = load(
+    legacy.replace(
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน |',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน | 10 |'
+    )
+  )
+  const lo1 = outOfRange.loDistributionTargets.find((t) => t.lo === 'LO1')
+  assert.ok(lo1)
+  assert.equal(lo1!.authoredTargetInvalidReason, 'out_of_range')
+  assert.equal(lo1!.targetPercent, 10, 'the authored value is carried for diagnosis')
+  // Untouched legacy rows keep midpoint behavior with no flag.
+  const lo2 = outOfRange.loDistributionTargets.find((t) => t.lo === 'LO2')
+  assert.equal(lo2!.authoredTargetInvalidReason, undefined)
+  assert.equal(lo2!.targetPercent, 33)
+
+  // Malformed: LO3's authored Target cell is not an integer.
+  const malformed = load(
+    legacy.replace(
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ | สามสิบ |'
+    )
+  )
+  const lo3 = malformed.loDistributionTargets.find((t) => t.lo === 'LO3')
+  assert.ok(lo3)
+  assert.equal(lo3!.authoredTargetInvalidReason, 'malformed')
+}
+
 // ─── Pattern Definitions + Distribution + Correspondence ────────────────────
 
 function verifies_pattern_definitions_all_six_including_matching_concept(): void {
@@ -345,6 +384,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'LO Definitions: 4 LOs with LO↔Type map', fn: verifies_lo_definitions_parse_with_type_map },
   { name: 'LO Distribution Targets: midpoint computed from range', fn: verifies_lo_distribution_targets_midpoint },
   { name: 'LO Distribution Targets: explicit Target column pins the target', fn: verifies_lo_distribution_explicit_target_column_pins_target },
+  { name: 'LO Distribution Targets: invalid explicit Target flagged (no midpoint fallback)', fn: verifies_lo_distribution_invalid_explicit_target_is_flagged },
   { name: 'Pattern Definitions: ALL 6 including Matching Concept (D-6 regression)', fn: verifies_pattern_definitions_all_six_including_matching_concept },
   { name: 'Pattern Distribution Targets: 6 with min/max/target', fn: verifies_pattern_distribution_targets_all_six },
   { name: 'Pattern × Type correspondence marks Primary cells', fn: verifies_pattern_type_correspondence_marks_primary },

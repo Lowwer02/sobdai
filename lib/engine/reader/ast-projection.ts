@@ -568,23 +568,40 @@ function projectLoDistributionTargets(
     if (range === null) continue
     // Authored exact Target (optional trailing column, mirroring the Pattern
     // Distribution Target table's Min/Max/Target convention). A Blueprint that
-    // authors a Target pins the representative percent verbatim. Legacy
-    // 4-column rows — and rows whose trailing cell is not an integer — keep
-    // the midpoint derivation unchanged.
-    const explicitTarget = parseInt(
-      cells[cells.length - 1]!.replace(/\*\*/g, ''),
-      10
-    )
-    const targetPercent =
-      cells.length >= 5 && Number.isFinite(explicitTarget)
-        ? explicitTarget
-        : // Midpoint as the representative target percent (legacy).
-          Math.round((range.min + range.max) / 2)
+    // authors a Target pins the representative percent verbatim — but an
+    // authored-but-invalid Target (not an integer, or outside the authored
+    // range) is flagged for Stage 6 to refuse the build (fail loud); it must
+    // NOT silently fall back to the midpoint. Legacy rows without a Target
+    // column keep the midpoint derivation unchanged.
+    const hasTargetCell = cells.length >= 5
+    const authoredTarget = hasTargetCell
+      ? parseInt(cells[cells.length - 1]!.replace(/\*\*/g, ''), 10)
+      : Number.NaN
+    let targetPercent: number
+    let authoredTargetInvalidReason: 'malformed' | 'out_of_range' | undefined
+    if (hasTargetCell && !Number.isFinite(authoredTarget)) {
+      targetPercent = Math.round((range.min + range.max) / 2)
+      authoredTargetInvalidReason = 'malformed'
+    } else if (
+      hasTargetCell &&
+      (authoredTarget < range.min || authoredTarget > range.max)
+    ) {
+      targetPercent = authoredTarget
+      authoredTargetInvalidReason = 'out_of_range'
+    } else if (hasTargetCell) {
+      targetPercent = authoredTarget
+    } else {
+      // Midpoint as the representative target percent (legacy).
+      targetPercent = Math.round((range.min + range.max) / 2)
+    }
     out.push({
       lo,
       minPercent: range.min,
       maxPercent: range.max,
       targetPercent,
+      ...(authoredTargetInvalidReason !== undefined
+        ? { authoredTargetInvalidReason }
+        : {}),
       sourceLocation: { ...table.location },
     })
   }

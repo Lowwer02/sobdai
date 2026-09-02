@@ -21,7 +21,8 @@
  *  - Immutable output: readBlueprint is a pure function (no input mutation).
  *  - Deterministic output: same source → same ReaderResult.
  *  - Execution metadata: readerVersion constant, schemaVersionMajor extracted.
- *  - Real Blueprint v3.0 → success (golden-path smoke test).
+ *  - Real Blueprint v3.0.1 → success (golden-path smoke test, repo-relative).
+ *  - Authored-but-invalid LO Target → Stage 6 fail-closed halt.
  */
 
 import assert from 'node:assert/strict'
@@ -235,20 +236,26 @@ function verifies_deterministic_with_timestamp(): void {
   assert.equal(a.executionMeta.timestampIso, '2026-07-24T00:00:00Z')
 }
 
-// ─── Real Blueprint v3.0 golden path ────────────────────────────────────────
+// ─── Real Blueprint v3.0.1 golden path ──────────────────────────────────────
+
+/**
+ * The REAL KSB Blueprint shipped in THIS repository/worktree — resolved
+ * relative to this test file (lib/engine/reader/ → repo root) so every
+ * checkout and worktree validates its own Blueprint, never an external path.
+ */
+function realBlueprintPath(): URL {
+  return new URL('../../../Blueprint/simulation_exam_blueprint.md', import.meta.url)
+}
 
 function verifies_real_blueprint_v3_produces_success_result(): void {
   // Smoke test against the actual frozen Blueprint document. This is the
   // Reader's primary acceptance criterion (Implementation Planning §3.2).
-  const src = readFileSync(
-    '/Users/kt_7297/Documents/sobdai/sobdai_v1/app_build/Blueprint/simulation_exam_blueprint.md',
-    'utf8'
-  )
+  const src = readFileSync(realBlueprintPath(), 'utf8')
   const r = readBlueprint(src)
-  assert.equal(r.ok, true, 'real Blueprint v3.0 must produce a success ReaderResult')
+  assert.equal(r.ok, true, 'real Blueprint v3.0.1 must produce a success ReaderResult')
   if (!r.ok) return
   assert.equal(r.assemblyRequest.identity.blueprint_id, 'bma-education-specialist')
-  assert.equal(r.assemblyRequest.identity.blueprint_version, '3.0.0')
+  assert.equal(r.assemblyRequest.identity.blueprint_version, '3.0.1')
   assert.equal(r.assemblyRequest.target.sets, 5)
   assert.equal(r.assemblyRequest.target.perSet, 100)
   assert.equal(r.assemblyRequest.documentRegistry.length, 12)
@@ -259,12 +266,82 @@ function verifies_real_blueprint_v3_zero_diagnostics(): void {
   // A clean Blueprint produces zero diagnostics on the success branch —
   // no warnings, no errors. This is the Reader's "real document is healthy"
   // property.
-  const src = readFileSync(
-    '/Users/kt_7297/Documents/sobdai/sobdai_v1/app_build/Blueprint/simulation_exam_blueprint.md',
-    'utf8'
-  )
+  const src = readFileSync(realBlueprintPath(), 'utf8')
   const r = readBlueprint(src)
   assert.equal(r.diagnostics.length, 0)
+}
+
+function verifies_real_blueprint_v3_lo_targets_sum_to_100(): void {
+  // The corrected v3.0.1 LO contract: exact authored Targets parse verbatim
+  // and total exactly 100 (the Solver's LO distribution contract).
+  const src = readFileSync(realBlueprintPath(), 'utf8')
+  const r = readBlueprint(src)
+  assert.equal(r.ok, true)
+  if (!r.ok) return
+  const targets = r.assemblyRequest.loDistribution.targets
+  assert.deepEqual(targets, { LO1: 24, LO2: 34, LO3: 24, LO4: 18 })
+  const total = Object.values(targets).reduce((sum, t) => sum + t, 0)
+  assert.equal(total, 100)
+}
+
+// ─── Authored-but-invalid LO Target halts at Stage 6 ────────────────────────
+
+function verifies_out_of_range_lo_target_halt_at_stage_6(): void {
+  // An authored Target outside its range must fail CLOSED at Stage 6 — never
+  // a silent midpoint fallback, never a pass-through to the Solver.
+  const source = buildStage5CompleteBlueprint().replace(
+    [
+      '| LO | สัดส่วน | จำนวน/ชุด | เหตุผล |',
+      '|---|---|---|---|',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน |',
+      '| LO2 | 30–35% | 30–35 | แกนหลัก |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ |',
+      '| LO4 | 15–20% | 15–20 | คิดสูง |',
+    ].join('\n'),
+    [
+      '| LO | สัดส่วน | จำนวน/ชุด | เหตุผล | Target |',
+      '|---|---|---|---|---|',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน | 10 |',
+      '| LO2 | 30–35% | 30–35 | แกนหลัก | 34 |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ | 24 |',
+      '| LO4 | 15–20% | 15–20 | คิดสูง | 18 |',
+    ].join('\n')
+  )
+  const r = readBlueprint(source)
+  assert.equal(r.ok, false, 'out-of-range authored Target must halt the Reader')
+  assert.equal('assemblyRequest' in r, false, 'no AssemblyRequest may be produced')
+  const halt = r.diagnostics.find((d) => d.explanation.includes('invalid_lo_target'))
+  assert.ok(halt, 'a blocking diagnostic naming invalid_lo_target must be present')
+  assert.equal(halt.severity, 'blocking')
+}
+
+function verifies_malformed_lo_target_halt_at_stage_6(): void {
+  // A non-integer authored Target must fail CLOSED at Stage 6 — it must NOT
+  // silently fall back to the midpoint merely because the cell is invalid.
+  const source = buildStage5CompleteBlueprint().replace(
+    [
+      '| LO | สัดส่วน | จำนวน/ชุด | เหตุผล |',
+      '|---|---|---|---|',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน |',
+      '| LO2 | 30–35% | 30–35 | แกนหลัก |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ |',
+      '| LO4 | 15–20% | 15–20 | คิดสูง |',
+    ].join('\n'),
+    [
+      '| LO | สัดส่วน | จำนวน/ชุด | เหตุผล | Target |',
+      '|---|---|---|---|---|',
+      '| LO1 | 20–25% | 20–25 | จำพื้นฐาน | 24 |',
+      '| LO2 | 30–35% | 30–35 | แกนหลัก | 34 |',
+      '| LO3 | 20–25% | 20–25 | ปฏิบัติ | สามสิบ |',
+      '| LO4 | 15–20% | 15–20 | คิดสูง | 18 |',
+    ].join('\n')
+  )
+  const r = readBlueprint(source)
+  assert.equal(r.ok, false, 'malformed authored Target must halt the Reader')
+  assert.equal('assemblyRequest' in r, false, 'no AssemblyRequest may be produced')
+  const halt = r.diagnostics.find((d) => d.explanation.includes('invalid_lo_target'))
+  assert.ok(halt, 'a blocking diagnostic naming invalid_lo_target must be present')
+  assert.equal(halt.severity, 'blocking')
 }
 
 // ─── runner ─────────────────────────────────────────────────────────────────
@@ -282,8 +359,11 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'immutability: readBlueprint does not mutate input', fn: verifies_readblueprint_does_not_mutate_input },
   { name: 'deterministic: same source → same ReaderResult', fn: verifies_deterministic_output },
   { name: 'deterministic: same timestamp → same result with timestamp carried', fn: verifies_deterministic_with_timestamp },
-  { name: 'REAL Blueprint v3.0 → success ReaderResult (golden path)', fn: verifies_real_blueprint_v3_produces_success_result },
-  { name: 'REAL Blueprint v3.0 → zero diagnostics', fn: verifies_real_blueprint_v3_zero_diagnostics },
+  { name: 'REAL Blueprint v3.0.1 → success ReaderResult (golden path)', fn: verifies_real_blueprint_v3_produces_success_result },
+  { name: 'REAL Blueprint v3.0.1 → zero diagnostics', fn: verifies_real_blueprint_v3_zero_diagnostics },
+  { name: 'REAL Blueprint v3.0.1 → LO targets 24/34/24/18 total 100', fn: verifies_real_blueprint_v3_lo_targets_sum_to_100 },
+  { name: 'out-of-range authored LO Target halts at Stage 6 (fail closed)', fn: verifies_out_of_range_lo_target_halt_at_stage_6 },
+  { name: 'malformed authored LO Target halts at Stage 6 (no midpoint fallback)', fn: verifies_malformed_lo_target_halt_at_stage_6 },
 ]
 
 let passed = 0

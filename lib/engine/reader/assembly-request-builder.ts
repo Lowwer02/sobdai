@@ -101,6 +101,7 @@ export type BuildFailureCode =
   | 'missing_distribution_constraints' // AST carried no Distribution Constraints block
   | 'missing_lo_distribution' // no LO Definitions → can't build loDistribution
   | 'missing_duplicate_prevention' // no Duplicate Policies → can't build duplicatePrevention
+  | 'invalid_lo_target' // an authored LO Target cell is non-integer or outside its authored range
 
 // ─── Defaults / constants ───────────────────────────────────────────────────
 
@@ -175,6 +176,22 @@ export function buildAssemblyRequest(
       code: 'missing_lo_distribution',
       message:
         'Cannot build AssemblyRequest: no LO Definitions found (cannot build lo_distribution map).',
+    }
+  }
+  // An authored-but-invalid LO Target (non-integer or outside its authored
+  // range) refuses the build — fail loud, never a silent midpoint fallback.
+  const invalidLoTarget = ast.loDistributionTargets.find(
+    (t) => t.authoredTargetInvalidReason !== undefined
+  )
+  if (invalidLoTarget) {
+    const detail =
+      invalidLoTarget.authoredTargetInvalidReason === 'malformed'
+        ? 'the authored Target cell is not an integer'
+        : `the authored Target ${invalidLoTarget.targetPercent} is outside the authored range ${invalidLoTarget.minPercent}–${invalidLoTarget.maxPercent}`
+    return {
+      ok: false,
+      code: 'invalid_lo_target',
+      message: `Cannot build AssemblyRequest: LO '${invalidLoTarget.lo}' has an invalid authored LO Target — ${detail}. Fix or remove the Target cell; the midpoint fallback does not apply to authored-but-invalid Targets.`,
     }
   }
 

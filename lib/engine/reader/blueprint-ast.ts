@@ -214,6 +214,15 @@ export interface LoDistributionTarget {
   readonly maxPercent: number
   /** Representative target percent (midpoint of min/max, or authored target). */
   readonly targetPercent: number
+  /**
+   * Set when the row authors an explicit Target cell (optional trailing
+   * column) that is INVALID: not an integer ('malformed'), or outside the
+   * authored [minPercent, maxPercent] range ('out_of_range'). Stage 6 refuses
+   * the build for such rows (fail closed) — the midpoint fallback must NOT
+   * silently apply to an authored-but-invalid Target. Rows without a Target
+   * column never carry this flag.
+   */
+  readonly authoredTargetInvalidReason?: 'malformed' | 'out_of_range'
   readonly sourceLocation: SourceLocation
 }
 
