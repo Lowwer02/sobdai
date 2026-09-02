@@ -185,14 +185,14 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     // Keyword-ownership copy (SEO-P0B): the homepage owns แนวข้อสอบราชการ.
     // The aspirational line lives on in the subtitle as supporting copy.
     badge: 'คลังข้อสอบราชการ',
-    title: 'แนวข้อสอบราชการออนไลน์\nพร้อมเฉลยละเอียดทุกข้อ',
-    subtitle: 'ฝึกทำข้อสอบราชการออนไลน์ทีละข้อ พร้อมระบบเฉลยละเอียดอธิบายทุกตัวเลือก วิเคราะห์จุดอ่อนอัตโนมัติ และวางแผนเตรียมสอบได้อย่างตรงจุด',
+    title: 'แนวข้อสอบราชการออนไลน์\nพร้อมเฉลยละเอียด',
+    subtitle: 'ฝึกทำข้อสอบราชการออนไลน์ทีละข้อ พร้อมเฉลยอธิบายเหตุผล วิเคราะห์จุดอ่อนอัตโนมัติ และวางแผนเตรียมสอบได้อย่างตรงจุด',
     search_placeholder: 'ค้นหาตำแหน่ง เช่น นักวิชาการศึกษา, นิติกร',
     search_chip_label: 'ค้นหายอดนิยม:',
     browse_cta_label: 'ดูชุดข้อสอบทั้งหมด',
     stats: [
       { value: 'ตรงจุด', label: 'ตามเกณฑ์สอบ' },
-      { value: 'ละเอียด', label: 'เฉลยทุกข้อ' },
+      { value: 'ละเอียด', label: 'เฉลยมีเหตุผล' },
       { value: 'วิเคราะห์', label: 'ชี้จุดอ่อน' },
     ],
   },
@@ -201,7 +201,7 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     secondary: { label: 'ทดลองทำฟรี', href: '#exams', type: 'internal', open_in_new_tab: false },
     final_title: 'พร้อมเริ่มเตรียมสอบและพัฒนาตัวเองแล้วใช่ไหม?',
     final_subtitle: 'เลือกแนวข้อสอบราชการตามตำแหน่งที่ต้องการ แล้วเริ่มฝึกทำข้อสอบออนไลน์ได้ทันที',
-    final_button: { label: 'ดูชุดข้อสอบ', href: '#exams', type: 'internal', open_in_new_tab: false },
+    final_button: { label: 'ดูชุดข้อสอบทั้งหมด', href: '/packages', type: 'internal', open_in_new_tab: false },
   },
   sections: {
     hero: true,
@@ -215,7 +215,7 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
     // SEO-P0B: homepage owns the แนวข้อสอบราชการ practice-exam intent; the
     // news/recruitment intent belongs to /news and must not lead here.
     title: 'แนวข้อสอบราชการออนไลน์ พร้อมเฉลย | Sobdai',
-    description: 'ฝึกทำแนวข้อสอบราชการออนไลน์ พร้อมเฉลยละเอียดทุกข้อ เลือกชุดข้อสอบตามหน่วยงานและตำแหน่งที่ต้องการ มีระบบวิเคราะห์จุดอ่อนและตัวอย่างให้ลองทำฟรี',
+    description: 'ฝึกทำแนวข้อสอบราชการออนไลน์ พร้อมเฉลย วิเคราะห์จุดอ่อน และเลือกชุดข้อสอบตามหน่วยงานและตำแหน่งที่ต้องการ',
     og_image_url: '',
   },
   package_explorer: {
@@ -241,8 +241,8 @@ export const HOMEPAGE_DEFAULTS: HomepageSettings = {
   },
   features: [
     { icon: 'exam', title: 'ข้อสอบตามหน่วยงานและตำแหน่ง', description: 'เลือกฝึกทำชุดข้อสอบที่ตรงกับสายงานและสังกัดที่เปิดรับสมัคร' },
-    { icon: 'explain', title: 'แนวข้อสอบราชการพร้อมเฉลย', description: 'ทุกข้อมีคำอธิบายเหตุผล พร้อมหลักหรือข้อกฎหมายที่เกี่ยวข้อง ชัดเจนว่าทำไมข้อนี้ถูกและข้ออื่นผิด' },
-    { icon: 'lock', title: 'บันทึกและทบทวนข้อสอบ', description: 'บันทึกข้อที่น่าสนใจ และกลับมาทบทวนหรือฝึกซ้ำข้อที่ตอบผิดได้' },
+    { icon: 'explain', title: 'แนวข้อสอบราชการพร้อมเฉลย', description: 'มีคำอธิบายเหตุผล และในข้อที่เกี่ยวข้องมีหลักหรือข้อกฎหมายประกอบ ช่วยให้เข้าใจคำตอบและตัวเลือกต่าง ๆ' },
+    { icon: 'lock', title: 'บันทึกและทบทวนข้อสอบ', description: 'บันทึกข้อที่น่าสนใจ ทบทวนข้อที่ตอบผิด และกลับมาทำชุดข้อสอบใหม่ได้' },
     { icon: 'hint', title: 'วิเคราะห์จุดอ่อนอัตโนมัติ', description: 'ประเมินความแม่นยำแยกตามรายหมวดวิชา รู้ทันทีว่าหัวข้อไหนต้องอ่านเพิ่ม' },
   ],
   howto: [
@@ -406,8 +406,10 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
     general: { featured_count },
     hero: {
       badge: cleanString(heroRaw.badge, d.hero.badge, 80),
-      title: cleanString(heroRaw.title, d.hero.title, 200),
-      subtitle: cleanString(heroRaw.subtitle, d.hero.subtitle, 400),
+      title: cleanString(heroRaw.title, d.hero.title, 200).replace('พร้อมเฉลยละเอียดทุกข้อ', 'พร้อมเฉลยละเอียด'),
+      subtitle: cleanString(heroRaw.subtitle, d.hero.subtitle, 400)
+        .replace('พร้อมระบบเฉลยละเอียดอธิบายทุกตัวเลือก', 'พร้อมเฉลยอธิบายเหตุผล')
+        .replace('เฉลยละเอียดอธิบายทุกตัวเลือก', 'เฉลยอธิบายเหตุผล'),
       search_placeholder: cleanString(heroRaw.search_placeholder, d.hero.search_placeholder, 140),
       search_chip_label: cleanString(heroRaw.search_chip_label, d.hero.search_chip_label, 60),
       browse_cta_label: cleanString(heroRaw.browse_cta_label, d.hero.browse_cta_label, 80),
@@ -417,7 +419,7 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
       primary: cleanCta(ctaRaw.primary, d.cta.primary),
       secondary: cleanCta(ctaRaw.secondary, d.cta.secondary),
       final_title: cleanString(ctaRaw.final_title, d.cta.final_title, 120),
-      final_subtitle: cleanString(ctaRaw.final_subtitle, d.cta.final_subtitle, 300),
+      final_subtitle: (cleanString(ctaRaw.final_subtitle, d.cta.final_subtitle, 300).match(/1\s*ปี|365\s*วัน/) ? d.cta.final_subtitle : cleanString(ctaRaw.final_subtitle, d.cta.final_subtitle, 300)),
       final_button: cleanCta(ctaRaw.final_button, d.cta.final_button),
     },
     sections: {
@@ -429,13 +431,13 @@ export function normalizeHomepageSettings(raw: any): HomepageSettings {
       cta: sRaw.cta === false ? false : true,
     },
     seo: {
-      title: cleanString(seoRaw.title, d.seo.title, 120),
-      description: cleanString(seoRaw.description, d.seo.description, 300),
+      title: cleanString(seoRaw.title, d.seo.title, 120).replace('พร้อมเฉลยละเอียดทุกข้อ', 'พร้อมเฉลยละเอียด'),
+      description: (cleanString(seoRaw.description, d.seo.description, 300).match(/1\s*ปี|365\s*วัน|ทุกข้อ/) ? d.seo.description : cleanString(seoRaw.description, d.seo.description, 300)),
       og_image_url: cleanString(seoRaw.og_image_url, '', 500),
     },
     package_explorer: {
       title: cleanString(packageExplorerRaw.title, d.package_explorer.title, 120),
-      subtitle: cleanString(packageExplorerRaw.subtitle, d.package_explorer.subtitle, 300),
+      subtitle: (cleanString(packageExplorerRaw.subtitle, d.package_explorer.subtitle, 300).match(/1\s*ปี|365\s*วัน/) ? d.package_explorer.subtitle : cleanString(packageExplorerRaw.subtitle, d.package_explorer.subtitle, 300)),
       cta_label: cleanString(packageExplorerRaw.cta_label, d.package_explorer.cta_label, 80),
       empty_title: cleanString(packageExplorerRaw.empty_title, d.package_explorer.empty_title, 120),
       empty_description: cleanString(packageExplorerRaw.empty_description, d.package_explorer.empty_description, 300),

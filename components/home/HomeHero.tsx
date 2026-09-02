@@ -75,7 +75,9 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
               whiteSpace: 'pre-line',
             }}
           >
-            {hero.title || 'แนวข้อสอบราชการออนไลน์\nพร้อมเฉลยละเอียดทุกข้อ'}
+            {hero.title
+              ? hero.title.replace('พร้อมเฉลยละเอียดทุกข้อ', 'พร้อมเฉลยละเอียด')
+              : 'แนวข้อสอบราชการออนไลน์\nพร้อมเฉลยละเอียด'}
           </h1>
 
           {/* 2. Concise Value Proposition */}
@@ -89,8 +91,11 @@ export default function HomeHero({ hero, searchChips }: HomeHeroProps) {
               whiteSpace: 'pre-line',
             }}
           >
-            {hero.subtitle ||
-              'ฝึกทำข้อสอบราชการออนไลน์ทีละข้อ พร้อมระบบเฉลยละเอียดอธิบายทุกตัวเลือก วิเคราะห์จุดอ่อนอัตโนมัติ และวางแผนเตรียมสอบได้อย่างตรงจุด'}
+            {hero.subtitle
+              ? hero.subtitle
+                  .replace('พร้อมระบบเฉลยละเอียดอธิบายทุกตัวเลือก', 'พร้อมเฉลยอธิบายเหตุผล')
+                  .replace('เฉลยละเอียดอธิบายทุกตัวเลือก', 'เฉลยอธิบายเหตุผล')
+              : 'ฝึกทำข้อสอบราชการออนไลน์ทีละข้อ พร้อมเฉลยอธิบายเหตุผล วิเคราะห์จุดอ่อนอัตโนมัติ และวางแผนเตรียมสอบได้อย่างตรงจุด'}
           </p>
 
           {/* 3. Primary / Secondary Action CTAs */}

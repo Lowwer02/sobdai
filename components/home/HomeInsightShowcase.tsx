@@ -91,7 +91,7 @@ export default function HomeInsightShowcase() {
                   className="badge badge-gold"
                   style={{ fontSize: '11px', padding: '3px 8px' }}
                 >
-                  โหมดฝึกฝน
+                  ฝึกทำ
                 </span>
               </div>
               <span

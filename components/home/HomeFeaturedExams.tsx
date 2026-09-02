@@ -41,7 +41,9 @@ export default function HomeFeaturedExams({ packages, config }: HomeFeaturedExam
             {config.title || 'เลือกแนวข้อสอบราชการตามหน่วยงานและตำแหน่ง'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', margin: 0 }}>
-            {config.subtitle || 'แต่ละชุดข้อสอบมาพร้อมแบบฝึกหัด เฉลยละเอียด และระบบติดตามความพร้อมรายบุคคล'}
+            {config.subtitle && !config.subtitle.includes('1 ปี') && !config.subtitle.includes('365 วัน')
+              ? config.subtitle
+              : 'แต่ละชุดข้อสอบมาพร้อมแบบฝึกหัด เฉลยละเอียด และระบบติดตามความพร้อมรายบุคคล'}
           </p>
         </div>
 
@@ -80,7 +82,7 @@ export default function HomeFeaturedExams({ packages, config }: HomeFeaturedExam
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
             gap: '20px',
           }}
         >

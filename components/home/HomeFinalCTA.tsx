@@ -7,6 +7,17 @@ interface HomeFinalCTAProps {
 }
 
 export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
+  const primaryButton = cta.final_button || {
+    label: 'ดูชุดข้อสอบทั้งหมด',
+    href: '/packages',
+    type: 'internal',
+    open_in_new_tab: false,
+  }
+  const buttonLabel = primaryButton.label || 'ดูชุดข้อสอบทั้งหมด'
+  const buttonHref = primaryButton.href || '/packages'
+  const isExternal = primaryButton.type === 'external' || buttonHref.startsWith('http')
+  const openInNewTab = Boolean(primaryButton.open_in_new_tab || isExternal)
+
   return (
     <section style={{ padding: 'clamp(44px, 6vw, 72px) 20px clamp(56px, 8vw, 120px)' }}>
       <div
@@ -76,7 +87,9 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
             lineHeight: 1.65,
           }}
         >
-          {cta.final_subtitle || 'เลือกแนวข้อสอบราชการตามตำแหน่งที่ต้องการ แล้วเริ่มฝึกทำข้อสอบออนไลน์ได้ทันที'}
+          {cta.final_subtitle && !cta.final_subtitle.includes('1 ปี') && !cta.final_subtitle.includes('365 วัน')
+            ? cta.final_subtitle
+            : 'เลือกแนวข้อสอบราชการตามตำแหน่งที่ต้องการ แล้วเริ่มฝึกทำข้อสอบออนไลน์ได้ทันที'}
         </p>
 
         <div
@@ -89,8 +102,10 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
           }}
         >
           <Link
-            href="/packages"
-            className="btn-primary animate-pulse-gold"
+            href={buttonHref}
+            target={openInNewTab ? '_blank' : undefined}
+            rel={openInNewTab ? 'noopener noreferrer' : undefined}
+            className="btn-primary"
             style={{
               padding: '14px 36px',
               fontSize: '16px',
@@ -100,7 +115,7 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
               gap: '8px',
             }}
           >
-            <span>ดูชุดข้อสอบทั้งหมด</span>
+            <span>{buttonLabel}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14" />
               <path d="m12 5 7 7-7 7" />
