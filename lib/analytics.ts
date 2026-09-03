@@ -40,6 +40,24 @@ export function login(method: string = 'email'): void {
 }
 
 /**
+ * Track a click on the Daily discovery CTA on the homepage.
+ */
+export function trackDailyHomeClick(): void {
+  pushToDataLayer({
+    event: 'daily_home_click',
+  })
+}
+
+/**
+ * Track a click on the static Daily link in the desktop or mobile navbar.
+ */
+export function trackDailyNavClick(): void {
+  pushToDataLayer({
+    event: 'daily_nav_click',
+  })
+}
+
+/**
  * Track viewing a package detail.
  */
 export function viewPackage(
