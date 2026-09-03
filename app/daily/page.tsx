@@ -6,8 +6,8 @@ import { loadDailyState } from './actions'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Daily 5 | Sobdai',
-  description: 'ฝึกทำข้อสอบวันละ 5 ข้อ สะสม EXP และรักษาสตรีกของคุณ',
+  title: 'ข้อสอบประจำวัน 5 ข้อ | Sobdai',
+  description: 'ฝึกสั้น ๆ วันละ 5 ข้อ ใช้เวลาเพียงไม่กี่นาที เพื่อฝึกให้ต่อเนื่องทุกวัน',
   robots: { index: false, follow: false },
 }
 
@@ -30,13 +30,13 @@ export default async function DailyPage() {
   }
 
   if (result.status === 'error') {
-    return <MessageCard title="Daily 5" message={result.message} />
+    return <MessageCard title="ข้อสอบประจำวัน 5 ข้อ" message={result.message} />
   }
 
   if (result.status === 'unavailable') {
     return (
       <MessageCard
-        title="Daily 5 ยังไม่พร้อมสำหรับวันนี้"
+        title="ข้อสอบประจำวัน 5 ข้อยังไม่พร้อมสำหรับวันนี้"
         message="ขณะนี้ยังมีข้อสอบที่เผยแพร่ไม่ครบ 5 ข้อ กรุณากลับมาใหม่ภายหลัง"
       />
     )

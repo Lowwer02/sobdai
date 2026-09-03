@@ -11,7 +11,7 @@ const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
   { href: '/packages', label: 'แพ็กเกจ' },
   { href: '/news', label: 'ข่าวสาร' },
-  { href: '/daily', label: 'Daily' },
+  { href: '/daily', label: 'ฝึกทุกวัน' },
   { href: '/exams', label: 'แดชบอร์ด' },
   { href: '/articles', label: 'บทความ' },
   // '/downloads' (คลังสื่อการเรียน) is temporarily unlinked while the
