@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Flame, LockKeyhole, Sparkles, Target, Trophy, Zap } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Flame, LockKeyhole, Sparkles, Target, Zap } from 'lucide-react'
 import { submitDailyAnswer } from '@/app/daily/actions'
 import type {
   DailyAnswers,
@@ -123,6 +123,9 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
   const selectedChoice = persistedChoice ?? draftChoice
   const currentResult = state.results.find((result) => result.id === question.id) ?? null
   const isComplete = state.progress.dailyCompleted
+  const isFinalQuestion = currentIndex === state.questions.length - 1
+  const terminalIncomplete = Boolean(persistedChoice) && isFinalQuestion && state.progress.questionsAnswered < state.questions.length
+  const actionDisabled = isSubmitting || (!persistedChoice && !draftChoice) || terminalIncomplete
 
   const summary = useMemo(() => ({
     correct: state.progress.correctAnswers,
@@ -226,12 +229,32 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                       <button
                         key={choice}
                         type="button"
-                        className={`choice-btn ${selected ? 'border-[#D4AF37] bg-[rgba(212,168,67,0.12)]' : ''}`}
+                        className={`choice-btn ${selected
+                          ? 'border-[#D4AF37] bg-[rgba(212,168,67,0.18)] font-semibold'
+                          : ''}`}
+                        data-selected={selected ? 'true' : 'false'}
                         aria-pressed={selected}
+                        aria-label={`ตัวเลือก ${choice}: ${question.choices[choice]}${selected ? ' (เลือกแล้ว)' : ''}`}
                         disabled={Boolean(persistedChoice) || isSubmitting}
+                        style={selected ? {
+                          borderColor: 'var(--gold)',
+                          backgroundColor: 'var(--gold-tint-hover)',
+                          boxShadow: '0 0 0 1px rgba(212, 175, 55, 0.28), 0 8px 24px rgba(212, 168, 67, 0.12)',
+                        } : undefined}
                         onClick={() => selectAnswer(choice)}
                       >
-                        <span className="choice-badge">{choice}</span>
+                        <span
+                          className="choice-badge"
+                          style={selected ? {
+                            backgroundColor: 'var(--gold)',
+                            borderColor: 'var(--gold)',
+                            color: '#1A1208',
+                            opacity: 1,
+                            boxShadow: '0 0 0 3px rgba(212, 175, 55, 0.18)',
+                          } : undefined}
+                        >
+                          {choice}
+                        </span>
                         <span>{question.choices[choice]}</span>
                       </button>
                     )
@@ -246,18 +269,24 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                   </button>
                   <button
                     type="button"
-                    className="btn-primary inline-flex items-center gap-2"
-                    disabled={isSubmitting || (!persistedChoice && !draftChoice) || (persistedChoice && currentIndex === 4)}
+                    className={`btn-primary inline-flex items-center gap-2 ${actionDisabled ? 'cursor-not-allowed opacity-45 saturate-50' : ''}`}
+                    aria-disabled={actionDisabled}
+                    disabled={actionDisabled}
+                    style={actionDisabled ? {
+                      cursor: 'not-allowed',
+                      filter: 'saturate(0.45)',
+                      opacity: 0.45,
+                      boxShadow: 'none',
+                      transform: 'none',
+                    } : undefined}
                     onClick={handleNext}
                   >
                     {isSubmitting
                       ? 'กำลังตรวจคำตอบ...'
                       : persistedChoice
-                        ? 'ข้อต่อไป'
-                        : currentIndex === 4
-                          ? 'ส่งคำตอบ'
-                          : 'ตรวจคำตอบและไปต่อ'}
-                    {currentIndex === 4 ? <Trophy size={17} /> : <ChevronRight size={17} />}
+                        ? terminalIncomplete ? 'กลับไปตอบข้อที่เหลือ' : 'ข้อต่อไป'
+                        : 'ตรวจคำตอบ'}
+                    {!isSubmitting && persistedChoice && !terminalIncomplete && <ChevronRight size={17} />}
                   </button>
                 </div>
                 {persistedChoice && currentIndex === 4 && state.progress.questionsAnswered < 5 && (
