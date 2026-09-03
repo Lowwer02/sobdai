@@ -155,7 +155,11 @@ function mkCandidate(questionCode: string, slot = sharedSlot): Candidate {
   }
 }
 
-function mkCandidateSet(codes: readonly string[], warning?: GeneratorWarning): CandidateSet {
+function mkCandidateSet(
+  codes: readonly string[],
+  warning?: GeneratorWarning,
+  options?: { readonly loTargets?: Partial<Record<'LO1' | 'LO2' | 'LO3' | 'LO4', number>> }
+): CandidateSet {
   return {
     identity: { assemblyRequestId: 'req-test-001', generatedAt: null, bankStateHash: 'bank-hash' },
     candidates: codes.map((code) => mkCandidate(code)),
@@ -180,7 +184,7 @@ function mkCandidateSet(codes: readonly string[], warning?: GeneratorWarning): C
         },
       ],
     },
-    constraintSnapshot: buildConstraintSnapshot(),
+    constraintSnapshot: withLoTargets(buildConstraintSnapshot(), options?.loTargets),
     warnings: warning === undefined ? [] : [warning],
     statistics: {
       totalCandidates: codes.length,
@@ -195,6 +199,26 @@ function mkCandidateSet(codes: readonly string[], warning?: GeneratorWarning): C
     },
     exclusionsLog: [],
     meta: { specVersion: '1.0', generatorVersion: '1.0.0' },
+  }
+}
+
+/** Override the fixture's LO distribution targets (undefined passthrough = 25 each). */
+function withLoTargets(
+  snapshot: ReturnType<typeof buildConstraintSnapshot>,
+  targets?: Partial<Record<'LO1' | 'LO2' | 'LO3' | 'LO4', number>>
+): ReturnType<typeof buildConstraintSnapshot> {
+  if (targets === undefined) return snapshot
+  return {
+    ...snapshot,
+    loDistribution: {
+      ...snapshot.loDistribution,
+      targets: {
+        LO1: targets.LO1 ?? 0,
+        LO2: targets.LO2 ?? 0,
+        LO3: targets.LO3 ?? 0,
+        LO4: targets.LO4 ?? 0,
+      },
+    },
   }
 }
 
@@ -366,7 +390,14 @@ function verifies_multiple_slots_are_independent_and_stable(): void {
     mkComposite('Q-000003', 0.7, { slot: alternateSlot }),
     mkComposite('Q-000004', 0.7, { slot: alternateSlot }),
   ]
-  const ranked = runRanking(composites)
+  // Legacy (unquantified) Blueprint: no authored LO quantities, so ordering
+  // groups follow the Candidates' observed slots.
+  const ranked = runRanking(
+    composites,
+    mkCandidateSet(composites.map((composite) => composite.questionCode), undefined, {
+      loTargets: { LO1: 0, LO2: 0, LO3: 0, LO4: 0 },
+    })
+  )
   assert.equal(ranked.slots.length, 2)
   assert.deepEqual(
     ranked.slots[0]!.rankedCandidates.map((candidate) => [candidate.code, candidate.rank]),

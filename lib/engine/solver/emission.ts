@@ -15,6 +15,7 @@ import type {
   ReplacementRecord,
 } from './contracts'
 import type { RankedCandidate } from '../ranking/contracts'
+import type { LearningObjective } from '../shared/assessment-vocabulary'
 import type { AllocationRuntimeState, ConflictRuntimeEntry, SlotRuntimeState } from './runtime'
 import type { AllocationFinalizationResult } from './finalization'
 import type { AuditFinalizationResult } from './audit'
@@ -45,6 +46,7 @@ export function emitAllocatedCandidateSet(
   const feasibility = placements.some((placement) => placement.state === 'rejected') || unresolvedConflicts.length > 0
     ? 'partially_feasible'
     : 'feasible'
+  const perSetPhysicalCounts = computePerSetPhysicalCounts(placements, runtimeState)
   const shortfallSummary = Object.freeze({
     allocatedSlotCount: placements.filter((placement) => placement.state === 'allocated').length,
     rejectedSlotCount: placements.filter((placement) => placement.state === 'rejected').length,
@@ -61,6 +63,9 @@ export function emitAllocatedCandidateSet(
       scoringModelVersion: finalized.rankedCandidateSet.meta.scoringModelVersion,
     }),
     placements,
+    ...(perSetPhysicalCounts !== null
+      ? { perSetPhysicalCounts: Object.freeze(perSetPhysicalCounts) }
+      : {}),
     feasibility,
     shortfallSummary,
     unresolvedConflicts,
@@ -198,6 +203,40 @@ function rejectionReason(candidateCode: string, blocking: readonly ConflictRunti
   return conflicts.length === 0
     ? `Candidate '${candidateCode}' was considered but no feasible finalized placement remained.`
     : conflicts.map((conflict) => `${conflict.constraint}: ${conflict.evidence}`).sort(compareStrings).join(' ')
+}
+
+/** Physical per-Set allocation evidence; null for legacy unquantified Blueprints. */
+function computePerSetPhysicalCounts(
+  placements: readonly Placement[],
+  runtimeState: AllocationRuntimeState
+): { setNumber: number; expectedQuestionCount: number; allocatedQuestionCount: number; distinctQuestionCount: number }[] | null {
+  const snapshot = runtimeState.constraintSnapshot
+  const perSet = snapshot.target.perSet
+  const setCount = snapshot.target.sets
+  let authoredDemand = 0
+  for (let setNumber = 1; setNumber <= setCount; setNumber++) {
+    for (const lo of Object.keys(snapshot.loDistribution.targets)) {
+      authoredDemand += Math.round(((snapshot.loDistribution.targets[lo as LearningObjective] ?? 0) * perSet) / 100)
+    }
+  }
+  if (authoredDemand === 0) return null
+
+  const counts: { setNumber: number; expectedQuestionCount: number; allocatedQuestionCount: number; distinctQuestionCount: number }[] = []
+  for (let setNumber = 1; setNumber <= setCount; setNumber++) {
+    const codes = placements
+      .flatMap((placement) =>
+        placement.state === 'allocated' && placement.slot.setNumber === setNumber
+          ? [placement.assignedCandidate.code]
+          : []
+      )
+    counts.push({
+      setNumber,
+      expectedQuestionCount: perSet,
+      allocatedQuestionCount: codes.length,
+      distinctQuestionCount: new Set(codes).size,
+    })
+  }
+  return counts
 }
 
 function shortfallSummaryText(placements: readonly Placement[], unresolvedConflictCount: number): string {

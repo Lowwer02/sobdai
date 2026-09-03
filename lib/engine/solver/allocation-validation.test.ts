@@ -161,8 +161,41 @@ function candidate(code: string): Candidate {
   }
 }
 
-function candidateSet(codes: readonly string[]): CandidateSet {
-  const constraintSnapshot = buildConstraintSnapshot()
+type SnapshotOverrides = {
+  readonly perSet?: number
+  readonly sets?: number
+}
+
+/**
+ * Consistent quantified snapshot: the authored LO demand equals the per-Set
+ * target, so fixtures exercise the Solver contract at a small scale.
+ */
+function quantifiedSnapshot(
+  base: ReturnType<typeof buildConstraintSnapshot>,
+  overrides?: SnapshotOverrides
+): ReturnType<typeof buildConstraintSnapshot> {
+  const perSet = overrides?.perSet ?? 2
+  const sets = (overrides?.sets ?? 1) as 1 | 2 | 3 | 4 | 5
+  const lo1 = Math.round((100 / perSet) * 100 * perSet / 100)
+  return {
+    ...base,
+    target: { ...base.target, perSet, sets },
+    distributionConstraints: { ...base.distributionConstraints, sumPerSet: perSet, tier1Floor: 0, tier4Ceiling: 0, tierMinMax: { 1: [0, perSet], 2: [0, perSet], 3: [0, perSet], 4: [0, perSet] } },
+    loDistribution: {
+      ...base.loDistribution,
+      targets: { LO1: Math.min(100, lo1), LO2: 0, LO3: 0, LO4: 0 },
+    },
+  }
+}
+
+function candidateSet(
+  codes: readonly string[],
+  snapshotOverrides?: SnapshotOverrides
+): CandidateSet {
+  const constraintSnapshot = quantifiedSnapshot(
+    buildConstraintSnapshot(),
+    snapshotOverrides
+  )
   return {
     identity: { assemblyRequestId: 'assembly-allocation-validation', generatedAt: null, bankStateHash: 'bank-hash' },
     candidates: codes.map(candidate),
@@ -200,8 +233,12 @@ function rankedSlot(slotId: string, s: BlueprintSlot, codes: readonly string[]):
   }
 }
 
-function rankedCandidateSet(slots: readonly RankedSlot[], codes: readonly string[]): RankedCandidateSet {
-  const cs = candidateSet(codes)
+function rankedCandidateSet(
+  slots: readonly RankedSlot[],
+  codes: readonly string[],
+  snapshotOverrides?: SnapshotOverrides
+): RankedCandidateSet {
+  const cs = candidateSet(codes, snapshotOverrides)
   return {
     identity: {
       candidateSetId: cs.identity.assemblyRequestId,
@@ -289,7 +326,8 @@ function duplicate_candidate_release_produces_consistent_effective_allocation():
       rankedSlot(a.slotId, a.slot, ['Q-000001']),
       rankedSlot(b.slotId, b.slot, ['Q-000002']),
     ],
-    ['Q-000001', 'Q-000002']
+    ['Q-000001', 'Q-000002'],
+    { perSet: 1 }
   )
   const i = inputs(rcs)
   const placement = withPlacement(i.placement, {
@@ -335,9 +373,18 @@ function ineligible_candidate_release_validates_as_released_slot(): void {
   const detection = detectAllocationConflicts(placement, i.runtimeState, i.validation)
   const resolution = resolveDetectedConflicts(detection, placement, i.runtimeState)
   const result = validateResolvedAllocation(resolution, placement, i.runtimeState)
-  assert.equal(result.validationResult, 'valid')
+  // Release mechanics remain consistent — every Slot is released — but the
+  // quantified per-Set contract FAILS LOUD: a fully released allocation leaves
+  // 0 of the required per-Set Questions and must never validate as feasible.
+  assert.equal(result.validationResult, 'invalid')
   assert.equal(result.validationSummary.effectivePlacementCount, 0)
   assert.equal(result.validationSummary.releasedSlotCount, 2)
+  assert.ok(
+    result.validationDiagnostics.some(
+      (diagnostic) =>
+        diagnostic.category === 'no_feasible_candidate' && diagnostic.severity === 'Fatal'
+    )
+  )
 }
 
 function unresolved_blueprint_conflict_invalidates_allocation(): void {

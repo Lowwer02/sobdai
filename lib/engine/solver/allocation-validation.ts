@@ -21,6 +21,7 @@
  *    Solver output.
  */
 
+import type { LearningObjective } from '../shared/assessment-vocabulary'
 import type { SolverDiagnostic, SolverDiagnosticCategory } from './contracts'
 import type { AllocationRuntimeState } from './runtime'
 import type { PlacementRuntimeState, ProvisionalPlacement } from './placement'
@@ -72,6 +73,7 @@ export function validateResolvedAllocation(
     ...diagnosticsFromActions(resolutionResult, runtimeState),
     ...diagnosticsFromEffectivePlacements(effectivePlacements, runtimeState),
     ...diagnosticsFromPlacementProgress(placementState),
+    ...diagnosticsFromPerSetQuantity(effectivePlacements, runtimeState),
   ].sort(compareDiagnostics)
   const fatalDiagnosticCount = diagnostics.filter((diagnostic) => diagnostic.severity === 'Fatal').length
 
@@ -442,6 +444,59 @@ function assertCompatibleInputs(
   if (resolutionResult.resolutionSummary.actionCount !== resolutionResult.resolutionActions.length) {
     throw new Error('Fatal Allocation Validation error: resolution summary does not match action count')
   }
+}
+
+/**
+ * HARD physical quantity invariant for quantified Blueprints (authored LO
+ * quantities): every Set must hold exactly `target.perSet` DISTINCT allocated
+ * Question placements — never a partial "Feasible k/100" allocation. Total
+ * Bank supply below the per-Set target fails loudly here instead of emitting
+ * a successful partial set.
+ */
+function diagnosticsFromPerSetQuantity(
+  effectivePlacements: readonly ProvisionalPlacement[],
+  runtimeState: AllocationRuntimeState
+): readonly SolverDiagnostic[] {
+  const snapshot = runtimeState.constraintSnapshot
+  const perSet = snapshot.target.perSet
+  const setCount = snapshot.target.sets
+  let authoredDemand = 0
+  for (let setNumber = 1; setNumber <= setCount; setNumber++) {
+    for (const lo of Object.keys(snapshot.loDistribution.targets)) {
+      const percent = snapshot.loDistribution.targets[lo as LearningObjective] ?? 0
+      authoredDemand += Math.round((percent * perSet) / 100)
+    }
+  }
+  if (authoredDemand === 0) return [] // legacy unquantified Blueprint
+
+  const placedCodesBySet = new Map<number, Set<string>>()
+  for (const placement of effectivePlacements) {
+    if (placement.status !== 'placed' || placement.candidateCode === null) continue
+    const setNumber = runtimeState.slotsById.get(placement.slotId)?.slot.setNumber
+    if (setNumber === undefined) continue
+    const codes = placedCodesBySet.get(setNumber) ?? new Set<string>()
+    codes.add(placement.candidateCode)
+    placedCodesBySet.set(setNumber, codes)
+  }
+
+  const diagnostics: SolverDiagnostic[] = []
+  for (let setNumber = 1; setNumber <= setCount; setNumber++) {
+    const count = placedCodesBySet.get(setNumber)?.size ?? 0
+    if (count === perSet) continue
+    diagnostics.push(
+      diagnostic(
+        count < perSet ? 'no_feasible_candidate' : 'corrupted_allocation',
+        'Fatal',
+        `set=${setNumber}`,
+        null,
+        `Set ${setNumber} allocated ${count} of exactly ${perSet} required Question placements — the Question Bank cannot supply a full Set.`,
+        count < perSet
+          ? `Add published Bank Questions covering this Blueprint's requirements, or reduce target.sets, before generating this assessment.`
+          : 'Investigate the placement runtime: a Set must never exceed its per-Set question target.'
+      )
+    )
+  }
+  return diagnostics
 }
 
 function diagnostic(

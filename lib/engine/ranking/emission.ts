@@ -67,8 +67,8 @@ export function emitRankedCandidateSet(
   assertValidInput(input)
 
   const knownCodes = new Set(input.candidateSet.candidates.map((candidate) => candidate.identity.questionCode))
-  const slots = input.tieResolution.slots.map((slot) =>
-    emitRankedSlot(slot, knownCodes)
+  const slots = input.tieResolution.slots.flatMap((slot) =>
+    emitRankedSlotInstances(slot, knownCodes)
   )
 
   return {
@@ -96,6 +96,29 @@ export function emitRankedCandidateSet(
 // ═══════════════════════════════════════════════════════════════════════════
 
 type TieResolvedSlot = TieResolutionOutput['slots'][number]
+
+/**
+ * Expand one resolved slot into its emitted RankedSlots. Quantified demand
+ * buckets (Blueprint per-Set quantities) expand into exactly `requiredCount`
+ * demand instances — one per required final Question placement — each carrying
+ * the bucket's full deterministic ordering; the Solver's global Candidate
+ * uniqueness assigns distinct placements. Legacy slots emit exactly one
+ * RankedSlot with their historical slot id.
+ */
+function emitRankedSlotInstances(
+  slot: TieResolvedSlot,
+  knownCodes: ReadonlySet<string>
+): readonly RankedSlot[] {
+  const instanceCount = slot.requiredCount ?? 1
+  if (instanceCount <= 0) return []
+  return Array.from({ length: instanceCount }, (_, index) => {
+    const suffixed = slot.requiredCount !== undefined
+    const slotId = suffixed
+      ? `${slot.slotId}|demand=${String(index + 1).padStart(4, '0')}`
+      : slot.slotId
+    return emitRankedSlot({ ...slot, slotId }, knownCodes)
+  })
+}
 
 function emitRankedSlot(slot: TieResolvedSlot, knownCodes: ReadonlySet<string>): RankedSlot {
   const resolvedCandidates = flattenGroups(slot.groups)

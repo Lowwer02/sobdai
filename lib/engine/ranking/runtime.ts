@@ -36,6 +36,11 @@ import type {
   OrderingKeyDescriptor,
 } from './contracts'
 import { emitRankedCandidateSet } from './emission'
+import {
+  buildAllocationDemand,
+  type AllocationDemand,
+  type AllocationDemandBucket,
+} from './demand'
 import { resolveTies } from './tie-resolution'
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -45,6 +50,12 @@ import { resolveTies } from './tie-resolution'
 /** Stage E-3E.1 input: immutable, already-computed Composite Scores. */
 export interface ScoreOrderingInput {
   readonly composites: readonly CompositeScore[]
+  /**
+   * Quantified allocation demand derived from the CandidateSet (Blueprint
+   * per-Set quantities). When absent or unquantified, ordering falls back to
+   * the historical grouping-by-observed-candidate-slot behavior.
+   */
+  readonly demand?: AllocationDemand
 }
 
 /**
@@ -92,6 +103,12 @@ export interface PreparedOrderingSlot {
   readonly slot: BlueprintSlot
   readonly orderingKey: OrderingKeyDescriptor
   readonly groups: readonly ScoreOrderingGroup[]
+  /**
+   * Quantified demand: how many final Question placements this bucket must
+   * fill (emission expands the bucket into this many demand instances).
+   * Undefined on legacy (unquantified) slots, which fill exactly one placement.
+   */
+  readonly requiredCount?: number
 }
 
 /** Stage E-3E.1 output. Does not emit RankedCandidateSet. */
@@ -164,13 +181,24 @@ export interface RankingRuntimeInput {
 export function runRanking(
   input: RankingRuntimeInput
 ): CandidateRankingResult {
+  const demand = buildAllocationDemand(input.candidateSet)
+  const configuredMax = input.maxTieGroupSize ?? DEFAULT_MAX_TIE_GROUP_SIZE
+  // Quantified demand buckets are large BY DESIGN (one bucket per authored
+  // axis quantity, e.g. 24–34 same-LO Candidates for KSB) and slot-relative
+  // Scoring legitimately scores them as order ties resolved by Question Code.
+  // The tie-group bound therefore scales to the largest quantified bucket
+  // instead of falsely signalling a scoring failure; resolution stays fully
+  // deterministic and transparent (tie groups + resolved order are emitted).
+  const maxTieGroupSize = demand.quantified
+    ? Math.max(configuredMax, ...demand.buckets.map((bucket) => bucket.candidateCodes.length))
+    : configuredMax
   const ordering = prepareScoreOrdering({
     composites: input.compositeScores,
+    demand,
   })
   const tieResolution = resolveTies({
     ordering,
-    maxTieGroupSize:
-      input.maxTieGroupSize ?? DEFAULT_MAX_TIE_GROUP_SIZE,
+    maxTieGroupSize,
   })
   const rankedCandidateSet = emitRankedCandidateSet({
     candidateSet: input.candidateSet,
@@ -200,7 +228,11 @@ export function prepareScoreOrdering(input: ScoreOrderingInput): ScoreOrderingOu
   const candidates = input.composites.map(prepareCandidate)
   assertNoDuplicateCandidateSlot(candidates)
 
-  const slots = groupCandidatesBySlot(candidates)
+  const groups = input.demand?.quantified
+    ? quantifiedDemandGroups(input.demand, candidates)
+    : groupCandidatesBySlot(candidates)
+
+  const slots = groups
     .map(prepareSlot)
     .sort((a, b) => compareStrings(a.slotId, b.slotId))
 
@@ -274,6 +306,8 @@ interface SlotCandidateGroup {
   readonly slotId: string
   readonly slot: BlueprintSlot
   readonly candidates: readonly ScoreOrderingCandidate[]
+  /** Quantified demand (final Question placements) carried to emission. */
+  readonly requiredCount?: number
 }
 
 function groupCandidatesBySlot(
@@ -296,6 +330,45 @@ function groupCandidatesBySlot(
     slot: group.slot,
     candidates: group.candidates,
   }))
+}
+
+/**
+ * Group Candidates into quantified demand buckets (Blueprint per-Set
+ * quantities). Each bucket carries `requiredCount` — the number of distinct
+ * final Question placements it must fill — and holds its matching Candidates
+ * (LO buckets) or every Candidate (the residual bucket that absorbs rounding
+ * drift and degraded LO supply). The Solver's global Candidate uniqueness
+ * turns the shared bucket ordering into distinct placements.
+ */
+function quantifiedDemandGroups(
+  demand: AllocationDemand,
+  candidates: readonly ScoreOrderingCandidate[]
+): readonly SlotCandidateGroup[] {
+  const knownCodes = new Set(demand.knownCodes)
+  for (const candidate of candidates) {
+    if (!knownCodes.has(candidate.questionCode)) {
+      throw new Error(
+        `Fatal Score Ordering error: Composite for ${candidate.questionCode} is not present in CandidateSet`
+      )
+    }
+  }
+  const byCode = new Map(candidates.map((candidate) => [candidate.questionCode, candidate]))
+
+  return demand.buckets
+    .filter((bucket) => bucket.requiredCount > 0)
+    .map((bucket: AllocationDemandBucket): SlotCandidateGroup => {
+      const bucketCandidates: ScoreOrderingCandidate[] = []
+      for (const code of bucket.candidateCodes) {
+        const candidate = byCode.get(code)
+        if (candidate !== undefined) bucketCandidates.push(candidate)
+      }
+      return {
+        slotId: bucket.bucketId,
+        slot: bucket.slot,
+        candidates: bucketCandidates,
+        requiredCount: bucket.requiredCount,
+      }
+    })
 }
 
 function prepareSlot(group: SlotCandidateGroup): PreparedOrderingSlot {
@@ -323,6 +396,7 @@ function prepareSlot(group: SlotCandidateGroup): PreparedOrderingSlot {
     slot: group.slot,
     orderingKey: SCORE_ORDERING_KEY,
     groups,
+    ...(group.requiredCount !== undefined ? { requiredCount: group.requiredCount } : {}),
   }
 }
 

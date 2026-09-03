@@ -5,6 +5,15 @@ export interface PublishApprovedAssessmentInput {
     readonly decision: 'approved'
     readonly executionId: string
   }
+  /**
+   * Blueprint identity of the approved result. Verified server-side against
+   * the Assessment Blueprint registry — never trusted as authority; the
+   * authoritative question target is derived from the registered source.
+   */
+  readonly blueprint: {
+    readonly id: string
+    readonly version: string
+  }
   readonly packageId: string
   readonly baseName: string
   readonly description: string

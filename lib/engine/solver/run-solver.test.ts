@@ -20,6 +20,23 @@ import { runRanking } from '../ranking/runtime'
 import { runScoring } from '../scoring/runtime'
 import { stableStringify } from '../shared/testing/determinism'
 import { buildConstraintSnapshot } from '../shared/testing/fixtures'
+
+/**
+ * Consistent quantified snapshot for a one-Question Blueprint: authored LO
+ * demand equals the per-Set target, so a full allocation is exactly 1.
+ */
+function quantifiedSnapshot(): ReturnType<typeof buildConstraintSnapshot> {
+  const base = buildConstraintSnapshot()
+  return {
+    ...base,
+    target: { ...base.target, perSet: 1, sets: 1 },
+    distributionConstraints: { ...base.distributionConstraints, sumPerSet: 1, tier1Floor: 0, tier4Ceiling: 0, tierMinMax: { 1: [0, 1], 2: [0, 1], 3: [0, 1], 4: [0, 1] } },
+    loDistribution: {
+      ...base.loDistribution,
+      targets: { LO1: 100, LO2: 0, LO3: 0, LO4: 0 },
+    },
+  }
+}
 import { runSolver } from './run-solver'
 
 function slot(setNumber: 1 | 2): BlueprintSlot {
@@ -99,7 +116,7 @@ function candidateSet(
     slotIndex: { slots: new Map() },
     shortfallReport: { entries: [] },
     coverageSatisfaction: { bindings: [] },
-    constraintSnapshot: buildConstraintSnapshot(),
+    constraintSnapshot: quantifiedSnapshot(),
     warnings: [],
     statistics: {
       totalCandidates: candidates.length,
@@ -194,7 +211,14 @@ function verifies_blueprint_fatals_are_forwarded(): void {
 
 function verifies_allocation_fatals_are_forwarded(): void {
   const ranked = rank(candidateSet([slot(1), slot(2)]))
-  const result = runSolver(ranked)
+  // Set 2 has demand but no Candidates: the per-Set quantity invariant must
+  // fail the allocation loudly instead of emitting a partial Feasible result.
+  const result = runSolver(
+    withConstraintSnapshot(ranked, {
+      ...ranked.constraintSnapshot,
+      target: { ...ranked.constraintSnapshot.target, sets: 2 },
+    })
+  )
 
   assert.equal(result.ok, false)
   if (result.ok) return

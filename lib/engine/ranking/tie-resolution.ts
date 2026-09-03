@@ -62,6 +62,8 @@ export interface TieResolvedSlot {
   readonly slot: PreparedOrderingSlot['slot']
   readonly orderingKey: PreparedOrderingSlot['orderingKey']
   readonly groups: readonly TieResolvedGroup[]
+  /** Quantified demand carried through from Score Ordering (undefined = legacy). */
+  readonly requiredCount?: number
 }
 
 /** Stage E-3E.2 output. Does not emit RankedCandidateSet or final ranks. */
@@ -121,6 +123,7 @@ function resolveSlot(slot: PreparedOrderingSlot, maxTieGroupSize: number): TieRe
     slot: slot.slot,
     orderingKey: slot.orderingKey,
     groups: slot.groups.map((group) => resolveGroup(slot.slotId, group, maxTieGroupSize)),
+    ...(slot.requiredCount !== undefined ? { requiredCount: slot.requiredCount } : {}),
   }
 }
 

@@ -513,6 +513,17 @@ export interface AllocatedCandidateSetMeta {
   readonly scoringModelVersion: '1.0'
 }
 
+/** Physical per-Set allocation evidence (quantified Blueprints only). */
+export interface PerSetPhysicalCount {
+  readonly setNumber: number
+  /** The Blueprint's required physical Set size (`target.perSet`). */
+  readonly expectedQuestionCount: number
+  /** Placements actually allocated for this Set. */
+  readonly allocatedQuestionCount: number
+  /** Distinct Question Codes among the allocated placements. */
+  readonly distinctQuestionCount: number
+}
+
 /**
  * The Solver's immutable OUTPUT contract (Solver §12). A feasible (or honestly
  * partial) joint mapping of Candidates to Blueprint Slots, with full audit
@@ -536,6 +547,13 @@ export interface AllocatedCandidateSet {
   readonly identity: AllocatedCandidateSetIdentity
   /** One placement per Blueprint Slot (Solver §12.3 placements[]). */
   readonly placements: readonly Placement[]
+  /**
+   * Physical per-Set allocation evidence for quantified Blueprints (authored
+   * LO quantities). One row per Set: the physical Question placements must
+   * equal the Blueprint's per-Set target exactly — slot-group counts are not
+   * a substitute. Undefined for legacy unquantified allocations.
+   */
+  readonly perSetPhysicalCounts?: readonly PerSetPhysicalCount[]
   /** The joint feasibility verdict for the whole allocation (Solver §8.1). */
   readonly feasibility: FeasibilityState
   /** Aggregate gap: targets vs. achieved (Solver §8.2, §12.3 shortfall_summary). */
