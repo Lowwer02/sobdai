@@ -124,13 +124,13 @@ function getDailyCopy(state: DailyState | null) {
   if (!state) {
     return {
       state: 'logged-out',
-      eyebrow: 'ฝึกสั้น ๆ ได้ทุกวัน',
-      title: 'Daily 5',
-      description: '5 คำถามในแต่ละวัน ใช้เวลาไม่นาน ช่วยให้คุณกลับมาฝึกให้ต่อเนื่องทุกวัน',
-      cta: 'เริ่ม Daily 5',
+      eyebrow: 'แบบฝึกประจำวัน',
+      title: 'ข้อสอบประจำวัน 5 ข้อ',
+      description: 'ฝึกสั้น ๆ วันละ 5 ข้อ ใช้เวลาเพียงไม่กี่นาที เพื่อฝึกให้ต่อเนื่องทุกวัน',
+      cta: 'เริ่มฝึกวันนี้',
       stats: [
         { label: 'โจทย์ประจำวัน', value: '5 ข้อ', icon: <Sparkles size={15} /> },
-        { label: 'รูปแบบการฝึก', value: 'สั้น กระชับ', icon: <Check size={15} /> },
+        { label: 'ใช้เวลา', value: 'ไม่กี่นาที', icon: <Check size={15} /> },
         { label: 'เป้าหมาย', value: 'ฝึกต่อเนื่อง', icon: <Flame size={15} /> },
       ],
     } as const
@@ -140,13 +140,13 @@ function getDailyCopy(state: DailyState | null) {
     return {
       state: 'completed',
       eyebrow: 'วันนี้ทำครบแล้ว',
-      title: 'Daily 5 สำเร็จแล้ว',
-      description: `วันนี้คุณตอบถูก ${state.progress.correctAnswers}/5 ข้อ และได้รับ ${state.progress.expEarned} EXP`,
+      title: 'ทำครบ 5 ข้อแล้ว',
+      description: `วันนี้ตอบถูก ${state.progress.correctAnswers}/5 ข้อ และได้รับ +${state.progress.expEarned} EXP`,
       cta: 'ดูผลวันนี้',
       stats: [
         { label: 'ผลวันนี้', value: `${state.progress.correctAnswers}/5 ถูก`, icon: <Check size={15} /> },
         { label: 'EXP วันนี้', value: `+${state.progress.expEarned} EXP`, icon: <Zap size={15} /> },
-        { label: 'Streak', value: `${state.lifetime.currentStreak} วัน`, icon: <Flame size={15} /> },
+        { label: 'ต่อเนื่อง', value: `${state.lifetime.currentStreak} วัน`, icon: <Flame size={15} /> },
       ],
     } as const
   }
@@ -154,28 +154,28 @@ function getDailyCopy(state: DailyState | null) {
   if (state.progress.questionsAnswered > 0) {
     return {
       state: 'in-progress',
-      eyebrow: 'กลับมาฝึกต่อจากเดิม',
-      title: 'ทำ Daily 5 ต่อ',
-      description: `วันนี้ตอบแล้ว ${state.progress.questionsAnswered}/5 ข้อ กลับมาฝึกให้ต่อเนื่องทุกวัน`,
+      eyebrow: 'ฝึกให้ต่อเนื่องทุกวัน',
+      title: 'ทำข้อสอบวันนี้ต่อ',
+      description: `วันนี้ตอบแล้ว ${state.progress.questionsAnswered}/5 ข้อ กลับมาฝึกต่อให้ครบ 5 ข้อ`,
       cta: 'ทำต่อ',
       stats: [
         { label: 'ความคืบหน้า', value: `${state.progress.questionsAnswered}/5 ข้อ`, icon: <Check size={15} /> },
-        { label: 'Streak', value: `${state.lifetime.currentStreak} วัน`, icon: <Flame size={15} /> },
-        { label: 'EXP รวม', value: `${state.stats.totalExp} EXP`, icon: <Zap size={15} /> },
+        { label: 'ต่อเนื่อง', value: `${state.lifetime.currentStreak} วัน`, icon: <Flame size={15} /> },
+        { label: 'EXP สะสม', value: `${state.stats.totalExp} EXP`, icon: <Zap size={15} /> },
       ],
     } as const
   }
 
   return {
     state: 'not-started',
-    eyebrow: 'พร้อมสำหรับวันนี้',
-    title: 'เริ่ม Daily 5',
-    description: '5 คำถามสั้น ๆ สำหรับฝึกทบทวนทุกวัน กลับมาฝึกให้ต่อเนื่องทีละนิด',
-    cta: 'เริ่ม Daily',
+    eyebrow: 'วันนี้ยังไม่ได้เริ่ม',
+    title: 'ข้อสอบประจำวัน 5 ข้อ',
+    description: 'เริ่มจากข้อสอบสั้น ๆ ใช้เวลาเพียงไม่กี่นาที แล้วฝึกให้ต่อเนื่องทุกวัน',
+    cta: 'เริ่มฝึกวันนี้',
     stats: [
       { label: 'โจทย์วันนี้', value: '5 ข้อ', icon: <Sparkles size={15} /> },
-      { label: 'Streak ปัจจุบัน', value: `${state.lifetime.currentStreak} วัน`, icon: <Flame size={15} /> },
-      { label: 'EXP รวม', value: `${state.stats.totalExp} EXP`, icon: <Zap size={15} /> },
+      { label: 'ต่อเนื่อง', value: `${state.lifetime.currentStreak} วัน`, icon: <Flame size={15} /> },
+      { label: 'EXP สะสม', value: `${state.stats.totalExp} EXP`, icon: <Zap size={15} /> },
     ],
   } as const
 }

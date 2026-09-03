@@ -13,8 +13,15 @@ import type {
 const CHOICES: DailyChoice[] = ['A', 'B', 'C', 'D']
 
 function formatDate(dateKey: string): string {
-  const [year, month, day] = dateKey.split('-')
-  return `${day}/${month}/${year}`
+  const [year, month, day] = dateKey.split('-').map(Number)
+  if (![year, month, day].every(Number.isInteger)) return dateKey
+
+  return new Intl.DateTimeFormat('th-TH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'Asia/Bangkok',
+  }).format(new Date(Date.UTC(year, month - 1, day)))
 }
 
 function accuracyLabel(correct: number, answered: number): string {
@@ -35,11 +42,9 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
 }
 
 function QuestCard({
-  label,
   rewardExp,
   completed,
 }: {
-  label: string
   rewardExp: number
   completed: boolean
 }) {
@@ -51,7 +56,7 @@ function QuestCard({
         {completed ? <Check size={20} /> : <Target size={18} />}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="font-semibold text-[#F5E9D6]">{label}</div>
+        <div className="font-semibold text-[#F5E9D6]">ทำข้อสอบวันนี้ให้ครบ 5 ข้อ</div>
         <div className="text-sm text-[#D4AF37]">+{rewardExp} EXP</div>
       </div>
       <span className={`text-xs font-semibold ${completed ? 'text-[#3D9D66]' : 'text-[#7A6550]'}`}>
@@ -187,15 +192,15 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
         <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#D4AF37]">
-              <Sparkles size={17} /> DAILY RETENTION PHASE 1
+              <Sparkles size={17} /> แบบฝึกประจำวัน
             </div>
-            <h1 className="text-4xl font-bold font-display md:text-5xl">Daily 5</h1>
-            <p className="mt-2 text-[#A1866B]">ข้อสอบ 5 ข้อประจำวัน · {formatDate(state.localDate)} · ชุดเดิมตลอดวันนี้</p>
+            <h1 className="text-4xl font-bold font-display md:text-5xl">ข้อสอบประจำวัน 5 ข้อ</h1>
+            <p className="mt-2 text-[#A1866B]">ฝึกสั้น ๆ วันละ 5 ข้อ · ชุดประจำวันที่ {formatDate(state.localDate)}</p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#1A140E] px-4 py-3">
             <Flame className="text-[#D4AF37]" size={22} />
             <div>
-              <div className="text-xs text-[#A1866B]">Streak</div>
+              <div className="text-xs text-[#A1866B]">ต่อเนื่อง</div>
               <div className="text-xl font-bold text-[#F5E9D6]">{state.lifetime.currentStreak} วัน</div>
             </div>
           </div>
@@ -300,9 +305,9 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                   <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#2D7A4F]/20 text-[#4CAF7D]">
                     <Check size={34} />
                   </div>
-                  <div className="text-sm font-semibold text-[#3D9D66]">Daily 5 สำเร็จแล้ว</div>
+                  <div className="text-sm font-semibold text-[#3D9D66]">ทำครบ 5 ข้อแล้ว</div>
                   <h2 className="mt-2 text-3xl font-bold font-display">ถูก {summary.correct}/{summary.answered} ข้อ</h2>
-                  <p className="mt-2 text-[#A1866B]">วันนี้คุณได้รับ {summary.expEarned} EXP จาก Daily</p>
+                  <p className="mt-2 text-[#A1866B]">วันนี้ได้รับ +{summary.expEarned} EXP</p>
                 </div>
                 <ResultList questions={state.questions} results={state.results} />
               </div>
@@ -313,29 +318,31 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
             <section>
               <div className="mb-3 flex items-center gap-2">
                 <Target size={18} className="text-[#D4AF37]" />
-                <h2 className="text-xl font-bold font-display">Daily Quests</h2>
+                <h2 className="text-xl font-bold font-display">ภารกิจวันนี้</h2>
               </div>
               <div className="space-y-3">
-                {state.quests.map((quest) => <QuestCard key={quest.id} {...quest} />)}
+                {state.quests.map((quest) => (
+                  <QuestCard key={quest.id} rewardExp={quest.rewardExp} completed={quest.completed} />
+                ))}
               </div>
             </section>
 
             <section>
               <div className="mb-3 flex items-center gap-2">
                 <Zap size={18} className="text-[#D4AF37]" />
-                <h2 className="text-xl font-bold font-display">Daily Stats</h2>
+                <h2 className="text-xl font-bold font-display">สถิติวันนี้</h2>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <StatCard label="วันนี้ตอบ" value={`${state.stats.questionsAnswered}/5`} icon={<Check size={14} />} />
                 <StatCard label="ความแม่นยำ" value={accuracyLabel(state.stats.correctAnswers, state.stats.questionsAnswered)} icon={<Target size={14} />} />
-                <StatCard label="EXP รวม" value={`${state.stats.totalExp}`} icon={<Zap size={14} />} />
-                <StatCard label="Streak สูงสุด" value={`${state.stats.longestStreak} วัน`} icon={<Flame size={14} />} />
+                <StatCard label="EXP สะสม" value={`${state.stats.totalExp}`} icon={<Zap size={14} />} />
+                <StatCard label="ต่อเนื่องสูงสุด" value={`${state.stats.longestStreak} วัน`} icon={<Flame size={14} />} />
               </div>
             </section>
 
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[rgba(212,168,67,0.06)] p-4 text-sm leading-6 text-[#A1866B]">
-              <div className="mb-2 flex items-center gap-2 font-semibold text-[#D4AF37]"><LockKeyhole size={15} /> กติกา Daily</div>
-              Streak และ EXP จะเพิ่มเมื่อส่งคำตอบ Daily 5 ครบทั้ง 5 ข้อเท่านั้น ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น
+              <div className="mb-2 flex items-center gap-2 font-semibold text-[#D4AF37]"><LockKeyhole size={15} /> กติกาประจำวัน</div>
+              ต่อเนื่องและ EXP จะเพิ่มเมื่อส่งคำตอบครบทั้ง 5 ข้อเท่านั้น ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น
             </div>
           </aside>
         </div>
