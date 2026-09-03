@@ -20,6 +20,7 @@ import HomeHero from '@/components/home/HomeHero'
 import HomeProof from '@/components/home/HomeProof'
 import HomeExamShowcase from '@/components/home/HomeExamShowcase'
 import HomeInsightShowcase from '@/components/home/HomeInsightShowcase'
+import HomeDailySection from '@/components/home/HomeDailySection'
 import HomeFeaturedExams from '@/components/home/HomeFeaturedExams'
 import HomeLatestNews from '@/components/home/HomeLatestNews'
 import HomeFinalCTA from '@/components/home/HomeFinalCTA'
@@ -177,29 +178,26 @@ export default async function Home() {
       {/* ===================== 5. Insight & Diagnostic Showcase ===================== */}
       <HomeInsightShowcase />
 
-      {/* =========================================================================
-          FUTURE SOBDAI DAILY INTEGRATION BOUNDARY
-          A dedicated task owns /daily, Daily 5, Streak, EXP, Quests.
-          The homepage is Daily-Ready but Daily-Independent.
-          ========================================================================= */}
+      {/* ===================== 6. Daily Retention Discovery ===================== */}
+      <HomeDailySection />
 
-      {/* ===================== 6. Learning Journey ===================== */}
+      {/* ===================== 7. Learning Journey ===================== */}
       {sections.howto && <CandidateJourneySection />}
 
-      {/* ===================== 7. Featured / Popular Exam Sets ===================== */}
+      {/* ===================== 8. Featured / Popular Exam Sets ===================== */}
       {sections.featured && (
         <HomeFeaturedExams packages={livePackages} config={package_explorer} />
       )}
 
-      {/* ===================== 8. Latest Government Exam News ===================== */}
+      {/* ===================== 9. Latest Government Exam News ===================== */}
       {sections.news && latestNews.length > 0 && (
         <HomeLatestNews news={latestNews} config={latest_news} />
       )}
 
-      {/* ===================== 9. Remaining Promotions ===================== */}
+      {/* ===================== 10. Remaining Promotions ===================== */}
       {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
 
-      {/* ===================== 10. Final Conversion CTA ===================== */}
+      {/* ===================== 11. Final Conversion CTA ===================== */}
       {sections.cta && <HomeFinalCTA cta={cta} />}
     </div>
   )

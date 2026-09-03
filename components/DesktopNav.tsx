@@ -5,11 +5,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
+import { trackDailyNavClick } from '@/lib/analytics'
 
 const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
   { href: '/packages', label: 'แพ็กเกจ' },
   { href: '/news', label: 'ข่าวสาร' },
+  { href: '/daily', label: 'Daily' },
   { href: '/exams', label: 'แดชบอร์ด' },
   { href: '/articles', label: 'บทความ' },
   // '/downloads' (คลังสื่อการเรียน) is temporarily unlinked while the
@@ -67,6 +69,12 @@ export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onR
             <Link
               key={link.href}
               href={link.href}
+              prefetch={link.href === '/daily' ? false : undefined}
+              onClick={link.href === '/daily' ? () => {
+                try {
+                  trackDailyNavClick()
+                } catch {}
+              } : undefined}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive 
                   ? 'text-[#D4AF37] bg-[rgba(212,175,55,0.08)]' 
