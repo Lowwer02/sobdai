@@ -79,7 +79,18 @@ function candidate(code: string): Candidate {
 }
 
 function candidateSet(codes: readonly string[]): CandidateSet {
-  const constraintSnapshot = buildConstraintSnapshot()
+  const base = buildConstraintSnapshot()
+  // Consistent quantified snapshot sized to the fixture: authored LO demand
+  // equals the per-Set target, so a full allocation is exactly 1 placement.
+  const constraintSnapshot = {
+    ...base,
+    target: { ...base.target, perSet: 1, sets: 1 },
+    distributionConstraints: { ...base.distributionConstraints, sumPerSet: 1, tier1Floor: 0, tier4Ceiling: 0, tierMinMax: { 1: [0, 1], 2: [0, 1], 3: [0, 1], 4: [0, 1] } },
+    loDistribution: {
+      ...base.loDistribution,
+      targets: { LO1: 100, LO2: 0, LO3: 0, LO4: 0 },
+    },
+  }
   return {
     identity: {
       assemblyRequestId: 'assembly-state-application',

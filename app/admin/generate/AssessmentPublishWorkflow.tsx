@@ -99,6 +99,10 @@ export default function AssessmentPublishWorkflow({
     ...emptySets.map(
       (set) => `Set ${set.setNumber} contains no allocated questions.`
     ),
+    ...partialSets.map(
+      (set) =>
+        `Set ${set.setNumber} contains ${set.questionCodes.length} of ${set.expectedQuestionCount} required Questions. Partial allocations cannot be published.`
+    ),
     ...(!publishConfirmed
       ? ['Publish confirmation is required.']
       : []),
@@ -119,6 +123,10 @@ export default function AssessmentPublishWorkflow({
           approval: {
             decision: 'approved',
             executionId: publishable.executionId,
+          },
+          blueprint: {
+            id: approvedResult.execution.blueprintId,
+            version: approvedResult.execution.blueprintVersion,
           },
           packageId,
           baseName,
@@ -222,12 +230,13 @@ export default function AssessmentPublishWorkflow({
                 })}
               </div>
               {partialSets.length > 0 && (
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/15 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-300">
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-500/15 bg-red-500/5 p-3 text-xs leading-relaxed text-red-300">
                   <TriangleAlert size={15} className="mt-0.5 shrink-0" />
                   {partialSets.length} approved set
-                  {partialSets.length === 1 ? ' is' : 's are'} below the
-                  Blueprint target. Editorial approval permits publishing the
-                  honest partial allocation.
+                  {partialSets.length === 1 ? ' is' : 's are'} below the full
+                  required Question count. Partial allocations cannot be
+                  published — regenerate the assessment so every Set satisfies
+                  the complete target.
                 </div>
               )}
             </section>

@@ -68,7 +68,7 @@ function emit() {
 
 function emits_exact_frozen_contract_and_preserves_references(): void {
   const { runtime, audit, output } = emit()
-  assert.deepEqual(Object.keys(output).sort(), ['auditTrail', 'constraintSnapshot', 'coverageSatisfaction', 'feasibility', 'identity', 'meta', 'placements', 'rankedCandidateSet', 'shortfallReport', 'shortfallSummary', 'unresolvedConflicts', 'warnings'])
+  assert.deepEqual(Object.keys(output).sort(), ['auditTrail', 'constraintSnapshot', 'coverageSatisfaction', 'feasibility', 'identity', 'meta', 'perSetPhysicalCounts', 'placements', 'rankedCandidateSet', 'shortfallReport', 'shortfallSummary', 'unresolvedConflicts', 'warnings'])
   assert.equal(output.constraintSnapshot, runtime.constraintSnapshot)
   assert.equal(output.auditTrail, audit.allocationAudit)
   assert.equal(output.warnings, runtime.rankedCandidateSet.warnings)

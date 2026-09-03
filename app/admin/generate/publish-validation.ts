@@ -31,6 +31,19 @@ export function validatePublishInput(
   ) {
     return 'A destination Package is required.'
   }
+  if (!isRecord(value.blueprint)) {
+    return 'Publish requires the approved Blueprint identity.'
+  }
+  if (
+    typeof value.blueprint.id !== 'string' ||
+    value.blueprint.id.trim().length === 0 ||
+    value.blueprint.id.length > 100 ||
+    typeof value.blueprint.version !== 'string' ||
+    value.blueprint.version.trim().length === 0 ||
+    value.blueprint.version.length > 100
+  ) {
+    return 'The approved Blueprint identity is invalid.'
+  }
   if (
     typeof value.baseName !== 'string' ||
     value.baseName.trim().length === 0
@@ -93,8 +106,9 @@ export function validatePublishInput(
     ) {
       return `Assessment Set ${set.setNumber} has an invalid question target.`
     }
-    if (set.questionCodes.length > set.expectedQuestionCount) {
-      return `Assessment Set ${set.setNumber} exceeds its approved question target.`
+    if (set.questionCodes.length !== set.expectedQuestionCount) {
+      // FAIL-CLOSED: a partial allocation must never reach Exam Set writes.
+      return `Assessment Set ${set.setNumber} contains ${set.questionCodes.length} of exactly ${set.expectedQuestionCount} required Questions. Partial allocations cannot be published.`
     }
     if (
       set.questionCodes.some(

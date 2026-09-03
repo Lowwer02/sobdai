@@ -10,6 +10,11 @@ import type {
   PublishApprovedAssessmentInput,
   PublishedExamSet,
 } from './publish-contracts'
+import {
+  resolveAuthoritativePublishTarget,
+  validateAuthoritativeQuestionCounts,
+  validateDestinationPackageBinding,
+} from './publish-authority'
 import { validatePublishInput } from './publish-validation'
 
 /**
@@ -36,10 +41,36 @@ export async function publishApprovedAssessmentAction(
       }
     }
 
+    // SERVER-AUTHORITATIVE TARGET (audit fix P1): resolve the registered
+    // Blueprint and derive the expected per-Set count from the server-held
+    // source before ANY database access. Client-declared counts are never
+    // trusted as authority.
+    const authoritativeTarget = await resolveAuthoritativePublishTarget(
+      input.blueprint
+    )
+    if (!authoritativeTarget.ok) {
+      return {
+        success: false as const,
+        error: authoritativeTarget.error,
+        examSets: [] as readonly PublishedExamSet[],
+      }
+    }
+    const authoritativeCountError = validateAuthoritativeQuestionCounts(
+      input.sets,
+      authoritativeTarget.perSet
+    )
+    if (authoritativeCountError) {
+      return {
+        success: false as const,
+        error: authoritativeCountError,
+        examSets: [] as readonly PublishedExamSet[],
+      }
+    }
+
     const { data: destinationPackage, error: packageError } =
       await supabase
         .from('packages')
-        .select('id')
+        .select('id, package_code')
         .eq('id', input.packageId)
         .maybeSingle()
 
@@ -58,6 +89,19 @@ export async function publishApprovedAssessmentAction(
       return {
         success: false as const,
         error: 'The selected destination Package no longer exists.',
+        examSets: [] as readonly PublishedExamSet[],
+      }
+    }
+
+    // The destination Package must be the Blueprint's registered package.
+    const bindingError = validateDestinationPackageBinding(
+      destinationPackage.package_code,
+      authoritativeTarget.packageCode
+    )
+    if (bindingError) {
+      return {
+        success: false as const,
+        error: bindingError,
         examSets: [] as readonly PublishedExamSet[],
       }
     }
