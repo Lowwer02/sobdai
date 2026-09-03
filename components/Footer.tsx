@@ -77,6 +77,12 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
               นโยบายคุกกี้
             </Link>
             <CookieSettingsButton />
+            <Link href="/help" className="hover:text-[#F5E9D6] transition-colors">
+              วิธีใช้งาน
+            </Link>
+            <Link href="/faq" className="hover:text-[#F5E9D6] transition-colors">
+              คำถามที่พบบ่อย
+            </Link>
             <Link href="/about" className="hover:text-[#F5E9D6] transition-colors">
               เกี่ยวกับเรา
             </Link>
