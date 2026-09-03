@@ -24,6 +24,8 @@ export const PUBLIC_STATIC_ROUTES: PublicRoute[] = [
   { path: '/news', changeFrequency: 'daily', priority: 0.9 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/help', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/faq', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/cookies', changeFrequency: 'yearly', priority: 0.3 },
