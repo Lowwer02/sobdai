@@ -163,42 +163,76 @@ export default async function Home() {
       {/* ===================== Announcement Bar ===================== */}
       <AnnouncementBar promotion={topPromotion} />
 
-      {/* ===================== 1. Product-First Hero ===================== */}
-      {sections.hero && <HomeHero hero={hero} searchChips={heroSearchChips} />}
+      <div className="home-v2-flow">
+        {/* ===================== 1. Product-First Hero ===================== */}
+        {sections.hero && (
+          <div className="home-v2-flow-item">
+            <HomeHero hero={hero} searchChips={heroSearchChips} />
+          </div>
+        )}
 
-      {/* ===================== 2. Verified Platform Proof ===================== */}
-      <HomeProof />
+        {/* ===================== 2. Verified Platform Proof ===================== */}
+        <div className="home-v2-flow-item">
+          <HomeProof />
+        </div>
 
-      {/* ===================== 3. Why Sobdai / Product Value ===================== */}
-      {sections.features && <ProductValueSection />}
+        {/* ===================== 3. Why Sobdai / Product Value ===================== */}
+        {sections.features && (
+          <div className="home-v2-flow-item">
+            <ProductValueSection />
+          </div>
+        )}
 
-      {/* ===================== 4. Large Exam Product Showcase ===================== */}
-      <HomeExamShowcase />
+        {/* ===================== 4. Large Exam Product Showcase ===================== */}
+        <div className="home-v2-flow-item">
+          <HomeExamShowcase />
+        </div>
 
-      {/* ===================== 5. Insight & Diagnostic Showcase ===================== */}
-      <HomeInsightShowcase />
+        {/* ===================== 5. Daily Discovery ===================== */}
+        <div className="home-v2-flow-item">
+          <HomeDailySection />
+        </div>
 
-      {/* ===================== 6. Daily Retention Discovery ===================== */}
-      <HomeDailySection />
+        {/* ===================== 6. Insight & Diagnostic Showcase ===================== */}
+        <div className="home-v2-flow-item">
+          <HomeInsightShowcase />
+        </div>
 
-      {/* ===================== 7. Learning Journey ===================== */}
-      {sections.howto && <CandidateJourneySection />}
+        {/* ===================== 7. Learning Journey ===================== */}
+        {sections.howto && (
+          <div className="home-v2-flow-item">
+            <CandidateJourneySection />
+          </div>
+        )}
 
-      {/* ===================== 8. Featured / Popular Exam Sets ===================== */}
-      {sections.featured && (
-        <HomeFeaturedExams packages={livePackages} config={package_explorer} />
-      )}
+        {/* ===================== 8. Featured / Popular Exam Sets ===================== */}
+        {sections.featured && (
+          <div className="home-v2-flow-item">
+            <HomeFeaturedExams packages={livePackages} config={package_explorer} />
+          </div>
+        )}
 
-      {/* ===================== 9. Latest Government Exam News ===================== */}
-      {sections.news && latestNews.length > 0 && (
-        <HomeLatestNews news={latestNews} config={latest_news} />
-      )}
+        {/* ===================== 9. Latest Government Exam News ===================== */}
+        {sections.news && latestNews.length > 0 && (
+          <div className="home-v2-flow-item">
+            <HomeLatestNews news={latestNews} config={latest_news} />
+          </div>
+        )}
 
-      {/* ===================== 10. Remaining Promotions ===================== */}
-      {remainingPromotions.length > 0 && <PromotionSection promotions={remainingPromotions} />}
+        {/* ===================== 10. Remaining Promotions ===================== */}
+        {remainingPromotions.length > 0 && (
+          <div className="home-v2-flow-item">
+            <PromotionSection promotions={remainingPromotions} />
+          </div>
+        )}
 
-      {/* ===================== 11. Final Conversion CTA ===================== */}
-      {sections.cta && <HomeFinalCTA cta={cta} />}
+        {/* ===================== 11. Final Conversion CTA ===================== */}
+        {sections.cta && (
+          <div className="home-v2-flow-item">
+            <HomeFinalCTA cta={cta} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -312,6 +312,21 @@ h1, h2, h3, .heading {
   z-index: 50;
 }
 
+/* Homepage V2 uses a calm, section-level rhythm on mobile. On large screens,
+   reduce only the space between major sections so the full story reads more
+   cohesively without compressing the cards or changing mobile layout. Each
+   flow item owns a whole section, keeping this convention independent of the
+   individual component's internal spacing. */
+.home-v2-flow-item + .home-v2-flow-item {
+  margin-top: 0;
+}
+
+@media (min-width: 1024px) {
+  .home-v2-flow-item + .home-v2-flow-item {
+    margin-top: clamp(-32px, -2.25vw, -20px);
+  }
+}
+
 /* ===================== Badges ===================== */
 .badge {
   display: inline-flex;
@@ -553,4 +568,3 @@ h1, h2, h3, .heading {
 .animate-toast-enter {
   animation: toast-enter 0.2s ease-out forwards;
 }
-
