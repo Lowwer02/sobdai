@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
 import DailyRuntime from '@/components/daily/DailyRuntime'
-import { loadDailyState } from './actions'
+import { loadDailyState, loadGuestDailyState } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +25,25 @@ export default async function DailyPage() {
   const result = await loadDailyState()
 
   if (result.status === 'unauthenticated') {
-    redirect('/login?redirect=/daily')
+    const guestResult = await loadGuestDailyState()
+    if (guestResult.status === 'error') {
+      return <MessageCard title="ข้อสอบประจำวัน 5 ข้อ" message={guestResult.message} />
+    }
+
+    if (guestResult.status === 'unavailable') {
+      return (
+        <MessageCard
+          title="ข้อสอบประจำวัน 5 ข้อยังไม่พร้อมสำหรับวันนี้"
+          message="ขณะนี้ยังมีข้อสอบที่เผยแพร่ไม่ครบ 5 ข้อ กรุณากลับมาใหม่ภายหลัง"
+        />
+      )
+    }
+
+    if (guestResult.status !== 'ready') {
+      return <MessageCard title="ข้อสอบประจำวัน 5 ข้อ" message="กรุณาโหลดหน้านี้ใหม่อีกครั้ง" />
+    }
+
+    return <DailyRuntime initialState={guestResult.state} />
   }
 
   if (result.status === 'error') {

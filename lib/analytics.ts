@@ -57,6 +57,35 @@ export function trackDailyNavClick(): void {
   })
 }
 
+/** Track a guest entering the full Daily experience. */
+export function trackDailyGuestStart(): void {
+  pushToDataLayer({
+    event: 'daily_guest_start',
+  })
+}
+
+/** Track a guest reaching the end of all five questions. */
+export function trackDailyGuestComplete(): void {
+  pushToDataLayer({
+    event: 'daily_guest_complete',
+  })
+}
+
+/** Track the selected authenticated conversion path after guest completion. */
+export function trackDailyGuestAuthClick(method: 'login' | 'signup'): void {
+  pushToDataLayer({
+    event: 'daily_guest_auth_click',
+    method,
+  })
+}
+
+/** Track a server-confirmed same-day guest completion claim. */
+export function trackDailyGuestClaimComplete(): void {
+  pushToDataLayer({
+    event: 'daily_guest_claim_complete',
+  })
+}
+
 /**
  * Track viewing a package detail.
  */

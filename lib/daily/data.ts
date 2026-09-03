@@ -107,6 +107,8 @@ function normalizeReady(value: unknown): DailyState | null {
 
   return {
     available: true,
+    viewer: 'authenticated',
+    guestClaimAvailable: false,
     localDate: value.localDate,
     questions: questions as DailyState['questions'],
     progress: {

@@ -1,8 +1,21 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { Check, ChevronLeft, ChevronRight, Flame, LockKeyhole, Sparkles, Target, Zap } from 'lucide-react'
-import { submitDailyAnswer } from '@/app/daily/actions'
+import {
+  claimGuestDaily,
+  completeGuestDaily,
+  submitDailyAnswer,
+  submitGuestDailyAnswer,
+} from '@/app/daily/actions'
+import {
+  trackDailyGuestAuthClick,
+  trackDailyGuestClaimComplete,
+  trackDailyGuestComplete,
+  trackDailyGuestStart,
+} from '@/lib/analytics'
 import type {
   DailyAnswers,
   DailyChoice,
@@ -44,9 +57,11 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
 function QuestCard({
   rewardExp,
   completed,
+  guest = false,
 }: {
   rewardExp: number
   completed: boolean
+  guest?: boolean
 }) {
   return (
     <div className={`flex items-center gap-3 rounded-2xl border p-4 ${completed
@@ -60,7 +75,7 @@ function QuestCard({
         <div className="text-sm text-[#D4AF37]">+{rewardExp} EXP</div>
       </div>
       <span className={`text-xs font-semibold ${completed ? 'text-[#3D9D66]' : 'text-[#7A6550]'}`}>
-        {completed ? 'สำเร็จแล้ว' : 'ยังไม่สำเร็จ'}
+        {completed ? 'สำเร็จแล้ว' : guest ? 'รอบันทึก' : 'ยังไม่สำเร็จ'}
       </span>
     </div>
   )
@@ -121,6 +136,54 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
   const [draftAnswers, setDraftAnswers] = useState<DailyAnswers>({})
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [guestClaimStatus, setGuestClaimStatus] = useState<'idle' | 'pending' | 'ready' | 'failed'>(
+    initialState.guestClaimAvailable ? 'pending' : 'idle',
+  )
+  const guestStartTrackedRef = useRef(false)
+  const guestCompleteTrackedRef = useRef(false)
+  const guestClaimStartedRef = useRef(false)
+
+  const isGuest = state.viewer === 'guest'
+
+  useEffect(() => {
+    if (state.viewer !== 'guest' || guestStartTrackedRef.current) return
+    guestStartTrackedRef.current = true
+    trackDailyGuestStart()
+  }, [state.viewer])
+
+  useEffect(() => {
+    if (state.viewer !== 'authenticated'
+      || !state.guestClaimAvailable
+      || guestClaimStartedRef.current) return
+
+    guestClaimStartedRef.current = true
+    setGuestClaimStatus('pending')
+    let cancelled = false
+
+    void claimGuestDaily().then((result) => {
+      if (cancelled) return
+
+      if (result.status === 'ready') {
+        setState(result.state)
+        setCurrentIndex(result.state.progress.currentIndex)
+        setGuestClaimStatus('ready')
+        trackDailyGuestClaimComplete()
+      } else if (result.status === 'error') {
+        setGuestClaimStatus('failed')
+        setSaveMessage(result.message)
+      } else if (result.status === 'invalid-proof') {
+        setGuestClaimStatus('failed')
+      }
+    }).catch(() => {
+      if (cancelled) return
+      setGuestClaimStatus('failed')
+      setSaveMessage('ไม่สามารถบันทึกผล Daily ให้บัญชีได้ในขณะนี้')
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [state.guestClaimAvailable, state.viewer])
 
   const question = state.questions[currentIndex]
   const persistedChoice = state.progress.answers[question.id]
@@ -155,26 +218,115 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
 
     setIsSubmitting(true)
     setSaveMessage(null)
-    const result = await submitDailyAnswer({
-      questionId: question.id,
-      choice: draftChoice,
-      nextIndex: currentIndex,
-    })
+    try {
+      if (isGuest) {
+        const guestResult = await submitGuestDailyAnswer({
+          questionId: question.id,
+          choice: draftChoice,
+          nextIndex: currentIndex,
+        })
 
-    if (result.status === 'ready') {
-      setState(result.result.state)
-      setDraftAnswers((previous) => {
-        const next = { ...previous }
-        delete next[question.id]
-        return next
+        if (guestResult.status === 'ready') {
+          const nextAnswers: DailyAnswers = {
+            ...state.progress.answers,
+            [question.id]: draftChoice,
+          }
+          const resultById = new Map([
+            ...state.results.map((result) => [result.id, result] as const),
+            [guestResult.result.id, guestResult.result] as const,
+          ])
+          const nextResults = state.questions
+            .map((candidate) => resultById.get(candidate.id))
+            .filter((result): result is DailyQuestionResult => Boolean(result))
+          const questionsAnswered = Object.keys(nextAnswers).length
+          const correctAnswers = nextResults.filter((result) => result.isCorrect).length
+          const dailyCompleted = questionsAnswered === state.questions.length
+
+          setState({
+            ...state,
+            guestClaimAvailable: false,
+            progress: {
+              ...state.progress,
+              currentIndex: Math.min(state.questions.length - 1, currentIndex + 1),
+              answers: nextAnswers,
+              questionsAnswered,
+              correctAnswers,
+              dailyCompleted,
+              expEarned: 0,
+              completedAt: null,
+            },
+            stats: {
+              ...state.stats,
+              questionsAnswered,
+              correctAnswers,
+              accuracy: Math.round((correctAnswers / questionsAnswered) * 100),
+              expEarnedToday: 0,
+              totalExp: 0,
+              currentStreak: 0,
+              longestStreak: 0,
+            },
+            results: nextResults,
+            quests: [{ ...state.quests[0], completed: false }],
+          })
+          setDraftAnswers((previous) => {
+            const next = { ...previous }
+            delete next[question.id]
+            return next
+          })
+
+          if (dailyCompleted) {
+            const proofResult = await completeGuestDaily({ answers: nextAnswers })
+            if (proofResult.status === 'ready') {
+              setGuestClaimStatus('ready')
+              setState((previous) => ({ ...previous, guestClaimAvailable: true }))
+              if (!guestCompleteTrackedRef.current) {
+                guestCompleteTrackedRef.current = true
+                trackDailyGuestComplete()
+              }
+              setSaveMessage('ตรวจคำตอบครบแล้ว ผลวันนี้พร้อมบันทึก')
+            } else {
+              setGuestClaimStatus('failed')
+              setSaveMessage(
+                proofResult.status === 'error'
+                  ? proofResult.message
+                  : 'ตรวจคำตอบครบแล้ว แต่ยังยืนยันผลไม่ได้ กรุณาลองใหม่อีกครั้ง',
+              )
+            }
+          } else {
+            setSaveMessage('ตรวจคำตอบแล้ว')
+          }
+        } else if (guestResult.status === 'unauthenticated') {
+          setSaveMessage('เซสชันเปลี่ยนแปลง กรุณาโหลดหน้านี้ใหม่อีกครั้ง')
+        } else {
+          setSaveMessage(guestResult.message)
+        }
+        return
+      }
+
+      const result = await submitDailyAnswer({
+        questionId: question.id,
+        choice: draftChoice,
+        nextIndex: currentIndex,
       })
-      setSaveMessage(result.result.idempotent ? 'คำตอบนี้ถูกบันทึกไว้แล้ว' : 'ตรวจคำตอบและบันทึกแล้ว')
-    } else if (result.status === 'unauthenticated') {
-      setSaveMessage('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง')
-    } else {
-      setSaveMessage(result.message)
+
+      if (result.status === 'ready') {
+        setState(result.result.state)
+        setDraftAnswers((previous) => {
+          const next = { ...previous }
+          delete next[question.id]
+          return next
+        })
+        setSaveMessage(result.result.idempotent ? 'คำตอบนี้ถูกบันทึกไว้แล้ว' : 'ตรวจคำตอบและบันทึกแล้ว')
+      } else if (result.status === 'unauthenticated') {
+        setSaveMessage('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง')
+      } else {
+        setSaveMessage(result.message)
+      }
+    } catch {
+      setSaveMessage(isGuest ? 'ไม่สามารถตรวจคำตอบได้ในขณะนี้' : 'ไม่สามารถบันทึก Daily ได้ในขณะนี้')
+    } finally {
+      setIsSubmitting(false)
     }
-    setIsSubmitting(false)
   }
 
   function handleNext() {
@@ -201,7 +353,9 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
             <Flame className="text-[#D4AF37]" size={22} />
             <div>
               <div className="text-xs text-[#A1866B]">ต่อเนื่อง</div>
-              <div className="text-xl font-bold text-[#F5E9D6]">{state.lifetime.currentStreak} วัน</div>
+              <div className="text-xl font-bold text-[#F5E9D6]">
+                {isGuest ? 'สมัครเพื่อเริ่ม' : `${state.lifetime.currentStreak} วัน`}
+              </div>
             </div>
           </div>
         </div>
@@ -307,9 +461,47 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                   </div>
                   <div className="text-sm font-semibold text-[#3D9D66]">ทำครบ 5 ข้อแล้ว</div>
                   <h2 className="mt-2 text-3xl font-bold font-display">ถูก {summary.correct}/{summary.answered} ข้อ</h2>
-                  <p className="mt-2 text-[#A1866B]">วันนี้ได้รับ +{summary.expEarned} EXP</p>
+                  {isGuest ? (
+                    <p className="mt-2 text-[#A1866B]">
+                      ผลวันนี้พร้อมแล้ว สมัครเพื่อเก็บผลและเริ่มสะสมวันต่อเนื่อง
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[#A1866B]">วันนี้ได้รับ +{summary.expEarned} EXP</p>
+                  )}
+                  {!isGuest && guestClaimStatus === 'failed' && saveMessage && (
+                    <p className="mt-3 text-sm text-[#E05C5C]">{saveMessage}</p>
+                  )}
                 </div>
                 <ResultList questions={state.questions} results={state.results} />
+                {isGuest && (
+                  <div className="mt-8 rounded-2xl border border-[rgba(212,175,55,0.28)] bg-[rgba(212,168,67,0.08)] p-5">
+                    <div className="text-lg font-bold text-[#F5E9D6]">เก็บผลวันนี้ไว้</div>
+                    <p className="mt-2 text-sm leading-6 text-[#A1866B]">
+                      สมัครหรือเข้าสู่ระบบเพื่อบันทึกผล เริ่มสะสมวันต่อเนื่อง และรับ +50 EXP
+                    </p>
+                    {guestClaimStatus === 'failed' && (
+                      <p className="mt-3 text-sm text-[#E05C5C]">
+                        ระบบยังยืนยันผลไม่สำเร็จ กรุณาลองทำรายการอีกครั้งก่อนเข้าสู่ระบบ
+                      </p>
+                    )}
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <Link
+                        href="/login?redirect=%2Fdaily&mode=register"
+                        className="btn-primary inline-flex items-center justify-center"
+                        onClick={() => trackDailyGuestAuthClick('signup')}
+                      >
+                        สมัครฟรี
+                      </Link>
+                      <Link
+                        href="/login?redirect=%2Fdaily&mode=login"
+                        className="btn-outline inline-flex items-center justify-center"
+                        onClick={() => trackDailyGuestAuthClick('login')}
+                      >
+                        เข้าสู่ระบบ
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -322,7 +514,7 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
               </div>
               <div className="space-y-3">
                 {state.quests.map((quest) => (
-                  <QuestCard key={quest.id} rewardExp={quest.rewardExp} completed={quest.completed} />
+                  <QuestCard key={quest.id} rewardExp={quest.rewardExp} completed={quest.completed} guest={isGuest} />
                 ))}
               </div>
             </section>
@@ -335,14 +527,16 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
               <div className="grid grid-cols-2 gap-3">
                 <StatCard label="วันนี้ตอบ" value={`${state.stats.questionsAnswered}/5`} icon={<Check size={14} />} />
                 <StatCard label="ความแม่นยำ" value={accuracyLabel(state.stats.correctAnswers, state.stats.questionsAnswered)} icon={<Target size={14} />} />
-                <StatCard label="EXP สะสม" value={`${state.stats.totalExp}`} icon={<Zap size={14} />} />
-                <StatCard label="ต่อเนื่องสูงสุด" value={`${state.stats.longestStreak} วัน`} icon={<Flame size={14} />} />
+                <StatCard label="EXP สะสม" value={isGuest ? '—' : `${state.stats.totalExp}`} icon={<Zap size={14} />} />
+                <StatCard label="ต่อเนื่องสูงสุด" value={isGuest ? '—' : `${state.stats.longestStreak} วัน`} icon={<Flame size={14} />} />
               </div>
             </section>
 
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[rgba(212,168,67,0.06)] p-4 text-sm leading-6 text-[#A1866B]">
               <div className="mb-2 flex items-center gap-2 font-semibold text-[#D4AF37]"><LockKeyhole size={15} /> กติกาประจำวัน</div>
-              ต่อเนื่องและ EXP จะเพิ่มเมื่อส่งคำตอบครบทั้ง 5 ข้อเท่านั้น ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น
+              {isGuest
+                ? 'ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น ผลและวันต่อเนื่องจะเริ่มบันทึกเมื่อเข้าสู่ระบบ'
+                : 'ต่อเนื่องและ EXP จะเพิ่มเมื่อส่งคำตอบครบทั้ง 5 ข้อเท่านั้น ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น'}
             </div>
           </aside>
         </div>

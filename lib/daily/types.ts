@@ -48,6 +48,9 @@ export interface DailyQuest {
 
 export interface DailyState {
   available: true
+  viewer: 'authenticated' | 'guest'
+  /** True only when the request carries a server-issued guest completion proof. */
+  guestClaimAvailable?: boolean
   localDate: string
   questions: [DailyQuestion, DailyQuestion, DailyQuestion, DailyQuestion, DailyQuestion]
   progress: DailyProgressSnapshot
@@ -95,3 +98,29 @@ export type DailyMutationResult =
   | { status: 'unauthenticated' }
   | { status: 'error'; message: string }
   | { status: 'ready'; result: DailySubmissionResult }
+
+export interface DailyGuestAnswerResult {
+  status: 'ready'
+  result: DailyQuestionResult
+}
+
+export type DailyGuestMutationResult =
+  | { status: 'unauthenticated' }
+  | { status: 'error'; message: string }
+  | DailyGuestAnswerResult
+
+export type DailyGuestCompletionResult =
+  | { status: 'ready' }
+  | { status: 'unauthenticated' }
+  | { status: 'error'; message: string }
+
+export type DailyGuestClaimResult =
+  | { status: 'none' }
+  | { status: 'unauthenticated' }
+  | { status: 'invalid-proof' }
+  | { status: 'error'; message: string }
+  | {
+      status: 'ready'
+      state: DailyState
+      expDelta: number
+    }

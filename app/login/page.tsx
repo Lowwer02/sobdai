@@ -21,6 +21,7 @@ function LoginPageInner() {
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect')
   const banned = searchParams.get('banned')
+  const initialMode = searchParams.get('mode') === 'register' ? 'register' : 'login'
 
   // Prevent hydration mismatch
   const [mounted, setMounted] = require('react').useState(false)
@@ -78,7 +79,7 @@ function LoginPageInner() {
           // Login successful, proceed to the requested protected page
           window.location.href = redirect || '/'
         }}
-        initialMode="login" 
+        initialMode={initialMode}
         redirectUrl={redirect || undefined} 
       />
     </div>

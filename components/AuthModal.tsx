@@ -146,11 +146,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
         onClose()
       }
     } else if (mode === 'register') {
+      const emailRedirectTo = redirectUrl
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
+        : `${window.location.origin}/auth/callback`
       const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo,
         }
       })
       if (error) {
