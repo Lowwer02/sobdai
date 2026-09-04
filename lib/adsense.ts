@@ -29,8 +29,9 @@
  *
  * Deliberately NOT here: Auto Ads / vignette / anchor / multiplex / ad-intents
  * configuration (all banned by the M3 spec), impression/click tracking, and
- * consent logic — the consent model (lib/consent.ts) has no advertising
- * category, so ads must never gate on the analytics flag (see M3 release note).
+ * consent logic — Google Privacy & messaging owns advertising choices, while
+ * the consent model (lib/consent.ts) remains analytics-only. Ads must never
+ * gate on the analytics flag (see M3 release note).
  *
  * No DB, no `next` import, no `@/` imports: node --test strip-types runs this
  * file directly (same convention as lib/affiliate.ts).

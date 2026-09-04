@@ -24,7 +24,7 @@ export function CookieBanner() {
             เราให้ความสำคัญกับความเป็นส่วนตัวของคุณ:
           </span>
           <span id="cookie-banner-description">
-            Sobdai ใช้คุกกี้ที่จำเป็นเพื่อให้เว็บไซต์ทำงาน และใช้คุกกี้วิเคราะห์เมื่อคุณยินยอม เพื่อช่วยปรับปรุงบริการ{' '}
+            Sobdai ใช้คุกกี้ที่จำเป็นเพื่อให้เว็บไซต์ทำงาน และใช้คุกกี้วิเคราะห์เมื่อคุณยินยอมเพื่อช่วยปรับปรุงบริการ ตัวเลือกโฆษณาของ Google จัดการแยกต่างหากเมื่อมีการแสดงโฆษณา{' '}
             <Link
               href="/cookies"
               className="text-[#D4A63A] underline hover:text-[#F7F3EC] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A] rounded"
@@ -40,14 +40,14 @@ export function CookieBanner() {
             onClick={openPreferences}
             className="w-full sm:w-auto px-3.5 py-2 text-xs font-semibold text-[#F7F3EC] bg-[#1A120B] hover:bg-[#24180E] border border-[#3A2A17] rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A]"
           >
-            ตั้งค่าคุกกี้
+            ตั้งค่าความเป็นส่วนตัว
           </button>
           <button
             type="button"
             onClick={acceptAnalytics}
             className="w-full sm:w-auto px-3.5 py-2 text-xs font-bold text-[#0F0A06] bg-[#D4A63A] hover:bg-[#E5B84A] rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A] shadow-sm"
           >
-            ยอมรับคุกกี้
+            ยอมรับคุกกี้วิเคราะห์
           </button>
         </div>
       </div>
