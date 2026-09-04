@@ -29,14 +29,13 @@ interface AdSenseUnitProps {
  *     Ads/`host`/`url-group` parameters would opt the site into page-level
  *     formats the M3 spec bans).
  *
- * NON-PERSONALIZED ADS
- *   - `requestNonPersonalizedAds = 1` is set before the first push. Sobdai's
- *     consent system (lib/consent.ts) has NO advertising category
- *     (`marketing` is hard-false; the banner collects analytics consent only),
- *     so the analytics flag must NOT be reused as an ads gate. Requesting
- *     non-personalized ads is Google's supported conservative posture for a
- *     property without a certified CMP; it also keeps behavior identical for
- *     consent-declining visitors (no per-user branching to maintain).
+ * ADVERTISING-CONSENT BOUNDARY
+ *   - `requestNonPersonalizedAds = 1` remains the explicit M3 delivery
+ *     posture. M4's Google Privacy & messaging integration owns advertising
+ *     choices when Google has been configured; Sobdai's consent system
+ *     (lib/consent.ts) remains analytics-only. The analytics flag must never
+ *     be reused as an ads gate, and this NPA setting must not change without
+ *     current Google guidance and a separate audit.
  *
  * DUPLICATE-PUSH SAFETY
  *   - The push effect is guarded by a data attribute on the <ins>, so React

@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useConsent } from '@/components/consent/ConsentProvider'
+import {
+  queueGooglePrivacyChoices,
+  subscribeToGooglePrivacyMessaging,
+} from '@/lib/google-privacy-messaging'
 
 export interface CookiePreferencesModalProps {
   isOpen: boolean
@@ -12,12 +16,19 @@ export interface CookiePreferencesModalProps {
 export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesModalProps) {
   const { hasAnalyticsConsent, acceptAnalytics, rejectAnalytics } = useConsent()
   const [analyticsEnabled, setAnalyticsEnabled] = useState<boolean>(hasAnalyticsConsent)
+  const [googlePrivacyMessagingReady, setGooglePrivacyMessagingReady] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setAnalyticsEnabled(hasAnalyticsConsent)
     }
   }, [isOpen, hasAnalyticsConsent])
+
+  useEffect(() => {
+    return subscribeToGooglePrivacyMessaging(() => {
+      setGooglePrivacyMessagingReady(true)
+    })
+  }, [])
 
   if (!isOpen) {
     return null
@@ -45,10 +56,10 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#3A2A17]">
           <div className="space-y-1">
             <h2 id="cookie-modal-title" className="text-lg sm:text-xl font-bold text-[#D4A63A]">
-              ตั้งค่าคุกกี้
+              ตั้งค่าความเป็นส่วนตัว
             </h2>
             <p id="cookie-modal-description" className="text-xs sm:text-sm text-[#C8BBA4] leading-relaxed">
-              คุณสามารถเลือกอนุญาตหรือปฏิเสธคุกกี้วิเคราะห์ได้ คุกกี้ที่จำเป็นจะเปิดใช้งานเสมอเพื่อให้เว็บไซต์ทำงานได้อย่างถูกต้อง
+              คุณสามารถจัดการคุกกี้วิเคราะห์ของ Sobdai ได้ที่นี่ ส่วนตัวเลือกโฆษณาจะจัดการโดย Google Privacy & messaging แยกจากตัวเลือกวิเคราะห์
             </p>
           </div>
           <button
@@ -98,17 +109,35 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
             </p>
           </div>
 
-          {/* 3. Marketing Cookies */}
-          <div className="p-4 bg-[#1A120B] border border-[#3A2A17] rounded-xl space-y-2 opacity-75">
+          {/* 3. Advertising choices — owned by Google's certified CMP. */}
+          <div className="p-4 bg-[#1A120B] border border-[#3A2A17] rounded-xl space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm sm:text-base font-bold text-[#F7F3EC]">คุกกี้การตลาด</h3>
+              <h3 className="text-sm sm:text-base font-bold text-[#F7F3EC]">ตัวเลือกโฆษณา</h3>
               <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-md bg-[#24180E] text-[#8B7A63] border border-[#3A2A17]">
-                ยังไม่เปิดใช้งาน
+                Google จัดการ
               </span>
             </div>
-            <p className="text-xs text-[#8B7A63] leading-relaxed">
-              สำรองไว้สำหรับเครื่องมือโฆษณาและการตลาดในอนาคต
+            <p className="text-xs text-[#C8BBA4] leading-relaxed">
+              เมื่อมีการแสดง AdSense ในหน้าที่เปิดใช้ Google Privacy & messaging จะเป็นผู้แสดงข้อความและจัดเก็บตัวเลือกด้านโฆษณาตามภูมิภาค ตัวเลือกนี้ไม่ใช่ความยินยอมวิเคราะห์ของ Sobdai และไม่ถูกบันทึกในคุกกี้ <code className="text-[#F2D37A]">sobdai_consent</code>
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (queueGooglePrivacyChoices()) {
+                  onClose()
+                }
+              }}
+              disabled={!googlePrivacyMessagingReady}
+              data-testid="google-advertising-privacy-settings"
+              className="w-full sm:w-auto px-3.5 py-2 text-xs font-semibold text-[#F7F3EC] bg-[#24180E] hover:bg-[#3A2A17] border border-[#6B4E2A] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A]"
+            >
+              จัดการตัวเลือกโฆษณาใน Google
+            </button>
+            {!googlePrivacyMessagingReady && (
+              <p className="text-[11px] text-[#8B7A63] leading-relaxed">
+                ปุ่มนี้จะพร้อมเมื่อ Google Privacy & messaging ถูกโหลดบนหน้าที่มี AdSense
+              </p>
+            )}
           </div>
         </div>
 
@@ -118,7 +147,7 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
             href="/cookies"
             className="text-xs text-[#D4A63A] underline hover:text-[#F7F3EC] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A] rounded"
           >
-            อ่านนโยบายคุกกี้
+            อ่านนโยบายคุกกี้และความเป็นส่วนตัว
           </Link>
 
           <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3">

@@ -6,6 +6,7 @@ export interface ConsentPreferences {
   version: number
   necessary: true
   analytics: boolean
+  /** Legacy hard-false marker; Google advertising choices live outside this cookie. */
   marketing: false
   updatedAt: string
 }
