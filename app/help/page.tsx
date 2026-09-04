@@ -28,6 +28,7 @@ import {
   REVIEW_FEATURES,
   MY_EXAMS_FEATURES,
 } from '@/content/help/help-data'
+import HelpScreenshot from './HelpScreenshot'
 
 export const metadata: Metadata = createPageMetadata({
   title: 'วิธีใช้งาน Sobdai | คู่มือฝึกทำแนวข้อสอบราชการออนไลน์',
@@ -167,6 +168,45 @@ export default function HelpPage() {
                   ))}
                 </div>
 
+                {/* Primary Visual: Packages catalog */}
+                <HelpScreenshot
+                  src="/images/help/help-packages.webp"
+                  alt="หน้าคลังแพ็กเกจข้อสอบ Sobdai สำหรับเลือกชุดข้อสอบที่ต้องการ"
+                  width={1440}
+                  height={1080}
+                  caption="หน้าคลังแพ็กเกจสำหรับค้นหาและเลือกชุดข้อสอบที่ตรงกับสายงานที่ต้องการ"
+                  annotation={{
+                    text: 'เลือกชุดที่ตรงกับการสอบของคุณ',
+                    labelPosition: { top: '56%', left: '8%' },
+                    arrow: { direction: 'down-right', top: '61.5%', left: '16%' },
+                  }}
+                />
+
+                {/* Supporting Visual: Package detail safe crop */}
+                <div className="p-5 md:p-6 rounded-2xl bg-[#140E0A] border border-[rgba(212,175,55,0.18)] space-y-4 shadow-lg">
+                  <div>
+                    <h3 className="text-base font-bold text-[#F5E9D6] font-display">
+                      สำรวจเนื้อหาและชุดข้อสอบภายในแพ็กเกจ
+                    </h3>
+                    <p className="text-xs text-[#A1866B] mt-1">
+                      สามารถเปิดดูโครงสร้างชุดข้อสอบและสรุปเนื้อหาที่ครอบคลุมได้ตั้งแต่ก่อนเข้าสู่ระบบ
+                    </p>
+                  </div>
+
+                  <HelpScreenshot
+                    src="/images/help/help-package-detail.webp"
+                    alt="หน้ารายละเอียดแพ็กเกจ แสดงสรุปเนื้อหาและชุดข้อสอบที่มีในแพ็กเกจ"
+                    width={1440}
+                    height={1012}
+                    caption="หน้ารายละเอียดแพ็กเกจแสดงสรุปเนื้อหาและโครงสร้างชุดข้อสอบให้ตรวจสอบได้ก่อนเข้าสู่ระบบ"
+                    annotation={{
+                      text: 'ดูว่าแพ็กเกจนี้มีอะไรบ้าง',
+                      labelPosition: { top: '6%', left: '8%' },
+                      arrow: { direction: 'down-right', top: '11%', left: '16%' },
+                    }}
+                  />
+                </div>
+
                 {/* Important Authoritative Rule Callout */}
                 <div className="p-5 rounded-2xl bg-[#0F0B07] border border-[#D4AF37]/30 flex items-start gap-4 shadow-sm">
                   <ShieldCheck size={20} className="text-[#D4AF37] shrink-0 mt-0.5" />
@@ -253,6 +293,43 @@ export default function HelpPage() {
                               </div>
                             ))}
                           </div>
+
+                          {/* Mode Screenshot */}
+                          <div className="mt-6 pt-4 border-t border-[rgba(255,255,255,0.06)]">
+                            {isPractice ? (
+                              <HelpScreenshot
+                                src="/images/help/help-practice.webp"
+                                alt="โหมดฝึกทำ แสดงผลคำตอบและข้อมูลสำหรับทบทวนหลังตอบคำถาม"
+                                width={640}
+                                height={1024}
+                                caption="ตอบแล้วแสดงผลคำตอบทันทีพร้อมข้อมูลสำหรับทบทวน"
+                                annotation={{
+                                  text: 'ตอบแล้วดูข้อมูลสำหรับทบทวนได้ตรงนี้',
+                                  labelPosition: { top: '50%', left: '8%' },
+                                  arrow: { direction: 'down', top: '54%', left: '22%' },
+                                }}
+                              />
+                            ) : (
+                              <HelpScreenshot
+                                src="/images/help/help-simulation.webp"
+                                alt="โหมดจำลองสอบ แสดงตัวจับเวลาและหน้าทำข้อสอบ"
+                                width={1024}
+                                height={823}
+                                caption="โหมดจำลองสอบมีตัวจับเวลาและทำต่อเนื่องจนครบ"
+                                annotation={{
+                                  text: 'โหมดจำลองสอบมีตัวจับเวลา',
+                                  labelPosition: { top: '12%', right: '10%' },
+                                  arrow: { direction: 'up-right', top: '7%', right: '15%' },
+                                  circleTarget: {
+                                    top: '3.2%',
+                                    right: '13.2%',
+                                    width: '12.5%',
+                                    height: '6.8%',
+                                  },
+                                }}
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
                     )
@@ -335,6 +412,20 @@ export default function HelpPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Dominant Result Visual */}
+                <HelpScreenshot
+                  src="/images/help/help-result.webp"
+                  alt="หน้าผลการทำข้อสอบ แสดงคะแนน จำนวนข้อถูกผิด เวลา และหัวข้อที่ควรทบทวน"
+                  width={785}
+                  height={1024}
+                  caption="หน้ารายงานผลการสอบ แสดงสัดส่วนคะแนน เวลาที่ใช้ พร้อมสรุปหัวข้อที่ควรกลับไปทบทวน"
+                  annotation={{
+                    text: 'ดูผลและจุดที่ควรกลับไปทบทวน',
+                    labelPosition: { top: '53%', left: '8%' },
+                    arrow: { direction: 'down', top: '57%', left: '22%' },
+                  }}
+                />
 
                 <div className="p-4 rounded-xl bg-[#0F0B07] border border-[rgba(212,175,55,0.2)] text-xs text-[#A1866B] leading-relaxed">
                   <span className="text-[#F5E9D6] font-semibold">การเลือกดูข้อสอบ:</span>{' '}
@@ -423,6 +514,20 @@ export default function HelpPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Dominant /exams visual */}
+                <HelpScreenshot
+                  src="/images/help/help-my-exams.webp"
+                  alt="หน้าข้อสอบของฉัน แสดงรายการทำต่อและผลการทำข้อสอบล่าสุด"
+                  width={1024}
+                  height={923}
+                  caption="หน้าข้อสอบของฉัน (/exams) สำหรับติดตามความคืบหน้า กลับไปทำต่อ และดูผลสอบล่าสุด"
+                  annotation={{
+                    text: 'กลับมาทำต่อและดูผลล่าสุดได้ที่นี่',
+                    labelPosition: { top: '8%', left: '6%' },
+                    arrow: { direction: 'down', top: '12.5%', left: '18%' },
+                  }}
+                />
 
                 <div className="pt-2">
                   <Link

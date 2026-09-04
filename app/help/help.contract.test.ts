@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 
@@ -110,4 +110,33 @@ test('Help page provides valid outbound navigation CTAs', () => {
   assert.match(helpPageSource, /href="\/faq"/)
   // /exams CTA
   assert.match(helpPageSource, /href="\/exams"/)
+})
+
+test('Help page integrates the six required WebP screenshot assets with alt text', () => {
+  const expectedImages = [
+    'help-packages.webp',
+    'help-package-detail.webp',
+    'help-practice.webp',
+    'help-simulation.webp',
+    'help-result.webp',
+    'help-my-exams.webp',
+  ]
+
+  for (const imgName of expectedImages) {
+    // 1. File exists in public/images/help/
+    const filePath = join(root, 'public/images/help', imgName)
+    assert.ok(existsSync(filePath), `Missing screenshot asset: ${imgName}`)
+
+    // 2. File size is valid (> 5KB and < 200KB)
+    const stats = statSync(filePath)
+    assert.ok(stats.size > 5000, `Asset ${imgName} is suspiciously small: ${stats.size} bytes`)
+    assert.ok(stats.size < 200000, `Asset ${imgName} is too large for Help V1: ${stats.size} bytes`)
+
+    // 3. Referenced in page.tsx
+    assert.match(
+      helpPageSource,
+      new RegExp(`/images/help/${imgName}`),
+      `Missing reference to ${imgName} in app/help/page.tsx`
+    )
+  }
 })

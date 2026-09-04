@@ -52,80 +52,95 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
   const renderedSocialLinks = footerConfig?.social_links || socialLinks
 
   return (
-    <footer className="bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] py-12 mt-auto">
+    <footer className="bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] pt-12 pb-24 lg:pb-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-8 md:gap-10 lg:grid-cols-4">
 
-        {/* Top row: brand + legal links + support button */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex flex-col items-center md:items-start">
-            <div className="text-xl font-display font-bold text-[#D4AF37] mb-2 tracking-wide">
+          {/* 1. BRAND */}
+          <div className="col-span-2 lg:col-span-1 flex flex-col items-start">
+            <div className="text-xl font-display font-bold text-[#D4AF37] tracking-wide mb-2">
               {legalConfig.companyName}
             </div>
-            <p className="text-[#A1866B] text-sm">
+            <p className="text-[#A1866B] text-xs leading-relaxed mb-3">
               &copy; {new Date().getFullYear()} {legalConfig.companyName}. สงวนลิขสิทธิ์
             </p>
-          </div>
 
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#A1866B] items-center">
-            <Link href="/terms" className="hover:text-[#F5E9D6] transition-colors">
-              เงื่อนไขการให้บริการ
-            </Link>
-            <Link href="/privacy" className="hover:text-[#F5E9D6] transition-colors">
-              นโยบายความเป็นส่วนตัว
-            </Link>
-            <Link href="/cookies" className="hover:text-[#F5E9D6] transition-colors">
-              นโยบายคุกกี้
-            </Link>
-            <CookieSettingsButton />
-            <Link href="/help" className="hover:text-[#F5E9D6] transition-colors">
-              วิธีใช้งาน
-            </Link>
-            <Link href="/faq" className="hover:text-[#F5E9D6] transition-colors">
-              คำถามที่พบบ่อย
-            </Link>
-            <Link href="/about" className="hover:text-[#F5E9D6] transition-colors">
-              เกี่ยวกับเรา
-            </Link>
-            <Link href="/contact" className="hover:text-[#F5E9D6] transition-colors">
-              ติดต่อเรา
-            </Link>
-
-            {/* Support button — rendered dynamically when Support is enabled */}
+            {/* Footer Donate — secondary outline action */}
             {supportConfig?.enabled && (
-              <button
-                id="footer-support-button"
-                type="button"
-                aria-haspopup="dialog"
-                aria-expanded={isModalOpen}
-                onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center gap-1.5 text-[#D4AF37] hover:text-[#F1D17A] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/25 px-3.5 py-1.5 rounded-full transition-all text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 shadow-sm"
-              >
-                <Heart size={13} className="fill-[#D4AF37]/40 text-[#D4AF37]" />
-                <span>{supportConfig.button_label || 'สนับสนุน Sobdai'}</span>
-              </button>
+              <div className="pt-1">
+                <button
+                  id="footer-support-button"
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-expanded={isModalOpen}
+                  onClick={() => setIsModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs text-[#A1866B] hover:text-[#D4AF37] border border-[rgba(212,175,55,0.2)] hover:border-[rgba(212,175,55,0.4)] bg-transparent hover:bg-[rgba(212,175,55,0.05)] px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37]/50"
+                >
+                  <Heart size={13} className="text-[#A1866B]" />
+                  <span>{supportConfig.button_label || 'สนับสนุน Sobdai'}</span>
+                </button>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Social section — sits above copyright, separated by a divider. */}
-        <div className="mt-8 pt-8 border-t border-[rgba(255,255,255,0.05)]">
-          <div className="flex flex-col items-center gap-4">
-            <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#A1866B]">
+          {/* 2. HELP / PRODUCT */}
+          <div className="col-span-1 flex flex-col">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+              ช่วยเหลือ
+            </h3>
+            <nav aria-label="ช่วยเหลือและบริการ" className="flex flex-col space-y-2.5 text-sm text-[#A1866B]">
+              <Link href="/help" className="hover:text-[#F5E9D6] transition-colors">
+                วิธีใช้งาน
+              </Link>
+              <Link href="/faq" className="hover:text-[#F5E9D6] transition-colors">
+                คำถามที่พบบ่อย
+              </Link>
+              <Link href="/contact" className="hover:text-[#F5E9D6] transition-colors">
+                ติดต่อเรา
+              </Link>
+              <Link href="/about" className="hover:text-[#F5E9D6] transition-colors">
+                เกี่ยวกับเรา
+              </Link>
+            </nav>
+          </div>
+
+          {/* 3. LEGAL / SETTINGS */}
+          <div className="col-span-1 flex flex-col">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+              ข้อกำหนดและนโยบาย
+            </h3>
+            <nav aria-label="กฎหมายและการตั้งค่า" className="flex flex-col space-y-2.5 text-sm text-[#A1866B]">
+              <Link href="/terms" className="hover:text-[#F5E9D6] transition-colors">
+                เงื่อนไขการให้บริการ
+              </Link>
+              <Link href="/privacy" className="hover:text-[#F5E9D6] transition-colors">
+                นโยบายความเป็นส่วนตัว
+              </Link>
+              <Link href="/cookies" className="hover:text-[#F5E9D6] transition-colors">
+                นโยบายคุกกี้
+              </Link>
+              <div className="text-left">
+                <CookieSettingsButton />
+              </div>
+            </nav>
+          </div>
+
+          {/* 4. CONNECT */}
+          <div className="col-span-2 lg:col-span-1 flex flex-col pt-2 lg:pt-0">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
               ติดตามเรา
-            </span>
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            </h3>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 lg:flex-col lg:items-start lg:space-y-2.5 lg:gap-0">
               {renderedSocialLinks.map((social) => {
-                const baseClass =
-                  'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px]'
                 if (!social.active) {
                   return (
                     <span
                       key={social.key}
                       aria-disabled="true"
-                      className={`${baseClass} border-[rgba(255,255,255,0.05)] text-[#5a4a3a] cursor-not-allowed`}
+                      className="inline-flex items-center gap-2 text-sm text-[#5a4a3a] cursor-not-allowed"
                     >
-                      <SocialIcon name={social.key} />
-                      {social.label}
+                      <SocialIcon name={social.key} size={16} />
+                      <span>{social.label}</span>
                     </span>
                   )
                 }
@@ -136,17 +151,17 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`ติดตาม Sobdai บน ${social.label}`}
-                    className={`${baseClass} border-[rgba(255,255,255,0.08)] text-[#A1866B] hover:text-[#D4AF37] hover:border-[rgba(212,175,55,0.3)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]`}
+                    className="inline-flex items-center gap-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37]"
                   >
-                    <SocialIcon name={social.key} />
-                    {social.label}
+                    <SocialIcon name={social.key} size={16} />
+                    <span>{social.label}</span>
                   </a>
                 )
               })}
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
 
       {/* Reusable SupportModal instance for Footer */}

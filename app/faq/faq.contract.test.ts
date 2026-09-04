@@ -157,16 +157,16 @@ test('Footer contains links to /help and /faq near about and contact', () => {
     'Footer missing /faq link'
   )
 
-  // Verify relative order near /about and /contact
+  // Verify relative order in HELP / PRODUCT group
   const helpIndex = footerSource.indexOf('href="/help"')
   const faqIndex = footerSource.indexOf('href="/faq"')
-  const aboutIndex = footerSource.indexOf('href="/about"')
   const contactIndex = footerSource.indexOf('href="/contact"')
+  const aboutIndex = footerSource.indexOf('href="/about"')
 
-  assert.ok(helpIndex !== -1 && faqIndex !== -1 && aboutIndex !== -1 && contactIndex !== -1)
+  assert.ok(helpIndex !== -1 && faqIndex !== -1 && contactIndex !== -1 && aboutIndex !== -1)
   assert.ok(helpIndex < faqIndex, '/help should appear before /faq')
-  assert.ok(faqIndex < aboutIndex, '/faq should appear before /about')
-  assert.ok(aboutIndex < contactIndex, '/about should appear before /contact')
+  assert.ok(faqIndex < contactIndex, '/faq should appear before /contact')
+  assert.ok(contactIndex < aboutIndex, '/contact should appear before /about')
 })
 
 test('PUBLIC_STATIC_ROUTES includes /help and /faq with monthly changeFrequency and 0.6 priority', () => {
