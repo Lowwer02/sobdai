@@ -1,9 +1,9 @@
 /**
  * AdSense Conservative (M3) — pure configuration + eligibility contract.
  *
- * M3 monetizes News/Article detail pages and the Daily practice surface with
- * ONE manual responsive display unit per eligible page. This module owns the
- * two decisions every surface needs:
+ * M3 monetizes News/Article detail pages and, once separately enabled, the
+ * Daily practice surface with ONE manual responsive display unit per eligible
+ * page. This module owns the decisions every surface needs:
  *
  *   1. PLATFORM CONFIG — publisher/client + slot ids come from environment
  *      variables (NEVER from content rows, mirroring how NEXT_PUBLIC_GTM_ID is
@@ -23,8 +23,9 @@
  *
  * Detail eligibility = opt-in AND config. Either failing → render no unit and
  * (via the AdSenseUnit island never mounting) never load the AdSense network
- * script. Daily uses the same validated platform config and its own product
- * surface gate; it has no content-row opt-in.
+ * script. Daily eligibility = explicit Daily flag AND the same validated
+ * platform config; the flag defaults OFF and is independent of analytics or
+ * marketing consent. Daily has no content-row opt-in.
  *
  * Deliberately NOT here: Auto Ads / vignette / anchor / multiplex / ad-intents
  * configuration (all banned by the M3 spec), impression/click tracking, and
@@ -38,6 +39,7 @@
 /** Environment variable names (documented contract, frozen by tests). */
 export const ADSENSE_CLIENT_ENV_VAR = 'NEXT_PUBLIC_ADSENSE_CLIENT'
 export const ADSENSE_DETAIL_SLOT_ENV_VAR = 'NEXT_PUBLIC_ADSENSE_DETAIL_SLOT'
+export const ADSENSE_DAILY_ENABLED_ENV_VAR = 'NEXT_PUBLIC_ADSENSE_DAILY_ENABLED'
 
 /** Subtle Thai ad label — the only disclosure the unit renders. */
 export const ADSENSE_LABEL = 'โฆษณา'
@@ -76,6 +78,11 @@ export function coerceAdsenseEnabled(value: unknown): boolean {
   return value === true
 }
 
+/** Daily is opt-in only: an env value must be exactly the string `true`. */
+export function parseAdsenseDailyEnabled(value: unknown): boolean {
+  return value === 'true'
+}
+
 /**
  * Resolve the detail-page AdSense config from an env-like record. Returns null
  * when EITHER variable is missing or malformed — a partial configuration is
@@ -96,12 +103,20 @@ export function getAdsenseDetailConfig(): AdsenseDetailConfig | null {
 }
 
 /**
- * Platform-level config for the Daily surface. It deliberately reuses the
- * existing M3 client + slot pair; Daily's placement is controlled in code,
- * not by a new DB row or a second AdSense script/config model.
+ * Resolve Daily's platform config from an env-like record. The dedicated
+ * surface flag is checked before the shared client + slot pair, so existing
+ * M3 values alone can never activate Daily ads.
  */
+export function getAdsenseDailyConfigFrom(
+  env: Record<string, string | undefined>,
+): AdsenseDetailConfig | null {
+  if (!parseAdsenseDailyEnabled(env[ADSENSE_DAILY_ENABLED_ENV_VAR])) return null
+  return getAdsenseDetailConfigFrom(env)
+}
+
+/** Process-env entry point used only by the Daily surface. */
 export function getAdsenseDailyConfig(): AdsenseDetailConfig | null {
-  return getAdsenseDetailConfigFrom(process.env)
+  return getAdsenseDailyConfigFrom(process.env)
 }
 
 /**

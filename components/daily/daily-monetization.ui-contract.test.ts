@@ -46,6 +46,7 @@ test('question state changes cannot refresh or remount the Daily ad slot', () =>
 test('AdSense is config-gated and has no custom click tracking', () => {
   assert.match(page, /getAdsenseDailyConfig\(\)/)
   assert.match(runtime, /\{dailyAd && \(/)
+  assert.match(page, /dailyAd=\{getAdsenseDailyConfig\(\)\}/)
   assert.doesNotMatch(runtime, /track[A-Za-z]*Ad|onClick=.*adsense/i)
   assert.doesNotMatch(adSense, /onClick|trackAffiliateClick|trackAd/i)
 })

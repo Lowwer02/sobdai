@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { ADSENSE_CLIENT_ENV_VAR, ADSENSE_DETAIL_SLOT_ENV_VAR, ADSENSE_LABEL, coerceAdsenseEnabled, getAdsenseDailyConfig, getAdsenseDetailConfigFrom, parseAdsenseClientId, parseAdsenseSlotId, resolveDetailAdUnit } from './adsense.ts'
+import { ADSENSE_CLIENT_ENV_VAR, ADSENSE_DAILY_ENABLED_ENV_VAR, ADSENSE_DETAIL_SLOT_ENV_VAR, ADSENSE_LABEL, coerceAdsenseEnabled, getAdsenseDailyConfigFrom, getAdsenseDetailConfigFrom, parseAdsenseClientId, parseAdsenseDailyEnabled, parseAdsenseSlotId, resolveDetailAdUnit } from './adsense.ts'
 
 const VALID_ENV = {
   [ADSENSE_CLIENT_ENV_VAR]: 'ca-pub-1234567890123456',
@@ -73,23 +73,43 @@ test('config resolves only when BOTH env vars are present and valid', () => {
   )
 })
 
-test('Daily reuses the same validated platform config entry point', () => {
-  const previousClient = process.env[ADSENSE_CLIENT_ENV_VAR]
-  const previousSlot = process.env[ADSENSE_DETAIL_SLOT_ENV_VAR]
-  process.env[ADSENSE_CLIENT_ENV_VAR] = VALID_ENV[ADSENSE_CLIENT_ENV_VAR]
-  process.env[ADSENSE_DETAIL_SLOT_ENV_VAR] = VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR]
-
-  try {
-    assert.deepEqual(getAdsenseDailyConfig(), {
-      clientId: VALID_ENV[ADSENSE_CLIENT_ENV_VAR],
-      slotId: VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR],
-    })
-  } finally {
-    if (previousClient === undefined) delete process.env[ADSENSE_CLIENT_ENV_VAR]
-    else process.env[ADSENSE_CLIENT_ENV_VAR] = previousClient
-    if (previousSlot === undefined) delete process.env[ADSENSE_DETAIL_SLOT_ENV_VAR]
-    else process.env[ADSENSE_DETAIL_SLOT_ENV_VAR] = previousSlot
+test('Daily enable flag accepts only the exact string true', () => {
+  assert.equal(parseAdsenseDailyEnabled('true'), true)
+  for (const malformed of [undefined, null, '', 'false', 'TRUE', '1', 'yes', ' true ', true, 1]) {
+    assert.equal(parseAdsenseDailyEnabled(malformed), false, `value ${String(malformed)} must stay OFF`)
   }
+})
+
+test('Daily config is fail-closed until its dedicated flag and shared config are valid', () => {
+  // Existing M3 client + slot values alone must not activate Daily.
+  assert.equal(getAdsenseDailyConfigFrom(VALID_ENV), null)
+  assert.equal(getAdsenseDailyConfigFrom({
+    ...VALID_ENV,
+    [ADSENSE_DAILY_ENABLED_ENV_VAR]: 'false',
+  }), null)
+
+  // Explicit true still requires both existing shared values.
+  assert.equal(getAdsenseDailyConfigFrom({
+    [ADSENSE_DAILY_ENABLED_ENV_VAR]: 'true',
+    [ADSENSE_CLIENT_ENV_VAR]: VALID_ENV[ADSENSE_CLIENT_ENV_VAR],
+  }), null)
+  assert.equal(getAdsenseDailyConfigFrom({
+    [ADSENSE_DAILY_ENABLED_ENV_VAR]: 'true',
+    [ADSENSE_DETAIL_SLOT_ENV_VAR]: VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR],
+  }), null)
+  assert.equal(getAdsenseDailyConfigFrom({
+    [ADSENSE_DAILY_ENABLED_ENV_VAR]: 'true',
+    [ADSENSE_CLIENT_ENV_VAR]: 'not-a-client',
+    [ADSENSE_DETAIL_SLOT_ENV_VAR]: VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR],
+  }), null)
+
+  assert.deepEqual(getAdsenseDailyConfigFrom({
+    ...VALID_ENV,
+    [ADSENSE_DAILY_ENABLED_ENV_VAR]: 'true',
+  }), {
+    clientId: VALID_ENV[ADSENSE_CLIENT_ENV_VAR],
+    slotId: VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR],
+  })
 })
 
 test('eligibility = content opt-in AND config (either failing → no ad unit)', () => {
