@@ -118,11 +118,11 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm sm:text-base font-bold text-[#F7F3EC]">ตัวเลือกโฆษณา</h3>
               <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-md bg-[#24180E] text-[#8B7A63] border border-[#3A2A17]">
-                Google จัดการ
+                จัดการโดย Google
               </span>
             </div>
             <p className="text-xs text-[#C8BBA4] leading-relaxed">
-              เมื่อมีการแสดง AdSense ในหน้าที่เปิดใช้ Google Privacy & messaging จะเป็นผู้แสดงข้อความและจัดเก็บตัวเลือกด้านโฆษณาตามภูมิภาค ตัวเลือกนี้ไม่ใช่ความยินยอมวิเคราะห์ของ Sobdai และไม่ถูกบันทึกในคุกกี้ <code className="text-[#F2D37A]">sobdai_consent</code>
+              เมื่อ Sobdai แสดงโฆษณาจาก Google การตั้งค่าด้านโฆษณาและความเป็นส่วนตัวจะจัดการผ่าน Google Privacy & messaging แยกจากคุกกี้วิเคราะห์ของ Sobdai
             </p>
             <button
               type="button"
@@ -141,7 +141,7 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
             </button>
             {!googlePrivacyMessagingReady && (
               <p className="text-[11px] text-[#8B7A63] leading-relaxed">
-                ปุ่มนี้จะพร้อมเมื่อ Google Privacy & messaging ถูกโหลดบนหน้าที่มี AdSense
+                ตัวเลือกนี้จะพร้อมใช้งานบนหน้าที่รองรับการตั้งค่าโฆษณาของ Google
               </p>
             )}
           </div>
