@@ -63,7 +63,9 @@ test('privacy management has one clear entry point and a Google-managed ad path'
   assert.match(banner, /ตั้งค่าความเป็นส่วนตัว/)
   assert.match(modal, /ตั้งค่าความเป็นส่วนตัว/)
   assert.match(modal, /subscribeToGooglePrivacyMessaging/)
-  assert.match(modal, /queueGooglePrivacyChoices/)
+  assert.match(modal, /queueGooglePrivacyChoicesOnce/)
+  assert.match(modal, /googlePrivacyChoiceInProgress/)
+  assert.match(modal, /disabled={!googlePrivacyMessagingReady \|\| googlePrivacyChoiceInProgress}/)
   assert.match(modal, /data-testid="google-advertising-privacy-settings"/)
   assert.match(footer, /<CookieSettingsButton\s*\/>/)
 })
@@ -101,4 +103,7 @@ test('legal content describes Google storage/choices without claiming universal 
   }
   assert.match(cookies, /Daily AdSense ยังปิดใช้งานอยู่/)
   assert.match(privacy, /Daily AdSense ยังปิดใช้งานอยู่/)
+  assert.match(cookies, /หากคุณปฏิเสธคุกกี้วิเคราะห์ Sobdai จะไม่ใช้เทคโนโลยีวิเคราะห์ทางเลือก/)
+  assert.match(cookies, /ตัวเลือกโฆษณาจะจัดการแยกผ่าน Google Privacy & messaging/)
+  assert.doesNotMatch(cookies, /ปฏิเสธคุกกี้ที่ไม่จำเป็น.*เฉพาะคุกกี้ที่จำเป็น/)
 })

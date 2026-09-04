@@ -18,6 +18,12 @@ interface GooglePrivacyMessagingNamespace {
   showRevocationMessage?: () => void
 }
 
+export interface GooglePrivacyChoiceActivationGuard {
+  current: boolean
+}
+
+export type GooglePrivacyChoiceActivationResult = 'queued' | 'in-progress' | 'unavailable'
+
 declare global {
   interface Window {
     googlefc?: GooglePrivacyMessagingNamespace
@@ -67,6 +73,28 @@ export function queueGooglePrivacyChoices(): boolean {
   const googlefc = getGooglePrivacyMessagingNamespace()
   if (!googlefc || typeof googlefc.showRevocationMessage !== 'function') return false
 
-  googlefc.callbackQueue!.push(googlefc.showRevocationMessage)
-  return true
+  try {
+    googlefc.callbackQueue!.push(googlefc.showRevocationMessage)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Prevents duplicate revocation requests during one modal interaction. This is
+ * only a transient click guard; Google remains the owner of all ad-consent
+ * state. An unavailable API releases the guard immediately so callers can
+ * safely retry after Google Privacy & messaging becomes ready.
+ */
+export function queueGooglePrivacyChoicesOnce(
+  guard: GooglePrivacyChoiceActivationGuard,
+): GooglePrivacyChoiceActivationResult {
+  if (guard.current) return 'in-progress'
+
+  guard.current = true
+  if (queueGooglePrivacyChoices()) return 'queued'
+
+  guard.current = false
+  return 'unavailable'
 }
