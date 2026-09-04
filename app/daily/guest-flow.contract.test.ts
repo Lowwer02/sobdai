@@ -14,6 +14,7 @@ const proof = read('lib/daily/guest-proof.ts')
 const login = read('app/login/page.tsx')
 const authModal = read('components/AuthModal.tsx')
 const analytics = read('lib/analytics.ts')
+const proofSecret = read('lib/daily/guest-proof-secret.ts')
 
 test('unauthenticated Daily renders the guest experience instead of redirecting', () => {
   assert.match(page, /loadGuestDailyState/)
@@ -44,6 +45,12 @@ test('proof verification is server-bound and claims only through the 089 RPC', (
   assert.match(actions, /for \(const \[index, questionId\] of proof\.questionIds\.entries\(\)/)
   assert.match(actions, /expDelta = Math\.min\(50, expDelta \+ parsed\.result\.expDelta\)/)
   assert.doesNotMatch(actions, /claimGuestDaily\([\s\S]*?p_(?:score|exp|streak|correct)/)
+})
+
+test('proof secret loading is server-only, dedicated, and has no service-role fallback', () => {
+  assert.match(proofSecret, /import ['"]server-only['"]/)
+  assert.match(proofSecret, /process\.env\.DAILY_GUEST_PROOF_SECRET/)
+  assert.doesNotMatch(proofSecret, /SUPABASE_SERVICE_ROLE_KEY/)
 })
 
 test('auth conversion keeps the Daily return path for login, signup, and email confirmation', () => {

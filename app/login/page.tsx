@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import AuthModal from '@/components/AuthModal'
+import { normalizeInternalReturnPath } from '@/lib/auth/return-path'
 
 // useSearchParams() during static prerender requires an explicit Suspense
 // boundary once the root app/loading.tsx boundary (which previously covered
@@ -19,7 +20,7 @@ export default function LoginPage() {
 
 function LoginPageInner() {
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect')
+  const returnPath = normalizeInternalReturnPath(searchParams.get('redirect'))
   const banned = searchParams.get('banned')
   const initialMode = searchParams.get('mode') === 'register' ? 'register' : 'login'
 
@@ -66,8 +67,8 @@ function LoginPageInner() {
         onClose={() => {
           // Intentional close (Guest cancelled)
           // Try to extract package slug from redirect url to return them gracefully
-          if (redirect?.startsWith('/package/')) {
-            const match = redirect.match(/^\/package\/([^\/]+)/)
+          if (returnPath.startsWith('/package/')) {
+            const match = returnPath.match(/^\/package\/([^\/]+)/)
             if (match) {
               window.location.href = `/package/${match[1]}`
               return
@@ -77,10 +78,10 @@ function LoginPageInner() {
         }} 
         onSuccess={() => {
           // Login successful, proceed to the requested protected page
-          window.location.href = redirect || '/'
+          window.location.href = returnPath
         }}
         initialMode={initialMode}
-        redirectUrl={redirect || undefined} 
+        redirectUrl={returnPath}
       />
     </div>
   )

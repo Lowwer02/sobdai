@@ -16,11 +16,11 @@ import { resolveGuestDailyChallenge } from '@/lib/daily/guest-data'
 import {
   createDailyGuestCompletionProof,
   dailyGuestProofCookieOptions,
-  getDailyGuestProofSecret,
   GUEST_DAILY_PROOF_COOKIE,
   normalizeGuestCompletionAnswers,
   verifyDailyGuestCompletionProof,
 } from '@/lib/daily/guest-proof'
+import { getDailyGuestProofSecret } from '@/lib/daily/guest-proof-secret'
 import type {
   DailyGuestClaimResult,
   DailyGuestCompletionResult,

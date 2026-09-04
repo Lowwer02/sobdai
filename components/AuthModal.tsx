@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
+import { normalizeInternalReturnPath } from '@/lib/auth/return-path'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import { login, signUp } from '@/lib/analytics'
@@ -76,6 +77,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
   const [rateLimitHit, setRateLimitHit] = useState(false)
   
   const supabase = createClient()
+  const returnPath = normalizeInternalReturnPath(redirectUrl)
 
   // Reset state when modal opens
   useEffect(() => {
@@ -110,9 +112,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
 
   const handleGoogleAuth = async () => {
     setLoading(true)
-    const redirectTo = redirectUrl 
-      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
-      : `${window.location.origin}/auth/callback`;
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath)}`
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -146,9 +146,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
         onClose()
       }
     } else if (mode === 'register') {
-      const emailRedirectTo = redirectUrl
-        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
-        : `${window.location.origin}/auth/callback`
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath)}`
       const { error, data } = await supabase.auth.signUp({
         email,
         password,

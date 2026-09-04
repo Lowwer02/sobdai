@@ -10,6 +10,7 @@ export const GUEST_DAILY_PROOF_MAX_AGE_SECONDS = 36 * 60 * 60
 
 const GUEST_PROOF_VERSION = 1
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
+export const GUEST_DAILY_PROOF_SECRET_MIN_BYTES = 32
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -55,19 +56,25 @@ function decode(value: string): string | null {
 }
 
 function signBody(body: string, secret: string): string {
-  return createHmac('sha256', secret).update(body).digest().toString('base64url')
+  return createHmac('sha256', validateDailyGuestProofSecret(secret))
+    .update(body)
+    .digest()
+    .toString('base64url')
 }
 
-/**
- * This is intentionally server-only configuration. A dedicated secret is
- * preferred; the existing server-only Supabase service key is a safe
- * migration-free fallback because it is already required by backend actions
- * and is never returned to the browser.
- */
-export function getDailyGuestProofSecret(): string {
-  const secret = process.env.DAILY_GUEST_PROOF_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!secret) throw new Error('Missing Daily guest proof secret.')
-  return secret
+export function validateDailyGuestProofSecret(value: unknown): string {
+  if (typeof value !== 'string'
+    || value.trim() !== value
+    || Buffer.byteLength(value, 'utf8') < GUEST_DAILY_PROOF_SECRET_MIN_BYTES) {
+    throw new Error('DAILY_GUEST_PROOF_SECRET must contain at least 32 bytes.')
+  }
+  return value
+}
+
+export function resolveDailyGuestProofSecret(
+  environment: { DAILY_GUEST_PROOF_SECRET?: string },
+): string {
+  return validateDailyGuestProofSecret(environment.DAILY_GUEST_PROOF_SECRET)
 }
 
 export function normalizeGuestCompletionAnswers(
