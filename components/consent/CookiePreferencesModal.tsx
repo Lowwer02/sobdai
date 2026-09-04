@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useConsent } from '@/components/consent/ConsentProvider'
 import {
-  queueGooglePrivacyChoices,
+  queueGooglePrivacyChoicesOnce,
   subscribeToGooglePrivacyMessaging,
 } from '@/lib/google-privacy-messaging'
 
@@ -17,10 +17,14 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
   const { hasAnalyticsConsent, acceptAnalytics, rejectAnalytics } = useConsent()
   const [analyticsEnabled, setAnalyticsEnabled] = useState<boolean>(hasAnalyticsConsent)
   const [googlePrivacyMessagingReady, setGooglePrivacyMessagingReady] = useState(false)
+  const [googlePrivacyChoiceInProgress, setGooglePrivacyChoiceInProgress] = useState(false)
+  const googlePrivacyChoiceActivationGuard = useRef(false)
 
   useEffect(() => {
     if (isOpen) {
       setAnalyticsEnabled(hasAnalyticsConsent)
+      googlePrivacyChoiceActivationGuard.current = false
+      setGooglePrivacyChoiceInProgress(false)
     }
   }, [isOpen, hasAnalyticsConsent])
 
@@ -123,11 +127,13 @@ export function CookiePreferencesModal({ isOpen, onClose }: CookiePreferencesMod
             <button
               type="button"
               onClick={() => {
-                if (queueGooglePrivacyChoices()) {
+                const result = queueGooglePrivacyChoicesOnce(googlePrivacyChoiceActivationGuard)
+                if (result === 'queued') {
+                  setGooglePrivacyChoiceInProgress(true)
                   onClose()
                 }
               }}
-              disabled={!googlePrivacyMessagingReady}
+              disabled={!googlePrivacyMessagingReady || googlePrivacyChoiceInProgress}
               data-testid="google-advertising-privacy-settings"
               className="w-full sm:w-auto px-3.5 py-2 text-xs font-semibold text-[#F7F3EC] bg-[#24180E] hover:bg-[#3A2A17] border border-[#6B4E2A] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A]"
             >
