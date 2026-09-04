@@ -7,15 +7,16 @@ import { ADSENSE_LABEL } from '@/lib/adsense'
 interface AdSenseUnitProps {
   clientId: string
   slotId: string
+  /** Optional surface format; existing editorial units remain `auto`. */
+  format?: 'auto' | 'horizontal'
 }
 
 /**
  * The ONE AdSense manual responsive display unit (M3 Conservative) — the only
  * client island in the feature, and the ONLY place the AdSense network script
- * is ever requested: because surfaces mount this component only when the
- * content opted in AND the platform config resolved, the script cost is paid
- * exclusively by eligible /news/[slug] and /articles/[slug] renderings. Root
- * layout, listings, and all Core Product routes never mount it.
+ * is ever requested. Surfaces mount it only after their own eligibility gate
+ * and the shared platform config resolve; Root layout, listings, and all
+ * other Core Product routes never mount it.
  *
  * SCRIPT LOADING
  *   - next/script `afterInteractive` keeps the page server-first: the label +
@@ -51,7 +52,7 @@ interface AdSenseUnitProps {
  *     (per AdSense policy) and the strict `ca-pub-<digits>` / numeric slot
  *     validation in lib/adsense.ts makes attribute injection impossible.
  */
-export default function AdSenseUnit({ clientId, slotId }: AdSenseUnitProps) {
+export default function AdSenseUnit({ clientId, slotId, format = 'auto' }: AdSenseUnitProps) {
   const insRef = useRef<HTMLModElement | null>(null)
 
   useEffect(() => {
@@ -98,7 +99,7 @@ export default function AdSenseUnit({ clientId, slotId }: AdSenseUnitProps) {
         style={{ display: 'block', minHeight: 120 }}
         data-ad-client={clientId}
         data-ad-slot={slotId}
-        data-ad-format="auto"
+        data-ad-format={format}
         data-full-width-responsive="true"
       />
       <Script

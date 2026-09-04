@@ -42,6 +42,16 @@ export const AFFILIATE_MAX_COLLECTION_ITEMS = 12
 /** Default merchant (M1 is Shopee-first, but the field is extensible). */
 export const DEFAULT_MERCHANT = 'shopee'
 
+/** Public Affiliate surface context used by the shared click contract. */
+export type AffiliateContentType = 'news' | 'article' | 'daily'
+
+/** Stable placement values shared by M1, M2, and Daily completion Picks. */
+export type AffiliateClickPlacement =
+  | 'sidebar'
+  | 'inline_mobile'
+  | 'listing_strip'
+  | 'daily_complete'
+
 /** Thai display labels for known merchants; unknown slugs render capitalized. */
 const MERCHANT_LABELS: Record<string, string> = {
   shopee: 'Shopee',

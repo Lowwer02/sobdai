@@ -18,7 +18,7 @@ const proofSecret = read('lib/daily/guest-proof-secret.ts')
 
 test('unauthenticated Daily renders the guest experience instead of redirecting', () => {
   assert.match(page, /loadGuestDailyState/)
-  assert.match(page, /return <DailyRuntime initialState=\{guestResult\.state\} \/>/)
+  assert.match(page, /return <ReadyDaily state=\{guestResult\.state\} \/>/)
   assert.doesNotMatch(page, /redirect\(['"]\/login\?redirect=\/daily/)
 })
 

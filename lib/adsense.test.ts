@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { ADSENSE_CLIENT_ENV_VAR, ADSENSE_DETAIL_SLOT_ENV_VAR, ADSENSE_LABEL, coerceAdsenseEnabled, getAdsenseDetailConfigFrom, parseAdsenseClientId, parseAdsenseSlotId, resolveDetailAdUnit } from './adsense.ts'
+import { ADSENSE_CLIENT_ENV_VAR, ADSENSE_DETAIL_SLOT_ENV_VAR, ADSENSE_LABEL, coerceAdsenseEnabled, getAdsenseDailyConfig, getAdsenseDetailConfigFrom, parseAdsenseClientId, parseAdsenseSlotId, resolveDetailAdUnit } from './adsense.ts'
 
 const VALID_ENV = {
   [ADSENSE_CLIENT_ENV_VAR]: 'ca-pub-1234567890123456',
@@ -71,6 +71,25 @@ test('config resolves only when BOTH env vars are present and valid', () => {
     }),
     null
   )
+})
+
+test('Daily reuses the same validated platform config entry point', () => {
+  const previousClient = process.env[ADSENSE_CLIENT_ENV_VAR]
+  const previousSlot = process.env[ADSENSE_DETAIL_SLOT_ENV_VAR]
+  process.env[ADSENSE_CLIENT_ENV_VAR] = VALID_ENV[ADSENSE_CLIENT_ENV_VAR]
+  process.env[ADSENSE_DETAIL_SLOT_ENV_VAR] = VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR]
+
+  try {
+    assert.deepEqual(getAdsenseDailyConfig(), {
+      clientId: VALID_ENV[ADSENSE_CLIENT_ENV_VAR],
+      slotId: VALID_ENV[ADSENSE_DETAIL_SLOT_ENV_VAR],
+    })
+  } finally {
+    if (previousClient === undefined) delete process.env[ADSENSE_CLIENT_ENV_VAR]
+    else process.env[ADSENSE_CLIENT_ENV_VAR] = previousClient
+    if (previousSlot === undefined) delete process.env[ADSENSE_DETAIL_SLOT_ENV_VAR]
+    else process.env[ADSENSE_DETAIL_SLOT_ENV_VAR] = previousSlot
+  }
 })
 
 test('eligibility = content opt-in AND config (either failing → no ad unit)', () => {

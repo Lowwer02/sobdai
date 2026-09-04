@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Check, ChevronLeft, ChevronRight, Flame, LockKeyhole, Sparkles, Target, Zap } from 'lucide-react'
+import AdSenseUnit from '@/components/adsense/AdSenseUnit'
 import {
   claimGuestDaily,
   completeGuestDaily,
@@ -22,6 +23,7 @@ import type {
   DailyQuestionResult,
   DailyState,
 } from '@/lib/daily/types'
+import type { AdsenseDetailConfig } from '@/lib/adsense'
 
 const CHOICES: DailyChoice[] = ['A', 'B', 'C', 'D']
 
@@ -130,7 +132,15 @@ function ResultList({
   )
 }
 
-export default function DailyRuntime({ initialState }: { initialState: DailyState }) {
+export default function DailyRuntime({
+  initialState,
+  dailyAd,
+  children,
+}: {
+  initialState: DailyState
+  dailyAd: AdsenseDetailConfig | null
+  children?: ReactNode
+}) {
   const [state, setState] = useState(initialState)
   const [currentIndex, setCurrentIndex] = useState(initialState.progress.currentIndex)
   const [draftAnswers, setDraftAnswers] = useState<DailyAnswers>({})
@@ -360,6 +370,14 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
           </div>
         </div>
 
+        {/* One stable, optional Daily ad slot. It is outside the quiz card and
+            remains mounted while question/result state changes. */}
+        {dailyAd && (
+          <div data-testid="daily-adsense-placement">
+            <AdSenseUnit clientId={dailyAd.clientId} slotId={dailyAd.slotId} format="horizontal" />
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section>
             {!isComplete ? (
@@ -502,6 +520,7 @@ export default function DailyRuntime({ initialState }: { initialState: DailyStat
                     </div>
                   </div>
                 )}
+                {children}
               </div>
             )}
           </section>

@@ -1,5 +1,8 @@
 import { Info } from 'lucide-react'
-import type { AffiliateRailProduct } from '@/lib/affiliate'
+import type {
+  AffiliateContentType,
+  AffiliateRailProduct,
+} from '@/lib/affiliate'
 import AffiliateProductCard from './AffiliateProductCard'
 
 /**
@@ -29,11 +32,14 @@ export const AFFILIATE_DISCLOSURE_TEXT =
 interface AffiliateRailProps {
   products: AffiliateRailProduct[]
   collectionId: string | null
-  contentType: 'news' | 'article'
+  contentType: AffiliateContentType
   contentSlug: string
   /** Viewport width where the surface switches to the desktop sidebar. */
-  sidebarMinWidthPx: number
+  sidebarMinWidthPx?: number
+  /** Fixed Daily completion placement; ordinary rails remain viewport-aware. */
+  clickPlacement?: 'daily_complete'
   heading?: string
+  eyebrow?: string
 }
 
 export default function AffiliateRail({
@@ -42,7 +48,9 @@ export default function AffiliateRail({
   contentType,
   contentSlug,
   sidebarMinWidthPx,
+  clickPlacement,
   heading = 'อุปกรณ์ที่อาจช่วยการเตรียมสอบ',
+  eyebrow = 'แนะนำจากพันธมิตร',
 }: AffiliateRailProps) {
   // No products → render nothing (never an empty box).
   if (products.length === 0) return null
@@ -69,7 +77,7 @@ export default function AffiliateRail({
             marginBottom: 6,
           }}
         >
-          แนะนำจากพันธมิตร
+          {eyebrow}
         </p>
         <h2
           className="font-display"
@@ -93,6 +101,7 @@ export default function AffiliateRail({
               contentType={contentType}
               contentSlug={contentSlug}
               sidebarMinWidthPx={sidebarMinWidthPx}
+              fixedPlacement={clickPlacement}
             />
           ))}
         </div>

@@ -1,8 +1,9 @@
 /**
  * AdSense Conservative (M3) — pure configuration + eligibility contract.
  *
- * M3 monetizes ONLY the News/Article detail pages with ONE manual responsive
- * display unit each. This module owns the two decisions every surface needs:
+ * M3 monetizes News/Article detail pages and the Daily practice surface with
+ * ONE manual responsive display unit per eligible page. This module owns the
+ * two decisions every surface needs:
  *
  *   1. PLATFORM CONFIG — publisher/client + slot ids come from environment
  *      variables (NEVER from content rows, mirroring how NEXT_PUBLIC_GTM_ID is
@@ -20,8 +21,10 @@
  *      coerced STRICTLY (`=== true`), matching the affiliate flag contract in
  *      lib/affiliate.ts. Absent/legacy rows → OFF.
  *
- * Eligibility = opt-in AND config. Either failing → render no unit and (via
- * the AdSenseUnit island never mounting) never load the AdSense network script.
+ * Detail eligibility = opt-in AND config. Either failing → render no unit and
+ * (via the AdSenseUnit island never mounting) never load the AdSense network
+ * script. Daily uses the same validated platform config and its own product
+ * surface gate; it has no content-row opt-in.
  *
  * Deliberately NOT here: Auto Ads / vignette / anchor / multiplex / ad-intents
  * configuration (all banned by the M3 spec), impression/click tracking, and
@@ -89,6 +92,15 @@ export function getAdsenseDetailConfigFrom(
 
 /** Process-env entry point used by the detail surfaces. */
 export function getAdsenseDetailConfig(): AdsenseDetailConfig | null {
+  return getAdsenseDetailConfigFrom(process.env)
+}
+
+/**
+ * Platform-level config for the Daily surface. It deliberately reuses the
+ * existing M3 client + slot pair; Daily's placement is controlled in code,
+ * not by a new DB row or a second AdSense script/config model.
+ */
+export function getAdsenseDailyConfig(): AdsenseDetailConfig | null {
   return getAdsenseDetailConfigFrom(process.env)
 }
 

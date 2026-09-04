@@ -3,7 +3,12 @@
 import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { trackAffiliateClick } from '@/lib/analytics'
-import { merchantLabel, type AffiliateRailProduct } from '@/lib/affiliate'
+import {
+  merchantLabel,
+  type AffiliateClickPlacement,
+  type AffiliateContentType,
+  type AffiliateRailProduct,
+} from '@/lib/affiliate'
 
 /**
  * The ONE client island inside the otherwise server-rendered AffiliateRail —
@@ -32,10 +37,12 @@ import { merchantLabel, type AffiliateRailProduct } from '@/lib/affiliate'
 interface AffiliateProductCardProps {
   product: AffiliateRailProduct
   collectionId: string | null
-  contentType: 'news' | 'article'
+  contentType: AffiliateContentType
   contentSlug: string
   /** Viewport width where the surface switches to the desktop sidebar. */
-  sidebarMinWidthPx: number
+  sidebarMinWidthPx?: number
+  /** Daily completion has one stable placement at every viewport width. */
+  fixedPlacement?: Extract<AffiliateClickPlacement, 'daily_complete'>
 }
 
 export default function AffiliateProductCard({
@@ -44,6 +51,7 @@ export default function AffiliateProductCard({
   contentType,
   contentSlug,
   sidebarMinWidthPx,
+  fixedPlacement,
 }: AffiliateProductCardProps) {
   // PromotionImage pattern: plain <img> + onError hide, so an arbitrary
   // admin-supplied external image degrades to the wrapper's reserved
@@ -54,10 +62,12 @@ export default function AffiliateProductCard({
     // Never let analytics break the outbound click. Fire-and-forget.
     try {
       const placement =
-        typeof window !== 'undefined' &&
+        fixedPlacement ??
+        (typeof window !== 'undefined' &&
+        typeof sidebarMinWidthPx === 'number' &&
         window.matchMedia(`(min-width: ${sidebarMinWidthPx}px)`).matches
           ? 'sidebar'
-          : 'inline_mobile'
+          : 'inline_mobile')
       trackAffiliateClick({
         merchant: product.merchant,
         product_id: product.id,

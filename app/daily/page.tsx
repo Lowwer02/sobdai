@@ -1,5 +1,10 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import DailyRuntime from '@/components/daily/DailyRuntime'
+import DailyAffiliatePicks from '@/components/affiliate/DailyAffiliatePicks'
+import { getAdsenseDailyConfig } from '@/lib/adsense'
+import { getDailyAffiliateCollectionId } from '@/lib/affiliate-daily'
+import type { DailyState } from '@/lib/daily/types'
 import { loadDailyState, loadGuestDailyState } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +23,20 @@ function MessageCard({ title, message }: { title: string; message: string }) {
         <p className="text-[#A1866B]">{message}</p>
       </div>
     </div>
+  )
+}
+
+function ReadyDaily({ state }: { state: DailyState }) {
+  const affiliateCollectionId = getDailyAffiliateCollectionId()
+
+  return (
+    <DailyRuntime initialState={state} dailyAd={getAdsenseDailyConfig()}>
+      {affiliateCollectionId && (
+        <Suspense fallback={null}>
+          <DailyAffiliatePicks collectionId={affiliateCollectionId} />
+        </Suspense>
+      )}
+    </DailyRuntime>
   )
 }
 
@@ -43,7 +62,7 @@ export default async function DailyPage() {
       return <MessageCard title="ข้อสอบประจำวัน 5 ข้อ" message="กรุณาโหลดหน้านี้ใหม่อีกครั้ง" />
     }
 
-    return <DailyRuntime initialState={guestResult.state} />
+    return <ReadyDaily state={guestResult.state} />
   }
 
   if (result.status === 'error') {
@@ -59,5 +78,5 @@ export default async function DailyPage() {
     )
   }
 
-  return <DailyRuntime initialState={result.state} />
+  return <ReadyDaily state={result.state} />
 }

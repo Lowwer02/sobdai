@@ -84,7 +84,7 @@ test('no global AdSense script in the root layout (or its loaders)', () => {
   }
 })
 
-test('route isolation: only the News/Article detail surfaces mount the unit', () => {
+test('route isolation: only the News/Article detail and Daily surfaces mount the unit', () => {
   const importers = [...walk('app'), ...walk('components')].filter((rel) =>
     /from\s+'@\/components\/adsense\/AdSenseUnit'/.test(read(rel))
   )
@@ -92,6 +92,7 @@ test('route isolation: only the News/Article detail surfaces mount the unit', ()
   assert.deepEqual(importers, [
     'app/news/[slug]/page.tsx',
     'components/articles/ArticleDetail.tsx',
+    'components/daily/DailyRuntime.tsx',
   ])
 })
 
@@ -114,7 +115,9 @@ test('no banned AdSense features anywhere in the M3 surface', () => {
 test('the unit is ONE manual responsive display unit with a Thai label', () => {
   const unitCode = stripComments(adsenseUnitSource)
   assert.equal(unitCode.match(/<ins\s/g)?.length, 1, 'exactly one <ins> ad element')
-  assert.match(adsenseUnitSource, /data-ad-format="auto"/)
+  assert.match(adsenseUnitSource, /format\?: 'auto' \| 'horizontal'/)
+  assert.match(adsenseUnitSource, /format = 'auto'/)
+  assert.match(adsenseUnitSource, /data-ad-format=\{format\}/)
   assert.match(adsenseUnitSource, /data-full-width-responsive="true"/)
   assert.match(adsenseUnitSource, /data-ad-client=\{clientId\}/)
   assert.match(adsenseUnitSource, /data-ad-slot=\{slotId\}/)

@@ -1,4 +1,5 @@
 import { readConsentFromDocumentCookie } from '@/lib/consent'
+import type { AffiliateClickPlacement, AffiliateContentType } from '@/lib/affiliate'
 
 declare global {
   interface Window {
@@ -320,9 +321,9 @@ export function trackAffiliateClick(params: {
   merchant: string
   product_id: string
   collection_id: string | null
-  content_type: 'news' | 'article'
+  content_type: AffiliateContentType
   content_slug: string
-  placement: 'sidebar' | 'inline_mobile' | 'listing_strip'
+  placement: AffiliateClickPlacement
 }): void {
   pushToDataLayer({
     event: 'affiliate_click',
