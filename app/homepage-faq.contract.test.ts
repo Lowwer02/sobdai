@@ -57,6 +57,32 @@ test('Homepage preview data derives from FAQ_ITEMS and equals source question an
   }
 })
 
+test('Homepage FAQ preview items do not render contextual link metadata', () => {
+  const previewItems = getHomepageFaqPreviewItems()
+  assert.strictEqual(previewItems.length, 6, 'Must have exactly 6 preview items')
+
+  for (const item of previewItems) {
+    assert.strictEqual(
+      item.link,
+      undefined,
+      `Preview item ${item.id} must not have contextual link metadata`
+    )
+  }
+
+  // Verify source FAQ items that have links are stripped for preview
+  const whatIsSobdai = previewItems.find((i: { id: string }) => i.id === 'what-is-sobdai')
+  assert.ok(whatIsSobdai, 'what-is-sobdai missing from preview')
+  assert.strictEqual(whatIsSobdai.link, undefined)
+
+  const practiceVsMock = previewItems.find((i: { id: string }) => i.id === 'practice-vs-mock')
+  assert.ok(practiceVsMock, 'practice-vs-mock missing from preview')
+  assert.strictEqual(practiceVsMock.link, undefined)
+
+  const packageValidity = previewItems.find((i: { id: string }) => i.id === 'package-validity')
+  assert.ok(packageValidity, 'package-validity missing from preview')
+  assert.strictEqual(packageValidity.link, undefined)
+})
+
 test('HomeFaqPreview CTA links to /faq with exact copy "ดูคำถามทั้งหมด"', () => {
   assert.match(
     homeFaqSource,

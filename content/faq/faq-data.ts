@@ -40,6 +40,10 @@ export const FAQ_ITEMS: FaqItem[] = [
     paragraphs: [
       'Sobdai คือเว็บแอปสำหรับฝึกทำแนวข้อสอบราชการ ช่วยให้คุณเลือกชุดข้อสอบ ฝึกทำ ดูผล ทบทวนข้อที่ตอบผิด บันทึกข้อที่สนใจ และดูหัวข้อที่ควรกลับไปฝึกเพิ่มเติม',
     ],
+    link: {
+      text: 'อ่านคู่มือวิธีใช้งาน Sobdai',
+      href: '/help',
+    },
   },
   {
     id: 'where-to-start',
@@ -73,6 +77,10 @@ export const FAQ_ITEMS: FaqItem[] = [
       'โหมดฝึกทำเหมาะสำหรับการเรียนรู้และทบทวน ไม่มีการนับเวลาถอยหลัง หลังเลือกคำตอบระบบจะแสดงผลของข้อนั้น และแสดงคำอธิบายหรือข้อมูลประกอบเมื่อข้อดังกล่าวมีข้อมูล',
       'โหมดจำลองสอบมีการจับเวลาและทำข้อสอบต่อเนื่อง โดยผลและรายละเอียดสำหรับทบทวนจะแสดงหลังส่งข้อสอบ',
     ],
+    link: {
+      text: 'ดูรายละเอียดและตัวอย่างโหมดการสอบ',
+      href: '/help#exam-modes',
+    },
   },
   {
     id: 'exam-explanations',
@@ -104,6 +112,10 @@ export const FAQ_ITEMS: FaqItem[] = [
     paragraphs: [
       'ได้ ในหน้าทบทวนผลการทำข้อสอบ คุณสามารถเลือกดูข้อที่ตอบผิดหรือไม่ได้ตอบ หรือเลือกดูทุกข้อของการทำข้อสอบครั้งนั้นได้',
     ],
+    link: {
+      text: 'ดูขั้นตอนการทบทวนผลสอบ',
+      href: '/help#results',
+    },
   },
   {
     id: 'practice-only-wrong-set',
@@ -158,6 +170,10 @@ export const FAQ_ITEMS: FaqItem[] = [
     paragraphs: [
       'ระยะเวลาและเงื่อนไขการเข้าถึงขึ้นอยู่กับรายละเอียดของแต่ละแพ็กเกจ กรุณาตรวจสอบข้อมูลบนหน้าแพ็กเกจก่อนเริ่มใช้งาน',
     ],
+    link: {
+      text: 'ตรวจสอบข้อมูลในหน้าคลังแพ็กเกจ',
+      href: '/packages',
+    },
   },
   {
     id: 'government-affiliation',
@@ -167,6 +183,10 @@ export const FAQ_ITEMS: FaqItem[] = [
     paragraphs: [
       'Sobdai เป็นบริการอิสระสำหรับช่วยเตรียมสอบ และไม่ได้เป็นเว็บไซต์ทางการของหน่วยงานราชการ สำหรับกำหนดการรับสมัคร คุณสมบัติ เงื่อนไข และประกาศสอบ ควรตรวจสอบข้อมูลจากประกาศทางการของหน่วยงานที่เกี่ยวข้องอีกครั้ง',
     ],
+    link: {
+      text: 'อ่านเกี่ยวกับ Sobdai และที่มาโครงการ',
+      href: '/about',
+    },
   },
 ]
 
@@ -206,6 +226,18 @@ export const HOMEPAGE_FAQ_PREVIEW_IDS = [
 export function getHomepageFaqPreviewItems(): FaqItem[] {
   const itemMap = new Map(FAQ_ITEMS.map((item) => [item.id, item]))
   return HOMEPAGE_FAQ_PREVIEW_IDS
-    .map((id) => itemMap.get(id))
+    .map((id) => {
+      const item = itemMap.get(id)
+      if (!item) return undefined
+      // Homepage preview intentionally renders only question and answer paragraphs,
+      // excluding contextual link metadata to keep the preview compact.
+      return {
+        id: item.id,
+        category: item.category,
+        categoryLabel: item.categoryLabel,
+        question: item.question,
+        paragraphs: item.paragraphs,
+      }
+    })
     .filter((item): item is FaqItem => Boolean(item))
 }

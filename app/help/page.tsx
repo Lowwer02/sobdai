@@ -340,6 +340,16 @@ export default function HelpPage() {
                   <span className="text-[#F5E9D6] font-semibold">หมายเหตุเกี่ยวกับเฉลย:</span>{' '}
                   คำอธิบายเฉลยและข้อมูลกฎหมายอ้างอิงจะแสดงเมื่อข้อสอบข้อนั้นมีข้อมูลเฉลยบันทึกในระบบ
                 </div>
+
+                <div className="pt-1">
+                  <Link
+                    href="/packages"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D4AF37] hover:text-[#F1D17A] transition-colors"
+                  >
+                    <span>เลือกดูแพ็กเกจข้อสอบเพื่อเริ่มฝึกทำ</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                </div>
               </section>
 
               {/* ---------------------------------------------------- */}
@@ -432,6 +442,16 @@ export default function HelpPage() {
                   สามารถเลือกทบทวนข้อที่ตอบผิดหรือไม่ได้ตอบ หรือเลือกดูทุกข้อของการทำข้อสอบครั้งนั้นได้
                   โดยคำอธิบายและข้อมูลอ้างอิงจะแสดงตามความพร้อมของข้อมูลในระบบ
                 </div>
+
+                <div className="pt-1">
+                  <Link
+                    href="/exams"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D4AF37] hover:text-[#F1D17A] transition-colors"
+                  >
+                    <span>ตรวจสอบผลการทำข้อสอบย้อนหลังในหน้าข้อสอบของฉัน</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                </div>
               </section>
 
               {/* ---------------------------------------------------- */}
@@ -474,6 +494,16 @@ export default function HelpPage() {
                   ระบบใช้ผลจากการทำข้อสอบที่ผ่านมาเพื่อช่วยสรุปหัวข้อที่ควรกลับไปให้ความสำคัญเพิ่มเติม
                   หากต้องการฝึกทำซ้ำ ผู้เรียนสามารถกด &ldquo;ทำชุดนี้อีกครั้ง&rdquo; เพื่อเริ่มทำชุดข้อสอบเดิมใหม่ทั้งชุด
                   เพื่อวัดความเข้าใจอย่างครอบคลุม
+                </div>
+
+                <div className="pt-1">
+                  <Link
+                    href="/faq#results-and-review"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D4AF37] hover:text-[#F1D17A] transition-colors"
+                  >
+                    <span>ดูคำถามที่พบบ่อยเกี่ยวกับการทบทวนและทำข้อสอบ</span>
+                    <ArrowRight size={13} />
+                  </Link>
                 </div>
               </section>
 

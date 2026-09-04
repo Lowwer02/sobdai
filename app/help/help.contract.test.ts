@@ -103,13 +103,41 @@ test('Help page includes structured breadcrumb JSON-LD for Search crawlers', () 
   )
 })
 
-test('Help page provides valid outbound navigation CTAs', () => {
-  // /packages CTA
+test('Help page provides valid outbound navigation CTAs and contextual actions', () => {
+  // Existing hero / section CTAs preserved
   assert.match(helpPageSource, /href="\/packages"/)
-  // /faq CTA
   assert.match(helpPageSource, /href="\/faq"/)
-  // /exams CTA
   assert.match(helpPageSource, /href="\/exams"/)
+
+  // Existing Step 1 action preserved
+  assert.match(helpDataSource, /actionLabel:\s*['"]ไปยังคลังแพ็กเกจ['"]/)
+  assert.match(helpDataSource, /actionHref:\s*['"]\/packages['"]/)
+  assert.match(helpPageSource, /step\.actionLabel/)
+
+  // Existing Section 6 action preserved
+  assert.match(helpPageSource, /ไปยังหน้าข้อสอบของฉัน/)
+
+  // Three new V1.1 contextual actions:
+  // 1. #exam-modes -> /packages
+  assert.match(
+    helpPageSource,
+    /<Link\s+href="\/packages"[^>]*>\s*<span>เลือกดูแพ็กเกจข้อสอบเพื่อเริ่มฝึกทำ<\/span>/,
+    'Missing contextual link in #exam-modes'
+  )
+
+  // 2. #results -> /exams
+  assert.match(
+    helpPageSource,
+    /<Link\s+href="\/exams"[^>]*>\s*<span>ตรวจสอบผลการทำข้อสอบย้อนหลังในหน้าข้อสอบของฉัน<\/span>/,
+    'Missing contextual link in #results'
+  )
+
+  // 3. #review -> /faq#results-and-review
+  assert.match(
+    helpPageSource,
+    /<Link\s+href="\/faq#results-and-review"[^>]*>\s*<span>ดูคำถามที่พบบ่อยเกี่ยวกับการทบทวนและทำข้อสอบ<\/span>/,
+    'Missing contextual link in #review'
+  )
 })
 
 test('Help page integrates the six required WebP screenshot assets with alt text', () => {

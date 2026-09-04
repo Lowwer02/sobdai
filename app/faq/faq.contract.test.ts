@@ -60,21 +60,73 @@ test('FAQ data source contains exactly 14 items across 4 visual categories', () 
     assert.ok(expectedCategoryIds.includes(item.category), `Invalid category for item ${item.id}`)
   }
 
-  // Verify item 2 links to /packages
-  const item2 = FAQ_ITEMS.find((i: { id: string }) => i.id === 'where-to-start')
-  assert.ok(item2, 'Item where-to-start not found')
-  assert.strictEqual(item2.link?.href, '/packages')
+  // Verify exactly the approved 7 FAQ items have link metadata with exact hrefs and text
+  const expectedApprovedLinks: Record<string, { text: string; href: string }> = {
+    'what-is-sobdai': {
+      text: 'อ่านคู่มือวิธีใช้งาน Sobdai',
+      href: '/help',
+    },
+    'where-to-start': {
+      text: 'ไปยังหน้าคลังข้อสอบ',
+      href: '/packages',
+    },
+    'practice-vs-mock': {
+      text: 'ดูรายละเอียดและตัวอย่างโหมดการสอบ',
+      href: '/help#exam-modes',
+    },
+    'where-to-view-results': {
+      text: 'ไปยังหน้าข้อสอบของฉัน',
+      href: '/exams',
+    },
+    'review-wrong-answers': {
+      text: 'ดูขั้นตอนการทบทวนผลสอบ',
+      href: '/help#results',
+    },
+    'package-validity': {
+      text: 'ตรวจสอบข้อมูลในหน้าคลังแพ็กเกจ',
+      href: '/packages',
+    },
+    'government-affiliation': {
+      text: 'อ่านเกี่ยวกับ Sobdai และที่มาโครงการ',
+      href: '/about',
+    },
+  }
+
+  const itemsWithLink = FAQ_ITEMS.filter((item: { link?: unknown }) => item.link !== undefined)
+  assert.strictEqual(
+    itemsWithLink.length,
+    7,
+    `Expected exactly 7 FAQ items with links, found ${itemsWithLink.length}`
+  )
+
+  for (const [id, expectedLink] of Object.entries(expectedApprovedLinks)) {
+    const item = FAQ_ITEMS.find((i: { id: string }) => i.id === id)
+    assert.ok(item, `Item ${id} not found in FAQ_ITEMS`)
+    assert.strictEqual(item.link?.href, expectedLink.href, `href mismatch for ${id}`)
+    assert.strictEqual(item.link?.text, expectedLink.text, `text mismatch for ${id}`)
+  }
+
+  // Verify the other 7 FAQ items have NO link metadata
+  const expectedLinkFreeIds = [
+    'login-requirement',
+    'exam-explanations',
+    'practice-only-wrong-set',
+    'bookmark-questions',
+    'weak-topics-calculation',
+    'resume-incomplete',
+    'mobile-usage',
+  ]
+  for (const id of expectedLinkFreeIds) {
+    const item = FAQ_ITEMS.find((i: { id: string }) => i.id === id)
+    assert.ok(item, `Item ${id} not found in FAQ_ITEMS`)
+    assert.strictEqual(item.link, undefined, `Item ${id} must not have link metadata`)
+  }
 
   // Verify item 3 requires login even for trial/sample
   const item3 = FAQ_ITEMS.find((i: { id: string }) => i.id === 'login-requirement')
   assert.ok(item3, 'Item login-requirement not found')
   assert.strictEqual(item3.paragraphs.length, 2)
   assert.match(item3.paragraphs[0], /จะต้องเข้าสู่ระบบก่อนทุกครั้ง ไม่ว่าแพ็กเกจนั้นจะเป็นแบบทดลองหรือไม่ก็ตาม/)
-
-  // Verify item 6 links to /exams (canonical learner route)
-  const item6 = FAQ_ITEMS.find((i: { id: string }) => i.id === 'where-to-view-results')
-  assert.ok(item6, 'Item where-to-view-results not found')
-  assert.strictEqual(item6.link?.href, '/exams')
 })
 
 test('FAQ page uses accessible native details and summary elements', () => {
@@ -143,6 +195,16 @@ test('FAQ page includes structured breadcrumb and FAQPage JSON-LD', () => {
   assert.strictEqual(schema.mainEntity.length, 14)
   assert.strictEqual(schema.mainEntity[0].name, 'Sobdai คืออะไร?')
   assert.match(schema.mainEntity[0].acceptedAnswer.text, /เว็บแอปสำหรับฝึกทำแนวข้อสอบราชการ/)
+
+  // Verify that link metadata (labels, URLs) does not contaminate schema answer text
+  for (const entity of schema.mainEntity) {
+    assert.doesNotMatch(entity.acceptedAnswer.text, /อ่านคู่มือวิธีใช้งาน Sobdai/)
+    assert.doesNotMatch(entity.acceptedAnswer.text, /ดูรายละเอียดและตัวอย่างโหมดการสอบ/)
+    assert.doesNotMatch(entity.acceptedAnswer.text, /ดูขั้นตอนการทบทวนผลสอบ/)
+    assert.doesNotMatch(entity.acceptedAnswer.text, /ตรวจสอบข้อมูลในหน้าคลังแพ็กเกจ/)
+    assert.doesNotMatch(entity.acceptedAnswer.text, /อ่านเกี่ยวกับ Sobdai และที่มาโครงการ/)
+    assert.doesNotMatch(entity.acceptedAnswer.text, /href=/)
+  }
 })
 
 test('Footer contains links to /help and /faq near about and contact', () => {
