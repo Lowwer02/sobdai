@@ -23,6 +23,7 @@ import HomeInsightShowcase from '@/components/home/HomeInsightShowcase'
 import HomeDailySection from '@/components/home/HomeDailySection'
 import HomeFeaturedExams from '@/components/home/HomeFeaturedExams'
 import HomeLatestNews from '@/components/home/HomeLatestNews'
+import HomeFaqPreview from '@/components/home/HomeFaqPreview'
 import HomeFinalCTA from '@/components/home/HomeFinalCTA'
 
 // Homepage shows public package data + homepage settings that change
@@ -226,7 +227,12 @@ export default async function Home() {
           </div>
         )}
 
-        {/* ===================== 11. Final Conversion CTA ===================== */}
+        {/* ===================== 11. FAQ Preview ===================== */}
+        <div className="home-v2-flow-item">
+          <HomeFaqPreview />
+        </div>
+
+        {/* ===================== 12. Final Conversion CTA ===================== */}
         {sections.cta && (
           <div className="home-v2-flow-item">
             <HomeFinalCTA cta={cta} />

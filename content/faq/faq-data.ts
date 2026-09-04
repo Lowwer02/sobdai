@@ -189,3 +189,23 @@ export function buildFaqPageJsonLd(items: FaqItem[]): Record<string, unknown> {
     })),
   }
 }
+
+/**
+ * Deterministic subset of high-value FAQ items displayed as a compact
+ * preview on the Homepage. Derived strictly from FAQ_ITEMS single source of truth.
+ */
+export const HOMEPAGE_FAQ_PREVIEW_IDS = [
+  'what-is-sobdai',
+  'login-requirement',
+  'practice-vs-mock',
+  'exam-explanations',
+  'resume-incomplete',
+  'package-validity',
+] as const
+
+export function getHomepageFaqPreviewItems(): FaqItem[] {
+  const itemMap = new Map(FAQ_ITEMS.map((item) => [item.id, item]))
+  return HOMEPAGE_FAQ_PREVIEW_IDS
+    .map((id) => itemMap.get(id))
+    .filter((item): item is FaqItem => Boolean(item))
+}
