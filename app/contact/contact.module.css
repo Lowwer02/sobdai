@@ -1,0 +1,626 @@
+/* ===================== Contact Page (V1) CSS Module =====================
+   Palette: #0F0A06 bg / #1A120B card / #D4A63A gold / #F7F3EC text / #C8BBA4 secondary
+   Sobdai Support: Calm, Helpful, Purpose-led, Restrained Gold Aesthetics
+   ======================================================================== */
+
+/* ── Page Root ── */
+.root {
+  min-height: 100vh;
+  background-color: #0f0a06;
+  color: #f7f3ec;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ── Shared: Gold Hairline Separator ── */
+.hairline {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(212, 168, 67, 0.18), transparent);
+  margin: 0 auto;
+  max-width: 64rem;
+  width: 100%;
+}
+
+/* ── Shared: Section Inner Container ── */
+.sectionInner {
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 3.75rem 1.25rem;
+}
+
+.sectionNarrow {
+  max-width: 52rem;
+}
+
+/* ── Section-specific Vertical Spacing ── */
+.heroSection {
+  padding: 4.5rem 1.25rem 3.5rem;
+  position: relative;
+}
+
+.quickCardsSection {
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+}
+
+.topicsSection {
+  padding-top: 3.75rem;
+  padding-bottom: 3.75rem;
+}
+
+.selfServiceSection {
+  padding-top: 3.75rem;
+  padding-bottom: 3.5rem;
+}
+
+.ctaSection {
+  padding-top: 3.75rem;
+  padding-bottom: 4.5rem;
+  text-align: center;
+}
+
+/* ── Shared: Eyebrow Badge ── */
+.eyebrow {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d4a63a;
+  background: rgba(212, 168, 67, 0.08);
+  border: 1px solid rgba(212, 168, 67, 0.22);
+  border-radius: 999px;
+  padding: 0.32rem 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Shared: Headings ── */
+.sectionHeading {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: clamp(1.4rem, 3.5vw, 1.95rem);
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.35;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+}
+
+.sectionHeaderCentered {
+  text-align: center;
+  margin-bottom: 2.75rem;
+}
+
+.sectionSubhead {
+  color: #c8bba4;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-top: -0.5rem;
+  margin-bottom: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECTION 01: HERO
+   ══════════════════════════════════════════════════════════════ */
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  align-items: center;
+  max-width: 64rem;
+  margin: 0 auto;
+}
+
+@media (min-width: 880px) {
+  .heroGrid {
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 3.5rem;
+  }
+}
+
+.heroContent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.heroH1 {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: clamp(2rem, 5.2vw, 3rem);
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.25;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.heroCopy {
+  font-size: clamp(0.95rem, 2vw, 1.075rem);
+  color: #c8bba4;
+  line-height: 1.75;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  max-width: 36rem;
+}
+
+.heroReassurance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(212, 168, 67, 0.06);
+  border: 1px solid rgba(212, 168, 67, 0.16);
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
+  color: #f7f3ec;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.reassuranceDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: #d4a63a;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+/* ── Hero Visual (Right Column) ── */
+.heroVisualCard {
+  background: linear-gradient(145deg, rgba(26, 18, 11, 0.85) 0%, rgba(17, 12, 7, 0.9) 100%);
+  border: 1px solid rgba(212, 168, 67, 0.2);
+  border-radius: 1.5rem;
+  padding: 1.75rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(212, 168, 67, 0.15);
+}
+
+.heroVisualGlow {
+  position: absolute;
+  top: -20%;
+  right: -20%;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(212, 168, 67, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.heroVisualBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #d4a63a;
+  background: rgba(212, 168, 67, 0.1);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.heroVisualIconBox {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.2) 0%, rgba(212, 168, 67, 0.05) 100%);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4a63a;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 0 24px rgba(212, 168, 67, 0.15);
+}
+
+.heroVisualTitle {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  margin: 0 0 0.4rem 0;
+}
+
+.heroVisualDesc {
+  color: #c8bba4;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 1.25rem 0;
+}
+
+.heroVisualList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  border-top: 1px solid rgba(212, 168, 67, 0.12);
+  padding-top: 1.1rem;
+}
+
+.heroVisualListItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #c8bba4;
+}
+
+.heroVisualListLabel {
+  color: #9c8e7c;
+}
+
+.heroVisualListValue {
+  color: #f7f3ec;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECTION 02: QUICK CONTACT CARDS
+   ══════════════════════════════════════════════════════════════ */
+.quickGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .quickGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.quickCard {
+  background: rgba(26, 18, 11, 0.65);
+  border: 1px solid rgba(212, 168, 67, 0.15);
+  border-radius: 1.15rem;
+  padding: 1.75rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.quickCard:hover {
+  border-color: rgba(212, 168, 67, 0.35);
+  transform: translateY(-2px);
+}
+
+.quickIconWrap {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: rgba(212, 168, 67, 0.08);
+  border: 1px solid rgba(212, 168, 67, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4a63a;
+  margin-bottom: 1.1rem;
+}
+
+.quickLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9c8e7c;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.5rem 0;
+}
+
+.quickValue {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.3;
+  margin: 0 0 0.35rem 0;
+}
+
+.quickLink {
+  color: #f7f3ec;
+  text-decoration: none;
+  word-break: break-all;
+  transition: color 0.15s ease;
+  display: inline-block;
+}
+
+.quickLink:hover {
+  color: #d4a63a;
+}
+
+.quickSubtext {
+  font-size: 0.825rem;
+  color: #c8bba4;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECTION 03: TOPICS + CHECKLIST
+   ══════════════════════════════════════════════════════════════ */
+.topicsLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+}
+
+@media (min-width: 880px) {
+  .topicsLayout {
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+  }
+}
+
+.topicsCol {
+  background: rgba(26, 18, 11, 0.45);
+  border: 1px solid rgba(212, 168, 67, 0.14);
+  border-radius: 1.25rem;
+  padding: 2rem 1.5rem;
+}
+
+.topicsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  margin-top: 1.5rem;
+}
+
+.topicItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding-bottom: 1.15rem;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.08);
+}
+
+.topicItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.topicIconBox {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: rgba(212, 168, 67, 0.1);
+  color: #d4a63a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.topicTitle {
+  font-size: 0.975rem;
+  font-weight: 600;
+  color: #f7f3ec;
+  margin: 0 0 0.25rem 0;
+}
+
+.topicDesc {
+  font-size: 0.85rem;
+  color: #c8bba4;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Checklist ── */
+.checklistCol {
+  background: rgba(26, 18, 11, 0.55);
+  border: 1px solid rgba(212, 168, 67, 0.18);
+  border-radius: 1.25rem;
+  padding: 2rem 1.5rem;
+  position: relative;
+}
+
+.checkItems {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin-top: 1.5rem;
+}
+
+.checkItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.checkIconBox {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: rgba(212, 168, 67, 0.15);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  color: #d4a63a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.checkTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f7f3ec;
+  margin: 0 0 0.2rem 0;
+}
+
+.checkDesc {
+  font-size: 0.825rem;
+  color: #c8bba4;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECTION 04: SELF-SERVICE HELP
+   ══════════════════════════════════════════════════════════════ */
+.selfServiceGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .selfServiceGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.selfServiceCard {
+  background: rgba(26, 18, 11, 0.6);
+  border: 1px solid rgba(212, 168, 67, 0.14);
+  border-radius: 1.15rem;
+  padding: 1.75rem 1.35rem;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.selfServiceCard:hover {
+  border-color: rgba(212, 168, 67, 0.38);
+  background: rgba(26, 18, 11, 0.85);
+  transform: translateY(-2px);
+}
+
+.selfServiceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.selfServiceIconBox {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.65rem;
+  background: rgba(212, 168, 67, 0.1);
+  color: #d4a63a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selfServiceArrow {
+  color: #9c8e7c;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.selfServiceCard:hover .selfServiceArrow {
+  color: #d4a63a;
+  transform: translateX(3px);
+}
+
+.selfServiceTitle {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  margin: 0 0 0.4rem 0;
+}
+
+.selfServiceDesc {
+  font-size: 0.85rem;
+  color: #c8bba4;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SECTION 05: FINAL CTA
+   ══════════════════════════════════════════════════════════════ */
+.ctaBox {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.ctaHeading {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.3;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.ctaCopy {
+  font-size: 0.95rem;
+  color: #c8bba4;
+  line-height: 1.7;
+  margin-top: 0;
+  margin-bottom: 2rem;
+}
+
+.ctaActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 480px) {
+  .ctaActions {
+    flex-direction: row;
+    gap: 1rem;
+  }
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #d4a63a;
+  color: #0f0a06;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.8rem 1.6rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 14px rgba(212, 168, 67, 0.25);
+  border: 1px solid transparent;
+}
+
+.btnPrimary:hover {
+  background-color: #e5b94f;
+  transform: translateY(-1px);
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(26, 18, 11, 0.6);
+  border: 1px solid rgba(212, 168, 67, 0.28);
+  color: #f7f3ec;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.8rem 1.5rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.btnSecondary:hover {
+  border-color: rgba(212, 168, 67, 0.5);
+  background: rgba(212, 168, 67, 0.08);
+  color: #d4a63a;
+}
+
+.pageEndSpacer {
+  height: 2.5rem;
+}
