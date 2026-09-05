@@ -2,9 +2,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { getPackagePublicCounts } from '@/lib/publicData'
-import { ORDER_COMPLETED_STATUSES, selectAccessiblePackages } from '@/lib/orderUtils'
+import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { deriveMyPackagesViewState, MY_PACKAGES_ORDER_HISTORY_HREF } from '@/lib/my-packages-state'
 import type { Metadata } from 'next'
-import { BookOpen, Award, CheckCircle, ChevronLeft } from 'lucide-react'
+import { AlertCircle, BookOpen, Award, CheckCircle, ChevronLeft } from 'lucide-react'
 import { createPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = createPageMetadata({
@@ -69,23 +70,31 @@ export default async function LearningDashboardPage() {
     .order('created_at', { ascending: false })
 
   if (ordersError) {
-    // Keep the learner-facing empty state safe, but make the failed authority
-    // read observable instead of silently presenting it as a real empty state.
+    // Keep the failed authority read observable without exposing database
+    // details to the learner-facing state.
     console.error('[MY_PACKAGES] Failed to resolve package access:', ordersError.message)
   }
 
-  // The order query is the access authority. The helper repeats the status
-  // guard, deduplicates package orders, and drops unpublished packages so a
-  // future query change cannot accidentally broaden learner access.
+  // The order query is the access authority. This state resolver preserves a
+  // failed authority read as an error instead of converting it to an empty
+  // account. On success, it repeats the status guard, deduplicates package
+  // orders, and drops unpublished packages so a future query change cannot
+  // accidentally broaden learner access.
   // The generated Supabase relation types represent to-one joins as arrays,
   // while the runtime response is the single related object used by this
   // page (the same convention used by the existing package UI).
-  const ownedPackages = selectAccessiblePackages<any>((orders ?? []) as any[])
+  const packageState = deriveMyPackagesViewState<any>(orders as any[] | null, ordersError)
+
+  if (packageState.kind === 'error') {
+    return <PackageAccessErrorState />
+  }
 
   // --- Logged in, owns nothing ---------------------------------------------
-  if (ownedPackages.length === 0) {
+  if (packageState.kind === 'empty') {
     return <NoPackagesEmptyState />
   }
+
+  const ownedPackages = packageState.packages
 
   // Summary counts are presentation-only. Keep them out of the entitlement
   // query so a legacy/KP summary relationship issue cannot hide valid package
@@ -176,12 +185,7 @@ export default async function LearningDashboardPage() {
           <p className="text-[#A1866B] text-sm md:text-base max-w-lg mx-auto">
             แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้
           </p>
-          <Link
-            href="/orders"
-            className="inline-flex items-center justify-center mt-4 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] text-xs font-medium text-[#A1866B] hover:text-[#D4AF37] hover:border-[rgba(212,175,55,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
-          >
-            ดูประวัติการสั่งซื้อ
-          </Link>
+          <OrderHistoryLink className="inline-flex items-center justify-center mt-4 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] text-xs font-medium text-[#A1866B] hover:text-[#D4AF37] hover:border-[rgba(212,175,55,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]" />
         </header>
 
         {/* Learning Cards Grid */}
@@ -198,6 +202,18 @@ export default async function LearningDashboardPage() {
 /* -------------------------------------------------------------------------- */
 /* Sub-components                                                             */
 /* -------------------------------------------------------------------------- */
+
+interface OrderHistoryLinkProps {
+  className: string
+}
+
+function OrderHistoryLink({ className }: OrderHistoryLinkProps) {
+  return (
+    <Link href={MY_PACKAGES_ORDER_HISTORY_HREF} className={className}>
+      ดูประวัติการสั่งซื้อ
+    </Link>
+  )
+}
 
 interface LearningCardProps {
   pkg: LearningCardData
@@ -337,6 +353,36 @@ function GuestEmptyState() {
   )
 }
 
+/** Primary package-access read failed; do not render any owned content. */
+function PackageAccessErrorState() {
+  return (
+    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex items-center justify-center px-4 py-12">
+      <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
+        <div className="w-16 h-16 rounded-full bg-[rgba(212,175,55,0.1)] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+          <AlertCircle size={32} aria-hidden="true" />
+        </div>
+
+        <h1 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">
+          ไม่สามารถโหลดแพ็กเกจของคุณได้
+        </h1>
+        <p className="text-[#A1866B] text-sm leading-relaxed mb-8">
+          กรุณาลองใหม่อีกครั้ง
+        </p>
+
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/my-packages"
+            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+          >
+            ลองใหม่
+          </Link>
+          <OrderHistoryLink className="border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Logged-in but owns no packages. */
 function NoPackagesEmptyState() {
   return (
@@ -358,12 +404,15 @@ function NoPackagesEmptyState() {
           เลือกแพ็กเกจที่สนใจเพื่อเริ่มต้นการเรียนและการเตรียมสอบกับ Sobdai
         </p>
 
-        <Link
-          href="/packages"
-          className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
-        >
-          เลือกแพ็กเกจ
-        </Link>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/packages"
+            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+          >
+            เลือกแพ็กเกจ
+          </Link>
+          <OrderHistoryLink className="border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] text-[#F5E9D6] font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20" />
+        </div>
       </div>
     </div>
   )
