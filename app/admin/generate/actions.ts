@@ -12,6 +12,7 @@ import {
   ADMIN_ASSESSMENT_BLUEPRINTS,
   type AdminAssessmentBlueprintKey,
 } from './config'
+import { resolveAssessmentDocumentAlias } from './document-alias'
 
 const QUESTION_BANK_PAGE_SIZE = 1_000
 
@@ -77,10 +78,18 @@ export async function generateAssessmentAdminAction(
       },
       questionBank: {
         readMetadata() {
+          // Document Alias Bridge: project the raw `questions.document` value
+          // to the canonical Blueprint registry name for this exact Blueprint
+          // identity before the Engine's Document Filter compares it. The raw
+          // Bank rows above remain untouched; unknown values pass through
+          // unchanged (see ./document-alias.ts).
           return bankRows.map((row) => ({
             questionCode: row.question_code,
             subject: row.subject,
-            document: row.document ?? '',
+            document: resolveAssessmentDocumentAlias(
+              { id: blueprint.id, version: blueprint.version },
+              row.document ?? ''
+            ),
             topic: row.topic,
             law: row.law,
             difficulty: row.difficulty,
