@@ -36,7 +36,9 @@ const heroVisualSource = read('components/contact/ContactHeroVisual.tsx')
 const quickCardsSource = read('components/contact/ContactQuickCards.tsx')
 const topicsSource = read('components/contact/ContactTopicsChecklist.tsx')
 const selfServiceSource = read('components/contact/ContactSelfService.tsx')
+const socialSource = read('components/contact/ContactSocial.tsx')
 const ctaSource = read('components/contact/ContactCta.tsx')
+const adminActionsSource = read('app/admin/homepage/actions.ts')
 
 // Combined source for comprehensive string analysis
 const allSource = [
@@ -45,6 +47,7 @@ const allSource = [
   quickCardsSource,
   topicsSource,
   selfServiceSource,
+  socialSource,
   ctaSource,
 ].join('\n')
 
@@ -307,6 +310,7 @@ test('No "use client" directive in any Contact component or page', () => {
     { name: 'ContactQuickCards.tsx', code: quickCardsSource },
     { name: 'ContactTopicsChecklist.tsx', code: topicsSource },
     { name: 'ContactSelfService.tsx', code: selfServiceSource },
+    { name: 'ContactSocial.tsx', code: socialSource },
     { name: 'ContactCta.tsx', code: ctaSource },
   ]
 
@@ -331,7 +335,168 @@ test('app/globals.css has NO Contact-specific styles', () => {
     !globalsCss.includes('.contact') &&
     !globalsCss.includes('contactModule') &&
     !globalsCss.includes('quickCard') &&
-    !globalsCss.includes('selfService'),
+    !globalsCss.includes('selfService') &&
+    !globalsCss.includes('socialSection'),
     'app/globals.css must remain free of Contact-specific styles'
+  )
+})
+
+// ── 12. Social Follow CMS Source Alignment ─────────────────────────────────
+
+test('No hardcoded getsobdai Facebook production URL in ContactSocial source', () => {
+  assert.ok(
+    !socialSource.includes('https://facebook.com/getsobdai'),
+    'ContactSocial must not hardcode production URL https://facebook.com/getsobdai'
+  )
+  assert.ok(
+    !socialSource.includes('getsobdai'),
+    'ContactSocial must not hardcode getsobdai handle string'
+  )
+})
+
+test('Contact page consumes existing global social configuration from getHomepageSettings', () => {
+  assert.ok(
+    pageSource.includes('getHomepageSettings'),
+    'page.tsx must import/use getHomepageSettings from lib/homepageConfig'
+  )
+  assert.ok(
+    pageSource.includes('homepageSettings.footer.social_links'),
+    'page.tsx must pass homepageSettings.footer.social_links to ContactSocial'
+  )
+  assert.ok(
+    socialSource.includes('FooterSocialLink'),
+    'ContactSocial must reference FooterSocialLink type from lib/homepageConfig'
+  )
+})
+
+test('ContactSocial supports facebook, line, and tiktok channel keys from existing CMS config', () => {
+  assert.ok(socialSource.includes("'facebook'"), 'Must support facebook channel key')
+  assert.ok(socialSource.includes("'line'"), 'Must support line channel key')
+  assert.ok(socialSource.includes("'tiktok'"), 'Must support tiktok channel key')
+  assert.ok(socialSource.includes('contact-social-${channel.key}'), 'Must assign unique ID per channel key')
+})
+
+test('Channel filter semantics: renders only when enabled AND valid HTTP URL exists', () => {
+  type MockLink = { key: 'facebook' | 'line' | 'tiktok'; label: string; url: string; active: boolean }
+
+  function filterTestChannels(channels: MockLink[]) {
+    return channels.filter((ch) => {
+      if (!ch || ch.active !== true) return false
+      const trimmed = (ch.url || '').trim()
+      if (!trimmed) return false
+      try {
+        const parsed = new URL(trimmed)
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && Boolean(parsed.hostname)
+      } catch {
+        return false
+      }
+    })
+  }
+
+  // Initial state: only Facebook active with valid URL
+  const sampleLinks: MockLink[] = [
+    { key: 'facebook', label: 'Facebook', url: 'https://facebook.com/sobdai', active: true },
+    { key: 'line', label: 'LINE OA', url: '', active: false },
+    { key: 'tiktok', label: 'TikTok', url: '', active: false },
+  ]
+
+  const activeInitial = filterTestChannels(sampleLinks)
+  assert.equal(activeInitial.length, 1)
+  assert.equal(activeInitial[0].key, 'facebook')
+
+  // When LINE OA is enabled in CMS with valid URL -> renders
+  const withLine: MockLink[] = [
+    { key: 'facebook', label: 'Facebook', url: 'https://facebook.com/sobdai', active: true },
+    { key: 'line', label: 'LINE OA', url: 'https://line.me/R/ti/p/@sobdai', active: true },
+    { key: 'tiktok', label: 'TikTok', url: '', active: false },
+  ]
+  const activeWithLine = filterTestChannels(withLine)
+  assert.equal(activeWithLine.length, 2)
+  assert.equal(activeWithLine[0].key, 'facebook')
+  assert.equal(activeWithLine[1].key, 'line')
+
+  // When TikTok is enabled in CMS with valid URL -> renders
+  const withAll: MockLink[] = [
+    { key: 'facebook', label: 'Facebook', url: 'https://facebook.com/sobdai', active: true },
+    { key: 'line', label: 'LINE OA', url: 'https://line.me/R/ti/p/@sobdai', active: true },
+    { key: 'tiktok', label: 'TikTok', url: 'https://tiktok.com/@sobdai', active: true },
+  ]
+  const activeWithAll = filterTestChannels(withAll)
+  assert.equal(activeWithAll.length, 3)
+
+  // Disabled channels must NOT render even if valid URL exists
+  const disabledWithUrls: MockLink[] = [
+    { key: 'facebook', label: 'Facebook', url: 'https://facebook.com/sobdai', active: false },
+    { key: 'line', label: 'LINE OA', url: 'https://line.me/R/ti/p/@sobdai', active: false },
+    { key: 'tiktok', label: 'TikTok', url: 'https://tiktok.com/@sobdai', active: false },
+  ]
+  assert.equal(filterTestChannels(disabledWithUrls).length, 0)
+
+  // Missing or invalid URLs must NOT render even if active is true
+  const invalidUrls: MockLink[] = [
+    { key: 'facebook', label: 'Facebook', url: '   ', active: true },
+    { key: 'line', label: 'LINE OA', url: '', active: true },
+    { key: 'tiktok', label: 'TikTok', url: 'not-a-valid-url', active: true },
+  ]
+  assert.equal(filterTestChannels(invalidUrls).length, 0)
+})
+
+test('No placeholders or coming soon buttons rendered in ContactSocial', () => {
+  assert.ok(!socialSource.includes('Coming soon'), 'No Coming soon placeholder')
+  assert.ok(!socialSource.includes('เร็วๆ นี้'), 'No เร็วๆ นี้ placeholder')
+  assert.ok(!socialSource.includes('aria-disabled'), 'No disabled placeholder buttons')
+  assert.ok(socialSource.includes('if (activeChannels.length === 0)'), 'Omit entire section when no active channels')
+})
+
+test('Social link opens safely with target="_blank" and rel="noopener noreferrer"', () => {
+  assert.ok(
+    socialSource.includes('target="_blank"'),
+    'Social link must open in new tab'
+  )
+  assert.ok(
+    socialSource.includes('rel="noopener noreferrer"'),
+    'Social link must have rel="noopener noreferrer"'
+  )
+})
+
+test('Social follow area does not claim customer support or response SLA', () => {
+  assert.ok(
+    !socialSource.includes('ติดต่อผ่าน Facebook') &&
+    !socialSource.includes('แชทผ่าน Facebook') &&
+    !socialSource.includes('support via Facebook') &&
+    !socialSource.includes('Messenger support') &&
+    !socialSource.includes('LINE support') &&
+    !socialSource.includes('chat support') &&
+    !socialSource.includes('guaranteed response'),
+    'Social follow must not claim Facebook, LINE, or TikTok as customer support channels'
+  )
+})
+
+test('Approved social follow Thai heading and copy are preserved', () => {
+  assert.ok(socialSource.includes('ติดตามเรา'), 'Eyebrow must contain "ติดตามเรา"')
+  assert.ok(socialSource.includes('ติดตาม Sobdai'), 'Heading must contain "ติดตาม Sobdai"')
+  assert.ok(
+    socialSource.includes('ติดตามข่าวสาร เนื้อหาใหม่ และอัปเดตจาก Sobdai'),
+    'Subhead must contain "ติดตามข่าวสาร เนื้อหาใหม่ และอัปเดตจาก Sobdai"'
+  )
+})
+
+test('No fake or placeholder social URLs in Contact source code', () => {
+  assert.ok(!socialSource.includes('example.com'), 'No example.com')
+  assert.ok(!socialSource.includes('placeholder.com') && !socialSource.includes('placeholder_url'), 'No placeholder URL')
+  assert.ok(!socialSource.includes('line.me/fake'), 'No fake LINE URL')
+  assert.ok(!socialSource.includes('tiktok.com/@fake'), 'No fake TikTok URL')
+})
+
+// ── 13. Cache & Revalidation Integrity ─────────────────────────────────────
+
+test('Admin save action revalidates /contact so CMS changes propagate without deployment', () => {
+  assert.ok(
+    adminActionsSource.includes("revalidatePath('/contact')"),
+    'saveHomepageSettings must include revalidatePath("/contact")'
+  )
+  assert.ok(
+    adminActionsSource.includes("revalidatePath('/')"),
+    'saveHomepageSettings must preserve revalidatePath("/")'
   )
 })

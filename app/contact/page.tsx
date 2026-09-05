@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { createPageMetadata, SITE_URL } from '@/lib/seo'
+import { getHomepageSettings } from '@/lib/homepageConfig'
 import StructuredData from '@/components/StructuredData'
 import ContactHeroVisual from '@/components/contact/ContactHeroVisual'
 import ContactQuickCards from '@/components/contact/ContactQuickCards'
 import ContactTopicsChecklist from '@/components/contact/ContactTopicsChecklist'
 import ContactSelfService from '@/components/contact/ContactSelfService'
+import ContactSocial from '@/components/contact/ContactSocial'
 import ContactCta from '@/components/contact/ContactCta'
 import styles from './contact.module.css'
 
@@ -60,7 +62,9 @@ const contactPageJsonLd: Record<string, unknown> = {
   },
 }
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const homepageSettings = await getHomepageSettings()
+
   return (
     <div className={styles.root}>
       {/* ContactPage JSON-LD */}
@@ -116,6 +120,11 @@ export default function ContactPage() {
           SECTION 04 — SELF-SERVICE HELP
           ══════════════════════════════════════════════════════════════ */}
       <ContactSelfService />
+
+      {/* ══════════════════════════════════════════════════════════════
+          SECTION 04.5 — SOCIAL FOLLOW (COMPACT STRIP)
+          ══════════════════════════════════════════════════════════════ */}
+      <ContactSocial socialLinks={homepageSettings.footer.social_links} />
 
       {/* ══════════════════════════════════════════════════════════════
           SECTION 05 — FINAL CTA

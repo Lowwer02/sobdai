@@ -56,9 +56,10 @@ export async function saveHomepageSettings(raw: any) {
     return { success: false, error: error.message }
   }
 
-  // Refresh the ISR cache so the homepage reflects the change within its
-  // revalidate window (immediately for the next request).
+  // Refresh the ISR cache so the homepage and contact page reflect the change
+  // within their revalidate window (immediately for the next request).
   revalidatePath('/')
+  revalidatePath('/contact')
   return { success: true }
 }
 

@@ -621,6 +621,109 @@
   color: #d4a63a;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   SECTION 04.5: SOCIAL FOLLOW (COMPACT STRIP)
+   ══════════════════════════════════════════════════════════════ */
+.socialSection {
+  padding-top: 3.25rem;
+  padding-bottom: 3.25rem;
+}
+
+.socialBox {
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.socialList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.socialCard {
+  background: rgba(26, 18, 11, 0.6);
+  border: 1px solid rgba(212, 168, 67, 0.16);
+  border-radius: 1.15rem;
+  padding: 1.35rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.socialCard:hover {
+  border-color: rgba(212, 168, 67, 0.38);
+  background: rgba(26, 18, 11, 0.85);
+  transform: translateY(-1px);
+}
+
+.socialCardLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.socialIconBox {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: rgba(212, 168, 67, 0.1);
+  color: #d4a63a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.socialTitle {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  margin: 0 0 0.2rem 0;
+}
+
+.socialHandle {
+  font-size: 0.85rem;
+  color: #c8bba4;
+  margin: 0;
+  word-break: break-all;
+}
+
+.socialCardRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #d4a63a;
+  flex-shrink: 0;
+}
+
+.socialArrow {
+  transition: transform 0.15s ease;
+}
+
+.socialCard:hover .socialArrow {
+  transform: translate(2px, -2px);
+}
+
+@media (max-width: 600px) {
+  .socialCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.15rem;
+  }
+
+  .socialCardRight {
+    align-self: flex-start;
+  }
+}
+
 .pageEndSpacer {
   height: 2.5rem;
 }
