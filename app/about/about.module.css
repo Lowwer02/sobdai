@@ -23,7 +23,45 @@
   max-width: 64rem;
   margin-left: auto;
   margin-right: auto;
-  padding: 5rem 1.25rem;
+  padding: 4rem 1.25rem;
+}
+
+/* ── Section-specific vertical rhythm tuning ── */
+
+/* Section 02: Person (Hero -> Person approx as-is, Person -> Principles slightly tightened) */
+section[aria-labelledby="about-person-heading"] .sectionInner {
+  padding-top: 4.75rem;
+  padding-bottom: 4.25rem;
+}
+
+/* Section 03: Principles (slightly tightened top, tightened bottom towards Sources) */
+section[aria-labelledby="about-principles-heading"] .sectionInner {
+  padding-top: 4.25rem;
+  padding-bottom: 3.75rem;
+}
+
+/* Section 04: Sources (tightened top and bottom) */
+section[aria-labelledby="about-sources-heading"] .sectionInner {
+  padding-top: 3.75rem;
+  padding-bottom: 3.75rem;
+}
+
+/* Section 05: Trust (tightened top, closer connection to Improvement) */
+section[aria-labelledby="about-trust-heading"] .sectionInner {
+  padding-top: 3.75rem;
+  padding-bottom: 3.25rem;
+}
+
+/* Section 06: Continuous Improvement (most important: tight connection with Trust) */
+section[aria-labelledby="about-improvement-heading"] .sectionInner {
+  padding-top: 3.25rem;
+  padding-bottom: 3.5rem;
+}
+
+/* Section 07: CTA (tightened top, comfortable bottom before footer spacer) */
+section[aria-labelledby="about-cta-heading"] .sectionInner {
+  padding-top: 3.75rem;
+  padding-bottom: 4rem;
 }
 
 /* ── Shared: Narrow section variant ── */
@@ -60,7 +98,7 @@
 /* ── Shared: Centered block ── */
 .sectionHeaderCentered {
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: 2.5rem;
 }
 .centered {
   text-align: center;
@@ -465,7 +503,41 @@
 
 /* ── Bottom spacer ── */
 .pageEndSpacer {
-  height: 4rem;
+  height: 3.5rem;
+}
+
+/* ── Mobile responsive vertical rhythm ── */
+@media (max-width: 640px) {
+  .sectionInner {
+    padding: 3rem 1.25rem;
+  }
+  .sectionHeaderCentered {
+    margin-bottom: 2rem;
+  }
+  section[aria-labelledby="about-person-heading"] .sectionInner {
+    padding-top: 3.5rem;
+    padding-bottom: 3rem;
+  }
+  section[aria-labelledby="about-principles-heading"] .sectionInner {
+    padding-top: 3rem;
+    padding-bottom: 2.75rem;
+  }
+  section[aria-labelledby="about-sources-heading"] .sectionInner {
+    padding-top: 2.75rem;
+    padding-bottom: 2.75rem;
+  }
+  section[aria-labelledby="about-trust-heading"] .sectionInner {
+    padding-top: 2.75rem;
+    padding-bottom: 2.25rem;
+  }
+  section[aria-labelledby="about-improvement-heading"] .sectionInner {
+    padding-top: 2.25rem;
+    padding-bottom: 2.5rem;
+  }
+  section[aria-labelledby="about-cta-heading"] .sectionInner {
+    padding-top: 2.75rem;
+    padding-bottom: 3rem;
+  }
 }
 
 /* ── Mobile: 320px hard floor ── */
