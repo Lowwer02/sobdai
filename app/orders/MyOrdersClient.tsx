@@ -88,7 +88,7 @@ export default function MyOrdersClient({ orders }: OrdersClientProps) {
         {/* Header */}
         <header className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold font-display text-[#F5E9D6] tracking-tight mb-2">
-            คำสั่งซื้อของฉัน
+            ประวัติการสั่งซื้อ
           </h1>
           <p className="text-[#A1866B] text-sm md:text-base">
             ดูประวัติการซื้อแพ็กเกจทั้งหมดของคุณ
@@ -106,7 +106,7 @@ export default function MyOrdersClient({ orders }: OrdersClientProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#1A140E] border border-[rgba(255,255,255,0.08)] text-[#F5E9D6] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-[#D4AF37]/50 transition-colors placeholder:text-[#A1866B]/60"
-              aria-label="ค้นหาคำสั่งซื้อ"
+              aria-label="ค้นหาประวัติการสั่งซื้อ"
             />
           </div>
 
@@ -232,7 +232,7 @@ export default function MyOrdersClient({ orders }: OrdersClientProps) {
               <ShoppingBag size={28} className="text-[#D4AF37]" />
             </div>
             <h3 className="text-lg font-bold text-[#F5E9D6] mb-2 font-display">
-              {searchQuery || activeFilter !== 'all' ? 'ไม่พบคำสั่งซื้อที่ตรงกับเงื่อนไข' : 'ยังไม่มีคำสั่งซื้อ'}
+              {searchQuery || activeFilter !== 'all' ? 'ไม่พบประวัติการสั่งซื้อที่ตรงกับเงื่อนไข' : 'ยังไม่มีประวัติการสั่งซื้อ'}
             </h3>
             <p className="text-sm text-[#A1866B] mb-8 max-w-sm mx-auto">
               {searchQuery || activeFilter !== 'all' ? 'ลองค้นหาด้วยคำอื่น หรือเปลี่ยนตัวกรอง' : 'คุณยังไม่ได้ซื้อแพ็กเกจใดๆ เริ่มต้นเรียนรู้ได้เลยวันนี้'}

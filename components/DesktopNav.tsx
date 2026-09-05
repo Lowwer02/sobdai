@@ -128,9 +128,6 @@ export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onR
                     <Link href="/my-packages" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
                       แพ็กเกจของฉัน
                     </Link>
-                    <Link href="/orders" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
-                      คำสั่งซื้อ
-                    </Link>
                     
                     {isAdmin && (
                       <Link href="/admin" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2 text-sm font-medium text-[#D4AF37] hover:bg-[rgba(212,175,55,0.08)] transition-colors">

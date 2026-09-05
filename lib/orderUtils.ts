@@ -35,3 +35,41 @@ export function isPaymentPending(status: string | undefined | null): boolean {
 export function canAccessPackage(orderStatus: string | undefined | null): boolean {
   return isOrderCompleted(orderStatus);
 }
+
+/**
+ * The package projection embedded in an order query. Supabase returns a
+ * to-one relation as an object, but accepting an array here keeps the access
+ * projection safe if the relation metadata is represented differently by a
+ * client or test double.
+ */
+export interface PackageAccessOrderRow<TPackage extends { id: string; is_published: boolean }> {
+  status?: string | null;
+  packages?: TPackage | TPackage[] | null;
+}
+
+/**
+ * Resolve the packages a learner can currently use from their order rows.
+ *
+ * `orders` remains the authority for entitlement. The first qualifying row is
+ * retained (the page query orders newest first), duplicate package orders are
+ * collapsed, and unpublished packages are never exposed as usable content.
+ */
+export function selectAccessiblePackages<TPackage extends { id: string; is_published: boolean }>(
+  orders: readonly PackageAccessOrderRow<TPackage>[],
+): TPackage[] {
+  const seenPackageIds = new Set<string>();
+  const accessiblePackages: TPackage[] = [];
+
+  for (const order of orders) {
+    if (!canAccessPackage(order.status)) continue;
+
+    const packageValue = order.packages;
+    const pkg = Array.isArray(packageValue) ? packageValue[0] : packageValue;
+    if (!pkg || !pkg.id || !pkg.is_published || seenPackageIds.has(pkg.id)) continue;
+
+    seenPackageIds.add(pkg.id);
+    accessiblePackages.push(pkg);
+  }
+
+  return accessiblePackages;
+}

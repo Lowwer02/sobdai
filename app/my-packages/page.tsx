@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { getPackagePublicCounts } from '@/lib/publicData'
-import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
+import { ORDER_COMPLETED_STATUSES, selectAccessiblePackages } from '@/lib/orderUtils'
 import type { Metadata } from 'next'
 import { BookOpen, Award, CheckCircle, ChevronLeft } from 'lucide-react'
 import { createPageMetadata } from '@/lib/seo'
@@ -44,9 +44,10 @@ export default async function LearningDashboardPage() {
   }
 
   // --- Logged in: resolve purchased packages --------------------------------
-  const { data: orders } = await supabase
+  const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select(`
+      status,
       package_id,
       packages (
         id,
@@ -60,27 +61,52 @@ export default async function LearningDashboardPage() {
         logo_url,
         is_published,
         organizations ( name, logo_url ),
-        positions ( name ),
-        summaries ( id, is_published )
+        positions ( name )
       )
     `)
     .eq('user_id', user.id)
     .in('status', ORDER_COMPLETED_STATUSES)
     .order('created_at', { ascending: false })
 
-  // De-duplicate by package id
-  const seen = new Set<string>()
-  const ownedPackages: any[] = []
-  for (const o of orders ?? []) {
-    const pkg = o.packages as any
-    if (!pkg || seen.has(pkg.id) || !pkg.is_published) continue
-    seen.add(pkg.id)
-    ownedPackages.push(pkg)
+  if (ordersError) {
+    // Keep the learner-facing empty state safe, but make the failed authority
+    // read observable instead of silently presenting it as a real empty state.
+    console.error('[MY_PACKAGES] Failed to resolve package access:', ordersError.message)
   }
+
+  // The order query is the access authority. The helper repeats the status
+  // guard, deduplicates package orders, and drops unpublished packages so a
+  // future query change cannot accidentally broaden learner access.
+  // The generated Supabase relation types represent to-one joins as arrays,
+  // while the runtime response is the single related object used by this
+  // page (the same convention used by the existing package UI).
+  const ownedPackages = selectAccessiblePackages<any>((orders ?? []) as any[])
 
   // --- Logged in, owns nothing ---------------------------------------------
   if (ownedPackages.length === 0) {
     return <NoPackagesEmptyState />
+  }
+
+  // Summary counts are presentation-only. Keep them out of the entitlement
+  // query so a legacy/KP summary relationship issue cannot hide valid package
+  // access. If this optional read is unavailable, cards still render with 0.
+  const summaryCounts: Record<string, number> = {}
+  try {
+    const { data: summaryRows, error: summaryError } = await supabase
+      .from('summaries')
+      .select('package_id')
+      .in('package_id', ownedPackages.map((pkg) => pkg.id))
+      .eq('is_published', true)
+
+    if (summaryError) {
+      console.error('[MY_PACKAGES] Optional summary counts unavailable:', summaryError.message)
+    } else {
+      for (const row of summaryRows ?? []) {
+        summaryCounts[row.package_id] = (summaryCounts[row.package_id] || 0) + 1
+      }
+    }
+  } catch (error) {
+    console.error('[MY_PACKAGES] Optional summary counts unavailable:', error)
   }
 
   // --- Logged in, owns packages --------------------------------------------
@@ -88,7 +114,6 @@ export default async function LearningDashboardPage() {
   try {
     const counts = await getPackagePublicCounts(ownedPackages.map((p) => p.id))
     enriched = ownedPackages.map((pkg) => {
-      const total_summaries = pkg.summaries?.filter((s: any) => s.is_published).length || 0
       return {
         id: pkg.id,
         slug: pkg.slug,
@@ -101,12 +126,11 @@ export default async function LearningDashboardPage() {
         positions: pkg.positions,
         total_questions: counts[pkg.id]?.total_questions || 0,
         total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
-        total_summaries,
+        total_summaries: summaryCounts[pkg.id] || 0,
       }
     })
   } catch {
     enriched = ownedPackages.map((pkg) => {
-      const total_summaries = pkg.summaries?.filter((s: any) => s.is_published).length || 0
       return {
         id: pkg.id,
         slug: pkg.slug,
@@ -119,7 +143,7 @@ export default async function LearningDashboardPage() {
         positions: pkg.positions,
         total_questions: 0,
         total_exam_sets: 0,
-        total_summaries,
+        total_summaries: summaryCounts[pkg.id] || 0,
       }
     })
   }
@@ -152,6 +176,12 @@ export default async function LearningDashboardPage() {
           <p className="text-[#A1866B] text-sm md:text-base max-w-lg mx-auto">
             แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้
           </p>
+          <Link
+            href="/orders"
+            className="inline-flex items-center justify-center mt-4 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] text-xs font-medium text-[#A1866B] hover:text-[#D4AF37] hover:border-[rgba(212,175,55,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+          >
+            ดูประวัติการสั่งซื้อ
+          </Link>
         </header>
 
         {/* Learning Cards Grid */}

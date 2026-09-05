@@ -5,7 +5,7 @@ import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = createPageMetadata({
-  title: 'คำสั่งซื้อของฉัน | Sobdai',
+  title: 'ประวัติการสั่งซื้อ | Sobdai',
   description: 'ดูประวัติการซื้อแพ็กเกจทั้งหมดของคุณ',
   path: '/orders',
   noindex: true,
