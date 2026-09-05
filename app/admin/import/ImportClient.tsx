@@ -201,6 +201,10 @@ export default function ImportClient() {
                         ))}
                       </ul>
                     )}
+                    {/* Document Code Intake V1 — let the admin verify the code before saving. */}
+                    {r.data?.document_code && (
+                      <p className="text-xs font-mono text-[#D4AF37] mt-1">Document Code: {r.data.document_code}</p>
+                    )}
                   </div>
                 </div>
               ))}

@@ -4,7 +4,8 @@ import { requirePermission } from '@/lib/auth/server-protect'
 
 import { revalidatePath } from 'next/cache'
 import type { ParsedQuestion } from '@/lib/markdownParser'
-import { normalizeSection, normalizeEnumAxis } from '@/lib/ig2'
+import { isValidDocumentCode } from '@/lib/markdownParser'
+import { buildQuestionInsertRow } from '@/lib/question-import-row'
 
 export async function importQuestionsAction(questions: ParsedQuestion[]) {
   try {
@@ -47,55 +48,25 @@ export async function importQuestionsAction(questions: ParsedQuestion[]) {
 
     // Prepare payload (status defaults to Draft based on DB schema).
     //
-    // IG-2 Closure (Session 6.20, migration 027): the four Blueprint v3.0
-    // filter axes now have columns and are persisted. Parser field → Bank
-    // column mapping:
-    //   q.blueprint         → blueprint_type     (CT v2.1 field; was discarded)
-    //   q.learning_objective→ learning_objective (CT v2.1 field; was discarded)
-    //   q.question_pattern  → question_pattern   (CT v2.2 NEW field)
-    //   q.section           → section            (CT v2.2 NEW field, normalized)
-    // Empty strings → NULL (Incomplete Metadata path, Scoring §11).
+    // The ParsedQuestion → insert-row mapping lives in
+    // lib/question-import-row.ts (pure, unit-tested). Document Code Intake V1
+    // adds q.document_code → questions.document_code, preserved exactly.
     //
-    // Other v2.1 fields the parser extracts (document_type, knowledge_coverage,
-    // question_type, choice_count) STILL have no DB column and remain excluded.
-    // IG-2 authorizes only the four Blueprint v3.0 axes; widening beyond them
-    // is out of scope for E-0.
-    const payload = questions.map((q, i) => {
-      const sectionNorm = normalizeSection(q.section)
+    // Defense in depth: the parser already rejects malformed DocumentCodes
+    // with a field-level diagnostic, but this action is the storage gate —
+    // re-check here so a malformed code can never reach the Bank even if the
+    // action is invoked directly.
+    const malformed = questions.find(
+      (q) => q.document_code !== '' && !isValidDocumentCode(q.document_code)
+    )
+    if (malformed) {
       return {
-        question_code: codes[i], // immutable business identifier (allocation-only RPC)
-        content: q.content,
-        choice_a: q.choice_a,
-        choice_b: q.choice_b,
-        choice_c: q.choice_c,
-        choice_d: q.choice_d,
-        correct_answer: q.correct_answer,
-        hint: q.hint || null,
-        full_explanation: q.full_explanation || null,
-        why_a_wrong: q.why_a_wrong || null,
-        why_b_wrong: q.why_b_wrong || null,
-        why_c_wrong: q.why_c_wrong || null,
-        why_d_wrong: q.why_d_wrong || null,
-        reference: q.reference || null,
-        difficulty: q.difficulty,
-        category: q.category || null,
-        subject: q.subject || null,
-        document: q.document || null,
-        law: q.law || null,
-        topic: q.topic || null,
-        tags: q.tags,
-        // IG-2 axes — empty/whitespace → NULL. Enum axes trimmed; section
-        // normalized to canonical (NFC + en-dash ranges). The DB CHECK
-        // constraints (migration 027) are the final enum authority; an
-        // invalid enum value here surfaces as a PostgREST insert error,
-        // which the existing error path reports to the caller.
-        blueprint_type: normalizeEnumAxis(q.blueprint) || null,
-        learning_objective: normalizeEnumAxis(q.learning_objective) || null,
-        question_pattern: normalizeEnumAxis(q.question_pattern) || null,
-        section: sectionNorm || null,
-        status: 'Draft' // Initially import as Draft
+        success: false,
+        error: `Invalid **DocumentCode:** format: "${malformed.document_code}" — use uppercase A–Z, digits 0–9, and hyphens only (e.g. DOC-ACT-STATE-ADMIN-2534)`
       }
-    })
+    }
+
+    const payload = questions.map((q, i) => buildQuestionInsertRow(q, codes[i]))
 
     // Batch insert into Supabase
     const { data, error } = await supabase

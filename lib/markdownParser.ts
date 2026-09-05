@@ -17,6 +17,12 @@ export interface ParsedQuestion {
   subject: string;
   document: string;
   document_type: string;
+  // Document Code Intake V1 (Content Template v2.1 Part 3). Empty string when
+  // the authored content doesn't carry the label (legacy content); the
+  // importer converts empty → NULL on insert. The value is preserved exactly
+  // (outer whitespace trimmed only) — never uppercased, rewritten, or derived
+  // from the Document name.
+  document_code: string;
   topic: string;
   learning_objective: string;
   knowledge_coverage: string;
@@ -48,6 +54,19 @@ function extractField(chunk: string, regexPattern: RegExp): string {
   const match = chunk.match(regexPattern);
   if (!match) return '';
   return match[1].trim();
+}
+
+/**
+ * Conservative machine-code format for **DocumentCode:** (Document Code
+ * Intake V1): uppercase ASCII letters, digits, and hyphens — e.g.
+ * DOC-ACT-STATE-ADMIN-2534, DOC-OAG-ORGANIC-ACT-2561. No leading/trailing
+ * hyphen, no empty segments, no other characters. The code is an opaque
+ * identity: the parser never derives, rewrites, or normalizes it.
+ */
+export const DOCUMENT_CODE_PATTERN = /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/
+
+export function isValidDocumentCode(value: string): boolean {
+  return DOCUMENT_CODE_PATTERN.test(value)
 }
 
 /**
@@ -84,6 +103,7 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     '\\*\\*ChoiceCount:\\*\\*',
     '\\*\\*Category:\\*\\*',
     '\\*\\*Subject:\\*\\*',
+    '\\*\\*DocumentCode:\\*\\*',
     '\\*\\*Document:\\*\\*',
     '\\*\\*DocumentType:\\*\\*',
     '\\*\\*Law:\\*\\*',
@@ -127,6 +147,10 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
     const subject = extractMultiline('\\*\\*Subject:\\*\\*');
     const document = extractMultiline('\\*\\*Document:\\*\\*');
     const document_type = extractMultiline('\\*\\*DocumentType:\\*\\*');
+    // Document Code Intake V1: the shared KNOWN_LABELS boundary list includes
+    // **DocumentCode:** so Document and DocumentCode never swallow each other
+    // regardless of the order they appear in.
+    const document_code = extractMultiline('\\*\\*DocumentCode:\\*\\*');
     const law = extractMultiline('\\*\\*Law:\\*\\*');
     const topic = extractMultiline('\\*\\*Topic:\\*\\*');
     const learning_objective = extractMultiline('\\*\\*LearningObjective:\\*\\*');
@@ -161,6 +185,16 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
 
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
+    // Document Code Intake V1: when a DocumentCode is supplied it must match
+    // the conservative machine-code format. A missing label stays allowed
+    // (legacy files); a malformed value fails THIS question with a clear
+    // field-level diagnostic. The value itself is never rewritten.
+    if (document_code && !isValidDocumentCode(document_code)) {
+      errors.push(
+        `Invalid **DocumentCode:** format: "${document_code}" — use uppercase A–Z, digits 0–9, and hyphens only (e.g. DOC-ACT-STATE-ADMIN-2534)`
+      );
+    }
+
     const isValid = errors.length === 0;
 
     const data: ParsedQuestion | null = isValid ? {
@@ -182,6 +216,7 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
       subject,
       document,
       document_type,
+      document_code,
       law,
       topic,
       learning_objective,
@@ -202,6 +237,28 @@ export function parseMarkdownQuestions(markdown: string): ParseResult[] {
       index: index + 1
     });
   });
+
+  // Document Code Intake V1 — partial-file safety. A file where SOME questions
+  // carry **DocumentCode:** and others omit it fails as a whole, so an
+  // accidentally partially-coded import can't slip through. Legacy files with
+  // NO codes at all pass unchanged, and questions in one file may legitimately
+  // carry DIFFERENT codes (multi-document files are fine). Coded-ness is read
+  // from the parsed value when the chunk parsed, otherwise from the raw chunk
+  // text (invalid chunks have data: null).
+  const coded = results.map((r) =>
+    r.data ? r.data.document_code !== '' : /\*\*DocumentCode:\*\*/i.test(r.rawText)
+  );
+  if (coded.some(Boolean) && coded.some((c) => !c)) {
+    results.forEach((r, i) => {
+      r.isValid = false;
+      r.data = null;
+      r.errors.push(
+        coded[i]
+          ? 'Partially-coded file: other questions in this file are missing **DocumentCode:**. Add the missing codes or split the file.'
+          : 'Partially-coded file: this question is missing **DocumentCode:** while other questions in the same file have one. Add it or split the file.'
+      );
+    });
+  }
 
   return results;
 }
