@@ -1,0 +1,487 @@
+/* ===================== About Page (V2) CSS Module =====================
+   Palette: #0F0A06 bg / #1A120B card / #D4A63A gold / #F7F3EC text / #C8BBA4 secondary
+   ======================================================================== */
+
+/* ── Page Root ── */
+.root {
+  min-height: 100vh;
+  background-color: #0f0a06;
+  color: #f7f3ec;
+}
+
+/* ── Shared: Gold Hairline Separator ── */
+.hairline {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(212, 168, 67, 0.18), transparent);
+  margin: 0 auto;
+  max-width: 64rem;
+  width: 100%;
+}
+
+/* ── Shared: Section Inner Container ── */
+.sectionInner {
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 5rem 1.25rem;
+}
+
+/* ── Shared: Narrow section variant ── */
+.sectionNarrow {
+  max-width: 52rem;
+}
+
+/* ── Shared: Eyebrow ── */
+.eyebrow {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d4a63a;
+  background: rgba(212, 168, 67, 0.08);
+  border: 1px solid rgba(212, 168, 67, 0.2);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Shared: Section Heading (H2) ── */
+.sectionHeading {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.35;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Shared: Centered block ── */
+.sectionHeaderCentered {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+.centered {
+  text-align: center;
+  display: block;
+}
+
+/* ── Section 01: Hero ── */
+.heroSection {
+  padding: 5rem 1.25rem 4rem;
+}
+.heroInner {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.heroH1 {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.3;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+.heroBr {
+  display: block;
+}
+.heroCopy {
+  font-size: 1rem;
+  color: #c8bba4;
+  line-height: 1.9;
+  max-width: 42rem;
+}
+
+/* ── Section 02: Person ── */
+.personGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .personGrid {
+    grid-template-columns: 5fr 7fr;
+    gap: 3.5rem;
+    align-items: center;
+  }
+}
+
+/* Portrait card column */
+.personCardCol {
+  display: flex;
+  justify-content: center;
+}
+.personCard {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 4 / 5;
+  background: #1a120b;
+  border: 1px solid rgba(212, 168, 67, 0.22);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  transition: border-color 250ms ease, box-shadow 250ms ease;
+}
+.personCard:hover {
+  border-color: rgba(212, 168, 67, 0.42);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45);
+}
+@media (min-width: 768px) {
+  .personCard {
+    max-width: 320px;
+  }
+}
+
+/* Real portrait image */
+.personImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+
+/* Bottom gradient overlay for nameplate readability */
+.personOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 55%,
+    rgba(15, 10, 6, 0.6) 72%,
+    rgba(15, 10, 6, 0.94) 95%,
+    rgba(15, 10, 6, 0.98) 100%
+  );
+  pointer-events: none;
+}
+
+/* Name + title badge inside the card */
+.personNameplate {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1.25rem 1.25rem 1.35rem;
+  text-align: center;
+  z-index: 2;
+}
+.personName {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  margin: 0 0 0.3rem;
+  line-height: 1.35;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+.personTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #d4a63a;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Story column */
+.personStoryCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.personNarrative {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+.personNarrative p {
+  font-size: 0.975rem;
+  color: #c8bba4;
+  line-height: 1.85;
+  margin: 0;
+}
+
+/* Inline independence note */
+.independenceInline {
+  background: rgba(212, 168, 67, 0.05);
+  border: 1px solid rgba(212, 168, 67, 0.15);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1.1rem;
+}
+.independenceInline p {
+  font-size: 0.8rem;
+  color: #8e7b68;
+  line-height: 1.75;
+  margin: 0;
+}
+
+/* ── Section 03: Principles Grid ── */
+.principlesGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+@media (min-width: 640px) {
+  .principlesGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.principleCard {
+  background: #1a120b;
+  border: 1px solid rgba(212, 168, 67, 0.12);
+  border-radius: 1rem;
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 200ms ease;
+}
+.principleCard:hover {
+  border-color: rgba(212, 168, 67, 0.28);
+}
+.principleNumber {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #d4a63a;
+  letter-spacing: 0.12em;
+}
+.principleTitle {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  line-height: 1.4;
+  margin: 0;
+}
+.principleBody {
+  font-size: 0.875rem;
+  color: #c8bba4;
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* ── Section 04: Source Principles ── */
+.sourcesGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .sourcesGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.sourceItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.015);
+}
+.sourceAccent {
+  width: 3px;
+  min-height: 2.5rem;
+  height: 100%;
+  background: linear-gradient(to bottom, #d4a63a, rgba(212, 168, 67, 0.2));
+  border-radius: 2px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+.sourceTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #f7f3ec;
+  margin: 0 0 0.4rem;
+  line-height: 1.4;
+}
+.sourceBody {
+  font-size: 0.825rem;
+  color: #c8bba4;
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* ── Section 05: Trust Card ── */
+.trustCard {
+  position: relative;
+  background: #14100a;
+  border: 1px solid rgba(212, 168, 67, 0.18);
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+.trustGlow {
+  position: absolute;
+  top: -4rem;
+  right: -4rem;
+  width: 20rem;
+  height: 20rem;
+  background: radial-gradient(ellipse at center, rgba(212, 168, 67, 0.06), transparent 70%);
+  pointer-events: none;
+}
+.trustContent {
+  position: relative;
+  padding: 2.5rem 2rem;
+}
+@media (min-width: 640px) {
+  .trustContent {
+    padding: 3rem 3.5rem;
+  }
+}
+.trustHeading {
+  font-size: clamp(1.3rem, 3vw, 1.75rem);
+  margin-bottom: 1.25rem;
+}
+.trustBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-bottom: 1.75rem;
+}
+.trustBody p {
+  font-size: 0.9rem;
+  color: #c8bba4;
+  line-height: 1.85;
+  margin: 0;
+}
+.trustLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.trustLink {
+  font-size: 0.8rem;
+  color: #8e7b68;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(142, 123, 104, 0.35);
+  transition: color 150ms ease, text-decoration-color 150ms ease;
+}
+.trustLink:hover {
+  color: #d4a63a;
+  text-decoration-color: rgba(212, 168, 67, 0.5);
+}
+.trustSeparator {
+  color: rgba(142, 123, 104, 0.4);
+  font-size: 0.8rem;
+}
+
+/* ── Section 06: Improvement ── */
+.improvementBody {
+  font-size: 0.975rem;
+  color: #c8bba4;
+  line-height: 1.9;
+  max-width: 40rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* ── Section 07: CTA ── */
+.ctaSection {
+  text-align: center;
+}
+.ctaHeading {
+  font-family: var(--font-supermarket), sans-serif;
+  font-size: clamp(1.35rem, 3.5vw, 1.85rem);
+  font-weight: 700;
+  color: #f7f3ec;
+  margin: 0 0 2rem;
+}
+.ctaButtons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 480px) {
+  .ctaButtons {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 2rem;
+  background: #d4a63a;
+  color: #0f0a06;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 0.6rem;
+  text-decoration: none;
+  transition: background 180ms ease, box-shadow 180ms ease;
+  min-width: 14rem;
+}
+.ctaPrimary:hover {
+  background: #e8c46e;
+  box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.22);
+}
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.72rem 2rem;
+  background: transparent;
+  color: #d4a63a;
+  border: 1.5px solid rgba(212, 168, 67, 0.4);
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 0.6rem;
+  text-decoration: none;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+  min-width: 14rem;
+}
+.ctaSecondary:hover {
+  border-color: rgba(212, 168, 67, 0.8);
+  background: rgba(212, 168, 67, 0.06);
+  color: #f1d17a;
+}
+.ctaMicro {
+  font-size: 0.8rem;
+  color: #8e7b68;
+  margin: 0;
+}
+.ctaFaqLink {
+  color: #d4a63a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(212, 168, 67, 0.35);
+  transition: color 150ms ease;
+}
+.ctaFaqLink:hover {
+  color: #f1d17a;
+}
+
+/* ── Bottom spacer ── */
+.pageEndSpacer {
+  height: 4rem;
+}
+
+/* ── Mobile: 320px hard floor ── */
+@media (max-width: 375px) {
+  .heroH1 {
+    font-size: 1.5rem;
+  }
+  .sectionHeading {
+    font-size: 1.2rem;
+  }
+  .personCard {
+    max-width: 240px;
+  }
+  .ctaPrimary,
+  .ctaSecondary {
+    min-width: unset;
+    width: 100%;
+  }
+}
