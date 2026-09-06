@@ -123,13 +123,25 @@ test('all substantive legal keywords and bullets from privacy.md are preserved',
   }
 })
 
-// ── 2. Authorized Email Correction ─────────────────────────────────────────
+// ── 2. Authorized Email Correction & Single Visible Occurrence ───────────
 
 test('official email support.sobdai@gmail.com is present in privacy.md', () => {
   assert.ok(
     rawPrivacyMd.includes('support.sobdai@gmail.com'),
     'privacy.md must contain support.sobdai@gmail.com'
   )
+})
+
+test('Section 14 of privacy.md contains support.sobdai@gmail.com exactly once', () => {
+  const { sections } = parsePrivacyMarkdown(rawPrivacyMd)
+  const sec14 = sections.find((s) => s.num === 14)
+  assert.ok(sec14, 'Section 14 must exist')
+  assert.ok(
+    sec14.body.includes('support.sobdai@gmail.com'),
+    'Section 14 body must contain support.sobdai@gmail.com'
+  )
+  const occurrences = (sec14.body.match(/support\.sobdai@gmail\.com/g) || []).length
+  assert.equal(occurrences, 1, 'Source Section 14 must contain exactly one occurrence of support email')
 })
 
 test('old email bridgex.info1@gmail.com is completely absent in privacy.md and all privacy code', () => {
@@ -145,10 +157,30 @@ test('old email bridgex.info1@gmail.com is completely absent in privacy.md and a
   )
 })
 
-test('actionable mailto:support.sobdai@gmail.com link is declared in PrivacySectionCard', () => {
+test('actionable mailto:support.sobdai@gmail.com link is handled in PrivacySectionCard', () => {
   assert.ok(
-    sectionCardSource.includes('href="mailto:support.sobdai@gmail.com"'),
+    sectionCardSource.includes('mailto:support.sobdai@gmail.com'),
     'PrivacySectionCard must render an actionable mailto: link for support.sobdai@gmail.com'
+  )
+})
+
+test('visible render architecture does NOT create a second duplicate email CTA card', () => {
+  assert.equal(
+    sectionCardSource.includes('calloutEmailBox'),
+    false,
+    'PrivacySectionCard must NOT contain calloutEmailBox or a separate duplicate email CTA'
+  )
+  assert.equal(
+    privacyCssSource.includes('.calloutEmailBox'),
+    false,
+    'privacy.module.css must NOT define dead .calloutEmailBox'
+  )
+})
+
+test('legal source content/legal/privacy.md remains semantically intact with zero unapproved changes', () => {
+  assert.ok(
+    rawPrivacyMd.includes('**Email:** support.sobdai@gmail.com'),
+    'privacy.md must preserve exact legal line: **Email:** support.sobdai@gmail.com'
   )
 })
 

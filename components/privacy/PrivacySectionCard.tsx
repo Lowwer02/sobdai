@@ -67,6 +67,39 @@ function getSectionParts(secNum: number, body: string): SectionPart[] {
   return [{ type: 'normal', content: body }]
 }
 
+const markdownComponents = {
+  a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+    const isEmail = href === 'mailto:support.sobdai@gmail.com' || href?.startsWith('mailto:')
+    if (isEmail) {
+      return (
+        <a href={href || 'mailto:support.sobdai@gmail.com'} className={styles.calloutEmailLink} {...props}>
+          <svg
+            className={styles.emailInlineIcon}
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+          {children}
+        </a>
+      )
+    }
+    return (
+      <a href={href} {...props}>
+        {children}
+      </a>
+    )
+  },
+}
+
 /**
  * Preamble Card for the introductory section of the Privacy Policy.
  */
@@ -94,7 +127,9 @@ export function PrivacyPreambleCard({ preamble }: { preamble: PrivacyPreamble })
       </div>
 
       <div className={styles.cardBody}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{preamble.body}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {preamble.body}
+        </ReactMarkdown>
       </div>
     </div>
   )
@@ -122,7 +157,6 @@ export default function PrivacySectionCard({ section }: PrivacySectionCardProps)
       <div className={styles.cardBody}>
         {parts.map((part, idx) => {
           if (part.type === 'callout') {
-            const isContactSection = section.num === 14
             return (
               <div key={idx} className={styles.legalCallout} role="note" aria-label={part.label}>
                 <div className={styles.calloutHeader}>
@@ -142,33 +176,18 @@ export default function PrivacySectionCard({ section }: PrivacySectionCardProps)
                   </svg>
                   <span>{part.label}</span>
                 </div>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.content}</ReactMarkdown>
-                {isContactSection && (
-                  <div className={styles.calloutEmailBox}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#D4A63A"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                    <a href="mailto:support.sobdai@gmail.com" className={styles.calloutEmailLink}>
-                      support.sobdai@gmail.com
-                    </a>
-                  </div>
-                )}
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                  {part.content}
+                </ReactMarkdown>
               </div>
             )
           }
 
-          return <ReactMarkdown key={idx} remarkPlugins={[remarkGfm]}>{part.content}</ReactMarkdown>
+          return (
+            <ReactMarkdown key={idx} remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {part.content}
+            </ReactMarkdown>
+          )
         })}
       </div>
     </section>
