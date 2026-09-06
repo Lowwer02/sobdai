@@ -390,9 +390,27 @@ export async function setExamSetStatusAction(
       }
     }
 
+    // Content freshness availability stamp: released_at marks the moment the
+    // set becomes available to users. Stamp ONLY when transitioning into
+    // 'published' from a non-published state (publish or republish after
+    // unpublish/archive). Edits while published and draft/archive moves must
+    // never refresh it — freshness means newly made available, not edited.
+    let releasedAt: string | undefined
+    if (status === 'published') {
+      const { data: current, error: currentError } = await supabase
+        .from('exam_sets')
+        .select('status')
+        .eq('id', id)
+        .maybeSingle()
+      if (currentError) throw currentError
+      if (current && current.status !== 'published') {
+        releasedAt = new Date().toISOString()
+      }
+    }
+
     const { error: updateError, data: updateData } = await supabase
       .from('exam_sets')
-      .update({ status })
+      .update(releasedAt ? { status, released_at: releasedAt } : { status })
       .eq('id', id)
       .select('id')
 
@@ -517,9 +535,17 @@ export async function bulkSetExamSetStatusAction(
     // If the list ends up empty, skip the write entirely.
     if (validatedIds.length > 0) {
       const sourceStatuses = concurrentUpdateSourceStatuses(target)
+      // Content freshness availability stamp: bulk publish only accepts
+      // draft → published, so every validated row is genuinely transitioning
+      // into availability and gets a fresh released_at. Archive moves are not
+      // availability moments and must not touch the stamp.
+      const updatePayload =
+        target === 'published'
+          ? { status: target, released_at: new Date().toISOString() }
+          : { status: target }
       const { data: updated, error: updateError } = (await supabase
         .from('exam_sets')
-        .update({ status: target })
+        .update(updatePayload)
         .in('id', validatedIds)
         .in('status', sourceStatuses)
         .select('id')) as {

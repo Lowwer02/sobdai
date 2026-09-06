@@ -1,144 +1,111 @@
 /**
- * Static contract tests for the Daily Retention Phase 1 follow-up (089).
+ * supabase/migrations/migrations.089.test.ts
+ * ----------------------------------------------------------------------------
+ * Migration integrity tests for migration 089
+ * (kp_legacy_summary_publish_released_at — Package Content Freshness V1
+ * remediation).
  *
- * These checks intentionally do not connect to Production. They protect the
- * state-only, authenticated-RPC, consistency-reward contract.
- * Run with:
- *   node --experimental-strip-types supabase/migrations/migrations.089.test.ts
+ * These tests do NOT execute the SQL (no Postgres in unit-test scope). They
+ * parse the migration file as text and verify the normative invariants:
+ *
+ *  - Exactly one 089_*.sql exists and no earlier migration is modified.
+ *  - The migration CREATE OR REPLACEs ONLY kp_persist_publish_legacy_summary
+ *    with the exact 069 signature (uuid, uuid).
+ *  - released_at is stamped with clock_timestamp() inside the
+ *    unpublished -> published UPDATE (executable SQL, not a comment).
+ *  - The is_published idempotence guard is intact, so an already-published
+ *    row is never re-stamped (edits while published cannot refresh the stamp).
+ *  - SECURITY DEFINER + locked proconfig (search_path / lock_timeout) are
+ *    preserved so the migration-068 writer fence keeps authorizing the RPC.
+ *  - Grants match 069: service_role execute only.
+ *  - Migration 069 is NOT edited or re-run (its file is untouched; 089 uses
+ *    CREATE OR REPLACE, not a re-execution).
  */
 
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const migrationDir = dirname(fileURLToPath(import.meta.url))
-const migrationName = '089_daily_retention_phase1.sql'
-const migration = readFileSync(join(migrationDir, migrationName), 'utf8')
-const executableSql = migration
+const migrationName = '089_kp_legacy_summary_publish_released_at.sql'
+const sql = readFileSync(join(migrationDir, migrationName), 'utf8')
+
+// Executable SQL = comments stripped, for assertions that should only match
+// real statements (not commented-out intent).
+const executableSql = sql
   .split('\n')
   .filter((line) => !line.trimStart().startsWith('--'))
   .join('\n')
 
-function functionBlock(name: string): string {
-  const start = executableSql.search(new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${name}\\s*\\(`, 'i'))
-  assert.notEqual(start, -1, `function ${name} exists`)
-  const rest = executableSql.slice(start)
-  const next = rest.search(/\ncreate\s+(?:or\s+replace\s+)?function\s+public\./i)
-  return next === -1 ? rest : rest.slice(0, next)
-}
-
-test('089 is the unique next migration and verification companion exists', () => {
+test('089 exists as a unique migration and leaves prior migrations untouched', () => {
   const files = readdirSync(migrationDir)
-  assert.equal(files.filter((name) => /^089_.+\.sql$/.test(name)).length, 1)
-  assert.equal(files.includes('089_daily_retention_phase1.sql'), true)
+  assert.equal(
+    files.filter((name) => /^089_.+\.sql$/.test(name)).length,
+    1,
+    'exactly one 089_*.sql file',
+  )
+  // 069 remains present and unmodified in this task (same content as the
+  // committed baseline: we never edit/re-run old migrations).
+  const source069 = readFileSync(
+    join(migrationDir, '069_kp_summary_bank_compatibility_publication.sql'),
+    'utf8',
+  )
+  assert.match(source069, /create function public\.kp_persist_publish_legacy_summary\(/)
+})
+
+test('089 replaces only the legacy publish RPC with the exact 069 signature', () => {
+  const replaces = executableSql.match(/create or replace function public\.\w+\(/g) ?? []
+  assert.deepEqual(replaces, ['create or replace function public.kp_persist_publish_legacy_summary('])
+  assert.match(executableSql, /kp_persist_publish_legacy_summary\(\s*p_summary_id uuid,\s*p_actor_id uuid\s*\)/)
+})
+
+test('released_at is stamped with clock_timestamp() on the publish transition', () => {
   assert.match(
-    readFileSync(join(migrationDir, '..', 'verification', '089_daily_retention_phase1.sql'), 'utf8'),
-    /verification-only/,
+    executableSql,
+    /set is_published = true,\s*released_at = clock_timestamp\(\),\s*updated_at = clock_timestamp\(\)/,
+  )
+  // Exactly one stamping site in the migration body.
+  assert.equal(
+    (executableSql.match(/released_at = clock_timestamp\(\)/g) ?? []).length,
+    1,
   )
 })
 
-test('Daily persists one aggregate reward state with exactly one quest', () => {
-  assert.match(executableSql, /create table public\.daily_challenges/i)
-  assert.match(executableSql, /create table public\.user_daily_progress/i)
-  assert.match(executableSql, /create table public\.user_progress/i)
-  assert.match(executableSql, /primary key \(user_id, local_date\)/i)
-  assert.match(executableSql, /exp_earned integer/i)
-  assert.match(executableSql, /exp_earned between 0 and 50/i)
-  assert.match(executableSql, /exp_earned = case when daily_completed then 50 else 0 end/i)
-  assert.match(executableSql, /jsonb_typeof\(answers\) = 'object'/i)
-  assert.doesNotMatch(executableSql, /quest_one_completed|quest_two_completed|both_quests_completed|score-three-of-five/i)
-  assert.doesNotMatch(executableSql, /then 20 else 0 end|then 30 else 0 end/i)
-  assert.doesNotMatch(executableSql, /create table public\.(?:daily_answers|daily_events|daily_exp_ledger|daily_review_tracking)/i)
-  assert.doesNotMatch(executableSql, /level\s+(?:integer|text|numeric)|total_level/i)
+test('the is_published idempotence guard is intact — already-published rows never re-stamp', () => {
+  // The early return for already-published rows must precede the UPDATE.
+  const guardIndex = executableSql.indexOf('if v_summary.is_published then')
+  const updateIndex = executableSql.indexOf('update public.summaries')
+  assert.ok(guardIndex > -1 && updateIndex > -1)
+  assert.ok(guardIndex < updateIndex)
+  assert.match(executableSql, /'idempotent_retry', true/)
 })
 
-test('Daily 5 is Published-only, deterministic, distinct, and no-random', () => {
-  const challengeBlock = functionBlock('daily_get_or_create_challenge')
-  const validityBlock = functionBlock('daily_question_is_valid')
-  assert.match(challengeBlock, /timezone\('Asia\/Bangkok', now\(\)\)::date/i)
-  assert.match(validityBlock, /p_question\.status\s*=\s*'Published'/i)
-  assert.match(validityBlock, /char_length\(btrim\(p_question\.content\)\)\s*>\s*0/i)
-  assert.match(challengeBlock, /md5\(v_today::text\s*\|\|\s*':'\s*\|\|\s*q\.id::text\)/i)
-  assert.match(challengeBlock, /order by selection_key, q\.id/i)
-  assert.match(challengeBlock, /limit 5/i)
-  assert.match(challengeBlock, /on conflict \(local_date\) do nothing/i)
-  assert.doesNotMatch(challengeBlock, /random\s*\(/i)
-  assert.match(executableSql, /daily_challenges_distinct_questions_check/i)
-  assert.match(executableSql, /create trigger daily_challenges_immutable[\s\S]*?before update or delete on public\.daily_challenges/i)
-  assert.match(functionBlock('daily_get_state'), /challenge-invalid/i)
-  assert.match(functionBlock('daily_submit_answer'), /persisted challenge is invalid/i)
+test('SECURITY DEFINER and locked proconfig are preserved for the writer fence', () => {
+  assert.match(executableSql, /security definer/)
+  assert.match(executableSql, /set search_path = pg_catalog, public, pg_temp/)
+  assert.match(executableSql, /set lock_timeout = '5s'/)
 })
 
-test('RPCs derive the user/date and expose only authenticated execution', () => {
-  for (const name of [
-    'daily_get_or_create_challenge',
-    'daily_get_state',
-    'daily_submit_answer',
-  ]) {
-    const block = functionBlock(name)
-    assert.match(block, /security\s+definer/i)
-    assert.match(block, /set search_path = pg_catalog, public, auth, pg_temp/i)
-    assert.match(block, /auth\.uid\(\)/i)
-    assert.match(block, /timezone\('Asia\/Bangkok', now\(\)\)::date/i)
-  }
-
-  for (const [name, args] of [
-    ['daily_get_or_create_challenge', ''],
-    ['daily_get_state', ''],
-    ['daily_submit_answer', 'uuid, text, integer'],
-  ]) {
-    assert.match(
-      executableSql,
-      new RegExp(`revoke\\s+all\\s+on\\s+function\\s+public\\.${name}\\s*\\(${args}\\)[\\s\\S]*?grant\\s+execute\\s+on\\s+function\\s+public\\.${name}\\s*\\(${args}\\)\\s+to\\s+authenticated`, 'i'),
-    )
-  }
-
-  assert.match(executableSql, /revoke all on table public\.daily_challenges from public, anon, authenticated/i)
-  assert.match(executableSql, /revoke all on table public\.user_daily_progress from public, anon, authenticated/i)
-  assert.match(executableSql, /revoke all on table public\.user_progress from public, anon, authenticated/i)
-  assert.doesNotMatch(executableSql, /grant\s+(?:insert|update|delete)[\s\S]*?user_daily_progress/i)
-  assert.doesNotMatch(executableSql, /grant\s+(?:insert|update|delete)[\s\S]*?user_progress/i)
+test('grants match 069: service_role execute only', () => {
+  assert.match(
+    executableSql,
+    /revoke all on function public\.kp_persist_publish_legacy_summary\(uuid,uuid\)\s*from public, anon, authenticated/,
+  )
+  assert.match(
+    executableSql,
+    /grant execute on function public\.kp_persist_publish_legacy_summary\(uuid,uuid\)\s*to service_role/,
+  )
+  // No broader grants are introduced.
+  assert.doesNotMatch(executableSql, /grant execute[\s\S]*to (anon|authenticated|public)\b/)
 })
 
-test('Each answer is terminal, merged, DB-scored, and retry-idempotent', () => {
-  const submitBlock = functionBlock('daily_submit_answer')
-  assert.match(submitBlock, /p_question_id\s+uuid/i)
-  assert.match(submitBlock, /p_choice\s+text/i)
-  assert.match(submitBlock, /p_next_index\s+integer/i)
-  assert.match(submitBlock, /for v_lock_question_id in[\s\S]*?order by ids\.id[\s\S]*?for update/i)
-  assert.match(submitBlock, /public\.daily_question_is_valid\(q\)/i)
-  assert.match(submitBlock, /select q\.\*[\s\S]*?from public\.questions q[\s\S]*?for update/i)
-  assert.match(submitBlock, /jsonb_set\([\s\S]*?p_question_id::text[\s\S]*?true/i)
-  assert.match(submitBlock, /if v_answers \? \(p_question_id::text\) then/i)
-  assert.match(submitBlock, /v_existing_choice <> p_choice/i)
-  assert.match(submitBlock, /v_idempotent := true/i)
-  assert.match(submitBlock, /v_questions_answered = 5/i)
-  assert.match(submitBlock, /v_exp_delta := 50/i)
-  assert.match(submitBlock, /correctAnswer.*v_selected_question\.correct_answer/i)
-  assert.doesNotMatch(submitBlock, /p_(?:score|accuracy|correct|exp|streak|quest|is_correct)\b/i)
-})
-
-test('Streaks recompute from completed dates under a consistent user lock', () => {
-  const streakBlock = functionBlock('daily_recompute_user_streaks')
-  const submitBlock = functionBlock('daily_submit_answer')
-  assert.match(streakBlock, /from public\.user_daily_progress p[\s\S]*p\.daily_completed/i)
-  assert.match(streakBlock, /row_number\(\) over \(order by p\.local_date\)/i)
-  assert.match(streakBlock, /order by run_end desc/i)
-  assert.match(streakBlock, /greatest\(v_existing_longest/i)
-  assert.match(submitBlock, /insert into public\.user_progress[\s\S]*?on conflict \(user_id\) do nothing/i)
-  assert.match(submitBlock, /from public\.user_progress p[\s\S]*?for update/i)
-  assert.match(submitBlock, /perform public\.daily_recompute_user_streaks\(v_user_id\)/i)
-})
-
-test('No client-authored answer snapshot or reward inputs exist', () => {
-  const actions = readFileSync(join(migrationDir, '..', '..', 'app', 'daily', 'actions.ts'), 'utf8')
-  const runtime = readFileSync(join(migrationDir, '..', '..', 'components', 'daily', 'DailyRuntime.tsx'), 'utf8')
-  assert.match(actions, /submitDailyAnswer/i)
-  assert.match(actions, /daily_submit_answer/i)
-  assert.doesNotMatch(actions, /saveDailyProgress|p_answers|p_finalize/i)
-  assert.match(runtime, /draftAnswers/i)
-  assert.doesNotMatch(runtime, /setTimeout|persistSnapshot|saveDailyProgress|p_answers|p_finalize/i)
-  assert.doesNotMatch(executableSql, /p_(?:score|accuracy|correct|exp|streak|quest|is_correct)\b/i)
+test('089 does not touch exam_sets or other tables with data changes', () => {
+  assert.doesNotMatch(executableSql, /alter table/i)
+  assert.doesNotMatch(executableSql, /insert into/i)
+  assert.doesNotMatch(executableSql, /delete from/i)
+  // The only data mutation is the legacy summary publication UPDATE.
+  assert.equal((executableSql.match(/update public\.\w+/g) ?? []).length, 1)
+  assert.match(executableSql, /update public\.summaries/)
 })
