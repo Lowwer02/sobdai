@@ -127,7 +127,7 @@ test('9. old summary made available today MUST be fresh', () => {
   )
   assert.equal(kpResult.newSummaryCount, 1)
 
-  // Legacy: published today via the 089-stamped released_at.
+  // Legacy: published today via the 091-stamped released_at.
   const legacyResult = computePackageContentFreshness(
     [],
     [],
@@ -138,7 +138,7 @@ test('9. old summary made available today MUST be fresh', () => {
 })
 
 test('10. legacy old rows with no recent availability signal must NOT become fresh', () => {
-  // Pre-089 rows carry released_at = created_at (migration 019 backfill) or
+  // Pre-091 rows carry released_at = created_at (migration 019 backfill) or
   // NULL — both resolve to the historical creation instant, which is outside
   // the window. Time passing alone never makes content fresh.
   const result = computePackageContentFreshness(

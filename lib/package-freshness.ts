@@ -27,7 +27,7 @@
  *                  and the RLS predicate (migration 046) exposes only active
  *                  placements the viewer can actually read.
  *   - summaries (legacy rows, summary_code IS NULL): `summaries.released_at`,
- *                  stamped by kp_persist_publish_legacy_summary (migration 089
+ *                  stamped by kp_persist_publish_legacy_summary (migration 091
  *                  CREATE OR REPLACE) on the unpublished→published transition.
  *
  * Fallback (documented, conservative)
@@ -42,7 +42,7 @@
  *
  * Sizing: three batched `in (package_ids)` reads with slim projections,
  * grouped in Node. No per-package N+1, no RPC changes, no extra migration
- * beyond 089's publish-RPC stamp. Every read fails safe to "no freshness" —
+ * beyond 091's publish-RPC stamp. Every read fails safe to "no freshness" —
  * an unavailable freshness signal must never break a card that already renders.
  */
 
@@ -90,7 +90,7 @@ export function examSetAvailabilityAt(row: ExamSetTimestamps): string | null {
 }
 
 /**
- * Legacy summary availability: the publish/republish stamp (migration 089);
+ * Legacy summary availability: the publish/republish stamp (migration 091);
  * rows that predate it fall back to created_at. Never updated_at.
  */
 export function legacySummaryAvailabilityAt(row: LegacySummaryTimestamps): string | null {
@@ -195,7 +195,7 @@ export async function getPackageContentFreshness(
       readTimestampRows(client, 'package_summaries', 'package_id, activated_at', ids, [
         { column: 'status', value: 'active' },
       ]),
-      // Legacy summary availability = released_at (migration 089 stamp) with
+      // Legacy summary availability = released_at (migration 091 stamp) with
       // created_at fallback. summary_code IS NULL excludes KP-native rows,
       // which are counted via their placements above (no double counting).
       readTimestampRows(client, 'summaries', 'package_id, released_at, created_at', ids, [

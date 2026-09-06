@@ -1,4 +1,4 @@
--- 089_kp_legacy_summary_publish_released_at.sql
+-- 091_kp_legacy_summary_publish_released_at.sql
 -- Package Content Freshness V1 (post-audit remediation) — legacy Summary
 -- availability stamp.
 --
@@ -92,7 +92,7 @@ begin
         );
     end if;
 
-    -- Migration 089: released_at is the availability stamp for Package
+    -- Migration 091: released_at is the availability stamp for Package
     -- Content Freshness. It marks the moment this Summary becomes available
     -- to users; it is NOT refreshed by edits, and republishing after an
     -- unpublish stamps a new value on purpose.
