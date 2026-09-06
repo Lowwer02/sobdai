@@ -120,7 +120,12 @@ export async function getPublicPackageCatalog(): Promise<PackageCardData[]> {
     return []
   }
 
-  return (data ?? []).map((row) => ({
+  // Package Content Freshness V1 rides the same one-roundtrip pattern and
+  // fails safe to absent, so cards render unchanged when the signal is
+  // unavailable. Integration adaptation for latest main: the /packages and
+  // /packages/phak-khor pages consume THIS loader (getPublishedPackages has no
+  // remaining consumers), so the approved V1 attachment point moved here.
+  const catalogRows = (data ?? []).map((row) => ({
     id: row.id,
     slug: row.slug,
     exam_year: row.exam_year ?? '',
@@ -135,6 +140,14 @@ export async function getPublicPackageCatalog(): Promise<PackageCardData[]> {
       ? { name: row.organization_name, logo_url: row.organization_logo_url }
       : null,
     positions: row.position_name ? { name: row.position_name } : null,
+  }))
+  const freshness = await getPackageContentFreshness(
+    catalogRows.map((row) => row.id),
+    supabase,
+  )
+  return catalogRows.map((row) => ({
+    ...row,
+    content_freshness: freshness[row.id] ?? null,
   }))
 }
 
