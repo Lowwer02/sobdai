@@ -1,5 +1,6 @@
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import type { PackageCardData } from '@/components/PackageCard'
+import { getPackageContentFreshness } from '@/lib/package-freshness'
 
 export interface PackageCounts {
   total_questions: number
@@ -168,10 +169,14 @@ export async function getPublishedPackages(): Promise<any[]> {
     }
 
     const counts = await getPackagePublicCounts(data.map((p: any) => p.id))
+    // Content freshness piggybacks on the same batched read pattern; it fails
+    // safe to absent, so cards render unchanged when the signal is unavailable.
+    const freshness = await getPackageContentFreshness(data.map((p: any) => p.id), supabase)
     return data.map((pkg: any) => ({
       ...pkg,
       total_questions: counts[pkg.id]?.total_questions || 0,
       total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
+      content_freshness: freshness[pkg.id] ?? null,
     }))
   } catch (error) {
     console.error('Failed to fetch published packages:', error)

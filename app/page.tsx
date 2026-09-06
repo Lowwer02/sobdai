@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { getPackagePublicCounts } from '@/lib/publicData'
+import { getPackageContentFreshness } from '@/lib/package-freshness'
 import { getHomepagePromotions } from '@/lib/homepagePromotions'
 import type { HomepagePromotion } from '@/lib/homepagePromotions'
 import type { PackageCardData } from '@/components/PackageCard'
@@ -138,11 +139,18 @@ export default async function Home() {
     latestNews = latestNewsResult
 
     if (featuredData.length > 0) {
-      const counts = await getPackagePublicCounts(featuredData.map((p: any) => p.id))
+      const ids = featuredData.map((p: any) => p.id)
+      const [counts, freshness] = await Promise.all([
+        getPackagePublicCounts(ids),
+        getPackageContentFreshness(ids, supabase),
+      ])
       livePackages = featuredData.map((pkg: any) => ({
         ...pkg,
         total_questions: counts[pkg.id]?.total_questions || 0,
         total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
+        // Subtle card-body chip only (PackageCard default) — the homepage must
+        // stay visually quiet; the top-right badge row is untouched.
+        content_freshness: freshness[pkg.id] ?? null,
       }))
     }
   } catch (error) {

@@ -2,6 +2,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { getPackagePublicCounts } from '@/lib/publicData'
+import {
+  formatFreshExamSetLabel,
+  formatFreshSummaryLabel,
+  getPackageContentFreshness,
+  type PackageContentFreshness,
+} from '@/lib/package-freshness'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import { deriveMyPackagesViewState, MY_PACKAGES_ORDER_HISTORY_HREF } from '@/lib/my-packages-state'
 import type { Metadata } from 'next'
@@ -33,6 +39,7 @@ interface LearningCardData {
   total_questions: number
   total_exam_sets: number
   total_summaries: number
+  content_freshness: PackageContentFreshness | null
 }
 
 export default async function LearningDashboardPage() {
@@ -119,9 +126,14 @@ export default async function LearningDashboardPage() {
   }
 
   // --- Logged in, owns packages --------------------------------------------
+  // Freshness is presentation-only like the counts: both run together and a
+  // failure degrades to "no badge / zero counts" without ever hiding access.
   let enriched: LearningCardData[] = []
   try {
-    const counts = await getPackagePublicCounts(ownedPackages.map((p) => p.id))
+    const [counts, freshness] = await Promise.all([
+      getPackagePublicCounts(ownedPackages.map((p) => p.id)),
+      getPackageContentFreshness(ownedPackages.map((p) => p.id), supabase),
+    ])
     enriched = ownedPackages.map((pkg) => {
       return {
         id: pkg.id,
@@ -136,6 +148,7 @@ export default async function LearningDashboardPage() {
         total_questions: counts[pkg.id]?.total_questions || 0,
         total_exam_sets: counts[pkg.id]?.total_exam_sets || 0,
         total_summaries: summaryCounts[pkg.id] || 0,
+        content_freshness: freshness[pkg.id] ?? null,
       }
     })
   } catch {
@@ -153,6 +166,7 @@ export default async function LearningDashboardPage() {
         total_questions: 0,
         total_exam_sets: 0,
         total_summaries: summaryCounts[pkg.id] || 0,
+        content_freshness: null,
       }
     })
   }
@@ -259,6 +273,40 @@ function LearningCard({ pkg }: LearningCardProps) {
           <CheckCircle size={14} />
           คุณเป็นเจ้าของแพ็กเกจนี้
         </div>
+
+        {/* Content freshness — ownership surface gets the most prominent signal.
+            Only rows for content types that actually changed; renders nothing
+            (no reserved space) when there is no recent content. */}
+        {pkg.content_freshness?.hasFreshContent && (
+          <div
+            className="mb-6"
+            style={{
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.02)',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              width: 'fit-content',
+              maxWidth: '100%',
+            }}
+            aria-label="เนื้อหาที่เพิ่มเข้ามาล่าสุดในแพ็กเกจนี้"
+          >
+            {pkg.content_freshness.newExamSetCount > 0 && (
+              <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: '#E29A78' }}>
+                <span aria-hidden="true">✦</span>
+                <span>{formatFreshExamSetLabel(pkg.content_freshness.newExamSetCount)}</span>
+              </div>
+            )}
+            {pkg.content_freshness.newSummaryCount > 0 && (
+              <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: '#E3B04B' }}>
+                <span aria-hidden="true">▣</span>
+                <span>{formatFreshSummaryLabel(pkg.content_freshness.newSummaryCount)}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="h-px bg-[rgba(255,255,255,0.06)] w-full mb-5" />
 

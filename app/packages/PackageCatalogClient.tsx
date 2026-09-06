@@ -326,7 +326,13 @@ export default function PackageCatalogClient({
             }}
           >
             {filteredPackages.map((pkg, i) => (
-              <PackageCard key={pkg.id} pkg={pkg} index={i} searchQuery={normalizedSearchQuery} />
+              <PackageCard
+                key={pkg.id}
+                pkg={pkg}
+                index={i}
+                searchQuery={normalizedSearchQuery}
+                freshnessVariant="detailed"
+              />
             ))}
           </div>
         ) : (

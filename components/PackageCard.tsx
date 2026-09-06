@@ -1,5 +1,12 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import type { PackageContentFreshness } from '@/lib/package-freshness'
+import {
+  formatFreshExamSetLabel,
+  formatFreshSummaryLabel,
+  GENERIC_FRESHNESS_LABEL,
+  GENERIC_FRESHNESS_TOOLTIP,
+} from '@/lib/package-freshness'
 
 interface PackageCardData {
   id: string
@@ -12,6 +19,11 @@ interface PackageCardData {
   total_exam_sets: number
   description: string | null
   logo_url: string | null
+  /**
+   * Optional content-freshness signal (lib/package-freshness.ts). Producers
+   * attach it per surface; absent means "render nothing" — never a placeholder.
+   */
+  content_freshness?: PackageContentFreshness | null
   organizations: {
     name: string
     /**
@@ -28,10 +40,18 @@ interface PackageCardData {
   } | null
 }
 
+/**
+ * 'subtle' (default) — one quiet generic chip for visually quiet surfaces
+ * (Homepage). 'detailed' — up to two compact chips with per-type counts
+ * (package catalogs).
+ */
+type PackageFreshnessVariant = 'subtle' | 'detailed'
+
 interface PackageCardProps {
   pkg: PackageCardData
   index?: number
   searchQuery?: string
+  freshnessVariant?: PackageFreshnessVariant
 }
 
 export type { PackageCardData }
@@ -70,7 +90,112 @@ function HighlightedText({ text, query }: { text: string; query?: string }) {
   )
 }
 
-export default function PackageCard({ pkg, index = 0, searchQuery }: PackageCardProps) {
+const FRESHNESS_CHIPS = {
+  exam: {
+    glyph: '✦',
+    color: '#E29A78',
+    background: 'rgba(226, 138, 100, 0.08)',
+    borderColor: 'rgba(226, 138, 100, 0.25)',
+  },
+  summary: {
+    glyph: '▣',
+    color: '#E3B04B',
+    background: 'rgba(212, 168, 67, 0.08)',
+    borderColor: 'rgba(212, 168, 67, 0.22)',
+  },
+} as const
+
+function FreshnessChip({ glyph, label, color, background, borderColor, tooltip }: {
+  glyph: string
+  label: string
+  color: string
+  background: string
+  borderColor: string
+  tooltip?: string
+}) {
+  return (
+    <span
+      title={tooltip}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        width: 'fit-content',
+        fontSize: '12px',
+        fontWeight: 600,
+        lineHeight: 1.4,
+        padding: '3px 10px',
+        borderRadius: '999px',
+        color,
+        background,
+        border: `1px solid ${borderColor}`,
+      }}
+    >
+      <span aria-hidden="true">{glyph}</span>
+      {label}
+    </span>
+  )
+}
+
+/**
+ * Content-freshness signal in its own visual hierarchy — card body, below the
+ * description, never in the top-right badge row (Mixed + discount stay there).
+ * Renders nothing when there is no fresh content: no reserved empty space.
+ */
+function PackageFreshnessSignal({ freshness, variant }: {
+  freshness?: PackageContentFreshness | null
+  variant: PackageFreshnessVariant
+}) {
+  if (!freshness?.hasFreshContent) return null
+
+  if (variant === 'subtle') {
+    return (
+      <div style={{ marginBottom: '16px', position: 'relative' }}>
+        <FreshnessChip
+          glyph="✦"
+          label={GENERIC_FRESHNESS_LABEL}
+          tooltip={GENERIC_FRESHNESS_TOOLTIP}
+          color="var(--gold)"
+          background="var(--gold-tint)"
+          borderColor="var(--border)"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+        marginBottom: '16px',
+        position: 'relative',
+      }}
+    >
+      {freshness.newExamSetCount > 0 && (
+        <FreshnessChip
+          glyph={FRESHNESS_CHIPS.exam.glyph}
+          label={formatFreshExamSetLabel(freshness.newExamSetCount)}
+          color={FRESHNESS_CHIPS.exam.color}
+          background={FRESHNESS_CHIPS.exam.background}
+          borderColor={FRESHNESS_CHIPS.exam.borderColor}
+        />
+      )}
+      {freshness.newSummaryCount > 0 && (
+        <FreshnessChip
+          glyph={FRESHNESS_CHIPS.summary.glyph}
+          label={formatFreshSummaryLabel(freshness.newSummaryCount)}
+          color={FRESHNESS_CHIPS.summary.color}
+          background={FRESHNESS_CHIPS.summary.background}
+          borderColor={FRESHNESS_CHIPS.summary.borderColor}
+        />
+      )}
+    </div>
+  )
+}
+
+export default function PackageCard({ pkg, index = 0, searchQuery, freshnessVariant = 'subtle' }: PackageCardProps) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const posName = pkg.positions?.name || 'ไม่ระบุตำแหน่ง'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url
@@ -183,6 +308,8 @@ export default function PackageCard({ pkg, index = 0, searchQuery }: PackageCard
         >
           {pkg.description || 'คลังข้อสอบเตรียมสอบข้าราชการ พร้อมสรุปและเฉลยอย่างละเอียด'}
         </p>
+
+        <PackageFreshnessSignal freshness={pkg.content_freshness} variant={freshnessVariant} />
 
         <div className="divider" style={{ margin: 'auto 0 16px 0', opacity: 0.3 }} />
 
