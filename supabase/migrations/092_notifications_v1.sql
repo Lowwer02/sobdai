@@ -20,6 +20,14 @@ begin
             message = 'Notification V1 requires public.profiles, public.orders, and public.packages.';
     end if;
 
+    if to_regnamespace('extensions') is null
+       or to_regprocedure('extensions.uuid_generate_v4()') is null
+    then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'Notification V1 requires extensions.uuid_generate_v4() in the extensions schema.';
+    end if;
+
     if to_regprocedure('public.approve_payment_submission(uuid)') is null then
         raise exception using
             errcode = 'check_violation',
@@ -40,7 +48,7 @@ $notifications_v1_preflight$;
 -- ---------------------------------------------------------------------------
 
 create table public.notifications (
-    id uuid primary key default public.uuid_generate_v4(),
+    id uuid primary key default extensions.uuid_generate_v4(),
     user_id uuid not null references public.profiles(id) on delete cascade,
     type text not null,
     title text not null,

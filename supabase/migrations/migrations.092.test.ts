@@ -24,7 +24,7 @@ test('092 exists as one canonical additive notification migration', () => {
 })
 
 test('notifications has the minimal durable row, deliberate cascades, and hard approval dedupe', () => {
-  assert.match(migration, /id uuid primary key default public\.uuid_generate_v4\(\)/i)
+  assert.match(migration, /id uuid primary key default extensions\.uuid_generate_v4\(\)/i)
   assert.match(migration, /user_id uuid not null references public\.profiles\(id\) on delete cascade/i)
   assert.match(migration, /source_order_id uuid not null references public\.orders\(id\) on delete cascade/i)
   assert.match(migration, /type text not null/i)
@@ -32,6 +32,11 @@ test('notifications has the minimal durable row, deliberate cascades, and hard a
   assert.match(migration, /created_at timestamptz not null default now\(\)/i)
   assert.match(migration, /constraint notifications_type_check check \(type in \('PACKAGE_APPROVED'\)\)/i)
   assert.match(migration, /constraint notifications_type_source_order_key unique \(type, source_order_id\)/i)
+})
+
+test('092 requires the deployed extensions-schema UUID generator before creating notification state', () => {
+  assert.match(migration, /to_regnamespace\('extensions'\) is null[\s\S]*?to_regprocedure\('extensions\.uuid_generate_v4\(\)'\) is null/i)
+  assert.match(migration, /Notification V1 requires extensions\.uuid_generate_v4\(\)/i)
 })
 
 test('notifications has the two bounded user-oriented indexes and own-row RLS', () => {

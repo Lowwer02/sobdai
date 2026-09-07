@@ -162,6 +162,16 @@ async function asAuthenticated(client, userId, callback) {
   }
 }
 
+async function asUntrustedRole(client, role, callback) {
+  ensure(['anon', 'authenticated'].includes(role), `unsupported untrusted role: ${role}`)
+  await query(client, `set role ${role}`)
+  try {
+    return await callback()
+  } finally {
+    await query(client, 'reset role')
+  }
+}
+
 async function expectRejected(client, label, callback) {
   let error = null
   try {
@@ -225,6 +235,7 @@ async function applyMigration(client) {
         ) as rls_enabled,
         exists (select 1 from pg_indexes where indexname = 'notifications_user_unread_idx') as unread_index,
         exists (select 1 from pg_indexes where indexname = 'notifications_user_created_at_idx') as created_index,
+        exists (select 1 from pg_indexes where indexname = 'notifications_type_source_order_key') as dedupe_index,
         has_table_privilege('authenticated', 'public.notifications', 'SELECT') as authenticated_select,
         has_table_privilege('authenticated', 'public.notifications', 'INSERT') as authenticated_insert,
         has_column_privilege('authenticated', 'public.notifications', 'read_at', 'UPDATE') as authenticated_read_at_update,
@@ -239,12 +250,197 @@ async function applyMigration(client) {
     rls_enabled: true,
     unread_index: true,
     created_index: true,
+    dedupe_index: true,
     authenticated_select: true,
     authenticated_insert: false,
     authenticated_read_at_update: true,
     authenticated_title_update: false,
     authenticated_delete: false,
   })
+}
+
+async function assertNotificationMetadata(client) {
+  const relation = await query(
+    client,
+    `
+      select relrowsecurity as rls_enabled, relforcerowsecurity as rls_forced
+      from pg_class
+      where oid = 'public.notifications'::regclass
+    `,
+  )
+  assert.deepEqual(relation.rows[0], { rls_enabled: true, rls_forced: false })
+
+  const policies = await query(
+    client,
+    `
+      select policyname, cmd, roles::text, qual, with_check
+      from pg_policies
+      where schemaname = 'public' and tablename = 'notifications'
+      order by policyname
+    `,
+  )
+  const policiesByName = new Map(policies.rows.map((row) => [row.policyname, row]))
+  const selectPolicy = policiesByName.get('Users can view own notifications.')
+  const updatePolicy = policiesByName.get('Users can mark own notifications read.')
+  ensure(selectPolicy && updatePolicy, 'notification RLS policies are incomplete')
+  assert.equal(selectPolicy.cmd, 'SELECT')
+  assert.equal(selectPolicy.roles, '{authenticated}')
+  assert.match(selectPolicy.qual, /user_id\s*=\s*auth\.uid\(\)/i)
+  assert.equal(updatePolicy.cmd, 'UPDATE')
+  assert.equal(updatePolicy.roles, '{authenticated}')
+  assert.match(updatePolicy.qual, /user_id\s*=\s*auth\.uid\(\)/i)
+  assert.match(updatePolicy.with_check, /user_id\s*=\s*auth\.uid\(\)/i)
+  assert.match(updatePolicy.with_check, /read_at\s+is\s+not\s+null/i)
+
+  const privileges = await query(
+    client,
+    `
+      select
+        has_table_privilege('anon', 'public.notifications', 'SELECT') as anon_select,
+        has_table_privilege('authenticated', 'public.notifications', 'SELECT') as authenticated_select,
+        has_table_privilege('authenticated', 'public.notifications', 'INSERT') as authenticated_insert,
+        has_table_privilege('authenticated', 'public.notifications', 'DELETE') as authenticated_delete,
+        has_table_privilege('authenticated', 'public.notifications', 'UPDATE') as authenticated_table_update,
+        has_column_privilege('authenticated', 'public.notifications', 'read_at', 'UPDATE') as read_at_update,
+        has_column_privilege('authenticated', 'public.notifications', 'user_id', 'UPDATE') as user_id_update,
+        has_column_privilege('authenticated', 'public.notifications', 'type', 'UPDATE') as type_update,
+        has_column_privilege('authenticated', 'public.notifications', 'title', 'UPDATE') as title_update,
+        has_column_privilege('authenticated', 'public.notifications', 'body', 'UPDATE') as body_update,
+        has_column_privilege('authenticated', 'public.notifications', 'href', 'UPDATE') as href_update,
+        has_column_privilege('authenticated', 'public.notifications', 'source_order_id', 'UPDATE') as source_order_id_update,
+        has_column_privilege('authenticated', 'public.notifications', 'created_at', 'UPDATE') as created_at_update
+    `,
+  )
+  assert.deepEqual(privileges.rows[0], {
+    anon_select: false,
+    authenticated_select: true,
+    authenticated_insert: false,
+    authenticated_delete: false,
+    authenticated_table_update: false,
+    read_at_update: true,
+    user_id_update: false,
+    type_update: false,
+    title_update: false,
+    body_update: false,
+    href_update: false,
+    source_order_id_update: false,
+    created_at_update: false,
+  })
+
+  const indexes = await query(
+    client,
+    `
+      select indexname, indexdef
+      from pg_indexes
+      where schemaname = 'public'
+        and tablename = 'notifications'
+        and indexname = any($1::text[])
+      order by indexname
+    `,
+    [[
+      'notifications_type_source_order_key',
+      'notifications_user_unread_idx',
+      'notifications_user_created_at_idx',
+    ]],
+  )
+  assert.equal(indexes.rows.length, 3)
+  assert.ok(indexes.rows.some((row) => row.indexname === 'notifications_type_source_order_key' && /unique/i.test(row.indexdef)))
+  assert.ok(indexes.rows.some((row) => row.indexname === 'notifications_user_unread_idx' && /read_at\s+is\s+null/i.test(row.indexdef)))
+  assert.ok(indexes.rows.some((row) => row.indexname === 'notifications_user_created_at_idx'))
+
+  const constraints = await query(
+    client,
+    `
+      select conname, contype, pg_get_constraintdef(oid, true) as definition
+      from pg_constraint
+      where conrelid = 'public.notifications'::regclass
+      order by conname
+    `,
+  )
+  assert.ok(constraints.rows.some((row) => row.conname === 'notifications_type_source_order_key' && row.contype === 'u'))
+  assert.ok(constraints.rows.some((row) => row.conname === 'notifications_user_id_fkey' && /references profiles\(id\) on delete cascade/i.test(row.definition)))
+  assert.ok(constraints.rows.some((row) => row.conname === 'notifications_source_order_id_fkey' && /references orders\(id\) on delete cascade/i.test(row.definition)))
+
+  const functions = await query(
+    client,
+    `
+      select p.oid::regprocedure::text as signature,
+             p.prosecdef as security_definer,
+             p.proconfig as configuration,
+             has_function_privilege('public', p.oid, 'EXECUTE') as public_execute,
+             has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
+             has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute,
+             has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_execute
+      from pg_proc p
+      where p.oid in (
+        to_regprocedure('public.try_create_package_approved_notification(uuid)'),
+        to_regprocedure('public.approve_payment_submission(uuid)'),
+        to_regprocedure('public.guard_manual_payment_paid_transition()')
+      )
+      order by p.oid::regprocedure::text
+    `,
+  )
+  const bySignature = new Map(functions.rows.map((row) => [row.signature, row]))
+  const helper = bySignature.get('try_create_package_approved_notification(uuid)')
+  ensure(helper, 'notification producer metadata is missing')
+  assert.equal(helper.security_definer, true)
+  assert.deepEqual(helper.configuration, ['search_path=pg_catalog, public, auth, pg_temp', 'lock_timeout=5s'])
+  assert.deepEqual(
+    [helper.public_execute, helper.anon_execute, helper.authenticated_execute, helper.service_role_execute],
+    [false, false, false, false],
+  )
+
+  const approval = bySignature.get('approve_payment_submission(uuid)')
+  ensure(approval, 'approval RPC metadata is missing after migration')
+  assert.equal(approval.security_definer, true)
+  assert.deepEqual(approval.configuration, ['search_path=pg_catalog, public, auth, pg_temp', 'lock_timeout=5s'])
+  assert.deepEqual(
+    [approval.public_execute, approval.anon_execute, approval.authenticated_execute, approval.service_role_execute],
+    [false, false, true, false],
+  )
+
+  const guard = bySignature.get('guard_manual_payment_paid_transition()')
+  ensure(guard, 'manual payment guard metadata is missing')
+  assert.equal(guard.security_definer, true)
+  assert.deepEqual(guard.configuration, ['search_path=pg_catalog, public, pg_temp'])
+  assert.deepEqual(
+    [guard.public_execute, guard.anon_execute, guard.authenticated_execute, guard.service_role_execute],
+    [false, false, false, false],
+  )
+
+  return {
+    rls_enabled: true,
+    policies: ['own_select', 'own_read_update'],
+    update_read_at_only: true,
+    insert_delete_denied: true,
+    helper_security_definer_fixed_search_path: true,
+    helper_execute_denied_to_untrusted_roles: true,
+    approval_security_unchanged: true,
+    foreign_keys_cascade: true,
+    unique_type_source_order: true,
+    unread_and_list_indexes: true,
+  }
+}
+
+async function assertMigrationDriftFailsClosed(client) {
+  const existing = await query(client, "select to_regclass('public.notifications') as notifications")
+  assert.equal(existing.rows[0].notifications, null)
+
+  let migrationError = null
+  await query(client, 'begin')
+  try {
+    await query(client, 'create table public.notifications (sentinel text)')
+    await query(client, MIGRATION_SQL)
+  } catch (error) {
+    migrationError = error
+  }
+  await query(client, 'rollback').catch(() => {})
+
+  ensure(migrationError, 'migration accepted an incompatible pre-existing notifications object')
+  assert.equal(migrationError.code, '42710')
+  const remaining = await query(client, "select to_regclass('public.notifications') as notifications")
+  assert.equal(remaining.rows[0].notifications, null)
+  return { migration_drift_fails_closed: true }
 }
 
 async function insertPackage(client, id, suffix) {
@@ -299,6 +495,23 @@ async function notificationCount(client, orderId) {
   return result.rows[0].count
 }
 
+async function paymentState(client, submissionId) {
+  const result = await query(
+    client,
+    `
+      select ps.status as submission_status,
+             ps.reviewed_at is not null as reviewed,
+             ps.reviewed_by::text as reviewed_by,
+             o.status as order_status
+      from public.payment_submissions ps
+      join public.orders o on o.id = ps.order_id
+      where ps.id = $1
+    `,
+    [submissionId],
+  )
+  return result.rows[0] ?? null
+}
+
 async function orderState(client, orderId) {
   const result = await query(client, 'select status from public.orders where id = $1', [orderId])
   return result.rows[0]?.status ?? null
@@ -333,6 +546,18 @@ async function dropFailureTrigger(client, trigger) {
   await query(client, `drop function if exists public.${trigger.functionName}()`)
 }
 
+async function assertHelperExecutionFenced(client, orderId) {
+  for (const role of ['anon', 'authenticated']) {
+    const error = await asUntrustedRole(client, role, () =>
+      expectRejected(client, `${role} notification producer execution`, () =>
+        query(client, 'select public.try_create_package_approved_notification($1)', [orderId]),
+      ),
+    )
+    assert.equal(error.code, '42501')
+  }
+  return true
+}
+
 async function createClient(config) {
   const client = new Client({
     connectionString: config.databaseUrl,
@@ -360,8 +585,10 @@ async function runProof() {
   const extraClients = []
 
   try {
-    await applyMigration(client)
     const ids = await lookupFixtureIds(client)
+    const migrationDrift = await assertMigrationDriftFailsClosed(client)
+    await applyMigration(client)
+    const metadata = await assertNotificationMetadata(client)
 
     const flows = ['recovery', 'success', 'rejected', 'concurrent', 'support'].map((name) => ({
       packageId: randomUUID(),
@@ -393,6 +620,20 @@ async function runProof() {
     )
     assert.equal(await orderState(client, flows[0].orderId), 'paid')
     assert.equal(await notificationCount(client, flows[0].orderId), 0)
+    assert.deepEqual(await paymentState(client, flows[0].submissionId), {
+      submission_status: 'approved',
+      reviewed: true,
+      reviewed_by: ids.manager,
+      order_status: 'paid',
+    })
+    const accessWithoutNotification = await asAuthenticated(client, ids.buyer, () =>
+      query(
+        client,
+        `select id from public.orders where id = $1 and status in ('paid', 'free')`,
+        [flows[0].orderId],
+      ),
+    )
+    assert.equal(accessWithoutNotification.rows.length, 1)
 
     await dropFailureTrigger(client)
     failureTrigger = null
@@ -403,6 +644,7 @@ async function runProof() {
       query(client, 'select * from public.approve_payment_submission($1)', [flows[0].submissionId]),
     )
     assert.equal(await notificationCount(client, flows[0].orderId), 1)
+    assert.deepEqual((await paymentState(client, flows[0].submissionId)).order_status, 'paid')
 
     await asAuthenticated(client, ids.manager, () =>
       query(client, 'select * from public.approve_payment_submission($1)', [flows[1].submissionId]),
@@ -416,6 +658,7 @@ async function runProof() {
       [flows[1].orderId],
     )
     assert.deepEqual(successNotification.rows, [{ href: '/my-packages', type: 'PACKAGE_APPROVED' }])
+    assert.equal(await orderState(client, flows[1].orderId), 'paid')
 
     const rejected = await asAuthenticated(client, ids.manager, () =>
       query(client, 'select * from public.reject_payment_submission($1, $2)', [flows[2].submissionId, 'integration rejection']),
@@ -423,6 +666,12 @@ async function runProof() {
     assert.equal(rejected.rows[0].status, 'rejected')
     assert.equal(await orderState(client, flows[2].orderId), 'pending')
     assert.equal(await notificationCount(client, flows[2].orderId), 0)
+    assert.deepEqual(await paymentState(client, flows[2].submissionId), {
+      submission_status: 'rejected',
+      reviewed: true,
+      reviewed_by: ids.manager,
+      order_status: 'pending',
+    })
 
     const concurrentA = await createClient(config)
     const concurrentB = await createClient(config)
@@ -437,6 +686,7 @@ async function runProof() {
     ])
     assert.deepEqual(concurrentResults.map((result) => result.rows[0].status), ['approved', 'approved'])
     assert.equal(await notificationCount(client, flows[3].orderId), 1)
+    assert.deepEqual((await paymentState(client, flows[3].submissionId)).order_status, 'paid')
 
     await asAuthenticated(client, ids.manager, () =>
       query(client, 'select * from public.approve_payment_submission($1)', [flows[4].submissionId]),
@@ -448,6 +698,7 @@ async function runProof() {
     )
     assert.equal(supportNotification.rows.length, 1)
     const supportNotificationId = supportNotification.rows[0].id
+    const helperExecutionFenced = await assertHelperExecutionFenced(client, flows[4].orderId)
 
     const buyerRows = await asAuthenticated(client, ids.buyer, () =>
       query(client, 'select id::text, user_id::text from public.notifications order by created_at'),
@@ -514,6 +765,27 @@ async function runProof() {
     )
     assert.equal(deleteError.code, '42501')
 
+    await query(
+      client,
+      `
+        insert into public.notifications (user_id, type, title, body, href, source_order_id)
+        values ($1, 'PACKAGE_APPROVED', 'test-only pending notification', 'test-only pending notification', '/my-packages', $2)
+      `,
+      [ids.buyer, flows[2].orderId],
+    )
+    const pendingNotification = await asAuthenticated(client, ids.buyer, () =>
+      query(client, 'select id from public.notifications where source_order_id = $1', [flows[2].orderId]),
+    )
+    assert.equal(pendingNotification.rows.length, 1)
+    const accessWithNotificationOnly = await asAuthenticated(client, ids.buyer, () =>
+      query(
+        client,
+        `select id from public.orders where id = $1 and status in ('paid', 'free')`,
+        [flows[2].orderId],
+      ),
+    )
+    assert.equal(accessWithNotificationOnly.rows.length, 0)
+
     const access = await asAuthenticated(client, ids.buyer, () =>
       query(
         client,
@@ -529,18 +801,30 @@ async function runProof() {
       status: 'PASS',
       database: 'disposable-only',
       migration: '092',
+      environment: {
+        project_ref: config.localOnly ? null : process.env.N1_NOTIFICATION_DB_TEST_PROJECT_REF,
+        explicit_test_variables: true,
+        application_environment_rejected: true,
+        dotenv_files_loaded: false,
+      },
+      migration_drift: migrationDrift,
+      metadata,
       assertions: {
-        successful_approval_one_notification: true,
-        retry_recovers_failed_notification: true,
-        repeated_retry_is_idempotent: true,
-        concurrent_approval_is_idempotent: true,
-        rejection_has_no_notification: true,
-        own_select_and_read: true,
-        foreign_select_and_read_denied: true,
+        approval_paid_and_one_notification: true,
+        approval_retry_remains_one_notification: true,
+        notification_failure_keeps_payment_paid: true,
+        notification_failure_keeps_paid_access: true,
+        notification_retry_recovers_one_notification: true,
+        concurrent_repeated_approval_dedupes_without_payment_corruption: true,
+        rejection_creates_no_approval_notification: true,
+        cross_user_select_denied: true,
+        cross_user_read_mutation_denied: true,
+        owner_read_mutation_allowed: true,
         immutable_fields_denied: true,
         forged_insert_denied: true,
         delete_denied: true,
-        paid_order_remains_access_authority: true,
+        helper_execution_denied_to_untrusted_roles: helperExecutionFenced,
+        notification_presence_does_not_grant_access: true,
       },
     }, null, 2))
   } finally {
