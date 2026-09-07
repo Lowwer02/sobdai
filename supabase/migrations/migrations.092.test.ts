@@ -15,7 +15,10 @@ const executableSql = migration
 test('092 exists as one canonical additive notification migration', () => {
   const files = readdirSync(migrationDir)
   assert.equal(files.filter((name) => /^092_.+\.sql$/.test(name)).length, 1)
-  assert.match(executableSql, /create table if not exists public\.notifications/i)
+  assert.match(executableSql, /create table public\.notifications\s*\(/i)
+  assert.doesNotMatch(executableSql, /create table if not exists public\.notifications/i)
+  assert.match(migration, /to_regclass\('public\.notifications'\) is not null[\s\S]*?raise exception/i)
+  assert.doesNotMatch(executableSql, /create index if not exists notifications_/i)
   assert.doesNotMatch(executableSql, /drop\s+(table|column|index)/i)
   assert.doesNotMatch(executableSql, /create table if not exists public\.(entitlements|enrollments)/i)
 })
@@ -32,8 +35,8 @@ test('notifications has the minimal durable row, deliberate cascades, and hard a
 })
 
 test('notifications has the two bounded user-oriented indexes and own-row RLS', () => {
-  assert.match(migration, /create index if not exists notifications_user_unread_idx[\s\S]*?on public\.notifications \(user_id, created_at desc\)[\s\S]*?where read_at is null/i)
-  assert.match(migration, /create index if not exists notifications_user_created_at_idx[\s\S]*?on public\.notifications \(user_id, created_at desc\)/i)
+  assert.match(migration, /create index notifications_user_unread_idx[\s\S]*?on public\.notifications \(user_id, created_at desc\)[\s\S]*?where read_at is null/i)
+  assert.match(migration, /create index notifications_user_created_at_idx[\s\S]*?on public\.notifications \(user_id, created_at desc\)/i)
   assert.match(migration, /alter table public\.notifications enable row level security/i)
   assert.match(migration, /create policy "Users can view own notifications\."[\s\S]*?for select[\s\S]*?using \(user_id = auth\.uid\(\)\)/i)
   assert.match(migration, /create policy "Users can mark own notifications read\."[\s\S]*?for update[\s\S]*?using \(user_id = auth\.uid\(\)\)[\s\S]*?with check \([\s\S]*?read_at is not null/i)
@@ -51,14 +54,19 @@ test('successful approval produces one trusted PACKAGE_APPROVED notification aft
   assert.ok(approval)
   assert.match(approval, /update public\.payment_submissions[\s\S]*?status = 'approved'/i)
   assert.match(approval, /update public\.orders as o[\s\S]*?set status = 'paid'/i)
-  assert.match(approval, /insert into public\.notifications[\s\S]*?'PACKAGE_APPROVED'/i)
-  assert.match(approval, /'แพ็กเกจของคุณพร้อมใช้งานแล้ว'/i)
-  assert.match(approval, /on conflict \(type, source_order_id\) do nothing/i)
-  assert.ok(approval.indexOf("set status = 'paid'") < approval.indexOf('insert into public.notifications'))
+  assert.match(approval, /perform public\.try_create_package_approved_notification\(v_order_id\)/i)
+  assert.ok(approval.indexOf("set status = 'paid'") < approval.lastIndexOf('perform public.try_create_package_approved_notification'))
+
+  const producer = migration.match(/create or replace function public\.try_create_package_approved_notification\([\s\S]*?comment on function public\.try_create_package_approved_notification/i)?.[0]
+  assert.ok(producer)
+  assert.match(producer, /'PACKAGE_APPROVED'/i)
+  assert.match(producer, /'แพ็กเกจของคุณพร้อมใช้งานแล้ว'/i)
+  assert.match(producer, /'\/my-packages'/i)
+  assert.match(producer, /on conflict \(type, source_order_id\) do nothing/i)
 })
 
 test('approval retries are idempotent and rejected evidence has no notification producer', () => {
-  assert.match(migration, /if v_submission_status = 'approved' and v_order_status = 'paid' then[\s\S]*?return query select v_submission_id, v_order_id, 'approved'::text/i)
+  assert.match(migration, /if v_submission_status = 'approved' and v_order_status = 'paid' then[\s\S]*?perform public\.try_create_package_approved_notification\(v_order_id\)[\s\S]*?return query select v_submission_id, v_order_id, 'approved'::text/i)
   assert.match(migration, /on conflict \(type, source_order_id\) do nothing/i)
 
   const historicalReject = readFileSync(
@@ -71,8 +79,13 @@ test('approval retries are idempotent and rejected evidence has no notification 
 })
 
 test('notification failure is isolated in a PL/pgSQL exception block', () => {
-  const approval = migration.match(/create or replace function public\.approve_payment_submission\([\s\S]*?p_submission_id uuid[\s\S]*?\)[\s\S]*?comment on function public\.approve_payment_submission/i)?.[0]
-  assert.ok(approval)
-  assert.match(approval, /begin[\s\S]*?insert into public\.notifications[\s\S]*?exception[\s\S]*?when others then[\s\S]*?raise warning/i)
-  assert.match(migration, /notification insertion is isolated in a PL\/pgSQL subtransaction/i)
+  const producer = migration.match(/create or replace function public\.try_create_package_approved_notification\([\s\S]*?p_order_id uuid[\s\S]*?\)[\s\S]*?comment on function public\.try_create_package_approved_notification/i)?.[0]
+  assert.ok(producer)
+  assert.match(producer, /insert into public\.notifications[\s\S]*?exception[\s\S]*?when others then[\s\S]*?raise warning/i)
+  assert.match(migration, /notification insertion is isolated in a[\s\S]*?PL\/pgSQL subtransaction/i)
+})
+
+test('notification producer is not a client-writable or client-executable authority', () => {
+  assert.match(migration, /revoke all on function public\.try_create_package_approved_notification\(uuid\)[\s\S]*?from public, anon, authenticated, service_role/i)
+  assert.doesNotMatch(migration, /grant execute on function public\.try_create_package_approved_notification/i)
 })

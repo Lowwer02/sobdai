@@ -53,7 +53,8 @@ test('package CTA lands on an existing package/access surface and access remains
   assert.match(packagePage, /\.from\('orders'\)[\s\S]*?\.in\('status', ORDER_COMPLETED_STATUSES\)/)
   assert.match(myPackagesPage, /\.from\('orders'\)[\s\S]*?\.in\('status', ORDER_COMPLETED_STATUSES\)/)
   assert.match(bell, /'\/my-packages'/)
-  assert.match(read('supabase/migrations/092_notifications_v1.sql'), /then '\/package\/' \|\| btrim\(v_package_slug\)/)
+  assert.match(read('supabase/migrations/092_notifications_v1.sql'), /'\/my-packages'/)
+  assert.doesNotMatch(read('supabase/migrations/092_notifications_v1.sql'), /v_package_slug|\/package\/' \|\|/)
 })
 
 test('admin approval remains inside the financial.manage boundary and uses the existing approval RPC', () => {

@@ -25,6 +25,12 @@ begin
             errcode = 'check_violation',
             message = 'Notification V1 requires the existing manual payment approval RPC.';
     end if;
+
+    if to_regclass('public.notifications') is not null then
+        raise exception using
+            errcode = 'duplicate_object',
+            message = 'Notification V1 refuses an existing public.notifications object; inspect schema drift before applying the canonical migration.';
+    end if;
 end
 $notifications_v1_preflight$;
 
@@ -33,7 +39,7 @@ $notifications_v1_preflight$;
 -- event ledger and not an access/entitlement table.
 -- ---------------------------------------------------------------------------
 
-create table if not exists public.notifications (
+create table public.notifications (
     id uuid primary key default public.uuid_generate_v4(),
     user_id uuid not null references public.profiles(id) on delete cascade,
     type text not null,
@@ -59,11 +65,11 @@ comment on column public.notifications.source_order_id is
 comment on column public.notifications.href is
     'Trusted internal destination selected by the payment approval RPC.';
 
-create index if not exists notifications_user_unread_idx
+create index notifications_user_unread_idx
     on public.notifications (user_id, created_at desc)
     where read_at is null;
 
-create index if not exists notifications_user_created_at_idx
+create index notifications_user_created_at_idx
     on public.notifications (user_id, created_at desc);
 
 alter table public.notifications enable row level security;
@@ -91,11 +97,72 @@ grant select on table public.notifications to authenticated;
 grant update (read_at) on table public.notifications to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Trusted producer. The payment/access transition stays exactly where it was:
--- this RPC updates payment_submissions and then public.orders.status = 'paid'.
--- Notification insertion is isolated in a PL/pgSQL subtransaction so any
--- notification failure is swallowed without rolling back that valid approval.
+-- Trusted producer. This helper is intentionally not executable by clients;
+-- only the approval RPC can invoke it. The payment/access transition stays
+-- exactly where it was: the RPC updates payment_submissions and then
+-- public.orders.status = 'paid'. Notification insertion is isolated in a
+-- PL/pgSQL subtransaction so any notification failure is swallowed without
+-- rolling back that valid approval.
 -- ---------------------------------------------------------------------------
+
+create or replace function public.try_create_package_approved_notification(
+    p_order_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public, auth, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_order_user_id uuid;
+    v_order_package_id uuid;
+    v_package_name text;
+begin
+    select o.user_id, o.package_id
+    into v_order_user_id, v_order_package_id
+    from public.orders o
+    where o.id = p_order_id;
+
+    if not found then
+        raise exception using
+            errcode = '22023',
+            message = 'Cannot create notification for a missing order.';
+    end if;
+
+    select p.name
+    into v_package_name
+    from public.packages p
+    where p.id = v_order_package_id;
+
+    insert into public.notifications (
+        user_id,
+        type,
+        title,
+        body,
+        href,
+        source_order_id
+    ) values (
+        v_order_user_id,
+        'PACKAGE_APPROVED',
+        'แพ็กเกจของคุณพร้อมใช้งานแล้ว',
+        coalesce(nullif(btrim(v_package_name), ''), 'แพ็กเกจของคุณ'),
+        '/my-packages',
+        p_order_id
+    )
+    on conflict (type, source_order_id) do nothing;
+exception
+    when others then
+        raise warning 'PACKAGE_APPROVED notification skipped for order %: %',
+            p_order_id, sqlerrm;
+end
+$function$;
+
+comment on function public.try_create_package_approved_notification(uuid) is
+    'Best-effort, idempotent PACKAGE_APPROVED read-model producer used only by the manual payment approval RPC.';
+
+revoke all on function public.try_create_package_approved_notification(uuid)
+    from public, anon, authenticated, service_role;
 
 create or replace function public.approve_payment_submission(
     p_submission_id uuid
@@ -120,8 +187,6 @@ declare
     v_order_user_id uuid;
     v_order_package_id uuid;
     v_completed_order_id uuid;
-    v_package_name text;
-    v_package_slug text;
 begin
     v_actor_id := auth.uid();
 
@@ -160,6 +225,7 @@ begin
     end if;
 
     if v_submission_status = 'approved' and v_order_status = 'paid' then
+        perform public.try_create_package_approved_notification(v_order_id);
         return query select v_submission_id, v_order_id, 'approved'::text;
         return;
     end if;
@@ -210,47 +276,17 @@ begin
             message = 'The order changed before approval could be completed.';
     end if;
 
-    -- This nested EXCEPTION block is a PostgreSQL subtransaction. A failed
-    -- notification insert therefore rolls back only the notification attempt;
-    -- the approved evidence and paid order remain committed by the caller.
-    begin
-        select p.name, p.slug
-        into v_package_name, v_package_slug
-        from public.packages p
-        where p.id = v_order_package_id;
-
-        insert into public.notifications (
-            user_id,
-            type,
-            title,
-            body,
-            href,
-            source_order_id
-        ) values (
-            v_order_user_id,
-            'PACKAGE_APPROVED',
-            'แพ็กเกจของคุณพร้อมใช้งานแล้ว',
-            coalesce(nullif(btrim(v_package_name), ''), 'แพ็กเกจของคุณ'),
-            case
-                when nullif(btrim(v_package_slug), '') is not null
-                    then '/package/' || btrim(v_package_slug)
-                else '/my-packages'
-            end,
-            v_order_id
-        )
-        on conflict (type, source_order_id) do nothing;
-    exception
-        when others then
-            raise warning 'PACKAGE_APPROVED notification skipped for order %: %',
-                v_order_id, sqlerrm;
-    end;
+    -- The helper owns the narrowly isolated notification subtransaction. A
+    -- failed insert therefore rolls back only the notification attempt; the
+    -- approved evidence and paid order remain committed by the caller.
+    perform public.try_create_package_approved_notification(v_order_id);
 
     return query select v_submission_id, v_order_id, 'approved'::text;
 end
 $function$;
 
 comment on function public.approve_payment_submission(uuid) is
-    'Atomically approves manual payment evidence and changes its existing order to paid; PACKAGE_APPROVED notification is best-effort and idempotent.';
+    'Atomically approves manual payment evidence and changes its existing order to paid; PACKAGE_APPROVED notification is best-effort, retryable, and idempotent.';
 
 revoke all on function public.approve_payment_submission(uuid)
     from public, anon, authenticated, service_role;
