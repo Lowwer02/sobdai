@@ -230,12 +230,21 @@ export default async function ArticleDetailPage({
         <ArticleDetail article={article} />
         {hasRailContent && (
           <aside className="article-affiliate-aside">
-            <ArticleRailPackages packages={railPackages} />
-            {affiliateProducts.length > 0 && (
-              /* Sticky wraps the affiliate rail only — the package block above
-                 scrolls away normally, and the affiliate keeps its existing
-                 sticky/scroll behavior (see the scoped style block). */
-              <div className="article-affiliate-sticky">
+            {/* ONE sticky wrapper carries BOTH rail blocks (first-party
+                package ABOVE affiliate), so the whole stack follows the reader
+                on desktop; the viewport-bounded internal scroll keeps every
+                product and the disclosure reachable. The `article-rail-solo`
+                variant (packages without affiliate) cancels the mobile inline
+                margin — its only mobile content is the hidden rail block. */}
+            <div
+              className={
+                affiliateProducts.length > 0
+                  ? 'article-rail-sticky'
+                  : 'article-rail-sticky article-rail-solo'
+              }
+            >
+              <ArticleRailPackages packages={railPackages} />
+              {affiliateProducts.length > 0 && (
                 <AffiliateRail
                   products={affiliateProducts}
                   collectionId={article.affiliate_collection_id}
@@ -243,8 +252,8 @@ export default async function ArticleDetailPage({
                   contentSlug={article.slug}
                   sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
                 />
-              </div>
-            )}
+              )}
+            </div>
           </aside>
         )}
       </div>
@@ -264,10 +273,11 @@ export default async function ArticleDetailPage({
         /* Desktop-only rail block: hidden on mobile, where the existing bottom
            section stays the single visible related-package presentation. */
         .article-package-rail { display: none; }
-        /* Inline (mobile) affiliate spacing lives on the sticky wrapper, not
-           the aside, so an aside containing only the mobile-hidden rail block
-           (packages-without-affiliate articles) adds no gap on mobile. */
-        .article-affiliate-sticky { margin-top: 48px; }
+        /* Inline (mobile) spacing lives on the shared rail wrapper; the solo
+           variant (packages without affiliate) cancels it, because its only
+           mobile content is the desktop-only hidden rail block. */
+        .article-rail-sticky { margin-top: 48px; }
+        .article-rail-solo { margin-top: 0; }
         @media (min-width: 1300px) {
           .article-affiliate-layout {
             display: grid;
@@ -275,8 +285,8 @@ export default async function ArticleDetailPage({
             column-gap: 40px;
             justify-content: center;
             /* No align-items: start — the aside must STRETCH to the row
-               height so the sticky affiliate wrapper below can travel the
-               full column (with start it would have no room to stick). */
+               height so the sticky rail wrapper below can travel the full
+               column (with start it would have no room to stick). */
           }
           .article-affiliate-aside {
             padding-top: 32px;
@@ -286,11 +296,11 @@ export default async function ArticleDetailPage({
             margin-bottom: 24px;
           }
           .article-packages-footer { display: none; }
-          /* Sticky moved from the aside onto the affiliate wrapper only: the
-             package block above scrolls away normally (no oversized sticky
-             container, no scroll trap), and the affiliate keeps its exact
-             previous sticky/scroll behavior. */
-          .article-affiliate-sticky {
+          /* Sticky applies to the SHARED wrapper (package + affiliate), so
+             the whole right rail follows the reader. Bounded to the viewport
+             with an internal scroll — no fixed positioning, no clipped
+             products/disclosure, no scroll trap. */
+          .article-rail-sticky {
             margin-top: 0;
             position: sticky;
             top: 24px;

@@ -57,17 +57,20 @@ test('the desktop rail receives the SAME related-package data as the bottom sect
   )
 })
 
-test('the related package block is composed ABOVE the affiliate rail in the aside', () => {
+test('the related package block is composed ABOVE the affiliate rail INSIDE the shared sticky wrapper', () => {
   const railIx = page.indexOf('<ArticleRailPackages')
-  const stickyIx = page.indexOf('article-affiliate-sticky')
+  const stickyIx = page.indexOf('article-rail-sticky')
   const affiliateIx = page.indexOf('<AffiliateRail')
   const asideIx = page.indexOf('article-affiliate-aside')
   const footerIx = page.indexOf('<ArticleRelatedPackages')
   assert.ok(railIx !== -1 && stickyIx !== -1 && affiliateIx !== -1)
-  // Desktop rail order: first-party Sobdai package → affiliate picks.
+  // V1.1: ONE sticky wrapper carries BOTH blocks; package stays ABOVE affiliate.
+  assert.ok(asideIx < stickyIx, 'sticky wrapper lives inside the aside')
+  assert.ok(stickyIx < railIx, 'package block is inside the sticky wrapper')
   assert.ok(railIx < affiliateIx, 'package block must come before AffiliateRail in DOM order')
   assert.ok(affiliateIx < footerIx, 'aside stays before the bottom section (M1 contract)')
-  assert.ok(asideIx < footerIx)
+  // The old affiliate-only sticky wrapper must be gone (no double-sticky).
+  assert.doesNotMatch(page, /article-affiliate-sticky/)
 })
 
 test('exactly one related-package presentation is visible per breakpoint', () => {
@@ -84,16 +87,19 @@ test('exactly one related-package presentation is visible per breakpoint', () =>
   assert.match(style, /@media \(min-width: 1300px\)/)
 })
 
-test('the affiliate keeps its existing sticky/scroll behavior on the wrapper', () => {
+test('the SHARED sticky wrapper keeps the viewport-bounded scroll constraints', () => {
   const desktop = styleBlock(page).slice(styleBlock(page).indexOf('@media (min-width: 1300px)'))
-  assert.match(desktop, /\.article-affiliate-sticky \{[\s\S]*?position: sticky;/)
-  assert.match(desktop, /\.article-affiliate-sticky \{[\s\S]*?top: 24px;/)
-  assert.match(desktop, /\.article-affiliate-sticky \{[\s\S]*?max-height: calc\(100vh - 48px\);/)
-  assert.match(desktop, /\.article-affiliate-sticky \{[\s\S]*?overflow-y: auto;/)
-  // Sticky must NOT wrap the package block too (no oversized sticky container).
-  const railRule = desktop.match(/\.article-package-rail \{[\s\S]*?\}/)
-  assert.ok(railRule, 'rail rule exists')
-  assert.doesNotMatch(railRule![0], /position: sticky/)
+  assert.match(desktop, /\.article-rail-sticky \{[\s\S]*?position: sticky;/)
+  assert.match(desktop, /\.article-rail-sticky \{[\s\S]*?top: 24px;/)
+  assert.match(desktop, /\.article-rail-sticky \{[\s\S]*?max-height: calc\(100vh - 48px\);/)
+  assert.match(desktop, /\.article-rail-sticky \{[\s\S]*?overflow-y: auto;/)
+  // No fixed positioning, no duplicated/overlapping sticky elements.
+  assert.doesNotMatch(styleBlock(page), /position: fixed/)
+  const stickyRules = styleBlock(page).match(/position: sticky/g) || []
+  assert.equal(stickyRules.length, 1, 'exactly one sticky element in the rail')
+  // The sticky rule is the SHARED wrapper class, not an affiliate-only one.
+  const stickyRule = desktop.match(/\.article-rail-sticky \{[\s\S]*?\}/)
+  assert.ok(stickyRule, 'shared sticky rule exists')
 })
 
 test('empty states: no empty rail block, affiliate-independent rendering', () => {
@@ -105,11 +111,20 @@ test('empty states: no empty rail block, affiliate-independent rendering', () =>
     /const hasRailContent = railPackages\.length > 0 \|\| affiliateProducts\.length > 0/,
   )
   assert.match(page, /\{hasRailContent && \(\s*\n\s*<aside className="article-affiliate-aside">/)
-  // The sticky wrapper only exists with affiliate products; the rail block
-  // renders whenever packages exist.
-  assert.match(page, /\{affiliateProducts\.length > 0 && \(/)
+  // The shared sticky wrapper always exists inside the aside; the affiliate
+  // rail renders inside it only with products.
+  assert.match(page, /className=\{\s*\n\s*affiliateProducts\.length > 0\s*\n\s*\? 'article-rail-sticky'\s*\n\s*: 'article-rail-sticky article-rail-solo'\s*\n\s*\}/)
   // No grid (and no blank sidebar shell) when the rail has no content at all.
   assert.match(page, /className=\{hasRailContent \? 'article-affiliate-layout' : undefined\}/)
+})
+
+test('mobile spacing contract: shared wrapper margin, solo variant cancels it', () => {
+  const style = styleBlock(page)
+  // Inline (mobile) gap between article and affiliate — same 48px as before.
+  assert.match(style, /\.article-rail-sticky \{ margin-top: 48px; \}/)
+  // Packages-without-affiliate articles: the wrapper's only mobile content is
+  // the hidden rail block, so the gap must cancel (no empty 48px gap).
+  assert.match(style, /\.article-rail-solo \{ margin-top: 0; \}/)
 })
 
 test('the mobile bottom section keeps its existing markup', () => {
