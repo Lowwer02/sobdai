@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
 import { usePathname } from 'next/navigation'
 import { trackDailyNavClick } from '@/lib/analytics'
+import NotificationBell, { type NotificationCenterState } from './NotificationBell'
 
 const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
@@ -27,9 +28,10 @@ interface MobileNavProps {
   onLoginClick: () => void
   onRegisterClick: () => void
   onSignOut: () => void
+  notifications: NotificationCenterState
 }
 
-export default function MobileNav({ user, isAdmin, avatarUrl, onLoginClick, onRegisterClick, onSignOut }: MobileNavProps) {
+export default function MobileNav({ user, isAdmin, avatarUrl, onLoginClick, onRegisterClick, onSignOut, notifications }: MobileNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
@@ -82,19 +84,23 @@ export default function MobileNav({ user, isAdmin, avatarUrl, onLoginClick, onRe
           </span>
         </Link>
 
-        {/* Hamburger */}
-        <button type="button"
-          className="relative z-[60] p-2 text-[#F5E9D6] hover:text-[#D4AF37] transition-colors focus:outline-none"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
-          aria-expanded={menuOpen}
-        >
-          <div className="w-6 h-5 flex flex-col justify-between items-end">
-            <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-6 rotate-45 translate-y-2.5' : 'w-6'}`} />
-            <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-0 opacity-0' : 'w-4'}`} />
-            <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-6 -rotate-45 -translate-y-2' : 'w-5'}`} />
-          </div>
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell active={Boolean(user)} center={notifications} />
+
+          {/* Hamburger */}
+          <button type="button"
+            className="relative z-[60] p-2 text-[#F5E9D6] hover:text-[#D4AF37] transition-colors focus:outline-none"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label={menuOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
+            aria-expanded={menuOpen}
+          >
+            <div className="w-6 h-5 flex flex-col justify-between items-end">
+              <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-6 rotate-45 translate-y-2.5' : 'w-6'}`} />
+              <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-0 opacity-0' : 'w-4'}`} />
+              <span className={`h-0.5 bg-current rounded-full transition-all duration-300 ${menuOpen ? 'w-6 -rotate-45 -translate-y-2' : 'w-5'}`} />
+            </div>
+          </button>
+        </div>
       </nav>
 
       {/* Render Backdrop and Menu at body level */}

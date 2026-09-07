@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { trackDailyNavClick } from '@/lib/analytics'
+import NotificationBell, { type NotificationCenterState } from './NotificationBell'
 
 const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
@@ -26,9 +27,10 @@ interface DesktopNavProps {
   onLoginClick: () => void
   onRegisterClick: () => void
   onSignOut: () => void
+  notifications: NotificationCenterState
 }
 
-export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onRegisterClick, onSignOut }: DesktopNavProps) {
+export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onRegisterClick, onSignOut, notifications }: DesktopNavProps) {
   const pathname = usePathname()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -91,6 +93,7 @@ export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onR
       <div className="flex items-center gap-4 shrink-0">
         {user ? (
           <div className="flex items-center gap-4">
+            <NotificationBell active={Boolean(user)} center={notifications} />
             
             {/* Profile Dropdown */}
             <div className="relative" ref={profileRef}>

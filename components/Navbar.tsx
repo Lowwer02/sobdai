@@ -8,6 +8,7 @@ import DesktopNav from './DesktopNav'
 import MobileNav from './MobileNav'
 import ConfirmDialog from './admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
+import { useNotificationCenter } from './NotificationBell'
 
 const AuthModal = dynamic(() => import('./AuthModal'), {
   ssr: false,
@@ -43,6 +44,7 @@ export default function Navbar() {
   const [hasOpenedAuth, setHasOpenedAuth] = useState(false)
   
   const authInitializedRef = useRef(false)
+  const notificationCenter = useNotificationCenter(user?.id ?? null)
 
   const initAuth = useCallback(async () => {
     if (authInitializedRef.current) return
@@ -188,6 +190,7 @@ export default function Navbar() {
           onLoginClick={handleLoginClick}
           onRegisterClick={handleRegisterClick}
           onSignOut={handleSignOutClick}
+          notifications={notificationCenter}
         />
       </div>
 
@@ -200,6 +203,7 @@ export default function Navbar() {
           onLoginClick={handleLoginClick}
           onRegisterClick={handleRegisterClick}
           onSignOut={handleSignOutClick}
+          notifications={notificationCenter}
         />
         </div>
       </header>
