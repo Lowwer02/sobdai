@@ -8,7 +8,9 @@ interface ArticleRelatedPackagesProps {
   error?: string
 }
 
-function formatPrice(val: number | null): string {
+// Shared with the desktop rail card (ArticleRailPackages) so both responsive
+// presentations of the same related-package data format prices identically.
+export function formatPrice(val: number | null): string {
   if (val === null || val === undefined) return ''
   return `฿${val.toLocaleString('th-TH')}`
 }

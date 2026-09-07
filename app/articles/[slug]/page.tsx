@@ -18,6 +18,7 @@ import {
 } from '@/lib/seo'
 import ArticleDetail from '@/components/articles/ArticleDetail'
 import ArticleRelatedPackages from '@/components/articles/ArticleRelatedPackages'
+import ArticleRailPackages from '@/components/articles/ArticleRailPackages'
 import StructuredData from '@/components/StructuredData'
 import AffiliateRail from '@/components/affiliate/AffiliateRail'
 import { getAffiliateRailProducts } from '@/lib/affiliate-public'
@@ -29,8 +30,11 @@ export const revalidate = 300
  * Viewport width where the two-column layout activates: the editorial column
  * (max-w-4xl = 896px) + the main element's lg:px-8 gutters (64px) + 40px gap +
  * 300px sidebar. Below this the rail flows inline after the article (Content →
- * Affiliate → Related packages), in pure document order. MUST match the media
- * query in the scoped style block below and the placement analytics
+ * Affiliate → Related packages), in pure document order. At and above it the
+ * right rail composes the FIRST-PARTY related Sobdai package block ABOVE the
+ * affiliate picks and hides the bottom related-packages section, so exactly
+ * one related-package presentation is visible per breakpoint. MUST match the
+ * media query in the scoped style block below and the placement analytics
  * breakpoint passed to AffiliateRail.
  */
 const AFFILIATE_SIDEBAR_MIN_WIDTH_PX = 1300
@@ -196,6 +200,13 @@ export default async function ArticleDetailPage({
       : Promise.resolve([] as AffiliateRailProduct[]),
   ])
 
+  // ONE related-package query feeds BOTH responsive presentations: the desktop
+  // rail block (ArticleRailPackages, hidden < 1300px) and the existing bottom
+  // section (ArticleRelatedPackages, hidden >= 1300px). Exactly one is visible
+  // per breakpoint; there is never a second fetch.
+  const railPackages = packagesRes.success ? packagesRes.data : []
+  const hasRailContent = railPackages.length > 0 || affiliateProducts.length > 0
+
   const articleJsonLd = buildArticleJsonLd(article)
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: 'หน้าแรก', path: '/' },
@@ -207,45 +218,80 @@ export default async function ArticleDetailPage({
     <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <StructuredData data={articleJsonLd} />
       <StructuredData data={breadcrumbJsonLd} />
-      {/* Two-zone layout (affiliate M1): the editorial column keeps its exact
-          max-w-4xl width; the affiliate <aside> becomes a sticky 300px sidebar
-          on wide viewports and flows inline after the article on narrow ones.
-          Related packages stay OUTSIDE the grid so the sticky sidebar stops
-          before them naturally. Document order IS the mobile order. */}
-      <div className="article-affiliate-layout">
+      {/* Two-zone layout (affiliate M1 + desktop package rail): the editorial
+          column keeps its exact max-w-4xl width; the <aside> becomes the 300px
+          right rail on wide viewports and flows inline after the article on
+          narrow ones. Rail order follows the product hierarchy: the FIRST-PARTY
+          related Sobdai package block sits ABOVE the affiliate picks. Document
+          order IS the mobile order. The grid class is only applied when the
+          rail has content, so an article with neither block keeps a clean,
+          centered reading column (no blank sidebar shell). */}
+      <div className={hasRailContent ? 'article-affiliate-layout' : undefined}>
         <ArticleDetail article={article} />
-        {affiliateProducts.length > 0 && (
-          <aside className="article-affiliate-aside" aria-label="สินค้าแนะนำจากพันธมิตร">
-            <AffiliateRail
-              products={affiliateProducts}
-              collectionId={article.affiliate_collection_id}
-              contentType="article"
-              contentSlug={article.slug}
-              sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
-            />
+        {hasRailContent && (
+          <aside className="article-affiliate-aside">
+            <ArticleRailPackages packages={railPackages} />
+            {affiliateProducts.length > 0 && (
+              /* Sticky wraps the affiliate rail only — the package block above
+                 scrolls away normally, and the affiliate keeps its existing
+                 sticky/scroll behavior (see the scoped style block). */
+              <div className="article-affiliate-sticky">
+                <AffiliateRail
+                  products={affiliateProducts}
+                  collectionId={article.affiliate_collection_id}
+                  contentType="article"
+                  contentSlug={article.slug}
+                  sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
+                />
+              </div>
+            )}
           </aside>
         )}
       </div>
-      <ArticleRelatedPackages
-        packages={packagesRes.success ? packagesRes.data : []}
-        error={!packagesRes.success ? packagesRes.error : undefined}
-      />
+      {/* Existing bottom related-packages section — the MOBILE presentation,
+          unchanged. Hidden at the sidebar breakpoint by the scoped CSS below
+          (the desktop rail block takes over there). */}
+      <div className="article-packages-footer">
+        <ArticleRelatedPackages
+          packages={railPackages}
+          error={!packagesRes.success ? packagesRes.error : undefined}
+        />
+      </div>
       {/* Scoped one-off layout rules (the same per-route <style> convention the
           news detail page uses). MUST stay in sync with
           AFFILIATE_SIDEBAR_MIN_WIDTH_PX above. */}
       <style>{`
-        .article-affiliate-aside { margin-top: 48px; }
+        /* Desktop-only rail block: hidden on mobile, where the existing bottom
+           section stays the single visible related-package presentation. */
+        .article-package-rail { display: none; }
+        /* Inline (mobile) affiliate spacing lives on the sticky wrapper, not
+           the aside, so an aside containing only the mobile-hidden rail block
+           (packages-without-affiliate articles) adds no gap on mobile. */
+        .article-affiliate-sticky { margin-top: 48px; }
         @media (min-width: 1300px) {
           .article-affiliate-layout {
             display: grid;
             grid-template-columns: minmax(0, 896px) 300px;
             column-gap: 40px;
             justify-content: center;
-            align-items: start;
+            /* No align-items: start — the aside must STRETCH to the row
+               height so the sticky affiliate wrapper below can travel the
+               full column (with start it would have no room to stick). */
           }
           .article-affiliate-aside {
-            margin-top: 0;
             padding-top: 32px;
+          }
+          .article-package-rail {
+            display: block;
+            margin-bottom: 24px;
+          }
+          .article-packages-footer { display: none; }
+          /* Sticky moved from the aside onto the affiliate wrapper only: the
+             package block above scrolls away normally (no oversized sticky
+             container, no scroll trap), and the affiliate keeps its exact
+             previous sticky/scroll behavior. */
+          .article-affiliate-sticky {
+            margin-top: 0;
             position: sticky;
             top: 24px;
             max-height: calc(100vh - 48px);
