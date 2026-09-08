@@ -6,6 +6,7 @@ import {
   Bold,
   Italic,
   Link as LinkIcon,
+  Image as ImageIcon,
   List,
   ListOrdered,
   Quote,
@@ -15,6 +16,8 @@ import {
   Columns2,
 } from 'lucide-react'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
+import InlineImageUploadDialog from '@/components/admin/InlineImageUploadDialog'
+import { insertMarkdownImageAtCursor } from '@/lib/admin/inline-image-insert'
 import { ARTICLE_MAX_LENGTHS } from '@/lib/articles'
 
 export type EditorMode = 'edit' | 'split' | 'preview'
@@ -23,6 +26,7 @@ interface ArticleMarkdownEditorProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  entityId?: string | null
 }
 
 function ToolButton({
@@ -54,9 +58,24 @@ export default function ArticleMarkdownEditor({
   value,
   onChange,
   placeholder = 'พิมพ์เนื้อหาบทความแบบ Markdown ที่นี่...',
+  entityId,
 }: ArticleMarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [mode, setMode] = useState<EditorMode>('split')
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const savedSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
+
+  // Stable entity ID for this editor session (in create mode, generates a UUID once)
+  const sessionEntityIdRef = useRef<string>(
+    entityId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ''),
+  )
+
+  // Update session ref if prop entityId arrives
+  useEffect(() => {
+    if (entityId) {
+      sessionEntityIdRef.current = entityId
+    }
+  }, [entityId])
 
   // Responsive default: Switch to 'edit' mode on small viewports (<768px) on mount
   useEffect(() => {
@@ -98,6 +117,36 @@ export default function ArticleMarkdownEditor({
     })
   }
 
+  const handleOpenImageModal = () => {
+    const el = textareaRef.current
+    if (el) {
+      savedSelectionRef.current = {
+        start: el.selectionStart,
+        end: el.selectionEnd,
+      }
+    } else {
+      savedSelectionRef.current = {
+        start: value.length,
+        end: value.length,
+      }
+    }
+    setIsImageModalOpen(true)
+  }
+
+  const handleImageUploaded = ({ url, alt }: { url: string; alt: string; key: string }) => {
+    const { start, end } = savedSelectionRef.current
+    const { nextValue, newCursorPos } = insertMarkdownImageAtCursor(value, start, end, alt, url)
+    onChange(nextValue)
+
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (el) {
+        el.focus()
+        el.setSelectionRange(newCursorPos, newCursorPos)
+      }
+    })
+  }
+
   return (
     <div className="bg-[#0F0B07] border border-[#D4AF37]/20 rounded-xl overflow-hidden flex flex-col h-[68vh] min-h-[540px] max-h-[780px]">
       {/* Sticky / Fixed Header Toolbar */}
@@ -125,6 +174,14 @@ export default function ArticleMarkdownEditor({
           >
             <LinkIcon size={16} />
           </ToolButton>
+          <ToolButton
+            onClick={handleOpenImageModal}
+            title="แทรกรูปภาพ (Image)"
+            disabled={mode === 'preview'}
+          >
+            <ImageIcon size={16} />
+          </ToolButton>
+          <span className="h-4 w-[1px] bg-[#D4AF37]/20 mx-1" />
           <ToolButton onClick={() => insertLinePrefix('- ')} title="รายการ (List)" disabled={mode === 'preview'}>
             <List size={16} />
           </ToolButton>
@@ -234,6 +291,15 @@ export default function ArticleMarkdownEditor({
           </div>
         </div>
       </div>
+
+      {/* Inline Image Upload Dialog */}
+      <InlineImageUploadDialog
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        scope="articles"
+        entityId={entityId || sessionEntityIdRef.current}
+        onSuccess={handleImageUploaded}
+      />
     </div>
   )
 }
