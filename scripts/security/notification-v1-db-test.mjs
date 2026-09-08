@@ -682,7 +682,7 @@ async function runProof() {
     )
     assert.equal(accessWithoutNotification.rows.length, 1)
 
-    await dropFailureTrigger(client)
+    await dropFailureTrigger(client, failureTrigger)
     failureTrigger = null
     await asAuthenticated(client, ids.manager, () =>
       query(client, 'select * from public.approve_payment_submission($1)', [flows[0].submissionId]),
