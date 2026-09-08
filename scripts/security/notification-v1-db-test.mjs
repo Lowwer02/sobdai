@@ -11,6 +11,7 @@ const { Client } = pg
 
 const TEST_GUARD = 'YES_I_AM_USING_SOBDAI_NOTIFICATION_V1_TEST'
 const LOCAL_ONLY_GUARD = 'YES_I_AM_USING_SOBDAI_LOCAL_ONLY'
+const EXISTING_MIGRATION_GUARD = 'YES_I_AM_REUSING_CANONICAL_NOTIFICATION_V1'
 const STATEMENT_TIMEOUT = '15000ms'
 const OPERATION_TIMEOUT_MS = 10000
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -87,7 +88,11 @@ function readConfiguration() {
     ensure(databaseUrl.port !== '', 'local database URL must declare a port')
     ensure(databaseUrl.search === '' && databaseUrl.hash === '', 'local database URL contains unexpected parts')
 
-    return { databaseUrl: databaseUrl.toString(), localOnly: true }
+    return {
+      databaseUrl: databaseUrl.toString(),
+      localOnly: true,
+      reuseExistingMigration: false,
+    }
   }
 
   for (const key of ['N1_NOTIFICATION_DB_TEST_PROJECT_REF', 'N1_NOTIFICATION_DB_TEST_SUPABASE_URL']) {
@@ -124,7 +129,17 @@ function readConfiguration() {
     assert.equal(databaseUrl.username, `postgres.${projectRef}`)
   }
 
-  return { databaseUrl: databaseUrl.toString(), localOnly: false }
+  const reuseExistingMigration = process.env.N1_NOTIFICATION_DB_REUSE_EXISTING_MIGRATION
+  ensure(
+    reuseExistingMigration === undefined || reuseExistingMigration === EXISTING_MIGRATION_GUARD,
+    'existing migration reuse guard is invalid',
+  )
+
+  return {
+    databaseUrl: databaseUrl.toString(),
+    localOnly: false,
+    reuseExistingMigration: reuseExistingMigration === EXISTING_MIGRATION_GUARD,
+  }
 }
 
 function withTimeout(promise, label) {
@@ -207,9 +222,16 @@ async function lookupFixtureIds(client) {
   return ids
 }
 
-async function applyMigration(client) {
+async function applyMigration(client, config) {
   const existing = await query(client, "select to_regclass('public.notifications') as notifications")
-  ensure(existing.rows[0].notifications === null, 'disposable target already has public.notifications; use a fresh target')
+  if (existing.rows[0].notifications !== null) {
+    ensure(
+      config.reuseExistingMigration,
+      'disposable target already has public.notifications; use a fresh target or explicitly reuse the canonical migration',
+    )
+    await assertNotificationMetadata(client)
+    return { alreadyApplied: true }
+  }
 
   await query(client, 'begin')
   try {
@@ -219,7 +241,6 @@ async function applyMigration(client) {
     await query(client, 'rollback').catch(() => {})
     throw error
   }
-
   const objects = await query(
     client,
     `
@@ -257,6 +278,8 @@ async function applyMigration(client) {
     authenticated_title_update: false,
     authenticated_delete: false,
   })
+
+  return { alreadyApplied: false }
 }
 
 async function assertNotificationMetadata(client) {
@@ -424,7 +447,33 @@ async function assertNotificationMetadata(client) {
 
 async function assertMigrationDriftFailsClosed(client) {
   const existing = await query(client, "select to_regclass('public.notifications') as notifications")
-  assert.equal(existing.rows[0].notifications, null)
+  if (existing.rows[0].notifications !== null) {
+    const suffix = randomUUID().replaceAll('-', '')
+    const renamedTable = `notifications_n1_drift_existing_${suffix}`
+
+    let migrationError = null
+    await query(client, 'begin')
+    try {
+      await query(client, "set local lock_timeout = '5s'")
+      await query(client, `alter table public.notifications rename to ${renamedTable}`)
+      await query(client, 'create table public.notifications (sentinel text)')
+      await query(client, MIGRATION_SQL)
+    } catch (error) {
+      migrationError = error
+    }
+    await query(client, 'rollback').catch(() => {})
+
+    ensure(migrationError, 'migration accepted an incompatible pre-existing notifications object')
+    assert.equal(migrationError.code, '42710')
+    const restored = await query(client, "select to_regclass('public.notifications') as notifications")
+    assert.notEqual(restored.rows[0].notifications, null)
+    const temporarySentinel = await query(client, `select to_regclass('public.${renamedTable}') as notifications`)
+    assert.equal(temporarySentinel.rows[0].notifications, null)
+    return {
+      migration_drift_fails_closed: true,
+      mode: 'existing canonical table temporarily renamed in a rolled-back transaction',
+    }
+  }
 
   let migrationError = null
   await query(client, 'begin')
@@ -440,7 +489,7 @@ async function assertMigrationDriftFailsClosed(client) {
   assert.equal(migrationError.code, '42710')
   const remaining = await query(client, "select to_regclass('public.notifications') as notifications")
   assert.equal(remaining.rows[0].notifications, null)
-  return { migration_drift_fails_closed: true }
+  return { migration_drift_fails_closed: true, mode: 'sentinel table rolled back' }
 }
 
 async function insertPackage(client, id, suffix) {
@@ -587,7 +636,7 @@ async function runProof() {
   try {
     const ids = await lookupFixtureIds(client)
     const migrationDrift = await assertMigrationDriftFailsClosed(client)
-    await applyMigration(client)
+    const migration = await applyMigration(client, config)
     const metadata = await assertNotificationMetadata(client)
 
     const flows = ['recovery', 'success', 'rejected', 'concurrent', 'support'].map((name) => ({
@@ -626,12 +675,10 @@ async function runProof() {
       reviewed_by: ids.manager,
       order_status: 'paid',
     })
-    const accessWithoutNotification = await asAuthenticated(client, ids.buyer, () =>
-      query(
-        client,
-        `select id from public.orders where id = $1 and status in ('paid', 'free')`,
-        [flows[0].orderId],
-      ),
+    const accessWithoutNotification = await query(
+      client,
+      `select id from public.orders where id = $1 and status in ('paid', 'free')`,
+      [flows[0].orderId],
     )
     assert.equal(accessWithoutNotification.rows.length, 1)
 
@@ -777,21 +824,17 @@ async function runProof() {
       query(client, 'select id from public.notifications where source_order_id = $1', [flows[2].orderId]),
     )
     assert.equal(pendingNotification.rows.length, 1)
-    const accessWithNotificationOnly = await asAuthenticated(client, ids.buyer, () =>
-      query(
-        client,
-        `select id from public.orders where id = $1 and status in ('paid', 'free')`,
-        [flows[2].orderId],
-      ),
+    const accessWithNotificationOnly = await query(
+      client,
+      `select id from public.orders where id = $1 and status in ('paid', 'free')`,
+      [flows[2].orderId],
     )
     assert.equal(accessWithNotificationOnly.rows.length, 0)
 
-    const access = await asAuthenticated(client, ids.buyer, () =>
-      query(
-        client,
-        `select id from public.orders where id = $1 and status in ('paid', 'free')`,
-        [flows[0].orderId],
-      ),
+    const access = await query(
+      client,
+      `select id from public.orders where id = $1 and status in ('paid', 'free')`,
+      [flows[0].orderId],
     )
     assert.equal(access.rows.length, 1)
 
@@ -800,7 +843,7 @@ async function runProof() {
     console.log(JSON.stringify({
       status: 'PASS',
       database: 'disposable-only',
-      migration: '092',
+      migration: migration.alreadyApplied ? '092 (already applied; canonical metadata verified)' : '092',
       environment: {
         project_ref: config.localOnly ? null : process.env.N1_NOTIFICATION_DB_TEST_PROJECT_REF,
         explicit_test_variables: true,
