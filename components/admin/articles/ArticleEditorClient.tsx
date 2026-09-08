@@ -522,6 +522,7 @@ export default function ArticleEditorClient({
             </h2>
             <ArticleMarkdownEditor
               value={bodyMarkdown}
+              entityId={article?.id}
               onChange={(val) => {
                 setBodyMarkdown(val)
                 setIsDirty(true)
