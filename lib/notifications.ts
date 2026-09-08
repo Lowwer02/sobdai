@@ -1,7 +1,10 @@
 export const PACKAGE_APPROVED_NOTIFICATION_TYPE = 'PACKAGE_APPROVED' as const
+export const PAYMENT_REJECTED_NOTIFICATION_TYPE = 'PAYMENT_REJECTED' as const
 export const NOTIFICATION_LIST_LIMIT = 20
 
-export type NotificationType = typeof PACKAGE_APPROVED_NOTIFICATION_TYPE
+export type NotificationType =
+  | typeof PACKAGE_APPROVED_NOTIFICATION_TYPE
+  | typeof PAYMENT_REJECTED_NOTIFICATION_TYPE
 
 export interface NotificationRecord {
   id: string

@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { NOTIFICATION_LIST_LIMIT, PACKAGE_APPROVED_NOTIFICATION_TYPE, type NotificationRecord } from '@/lib/notifications'
+import {
+  NOTIFICATION_LIST_LIMIT,
+  PACKAGE_APPROVED_NOTIFICATION_TYPE,
+  PAYMENT_REJECTED_NOTIFICATION_TYPE,
+  type NotificationRecord,
+  type NotificationType,
+} from '@/lib/notifications'
 
 export const runtime = 'nodejs'
 
@@ -17,11 +23,14 @@ function toNotificationRecord(row: {
   read_at: string | null
   created_at: string
 }): NotificationRecord | null {
-  if (row.type !== PACKAGE_APPROVED_NOTIFICATION_TYPE) return null
+  if (
+    row.type !== PACKAGE_APPROVED_NOTIFICATION_TYPE
+    && row.type !== PAYMENT_REJECTED_NOTIFICATION_TYPE
+  ) return null
 
   return {
     id: row.id,
-    type: PACKAGE_APPROVED_NOTIFICATION_TYPE,
+    type: row.type as NotificationType,
     title: row.title,
     body: row.body,
     href: row.href,

@@ -380,7 +380,15 @@ async function assertNotificationMetadata(client) {
       order by conname
     `,
   )
-  assert.ok(constraints.rows.some((row) => row.conname === 'notifications_type_source_order_key' && row.contype === 'u'))
+  const legacyOrderDedupeConstraint = constraints.rows.some(
+    (row) => row.conname === 'notifications_type_source_order_key' && row.contype === 'u',
+  )
+  const scopedOrderDedupeIndex = indexes.rows.some(
+    (row) => row.indexname === 'notifications_type_source_order_key'
+      && /unique/i.test(row.indexdef)
+      && /PACKAGE_APPROVED/i.test(row.indexdef),
+  )
+  assert.ok(legacyOrderDedupeConstraint || scopedOrderDedupeIndex)
   assert.ok(constraints.rows.some((row) => row.conname === 'notifications_user_id_fkey' && /references profiles\(id\) on delete cascade/i.test(row.definition)))
   assert.ok(constraints.rows.some((row) => row.conname === 'notifications_source_order_id_fkey' && /references orders\(id\) on delete cascade/i.test(row.definition)))
 
@@ -748,7 +756,7 @@ async function runProof() {
     const helperExecutionFenced = await assertHelperExecutionFenced(client, flows[4].orderId)
 
     const buyerRows = await asAuthenticated(client, ids.buyer, () =>
-      query(client, 'select id::text, user_id::text from public.notifications order by created_at'),
+      query(client, "select id::text, user_id::text from public.notifications where type = 'PACKAGE_APPROVED' order by created_at"),
     )
     ensure(buyerRows.rows.length === 3, 'buyer should see only buyer-owned notification rows')
     ensure(buyerRows.rows.every((row) => row.user_id === ids.buyer), 'buyer saw a foreign notification row')
@@ -821,7 +829,7 @@ async function runProof() {
       [ids.buyer, flows[2].orderId],
     )
     const pendingNotification = await asAuthenticated(client, ids.buyer, () =>
-      query(client, 'select id from public.notifications where source_order_id = $1', [flows[2].orderId]),
+      query(client, "select id from public.notifications where source_order_id = $1 and type = 'PACKAGE_APPROVED'", [flows[2].orderId]),
     )
     assert.equal(pendingNotification.rows.length, 1)
     const accessWithNotificationOnly = await query(

@@ -15,6 +15,9 @@ const mobileNav = read('components/MobileNav.tsx')
 const paymentActions = read('app/admin/orders/actions.ts')
 const packagePage = read('app/package/[slug]/page.tsx')
 const myPackagesPage = read('app/my-packages/page.tsx')
+const checkoutPage = read('app/checkout/[id]/page.tsx')
+const checkoutClient = read('app/checkout/[id]/CheckoutClient.tsx')
+const rejectedMigration = read('supabase/migrations/093_payment_rejected_notification.sql')
 
 test('unread badge uses a small authenticated count query and latest list is capped', () => {
   assert.match(readRoute, /await supabase\.auth\.getUser\(\)/)
@@ -67,4 +70,38 @@ test('guests do not receive notification requests from the bell or API', () => {
   assert.match(bell, /if \(!active\) return null/)
   assert.match(bell, /if \(!userId\) return/)
   assert.match(readRoute, /if \(!user\)[\s\S]*?return NextResponse\.json\([\s\S]*?status: 401/i)
+})
+
+test('PAYMENT_REJECTED is a supported read-model type with a resubmission CTA', () => {
+  assert.match(read('lib/notifications.ts'), /PAYMENT_REJECTED_NOTIFICATION_TYPE = 'PAYMENT_REJECTED'/)
+  assert.match(readRoute, /PAYMENT_REJECTED_NOTIFICATION_TYPE/)
+  assert.match(readRoute, /type: row\.type as NotificationType/)
+  assert.match(bell, /PAYMENT_REJECTED_NOTIFICATION_TYPE/)
+  assert.match(bell, /'ส่งหลักฐานใหม่'/)
+  assert.match(rejectedMigration, /type in \('PACKAGE_APPROVED', 'PAYMENT_REJECTED'\)/i)
+  assert.match(rejectedMigration, /source_payment_submission_id uuid[\s\S]*?references public\.payment_submissions\(id\) on delete cascade/i)
+  assert.match(rejectedMigration, /notifications_type_source_payment_submission_key[\s\S]*?unique \(type, source_payment_submission_id\)/i)
+  assert.match(rejectedMigration, /'\/checkout\/' \|\| v_package_id::text/i)
+  assert.match(rejectedMigration, /'กรุณาตรวจสอบและส่งหลักฐานการชำระเงินใหม่'/i)
+  assert.match(checkoutPage, /\.from\('payment_submissions'\)[\s\S]*?rejection_reason/i)
+  assert.match(checkoutClient, /submissionStatus === 'rejected'[\s\S]*?ส่งหลักฐานอีกครั้ง/i)
+})
+
+test('rejection producer is trusted, best-effort, per-submission idempotent, and privacy-safe', () => {
+  const producer = rejectedMigration.match(/create or replace function public\.try_create_payment_rejected_notification\([\s\S]*?comment on function public\.try_create_payment_rejected_notification/i)?.[0]
+  assert.ok(producer)
+  assert.match(producer, /security definer/i)
+  assert.match(producer, /set search_path = pg_catalog, public, auth, pg_temp/i)
+  assert.match(producer, /insert into public\.notifications[\s\S]*?source_payment_submission_id/i)
+  assert.match(producer, /on conflict \(type, source_payment_submission_id\) do nothing/i)
+  assert.match(producer, /exception[\s\S]*?when others then[\s\S]*?raise warning/i)
+  assert.doesNotMatch(producer, /rejection_reason/i)
+  assert.match(rejectedMigration, /revoke all on function public\.try_create_payment_rejected_notification\(uuid\)[\s\S]*?from public, anon, authenticated, service_role/i)
+
+  const reject = rejectedMigration.match(/create or replace function public\.reject_payment_submission\([\s\S]*?comment on function public\.reject_payment_submission/i)?.[0]
+  assert.ok(reject)
+  assert.match(reject, /if v_submission_status = 'rejected' then[\s\S]*?perform public\.try_create_payment_rejected_notification/i)
+  assert.match(reject, /set status = 'rejected'[\s\S]*?perform public\.try_create_payment_rejected_notification/i)
+  assert.match(reject, /set search_path = pg_catalog, public, auth, pg_temp/i)
+  assert.match(rejectedMigration, /grant execute on function public\.reject_payment_submission\(uuid, text\)[\s\S]*?to authenticated/i)
 })
