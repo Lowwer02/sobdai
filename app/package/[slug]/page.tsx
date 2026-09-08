@@ -180,6 +180,7 @@ export default async function PackagePage({ params }: PageProps) {
           supportConfig={supportConfig}
           relatedNews={relatedContent.news}
           relatedArticles={relatedContent.articles}
+          isAuthenticated={Boolean(user)}
         />
       </Suspense>
     </>

@@ -16,6 +16,7 @@ import { buildPackageH1, formatThaiDisplayYear } from '@/lib/seo'
 import ContentCard from '@/components/ContentCard'
 import WrittenExamNavigation from '@/components/WrittenExamNavigation'
 import type { WrittenExamDiscovery } from '@/lib/writtenExamLearner'
+import PackageSampleExamSection from '@/components/packages/PackageSampleExamSection'
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
@@ -68,6 +69,7 @@ export default function PackageClient({
   writtenExams = [],
   relatedNews = [],
   relatedArticles = [],
+  isAuthenticated,
 }: {
   pkg: any
   examSets: any[]
@@ -77,11 +79,22 @@ export default function PackageClient({
   writtenExams?: WrittenExamDiscovery[]
   relatedNews?: RelatedNewsItem[]
   relatedArticles?: RelatedArticleItem[]
+  isAuthenticated: boolean
 }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
+
+  // Sample exam: the first published is_sample exam set.
+  // Resolved from the already-fetched examSets prop — no extra query.
+  const sampleExam = (examSets as any[]).find((es) => es.is_sample) ?? null
+
+  // Regular exam sets passed to ExamNavigation: sample is handled in the
+  // early PackageSampleExamSection, so ExamNavigation receives only the
+  // non-sample (full) sets — one canonical presentation for sample,
+  // no duplicate in the lower exam list.
+  const regularExamSets = (examSets as any[]).filter((es) => !es.is_sample)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -270,6 +283,20 @@ export default function PackageClient({
 
           </div>
 
+          {/* ── Early Sample Exam Discovery ─────────────────────────────────
+               Rendered immediately after the Package Hero grid, before
+               SupportCard and #resources, so new visitors discover the free
+               sample without scrolling through the content lists.
+               Conditionally hidden when the package has no sample exam.
+          */}
+          {sampleExam && (
+            <PackageSampleExamSection
+              sampleExam={sampleExam}
+              packageSlug={pkg.slug}
+              isAuthenticated={isAuthenticated}
+            />
+          )}
+
           {supportConfig.enabled && (
             <SupportCard
               title={supportConfig.title}
@@ -304,7 +331,7 @@ export default function PackageClient({
               
               <div className="flex-1">
                 <ExamNavigation
-                  examSets={examSets}
+                  examSets={regularExamSets}
                   packageSlug={pkg.slug}
                   writtenExamCount={writtenExams.length}
                 />

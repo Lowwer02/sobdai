@@ -22,7 +22,9 @@ test('Package integrates safe Written Exam discovery without changing MCQ entry 
   assert.doesNotMatch(packageClient, /ข้อสอบอัตนัย ภาค ข/)
   assert.doesNotMatch(packageClient, /lg:grid-cols-3/)
   assert.match(writtenExamNavigation, /package\/\$\{packageSlug\}\/written-exam\/\$\{material\.materialSlug\}/)
-  assert.match(packageClient, /ExamNavigation[\s\S]*examSets=\{examSets\}/)
+  // After sample-early-placement V1: ExamNavigation receives only non-sample
+  // exam sets (regularExamSets). The sample is presented in the early section.
+  assert.match(packageClient, /ExamNavigation[\s\S]*examSets=\{regularExamSets\}/)
   assert.match(packageClient, /ExamNavigation[\s\S]*WrittenExamNavigation/)
 })
 
