@@ -32,6 +32,7 @@ import GpExamRequirementBadge from '@/components/news/GpExamRequirementBadge'
 import RecruitmentStatusBadge from '@/components/news/RecruitmentStatusBadge'
 import NewsShareButtons from '@/components/news/NewsShareButtons'
 import NewsSocialFollowBox from '@/components/news/NewsSocialFollowBox'
+import NewsRailPackages from '@/components/news/NewsRailPackages'
 import AffiliateRail from '@/components/affiliate/AffiliateRail'
 import { getAffiliateRailProducts } from '@/lib/affiliate-public'
 import type { AffiliateRailProduct } from '@/lib/affiliate'
@@ -44,9 +45,12 @@ import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
  * Viewport width where the two-column layout activates: the editorial column
  * (800px incl. its 20px gutters) + 40px gap + 300px sidebar. Below this the
  * rail flows inline after the Sobdai CTA zone (Content → CTA → Affiliate →
- * Related), with no CSS ordering tricks — pure document order. MUST match the
- * media query in the scoped style block below and the placement analytics
- * breakpoint passed to AffiliateRail.
+ * Related), with no CSS ordering tricks — pure document order. Above it the
+ * right rail composes the FIRST-PARTY related Sobdai package block ABOVE the
+ * affiliate picks in ONE shared sticky stack (the shipped article-rail V1.1
+ * model, at News's own breakpoint). MUST match the media query in the scoped
+ * style block below and the placement analytics breakpoint passed to
+ * AffiliateRail.
  */
 const AFFILIATE_SIDEBAR_MIN_WIDTH_PX = 1180
 
@@ -423,6 +427,14 @@ export default async function NewsDetailPage({
       : Promise.resolve([] as AffiliateRailProduct[]),
   ])
 
+  // ONE related-package query feeds BOTH responsive presentations: the desktop
+  // rail block (NewsRailPackages, hidden < 1180px) and the existing bottom
+  // section (only its packages part hides >= 1180px; summaries stay). Exactly
+  // one related-package presentation is visible per breakpoint; no second
+  // fetch, and the rail shows exactly the relation/order the bottom section
+  // would have shown.
+  const hasRailContent = related.packages.length > 0 || affiliateProducts.length > 0
+
   const socialFollowPlacement = homepageSettings.social_follow.placements.news_detail_end
   const resolvedSocialChannels = resolveSocialFollowChannels(
     homepageSettings.social_follow,
@@ -450,14 +462,19 @@ export default async function NewsDetailPage({
 
   return (
     <div style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      {/* Two-zone layout (affiliate M1): the editorial column keeps its exact
-          800px reading width; the affiliate <aside> becomes a sticky 300px
-          sidebar on wide viewports and flows inline (after the Sobdai CTA /
-          social zone, before Related content) on narrow ones. Related content,
-          back link, and prev/next live in a trailing block OUTSIDE the grid so
-          the sticky sidebar naturally stops before them. Document order IS the
-          mobile order: Content → Sobdai CTA → Affiliate → Related. */}
-      <div className="news-detail-layout">
+      {/* Two-zone layout (affiliate M1 + desktop package rail): the editorial
+          column keeps its exact 800px reading width; the <aside> becomes the
+          300px right rail on wide viewports and flows inline (after the Sobdai
+          CTA / social zone, before Related content) on narrow ones. Rail order
+          follows the product hierarchy: the FIRST-PARTY related Sobdai package
+          block sits ABOVE the affiliate picks, and BOTH travel as ONE sticky
+          stack. Related content, back link, and prev/next live in a trailing
+          block OUTSIDE the grid so the sticky rail naturally stops before
+          them. Document order IS the mobile order: Content → Sobdai CTA →
+          Affiliate → Related. The grid class is only applied when the rail has
+          content, so a news item with neither block keeps a clean, centered
+          reading column (no blank sidebar shell). */}
+      <div className={hasRailContent ? 'news-detail-layout' : undefined}>
       <article style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 0' }}>
         <StructuredData data={jsonLd} />
         <StructuredData data={breadcrumbJsonLd} />
@@ -736,20 +753,37 @@ export default async function NewsDetailPage({
         />
       </article>
 
-      {/* Affiliate recommendation sidebar / inline block. Rendered only when
-          the article opted in AND the assigned collection has published
-          products (AffiliateRail + the fetch above already guarantee empty →
-          nothing). Sits AFTER the Sobdai CTA zone and BEFORE Related content
-          in DOM order, so the mobile reading hierarchy needs no CSS hacks. */}
-      {affiliateProducts.length > 0 && (
-        <aside className="news-detail-aside" aria-label="สินค้าแนะนำจากพันธมิตร">
-          <AffiliateRail
-            products={affiliateProducts}
-            collectionId={article.affiliate_collection_id}
-            contentType="news"
-            contentSlug={slug}
-            sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
-          />
+      {/* Right rail / inline block: the FIRST-PARTY related Sobdai package
+          (desktop rail only — hidden below the 1180px sidebar breakpoint,
+          where the bottom section keeps the package presentation) ABOVE the
+          affiliate picks, both inside ONE shared sticky wrapper. Rendered when
+          EITHER block has content; the wrapper carries both so the whole
+          stack follows the reader on desktop, with a viewport-bounded internal
+          scroll keeping every product and the disclosure reachable. The
+          affiliate query still only runs on opt-in and AffiliateRail renders
+          nothing without products; the `news-detail-aside-solo` variant
+          (packages without affiliate) cancels the mobile inline margin — its
+          only mobile content is the hidden rail block. */}
+      {hasRailContent && (
+        <aside
+          className={
+            affiliateProducts.length > 0
+              ? 'news-detail-aside'
+              : 'news-detail-aside news-detail-aside-solo'
+          }
+        >
+          <div className="news-rail-sticky">
+            <NewsRailPackages packages={related.packages} />
+            {affiliateProducts.length > 0 && (
+              <AffiliateRail
+                products={affiliateProducts}
+                collectionId={article.affiliate_collection_id}
+                contentType="news"
+                contentSlug={slug}
+                sidebarMinWidthPx={AFFILIATE_SIDEBAR_MIN_WIDTH_PX}
+              />
+            )}
+          </div>
         </aside>
       )}
       </div>
@@ -761,10 +795,18 @@ export default async function NewsDetailPage({
 
         {/* Related content — the conversion path (News → Package → Summary).
             Editor-curated via news_packages / news_summaries. Renders NOTHING
-            when there are no relations (no empty boxes). Cards are reused: */}
+            when there are no relations (no empty boxes). Cards are reused.
+            On Desktop (>= 1180px) the related PACKAGES live in the right rail,
+            so only the packages block hides here — related summaries stay
+            exactly where they are, and a news item with packages but no
+            summaries hides the whole section on Desktop (nothing would remain
+            under the heading). */}
         {(related.packages.length > 0 || related.summaries.length > 0) && (
           <section
             aria-label="เนื้อหาที่เกี่ยวข้อง"
+            className={
+              related.summaries.length === 0 ? 'news-related-desktop-hidden' : undefined
+            }
             style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)' }}
           >
             <h2
@@ -779,9 +821,14 @@ export default async function NewsDetailPage({
               เนื้อหาที่เกี่ยวข้อง
             </h2>
 
-            {/* Related Packages */}
+            {/* Related Packages — the MOBILE presentation; hidden >= 1180px
+                where the desktop rail block (NewsRailPackages) takes over with
+                the same `related.packages` data. */}
             {related.packages.length > 0 && (
-              <div style={{ marginBottom: related.summaries.length > 0 ? 32 : 0 }}>
+              <div
+                className="news-related-packages-block"
+                style={{ marginBottom: related.summaries.length > 0 ? 32 : 0 }}
+              >
                 <h3
                   style={{
                     fontSize: 13,
@@ -1000,26 +1047,48 @@ export default async function NewsDetailPage({
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
           gap: 16px;
         }
-        /* Affiliate two-zone layout (M1). Mobile-first: the aside flows inline
-           with the article's own gutters. At >= 1180px the wrapper becomes a
-           centered two-column grid — the editorial column keeps its exact
-           800px width (never squeezed), the sidebar is a 300px visually
-           secondary column, sticky within the grid so it stops before the
-           trailing Related block naturally (align-items: start is required for
-           sticky grid items). MUST stay in sync with
-           AFFILIATE_SIDEBAR_MIN_WIDTH_PX above. */
+        /* Desktop-only rail block: hidden on mobile, where the existing bottom
+           section stays the single visible related-package presentation. */
+        .news-package-rail { display: none; }
+        /* Two-zone layout (affiliate M1 + desktop package rail). Mobile-first:
+           the aside flows inline with the article's own gutters. The solo
+           variant (packages without affiliate) cancels the inline gap, because
+           its only mobile content is the desktop-only hidden rail block. At
+           >= 1180px the wrapper becomes a centered two-column grid — the
+           editorial column keeps its exact 800px width (never squeezed), the
+           rail is a 300px visually secondary column. No align-items: start —
+           the aside must STRETCH to the row height so the sticky rail wrapper
+           below can travel the full column (with start it would have no room
+           to stick). MUST stay in sync with AFFILIATE_SIDEBAR_MIN_WIDTH_PX
+           above. */
         .news-detail-aside { margin-top: 48px; padding: 0 20px; }
+        .news-detail-aside.news-detail-aside-solo { margin-top: 0; }
         @media (min-width: 1180px) {
           .news-detail-layout {
             display: grid;
             grid-template-columns: minmax(0, 800px) 300px;
             column-gap: 40px;
             justify-content: center;
-            align-items: start;
           }
           .news-detail-aside {
             margin-top: 0;
             padding: 32px 0 0;
+          }
+          .news-package-rail {
+            display: block;
+            margin-bottom: 24px;
+          }
+          /* The bottom section's related-PACKAGES presentation yields to the
+             rail on Desktop; related summaries and prev/next stay untouched. */
+          .news-related-packages-block { display: none; }
+          /* Packages-only news: nothing remains under the heading on Desktop,
+             so the whole bottom section hides (no empty heading shell). */
+          .news-related-desktop-hidden { display: none; }
+          /* Sticky applies to the SHARED wrapper (package + affiliate), so
+             the whole right rail follows the reader. Bounded to the viewport
+             with an internal scroll — no fixed positioning, no clipped
+             products/disclosure, no scroll trap. */
+          .news-rail-sticky {
             position: sticky;
             top: 24px;
             max-height: calc(100vh - 48px);
