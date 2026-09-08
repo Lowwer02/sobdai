@@ -553,6 +553,7 @@ export default function NewsEditorClient({
           <h2 className="text-[#D4AF37] font-bold font-display">เนื้อหา</h2>
           <MarkdownEditor
             value={bodyMarkdown}
+            entityId={article?.id}
             onChange={v => {
               setBodyMarkdown(v)
               // Toolbar inserts call this prop directly (no DOM change event),
