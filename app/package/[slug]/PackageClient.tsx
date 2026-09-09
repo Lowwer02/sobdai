@@ -86,15 +86,16 @@ export default function PackageClient({
   const hasDiscount = pkg.original_price > pkg.current_price
   const discountAmount = hasDiscount ? (pkg.original_price - pkg.current_price) : 0
 
-  // Sample exam: the first published is_sample exam set.
+  // Promoted sample exam: the first published is_sample exam set.
   // Resolved from the already-fetched examSets prop — no extra query.
   const sampleExam = (examSets as any[]).find((es) => es.is_sample) ?? null
 
-  // Regular exam sets passed to ExamNavigation: sample is handled in the
-  // early PackageSampleExamSection, so ExamNavigation receives only the
-  // non-sample (full) sets — one canonical presentation for sample,
-  // no duplicate in the lower exam list.
-  const regularExamSets = (examSets as any[]).filter((es) => !es.is_sample)
+  // Lower exam sets passed to ExamNavigation: excludes only the exact
+  // promoted sample record so it is not duplicated in lower navigation,
+  // while preserving all other exam sets (including any secondary sample records).
+  const lowerExamSets = sampleExam
+    ? (examSets as any[]).filter((es) => es.id !== sampleExam.id)
+    : examSets
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -331,7 +332,7 @@ export default function PackageClient({
               
               <div className="flex-1">
                 <ExamNavigation
-                  examSets={regularExamSets}
+                  examSets={lowerExamSets}
                   packageSlug={pkg.slug}
                   writtenExamCount={writtenExams.length}
                 />

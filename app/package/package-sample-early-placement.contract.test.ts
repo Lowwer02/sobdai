@@ -11,8 +11,8 @@ import test from 'node:test'
  * Covers:
  *  A. Package with sample: early section renders (after Hero, before #resources)
  *  B. No sample: no empty section rendered (sampleExam && guard)
- *  C. No duplicate: sample is not in ExamNavigation (regularExamSets = non-sample only)
- *  D. Full exam sets preserved: ExamNavigation still receives regularExamSets
+ *  C. Lower list excludes promoted sample by ID (lowerExamSets = es.id !== sampleExam.id)
+ *  D. Full exam sets preserved: ExamNavigation still receives lowerExamSets
  *  E. Summaries: SummaryNavigation still rendered
  *  F. Auth/access: existing exam engine auth check unchanged, new CTA uses /login?redirect=
  *  G. isAuthenticated: required boolean prop (not optional) — explicit on PackageClient
@@ -65,25 +65,74 @@ test('B: no empty section rendered when sampleExam is falsy (conditional guard)'
   assert.match(packageClient, /\?\? null/)
 })
 
-// ── C. No duplicate in lower list: ExamNavigation receives regularExamSets ─────
-test('C: ExamNavigation receives regularExamSets (non-sample only) — no duplicate sample card', () => {
-  assert.match(packageClient, /const regularExamSets = .*examSets.*filter.*is_sample/)
-  assert.match(packageClient, /ExamNavigation[\s\S]*examSets=\{regularExamSets\}/)
-  // ExamNavigation itself must NOT internally filter is_sample (semantics must
-  // stay transparent — filtering is explicit at the call site in PackageClient).
-  // The SAMPLE_CATEGORY group is now effectively unreachable because no is_sample
-  // sets are passed in, but we do NOT assert internal ExamNavigation behavior here.
+// ── C. Lower list excludes promoted sample by ID ─────────────────────────────
+test('C: ExamNavigation receives lowerExamSets excluding ONLY the promoted sample by ID', () => {
+  assert.match(packageClient, /const lowerExamSets = sampleExam\s*\?\s*\(?examSets[^;]*\.filter\(\(es[^)]*\) => es\.id !== sampleExam\.id\)\s*:\s*examSets/)
+  assert.match(packageClient, /ExamNavigation[\s\S]*examSets=\{lowerExamSets\}/)
 })
 
-test('C: regularExamSets excludes sample entries explicitly at PackageClient call site', () => {
-  // The filter must be !es.is_sample
-  assert.match(packageClient, /regularExamSets = .*filter.*!es\.is_sample|filter.*es => !es\.is_sample/)
+test('C: implementation does NOT use filter(es => !es.is_sample) for lower-list data', () => {
+  // P2 fix requirement: do not remove every is_sample record, which would hide secondary samples
+  assert.doesNotMatch(packageClient, /filter\(\(?es\)?\s*=>\s*!es\.is_sample\)/)
+  assert.doesNotMatch(packageClient, /regularExamSets/)
+})
+
+test('C: lowerExamSets semantics: no-sample path preserves all examSets', () => {
+  const mockExamSets = [
+    { id: 'exam-1', name: 'Exam 1', is_sample: false },
+    { id: 'exam-2', name: 'Exam 2', is_sample: false },
+  ]
+  const sampleExam = mockExamSets.find((es) => es.is_sample) ?? null
+  const lowerExamSets = sampleExam
+    ? mockExamSets.filter((es) => es.id !== sampleExam.id)
+    : mockExamSets
+
+  assert.equal(sampleExam, null)
+  assert.equal(lowerExamSets, mockExamSets)
+  assert.equal(lowerExamSets.length, 2)
+})
+
+test('C: lowerExamSets semantics: single sample promoted early and excluded from lower list by ID', () => {
+  const mockExamSets = [
+    { id: 'sample-1', name: 'Sample Exam', is_sample: true },
+    { id: 'exam-1', name: 'Regular Exam 1', is_sample: false },
+    { id: 'exam-2', name: 'Regular Exam 2', is_sample: false },
+  ]
+  const sampleExam = mockExamSets.find((es) => es.is_sample) ?? null
+  const lowerExamSets = sampleExam
+    ? mockExamSets.filter((es) => es.id !== sampleExam.id)
+    : mockExamSets
+
+  assert.equal(sampleExam?.id, 'sample-1')
+  assert.equal(lowerExamSets.length, 2)
+  assert.deepEqual(lowerExamSets.map((es) => es.id), ['exam-1', 'exam-2'])
+  assert.ok(!lowerExamSets.some((es) => es.id === 'sample-1'))
+})
+
+test('C: lowerExamSets semantics: multiple sample anomaly preserves secondary sample records in lower list', () => {
+  const mockExamSets = [
+    { id: 'sample-1', name: 'Sample Exam 1', is_sample: true },
+    { id: 'exam-1', name: 'Regular Exam 1', is_sample: false },
+    { id: 'sample-2', name: 'Sample Exam 2', is_sample: true },
+    { id: 'exam-2', name: 'Regular Exam 2', is_sample: false },
+  ]
+  const sampleExam = mockExamSets.find((es) => es.is_sample) ?? null
+  const lowerExamSets = sampleExam
+    ? mockExamSets.filter((es) => es.id !== sampleExam.id)
+    : mockExamSets
+
+  // Deterministic first resolved sample remains promoted early
+  assert.equal(sampleExam?.id, 'sample-1')
+  // ONLY promoted sample is excluded; secondary sample is preserved and discoverable
+  assert.equal(lowerExamSets.length, 3)
+  assert.deepEqual(lowerExamSets.map((es) => es.id), ['exam-1', 'sample-2', 'exam-2'])
+  assert.ok(lowerExamSets.some((es) => es.id === 'sample-2' && es.is_sample))
 })
 
 // ── D. Full exam sets preserved ──────────────────────────────────────────────
-test('D: ExamNavigation is still rendered with the regular exam sets', () => {
+test('D: ExamNavigation is still rendered with lowerExamSets', () => {
   assert.match(packageClient, /<ExamNavigation/)
-  assert.match(packageClient, /examSets=\{regularExamSets\}/)
+  assert.match(packageClient, /examSets=\{lowerExamSets\}/)
   // Summaries section preserved
   assert.match(packageClient, /<SummaryNavigation/)
 })
