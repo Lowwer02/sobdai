@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
     ],
     // Prefer modern formats when the browser supports them.
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 2_678_400,
   },
   experimental: {
     // lucide-react ships many named exports; this keeps imports tree-shaken
