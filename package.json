@@ -27,7 +27,7 @@
     "remark-gfm": "^4.0.1",
     "remark-github-alerts": "^0.1.1",
     "remark-parse": "^11.0.0",
-    "sharp": "^0.35.4",
+    "sharp": "0.34.5",
     "unified": "^11.0.0"
   },
   "devDependencies": {
