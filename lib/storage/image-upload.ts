@@ -8,6 +8,7 @@ import { uploadImageToR2, type UploadImageResult, type UploadOptions } from './r
 export interface ProcessAndUploadImageInput {
   file: File | Blob | ArrayBuffer | Buffer | Uint8Array
   scope: unknown
+  purpose?: unknown
   entityId?: string | null
 }
 
@@ -19,7 +20,7 @@ export type ProcessAndUploadImageOptions = UploadOptions & {
  * Full image processing and R2 upload pipeline.
  *
  * Sequence:
- * 1. Validates scope and entityId; generates immutable object key.
+ * 1. Validates scope, purpose, and entityId; generates immutable object key.
  * 2. Enforces input size limit (<= 4 MiB) on file/buffer.
  * 3. Decodes format, validates <= 50 MP, resizes to max-width 1200, auto-orients, and converts to WebP q78.
  * 4. Uploads processed bytes to Cloudflare R2 with immutable cache-control headers.
@@ -29,11 +30,12 @@ export async function processAndUploadImage(
   input: ProcessAndUploadImageInput,
   options: ProcessAndUploadImageOptions = {},
 ): Promise<UploadImageResult> {
-  const { scope, entityId } = input
+  const { scope, purpose, entityId } = input
 
-  // 1. Generate key (validates scope & entityId fail-closed before any processing or upload)
+  // 1. Generate key (validates scope, purpose & entityId fail-closed before processing/upload)
   const key = generateAssetKey({
     scope,
+    purpose,
     entityId,
     now: options.now,
   })

@@ -15,12 +15,26 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
-    // Org logos + user avatars are served from Supabase Storage.
+    // Org logos, user avatars, and existing covers are served from Supabase Storage.
     remotePatterns: [
       {
         protocol: "https",
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "assets.sobdai.com",
+        port: "",
+        pathname: "/news/*/cover/**",
+        search: "",
+      },
+      {
+        protocol: "https",
+        hostname: "assets.sobdai.com",
+        port: "",
+        pathname: "/articles/*/cover/**",
+        search: "",
       },
     ],
     // Prefer modern formats when the browser supports them.

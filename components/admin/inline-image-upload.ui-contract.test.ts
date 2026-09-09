@@ -64,6 +64,7 @@ test('InlineImageUploadDialog calls /api/admin/media/upload with FormData and en
   // FormData append
   assert.match(source, /formData\.append\(['"]file['"],\s*file\)/)
   assert.match(source, /formData\.append\(['"]scope['"],\s*scope\)/)
+  assert.doesNotMatch(source, /formData\.append\(['"]purpose['"]/, 'Legacy inline callers should keep using the default inline purpose')
 
   // 4 MB size limit
   assert.match(source, /4\s*\*\s*1024\s*\*\s*1024/)

@@ -1,7 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 // @ts-expect-error Node's strip-types test runner requires explicit .ts extensions.
-import { ALLOWED_ASSET_SCOPES, generateAssetKey, isValidAssetScope, isValidEntityUuid } from './asset-key.ts'
+import * as assetKey from './asset-key.ts'
+
+const {
+  ALLOWED_ASSET_PURPOSES,
+  generateAssetKey,
+  isValidAssetPurpose,
+  isValidAssetScope,
+  isValidEntityUuid,
+} = assetKey
 
 test('isValidAssetScope accepts only news and articles', () => {
   assert.equal(isValidAssetScope('news'), true)
@@ -14,6 +22,18 @@ test('isValidAssetScope accepts only news and articles', () => {
   assert.equal(isValidAssetScope(null), false)
   assert.equal(isValidAssetScope(undefined), false)
   assert.equal(isValidAssetScope(123), false)
+})
+
+test('isValidAssetPurpose accepts only inline and cover', () => {
+  assert.deepEqual(ALLOWED_ASSET_PURPOSES, ['inline', 'cover'])
+  assert.equal(isValidAssetPurpose('inline'), true)
+  assert.equal(isValidAssetPurpose('cover'), true)
+
+  assert.equal(isValidAssetPurpose(''), false)
+  assert.equal(isValidAssetPurpose('avatar'), false)
+  assert.equal(isValidAssetPurpose('../cover'), false)
+  assert.equal(isValidAssetPurpose(null), false)
+  assert.equal(isValidAssetPurpose(undefined), false)
 })
 
 test('isValidEntityUuid validates canonical UUID v4 shapes', () => {
@@ -58,6 +78,32 @@ test('generateAssetKey produces stable entity partition in edit flow (with valid
   assert.ok(key.endsWith('.webp'))
 })
 
+test('generateAssetKey keeps omitted purpose backward compatible with inline keys', () => {
+  const key = generateAssetKey({
+    scope: 'articles',
+    entityId: '12345678-1234-1234-1234-123456789abc',
+  })
+
+  assert.match(key, /^articles\/12345678-1234-1234-1234-123456789abc\/[0-9a-f-]+\.webp$/)
+  assert.doesNotMatch(key, /\/cover\//)
+})
+
+test('generateAssetKey produces distinguishable cover key for date and entity partitions', () => {
+  const dateKey = generateAssetKey({
+    scope: 'news',
+    purpose: 'cover',
+    now: new Date('2026-09-09T10:00:00Z'),
+  })
+  const entityKey = generateAssetKey({
+    scope: 'articles',
+    purpose: 'cover',
+    entityId: '12345678-1234-1234-1234-123456789abc',
+  })
+
+  assert.match(dateKey, /^news\/2026-09\/cover\/[0-9a-f-]+\.webp$/)
+  assert.match(entityKey, /^articles\/12345678-1234-1234-1234-123456789abc\/cover\/[0-9a-f-]+\.webp$/)
+})
+
 test('generateAssetKey produces unique collision-free keys on repeated calls', () => {
   const key1 = generateAssetKey({ scope: 'news' })
   const key2 = generateAssetKey({ scope: 'news' })
@@ -74,6 +120,23 @@ test('generateAssetKey rejects invalid scopes fail-closed', () => {
   assert.throws(
     () => generateAssetKey({ scope: '../../../etc/passwd' }),
     /Invalid asset scope/,
+  )
+
+  assert.throws(
+    () => generateAssetKey({ scope: 'avatars', purpose: 'cover' }),
+    /Invalid asset scope/,
+  )
+})
+
+test('generateAssetKey rejects invalid purposes fail-closed', () => {
+  assert.throws(
+    () => generateAssetKey({ scope: 'news', purpose: 'avatar' }),
+    /Invalid asset purpose/,
+  )
+
+  assert.throws(
+    () => generateAssetKey({ scope: 'articles', purpose: '../../cover' }),
+    /Invalid asset purpose/,
   )
 })
 

@@ -5,6 +5,7 @@ import { isUsableAccountProfile } from '@/lib/auth/server-protect'
 import {
   ImageProcessingError,
   MAX_IMAGE_INPUT_BYTES,
+  isValidAssetPurpose,
   isValidAssetScope,
   isValidEntityUuid,
   processAndUploadImage,
@@ -14,7 +15,7 @@ import {
  * Maximum allowed Content-Length for the multipart request.
  * Accounts for the 4 MiB image file limit + form field/boundary overhead (~512 KiB buffer).
  */
-export const MAX_MULTIPART_REQUEST_BYTES = 4.5 * 1024 * 1024
+const MAX_MULTIPART_REQUEST_BYTES = 4.5 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   // 1. Early request size gate: check Content-Length before buffering/parsing formData
@@ -97,6 +98,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const rawPurpose = formData.get('purpose')
+  const purpose = rawPurpose === null ? 'inline' : rawPurpose
+  if (!isValidAssetPurpose(purpose)) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid "purpose". Allowed purposes: "inline", "cover"' },
+      { status: 400 },
+    )
+  }
+
   const rawEntityId = formData.get('entityId')
   const entityId = typeof rawEntityId === 'string' && rawEntityId.trim() !== '' ? rawEntityId.trim() : null
   if (entityId !== null && !isValidEntityUuid(entityId)) {
@@ -111,6 +121,7 @@ export async function POST(request: NextRequest) {
     const asset = await processAndUploadImage({
       file: file as Blob,
       scope,
+      purpose,
       entityId,
     })
 

@@ -450,55 +450,6 @@ export async function getArticleById(id: string): Promise<Article | null> {
   return data as unknown as Article
 }
 
-// ─── COVER UPLOAD ───────────────────────────────────────────────────────────
-
-export async function uploadArticleCover(
-  formData: FormData
-): Promise<{ success: boolean; url?: string; error?: string }> {
-  const { supabase } = await requirePermission('content.write')
-
-  const file = formData.get('file') as File | null
-  if (!file || file.size === 0) {
-    return { success: false, error: 'ไม่พบไฟล์ที่ต้องการอัปโหลด หรือไฟล์ว่างเปล่า' }
-  }
-
-  if (file.size > 4 * 1024 * 1024) {
-    return { success: false, error: 'ขนาดไฟล์เกิน 4 MB' }
-  }
-
-  const mimeMap: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/heic': 'heic',
-  }
-
-  const ext = mimeMap[file.type]
-  if (!ext) {
-    return { success: false, error: 'รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WEBP, HEIC)' }
-  }
-
-  const path = `article-covers/${crypto.randomUUID()}.${ext}`
-
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-
-  const { error: uploadError } = await supabase.storage
-    .from('article-assets')
-    .upload(path, buffer, {
-      contentType: file.type,
-      upsert: false,
-    })
-
-  if (uploadError) {
-    return { success: false, error: uploadError.message }
-  }
-
-  const { data } = supabase.storage.from('article-assets').getPublicUrl(path)
-
-  return { success: true, url: data.publicUrl }
-}
-
 // ─── ARTICLE - PACKAGE RELATIONS ────────────────────────────────────────────
 
 export async function getArticlePackageRelations(

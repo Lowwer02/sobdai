@@ -16,5 +16,19 @@ test("image optimization cache and existing configuration contract", () => {
       hostname: "*.supabase.co",
       pathname: "/storage/v1/object/public/**",
     },
+    {
+      protocol: "https",
+      hostname: "assets.sobdai.com",
+      port: "",
+      pathname: "/news/*/cover/**",
+      search: "",
+    },
+    {
+      protocol: "https",
+      hostname: "assets.sobdai.com",
+      port: "",
+      pathname: "/articles/*/cover/**",
+      search: "",
+    },
   ])
 })

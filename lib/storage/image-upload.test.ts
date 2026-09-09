@@ -109,6 +109,49 @@ test('processAndUploadImage end-to-end runs pipeline and uploads to R2', async (
   assert.ok(result.url.endsWith('.webp'))
 })
 
+test('processAndUploadImage writes normalized covers to the purpose-specific immutable key', async () => {
+  const sentCommands: unknown[] = []
+
+  const mockS3Client = {
+    async send(command: unknown) {
+      sentCommands.push(command)
+      return {}
+    },
+  } as unknown as S3Client
+
+  const rawPng = await sharp({
+    create: {
+      width: 640,
+      height: 360,
+      channels: 4,
+      background: { r: 20, g: 40, b: 60, alpha: 1 },
+    },
+  })
+    .png()
+    .toBuffer()
+
+  const result = await processAndUploadImage(
+    {
+      file: rawPng,
+      scope: 'news',
+      purpose: 'cover',
+      entityId: '12345678-1234-1234-1234-123456789abc',
+    },
+    {
+      config: mockConfig,
+      s3Client: mockS3Client,
+    },
+  )
+
+  assert.equal(sentCommands.length, 1)
+  const cmd = sentCommands[0] as PutObjectCommand
+  assert.match(cmd.input.Key as string, /^news\/12345678-1234-1234-1234-123456789abc\/cover\/[0-9a-f-]+\.webp$/)
+  assert.equal(cmd.input.ContentType, 'image/webp')
+  assert.equal(cmd.input.CacheControl, 'public, max-age=31536000, immutable')
+  assert.equal(result.contentType, 'image/webp')
+  assert.match(result.url, /^https:\/\/assets\.sobdai\.com\/news\/12345678-1234-1234-1234-123456789abc\/cover\/[0-9a-f-]+\.webp$/)
+})
+
 test('processAndUploadImage rejects file exceeding 4 MiB before R2 write', async () => {
   const sentCommands: unknown[] = []
 
@@ -177,6 +220,30 @@ test('processAndUploadImage aborts without R2 write when scope or format is inva
     /Failed to decode image/,
   )
   assert.equal(sentCommands.length, 0, 'No R2 write should occur on invalid image')
+})
+
+test('processAndUploadImage rejects an invalid purpose before R2 write', async () => {
+  const sentCommands: unknown[] = []
+  const mockS3Client = {
+    async send(command: unknown) {
+      sentCommands.push(command)
+      return {}
+    },
+  } as unknown as S3Client
+
+  await assert.rejects(
+    async () =>
+      processAndUploadImage(
+        {
+          file: Buffer.from('test'),
+          scope: 'news',
+          purpose: 'avatar',
+        },
+        { config: mockConfig, s3Client: mockS3Client },
+      ),
+    /Invalid asset purpose/,
+  )
+  assert.equal(sentCommands.length, 0, 'No R2 write should occur on invalid purpose')
 })
 
 test('processAndUploadImage propagates S3 upload failure cleanly without returning fake URL', async () => {

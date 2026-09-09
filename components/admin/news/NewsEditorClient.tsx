@@ -19,7 +19,6 @@ import {
 } from 'lucide-react'
 import { toastEvent } from '@/hooks/useToast'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
-import { createClient } from '@/lib/supabase/client'
 import { createNews, updateNews, publishNews, archiveNews, restoreNews, updateRelations } from '@/app/admin/news/actions'
 import {
   validateNewsForPublish,
@@ -184,9 +183,8 @@ export default function NewsEditorClient({
   const [adsenseEnabled, setAdsenseEnabled] = useState(article?.adsense_enabled ?? false)
 
   // Cover image: URL held in state (carried into the payload, not a form field).
-  // Create has no row id yet (it's generated server-side), so the storage path
-  // uses a client UUID prefix on create and the article id on edit for a stable
-  // upsert path — both match the packages cover-logo convention.
+  // Create has no row id yet, so use a session UUID as the server-validated R2
+  // partition; edit mode uses the existing article UUID.
   const [coverId] = useState(() => article?.id || crypto.randomUUID())
   const [coverImageUrl, setCoverImageUrl] = useState(article?.cover_image_url || '')
   const [coverImageAlt, setCoverImageAlt] = useState(article?.cover_image_alt || '')
@@ -223,10 +221,15 @@ export default function NewsEditorClient({
     canonical_url: 'Canonical URL',
   }
 
-  // ─── Cover image upload (news-assets bucket, mirrors packages logo upload) ──
+  // ─── Cover image upload (secure Sobdai media API → normalized R2 asset) ─────
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      toastEvent('รองรับเฉพาะไฟล์รูปภาพ JPG, PNG และ WebP เท่านั้น', 'error')
+      e.target.value = ''
+      return
+    }
     if (file.size > 4 * 1024 * 1024) {
       toastEvent('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 4 MB', 'error')
       e.target.value = ''
@@ -236,27 +239,33 @@ export default function NewsEditorClient({
   }
 
   const uploadCover = async (file: File) => {
+    if (isUploading) return
+
     try {
       setIsUploading(true)
-      const supabase = createClient()
-      const fileName = `news/${coverId}/cover.webp`
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('scope', 'news')
+      formData.append('purpose', 'cover')
+      formData.append('entityId', coverId)
 
-      const { error: uploadError } = await supabase.storage
-        .from('news-assets')
-        .upload(fileName, file, { contentType: 'image/webp', upsert: true })
-      if (uploadError) throw uploadError
+      const response = await fetch('/api/admin/media/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      const result = await response.json().catch(() => null)
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('news-assets').getPublicUrl(fileName)
+      if (!response.ok || !result?.success || !result.asset?.url) {
+        toastEvent(result?.error || 'เกิดข้อผิดพลาดในการอัปโหลดรูปปก', 'error')
+        return
+      }
 
-      // Cache-bust so re-uploads under the same path are not served stale.
-      setCoverImageUrl(`${publicUrl}?v=${Date.now()}`)
+      setCoverImageUrl(result.asset.url)
       setIsDirty(true)
       setPublishErrors({})
       toastEvent('อัปโหลดรูปปกสำเร็จ', 'success')
-    } catch (err: any) {
-      toastEvent(err.message || 'เกิดข้อผิดพลาดในการอัปโหลด', 'error')
+    } catch {
+      toastEvent('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่ออัปโหลดรูปภาพได้', 'error')
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -825,10 +834,11 @@ export default function NewsEditorClient({
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                  disabled={isUploading}
                   className="hidden"
                 />
-                <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG, WEBP หรือ HEIC</p>
+                <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG และ WebP</p>
               </div>
             </div>
 

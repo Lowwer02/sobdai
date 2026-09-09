@@ -41,8 +41,16 @@ test('Route Handler enforces server-side authentication, RBAC, and early size ga
   // Enforces scope whitelist
   assert.match(routeSource, /isValidAssetScope/)
 
+  // Defaults legacy callers to inline and rejects unsupported purposes
+  assert.match(routeSource, /rawPurpose\s*===\s*null\s*\?\s*['"]inline['"]\s*:\s*rawPurpose/)
+  assert.match(routeSource, /isValidAssetPurpose/)
+  assert.match(routeSource, /Allowed purposes: [^\n]*inline[^\n]*cover/)
+
   // Enforces UUID entityId validation
   assert.match(routeSource, /isValidEntityUuid/)
+
+  // Client payload cannot select infrastructure or an arbitrary object key.
+  assert.doesNotMatch(routeSource, /formData\.get\(['"](?:key|bucket|endpoint)['"]\)/)
 
   // Never leaks credentials
   assert.doesNotMatch(routeSource, /R2_ACCESS_KEY_ID/)

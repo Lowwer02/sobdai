@@ -31,7 +31,6 @@ import {
   publishArticle,
   archiveArticle,
   restoreArticle,
-  uploadArticleCover,
   updateArticlePackageRelations,
   type RelatedPackageItem,
 } from '@/app/admin/articles/actions'
@@ -190,21 +189,49 @@ export default function ArticleEditorClient({
 
   const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || isUploading) return
 
-    setIsUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      toastEvent('รองรับเฉพาะไฟล์รูปภาพ JPG, PNG และ WebP เท่านั้น', 'error')
+      e.target.value = ''
+      return
+    }
 
-    const res = await uploadArticleCover(formData)
-    setIsUploading(false)
+    if (file.size > 4 * 1024 * 1024) {
+      toastEvent('ขนาดไฟล์เกิน 4 MB', 'error')
+      e.target.value = ''
+      return
+    }
 
-    if (!res.success || !res.url) {
-      toastEvent(res.error || 'อัปโหลดรูปภาพปกไม่สำเร็จ', 'error')
-    } else {
-      setCoverImageUrl(res.url)
+    try {
+      setIsUploading(true)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('scope', 'articles')
+      formData.append('purpose', 'cover')
+      if (article?.id) {
+        formData.append('entityId', article.id)
+      }
+
+      const response = await fetch('/api/admin/media/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok || !result?.success || !result.asset?.url) {
+        toastEvent(result?.error || 'อัปโหลดรูปภาพปกไม่สำเร็จ', 'error')
+        return
+      }
+
+      setCoverImageUrl(result.asset.url)
       setIsDirty(true)
       toastEvent('อัปโหลดรูปภาพปกเรียบร้อยแล้ว', 'success')
+    } catch {
+      toastEvent('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่ออัปโหลดรูปภาพได้', 'error')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -682,8 +709,10 @@ export default function ArticleEditorClient({
               </div>
             ) : (
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-[#D4AF37]/30 hover:border-[#D4AF37] rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer bg-[#0F0B07]/50 hover:bg-[#0F0B07] transition-colors p-4 text-center"
+                onClick={() => {
+                  if (!isUploading) fileInputRef.current?.click()
+                }}
+                className={`border-2 border-dashed border-[#D4AF37]/30 hover:border-[#D4AF37] rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer bg-[#0F0B07]/50 hover:bg-[#0F0B07] transition-colors p-4 text-center ${isUploading ? 'pointer-events-none opacity-60' : ''}`}
               >
                 {isUploading ? (
                   <Loader2 size={32} className="animate-spin text-[#D4AF37]" />
@@ -700,10 +729,13 @@ export default function ArticleEditorClient({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               onChange={handleCoverFileUpload}
+              disabled={isUploading}
               className="hidden"
             />
+
+            <p className="text-[10px] text-[#A1866B]">รองรับ JPG, PNG และ WebP เท่านั้น</p>
 
             <div>
               <label className="block text-xs font-semibold text-[#A1866B] uppercase mb-1">
