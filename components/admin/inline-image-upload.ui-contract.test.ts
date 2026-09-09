@@ -74,6 +74,22 @@ test('InlineImageUploadDialog calls /api/admin/media/upload with FormData and en
   // Disables duplicate submission during upload
   assert.match(source, /isUploading/)
   assert.match(source, /disabled=\{[^}]*isUploading[^}]*\}/)
+
+  // Contract: Dialog must NOT use <form> tag to prevent nesting inside parent editor forms
+  assert.doesNotMatch(source, /<form[\s>]/, 'InlineImageUploadDialog must not use <form> tag')
+
+  // Contract: All buttons in dialog must explicitly be type="button" (never type="submit")
+  assert.doesNotMatch(source, /type=["']submit["']/, 'No button in dialog should be type="submit"')
+  assert.match(source, /<button[^>]*type=["']button["'][^>]*onClick=\{handleUploadAndInsert\}/, 'Upload button must be type="button"')
+  assert.match(source, /<button[^>]*type=["']button["'][^>]*onClick=\{onClose\}/, 'Cancel/Close buttons must be type="button"')
+
+  // Contract: Alt text input intercepts Enter key without submitting any form
+  assert.match(source, /if\s*\(\s*e\.key\s*===\s*['"]Enter['"]\s*\)/, 'Alt text input should handle Enter key')
+  assert.match(source, /e\.preventDefault\(\)/, 'Enter key handler must call e.preventDefault()')
+
+  // Contract: Successful upload calls onSuccess to trigger Markdown insertion, then closes
+  assert.match(source, /onSuccess\(\{\s*url:\s*json\.asset\.url,\s*alt:\s*trimmedAlt,\s*key:\s*json\.asset\.key,?\s*\}\)/)
+  assert.match(source, /onClose\(\)/)
 })
 
 test('SummaryMarkdown renders Markdown images with lazy loading and responsive width', () => {

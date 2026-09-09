@@ -71,8 +71,7 @@ export default function InlineImageUploadDialog({
     setFile(selected)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleUploadAndInsert = async () => {
     if (isUploading) return
 
     setErrorMsg(null)
@@ -162,7 +161,7 @@ export default function InlineImageUploadDialog({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             {/* Error banner */}
             {errorMsg && (
               <div className="p-3 bg-red-950/40 border border-red-800/60 rounded-xl flex items-start gap-2.5 text-xs text-red-200">
@@ -222,6 +221,14 @@ export default function InlineImageUploadDialog({
                 type="text"
                 value={altText}
                 onChange={(e) => setAltText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    if (file && altText.trim() && !isUploading) {
+                      void handleUploadAndInsert()
+                    }
+                  }
+                }}
                 placeholder="ระบุข้อความอธิบายภาพสั้นๆ สำหรับผู้พิการและ SEO..."
                 disabled={isUploading}
                 className="w-full bg-[#0F0B07] border border-[#D4AF37]/20 rounded-xl px-3.5 py-2 text-sm text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] disabled:opacity-50"
@@ -242,7 +249,8 @@ export default function InlineImageUploadDialog({
                 ยกเลิก
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={handleUploadAndInsert}
                 disabled={!file || !altText.trim() || isUploading}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#D4AF37] hover:bg-[#F2D06B] text-[#0F0B07] text-xs font-bold rounded-xl shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -256,7 +264,7 @@ export default function InlineImageUploadDialog({
                 )}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
