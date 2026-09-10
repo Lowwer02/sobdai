@@ -54,7 +54,7 @@ export default async function ExamSetPage({
   const [pkgResult, userResult] = await Promise.all([
     supabase
       .from('packages')
-      .select('id, name, slug, positions(name), organizations(name)')
+      .select('id, name, slug, current_price, original_price, positions(name), organizations(name)')
       .eq('slug', slug)
       .single(),
     supabase.auth.getUser(),
@@ -87,19 +87,15 @@ export default async function ExamSetPage({
   //    Running these three at once collapses 2-3 sequential round-trips into one.
   const needsAccessCheck = !examSet.is_sample
   const [profileResult, orderResult, questionsResult] = await Promise.all([
-    needsAccessCheck
-      ? supabase.from('profiles').select('role').eq('id', user.id).single()
-      : Promise.resolve({ data: null }),
+    supabase.from('profiles').select('role').eq('id', user.id).single(),
     // order only matters when not Owner/Admin internal access; fetch anyway to keep it parallel
-    needsAccessCheck
-      ? supabase
-          .from('orders')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('package_id', pkg.id)
-          .in('status', ORDER_COMPLETED_STATUSES)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    supabase
+      .from('orders')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('package_id', pkg.id)
+      .in('status', ORDER_COMPLETED_STATUSES)
+      .maybeSingle(),
     supabase
       .from('exam_set_questions')
       .select(`
@@ -128,10 +124,12 @@ export default async function ExamSetPage({
       .order('sort_order', { ascending: true }),
   ])
 
+  const profile = profileResult.data
+  const hasInternalAccess = Boolean(profile && hasInternalPackageAccess(profile.role))
+  const hasOrder = Boolean(orderResult.data)
+  const isPackageOwner = hasInternalAccess || hasOrder
+
   if (needsAccessCheck) {
-    const profile = profileResult.data
-    const hasInternalAccess = Boolean(profile && hasInternalPackageAccess(profile.role))
-    const hasOrder = Boolean(orderResult.data)
     if (!hasInternalAccess && !hasOrder) {
       return (
         <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
@@ -345,6 +343,7 @@ export default async function ExamSetPage({
       questions={questions}
       mode={mode}
       bookmarkState={bookmarkState}
+      isPackageOwner={isPackageOwner}
       examResultSocialFollow={{
         heading: socialFollowPlacement.heading,
         description: socialFollowPlacement.description,
