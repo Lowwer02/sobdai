@@ -18,6 +18,11 @@ import WrittenExamNavigation from '@/components/WrittenExamNavigation'
 import type { WrittenExamDiscovery } from '@/lib/writtenExamLearner'
 import PackageSampleExamSection from '@/components/packages/PackageSampleExamSection'
 
+type CanonicalPositionLink = {
+  slug: string
+  name: string
+}
+
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0F0B07] border border-[#D4AF37]/30 text-[#D4AF37] text-[12px] rounded-full">
@@ -70,6 +75,7 @@ export default function PackageClient({
   relatedNews = [],
   relatedArticles = [],
   isAuthenticated,
+  canonicalPosition = null,
 }: {
   pkg: any
   examSets: any[]
@@ -80,6 +86,7 @@ export default function PackageClient({
   relatedNews?: RelatedNewsItem[]
   relatedArticles?: RelatedArticleItem[]
   isAuthenticated: boolean
+  canonicalPosition?: CanonicalPositionLink | null
 }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
@@ -151,6 +158,20 @@ export default function PackageClient({
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-[#F5E9D6] text-[13px] mr-2">{orgName}</span>
+                    {(canonicalPosition || pkg.positions?.name) && (
+                      canonicalPosition ? (
+                        <Link
+                          href={`/positions/${encodeURIComponent(canonicalPosition.slug)}`}
+                          className="text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full border border-[#D4AF37]/30 hover:bg-[#D4AF37]/10 transition-colors"
+                        >
+                          {canonicalPosition.name}
+                        </Link>
+                      ) : (
+                        <span className="text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full border border-white/10">
+                          {pkg.positions.name}
+                        </span>
+                      )
+                    )}
                     <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{pkg.package_code}</span>
                     <span className="bg-[#D4AF37]/10 text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {formatThaiDisplayYear(pkg.exam_year)}</span>
                     <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full">v{pkg.version || '1'}</span>

@@ -2,10 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const root = process.cwd()
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
 const migration = read('supabase/migrations/093_payment_rejected_notification.sql')
+const positionMigrationPath = fileURLToPath(new URL('./093_position_entities_v1.sql', import.meta.url))
+const positionMigration = readFileSync(positionMigrationPath, 'utf8')
 const executableSql = migration
   .split('\n')
   .filter((line) => !line.trimStart().startsWith('--'))
@@ -56,4 +59,20 @@ test('093 keeps trusted helper execution fenced and rejection authority unchange
   assert.match(rejection, /set status = 'rejected'[\s\S]*?public\.try_create_payment_rejected_notification/i)
   assert.match(migration, /grant execute on function public\.reject_payment_submission\(uuid, text\)[\s\S]*?to authenticated/i)
   assert.doesNotMatch(rejection, /update public\.orders[\s\S]*?set status/i)
+})
+
+test('Position V1 migration is additive, relational, and does not seed production content', () => {
+  assert.match(positionMigration, /create table if not exists public\.position_entities/i)
+  assert.match(positionMigration, /slug text unique not null/i)
+  assert.match(positionMigration, /status text not null default 'draft'/i)
+  assert.match(positionMigration, /sources jsonb not null default '\[\]'::jsonb/i)
+  assert.match(positionMigration, /references public\.article_authors\(id\) on delete set null/i)
+  assert.match(positionMigration, /add column if not exists position_entity_id uuid/i)
+  assert.match(positionMigration, /foreign key \(position_entity_id\).*references public\.position_entities\(id\).*on delete set null/is)
+  assert.match(positionMigration, /Public can read published position entities/i)
+  assert.match(positionMigration, /status = 'published'/i)
+  assert.match(positionMigration, /Content managers can manage position entities/i)
+  assert.match(positionMigration, /role in \('owner', 'admin', 'editor'\)/i)
+  assert.doesNotMatch(positionMigration, /policy-and-plan-analyst/i)
+  assert.doesNotMatch(positionMigration, /นักวิเคราะห์นโยบายและแผน/i)
 })

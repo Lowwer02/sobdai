@@ -18,6 +18,7 @@ import {
   type PackageSeoData,
 } from '@/lib/seo'
 import StructuredData from '@/components/StructuredData'
+import { getCanonicalPositionLink } from '@/lib/positions-public'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -90,7 +91,7 @@ export default async function PackagePage({ params }: PageProps) {
 
   // Now that we have the package id + user, run the dependent queries in parallel.
   const user = userResult.data.user
-  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent, writtenExams] = await Promise.all([
+  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent, writtenExams, canonicalPosition] = await Promise.all([
     getPackagePublicCounts([pkg.id]),
     // Only need a profile lookup if the package is an unpublished draft
     pkg.is_published
@@ -136,6 +137,7 @@ export default async function PackagePage({ params }: PageProps) {
       console.error('Error fetching published Written Exam discovery:', err)
       return []
     }),
+    getCanonicalPositionLink(pkg.position_id),
   ])
 
   // Apply counts
@@ -181,6 +183,7 @@ export default async function PackagePage({ params }: PageProps) {
           relatedNews={relatedContent.news}
           relatedArticles={relatedContent.articles}
           isAuthenticated={Boolean(user)}
+          canonicalPosition={canonicalPosition}
         />
       </Suspense>
     </>

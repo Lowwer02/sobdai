@@ -16,6 +16,7 @@ const learningNav = [
 const managementNav = [
   { name: 'Organizations', href: '/admin/organizations', icon: Building2, permission: 'system.manage' },
   { name: 'Positions', href: '/admin/positions', icon: UserCircle2, permission: 'system.manage' },
+  { name: 'Position Entities', href: '/admin/position-entities', icon: UserCircle2, permission: 'content.read' },
   { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
   { name: 'Homepage', href: '/admin/homepage', icon: Home, permission: 'content.write' },

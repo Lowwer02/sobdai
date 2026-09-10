@@ -1,6 +1,7 @@
 'use server'
 
 import { requirePermission } from '@/lib/auth/server-protect'
+import { packageOwnershipError, validatePackageOrganizationPosition } from '@/lib/package-ownership'
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -26,10 +27,14 @@ export async function createPackageAction(formData: FormData) {
     const version = formData.get('version') as string
 
     // Fetch codes for auto-generation
-    const { data: org } = await supabase.from('organizations').select('code').eq('id', orgId).single()
-    const { data: pos } = await supabase.from('positions').select('code').eq('id', posId).single()
+    const [{ data: org }, { data: pos }] = await Promise.all([
+      supabase.from('organizations').select('code').eq('id', orgId).single(),
+      supabase.from('positions').select('code, organization_id').eq('id', posId).single(),
+    ])
 
-    if (!org || !pos) throw new Error('Invalid organization or position')
+    const ownership = validatePackageOrganizationPosition(org ? orgId : null, pos?.organization_id)
+    const ownershipError = packageOwnershipError(ownership)
+    if (ownershipError) return { success: false, error: ownershipError }
 
     const packageCode = `${org.code}-${pos.code}-${examYear}-V${version.replace(/\./g, '')}`
 
@@ -98,10 +103,14 @@ export async function updatePackageAction(id: string, formData: FormData) {
     const version = formData.get('version') as string
 
     // Fetch codes for auto-generation
-    const { data: org } = await supabase.from('organizations').select('code').eq('id', orgId).single()
-    const { data: pos } = await supabase.from('positions').select('code').eq('id', posId).single()
+    const [{ data: org }, { data: pos }] = await Promise.all([
+      supabase.from('organizations').select('code').eq('id', orgId).single(),
+      supabase.from('positions').select('code, organization_id').eq('id', posId).single(),
+    ])
 
-    if (!org || !pos) throw new Error('Invalid organization or position')
+    const ownership = validatePackageOrganizationPosition(org ? orgId : null, pos?.organization_id)
+    const ownershipError = packageOwnershipError(ownership)
+    if (ownershipError) return { success: false, error: ownershipError }
 
     const packageCode = `${org.code}-${pos.code}-${examYear}-V${version.replace(/\./g, '')}`
 

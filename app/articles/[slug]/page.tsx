@@ -23,6 +23,7 @@ import StructuredData from '@/components/StructuredData'
 import AffiliateRail from '@/components/affiliate/AffiliateRail'
 import { getAffiliateRailProducts } from '@/lib/affiliate-public'
 import type { AffiliateRailProduct } from '@/lib/affiliate'
+import { getCanonicalPositionLinks, type CanonicalPositionLink } from '@/lib/positions-public'
 
 export const revalidate = 300
 
@@ -205,6 +206,17 @@ export default async function ArticleDetailPage({
   // section (ArticleRelatedPackages, hidden >= 1300px). Exactly one is visible
   // per breakpoint; there is never a second fetch.
   const railPackages = packagesRes.success ? packagesRes.data : []
+  const canonicalPositions = await getCanonicalPositionLinks(
+    railPackages.map((pkg) => pkg.position_id),
+  )
+  const relatedPositions = Array.from(
+    new Map(
+      railPackages
+        .map((pkg) => pkg.position_id ? canonicalPositions.get(pkg.position_id) : null)
+        .filter((position): position is CanonicalPositionLink => Boolean(position))
+        .map((position) => [position.id, position]),
+    ).values(),
+  )
   const hasRailContent = railPackages.length > 0 || affiliateProducts.length > 0
 
   const articleJsonLd = buildArticleJsonLd(article)
@@ -227,7 +239,7 @@ export default async function ArticleDetailPage({
           rail has content, so an article with neither block keeps a clean,
           centered reading column (no blank sidebar shell). */}
       <div className={hasRailContent ? 'article-affiliate-layout' : undefined}>
-        <ArticleDetail article={article} />
+        <ArticleDetail article={article} relatedPositions={relatedPositions} />
         {hasRailContent && (
           <aside className="article-affiliate-aside">
             {/* ONE sticky wrapper carries BOTH rail blocks (first-party
