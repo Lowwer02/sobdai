@@ -34,6 +34,7 @@ export function projectConstraintSnapshot(
       tier: entry.tier,
     })),
     target: source.target,
+    documentQuotas: source.documentQuotas ?? null,
     runUnit: source.runUnit,
   }
 }

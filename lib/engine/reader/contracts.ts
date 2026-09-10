@@ -228,6 +228,39 @@ export interface AssemblyRequestMeta {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 2b. Quantified Document quotas (Document Quota Closure)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * One authored per-Set Document quota cell (Document Quota Closure).
+ *
+ * A Blueprint that explicitly declares the 'quantified-physical' Document
+ * Allocation mode AND authors per-Document per-Set counts whose per-Set sum
+ * equals `target.perSet` promotes those counts from advisory Master-Table
+ * guidance to AUTHORITATIVE PHYSICAL QUOTAS: every Set must contain exactly
+ * `count` Questions from `document`. The Solver satisfies the quotas by
+ * construction (one demand bucket per Document×LO cell) and fails loudly when
+ * the Bank cannot supply them.
+ *
+ * quantified-physical V1 additionally requires every Set to carry the SAME
+ * per-Document quota vector (identical per-Set Document marginals): Stage 6
+ * refuses a declared Blueprint whose Set vectors differ
+ * ('invalid_document_quotas'), because the allocator's exact global
+ * aggregate + per-Set peel decomposition relies on that invariant.
+ *
+ * Blueprints WITHOUT the explicit declaration (e.g. KSB v3.0.1) keep the
+ * historical advisory treatment — their Master-Table counts stay guidance and
+ * are never carried into the AssemblyRequest.
+ */
+export interface DocumentQuotaEntry {
+  readonly setNumber: 1 | 2 | 3 | 4 | 5
+  /** Exact stored Document name (Document Registry id === name in v3.0). */
+  readonly document: string
+  /** Required physical Question count for this Document in this Set. */
+  readonly count: number
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 3. AssemblyRequest — the sole Engine input contract
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -268,6 +301,14 @@ export interface AssemblyRequest {
   loDistribution: LoDistribution
   /** L1–L5 with scope, enforcement level, optional similarity thresholds. */
   duplicatePrevention: DuplicatePreventionRule[]
+  /**
+   * Quantified per-Set Document quotas (Document Quota Closure). null (or
+   * absent) when the Blueprint does not declare the 'quantified-physical'
+   * Document Allocation mode — legacy Blueprints keep advisory document
+   * counts. When present, the per-Set sum of counts equals target.perSet
+   * (validated at Stage 6) and the counts are hard physical quotas.
+   */
+  documentQuotas?: readonly DocumentQuotaEntry[] | null
   /** Runtime-only: Question Codes to exclude from this run (not persisted). */
   exclusions: string[]
   /** Constant spec_version "1.0" for this Integration Spec version. */

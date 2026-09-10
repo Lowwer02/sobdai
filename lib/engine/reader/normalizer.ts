@@ -78,6 +78,12 @@ export interface CanonicalBlueprintMetadata {
   readonly engineVersion: string | null
   /** NFC + trimmed + leading-zero-stripped. null if absent. */
   readonly blueprintVersion: string | null
+  /**
+   * The Document Allocation mode, NFC + trimmed (e.g. 'quantified-physical').
+   * null if absent — absence keeps the Blueprint's document counts advisory
+   * (legacy behavior). Document Quota Closure.
+   */
+  readonly documentAllocation?: string | null
   /** NFC + trimmed + lowercased (kebab-case is enforced by Stage 3). null if absent. */
   readonly positionId: string | null
   /** NFC + whitespace-collapsed. null if H1 was absent. NOT trimmed to a max length. */
@@ -106,6 +112,7 @@ export function normalizeMetadata(m: BlueprintMetadata): CanonicalBlueprintMetad
     engineVersion: m.engineVersion !== null ? normalizeVersion(m.engineVersion) : null,
     blueprintVersion: m.blueprintVersion !== null ? normalizeVersion(m.blueprintVersion) : null,
     positionId: m.positionId !== null ? normalizePositionId(m.positionId) : null,
+    documentAllocation: m.documentAllocation != null ? normalizeText(m.documentAllocation) : null,
     title: m.title !== null ? normalizeText(m.title) : null,
     sourceLine: m.sourceLine,
     form: m.form,

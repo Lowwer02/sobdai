@@ -46,6 +46,7 @@ import type {
 import type {
   CoverageRule,
   DistributionConstraints,
+  DocumentQuotaEntry,
   DocumentRegistryEntry,
   DuplicatePreventionRule,
   LoDistribution,
@@ -468,6 +469,12 @@ export interface ConstraintSnapshot {
   readonly loDistribution: DeepReadonly<LoDistribution>
   readonly documentRegistry: readonly DeepReadonly<Pick<DocumentRegistryEntry, 'id' | 'tier'>>[]
   readonly target: DeepReadonly<RunTarget>
+  /**
+   * Quantified per-Set Document quotas (Document Quota Closure) — present
+   * only when the Blueprint declares the 'quantified-physical' Document
+   * Allocation mode. null = legacy advisory document counts (unchanged).
+   */
+  readonly documentQuotas?: readonly DeepReadonly<DocumentQuotaEntry>[] | null
   readonly runUnit: RunUnit
 }
 

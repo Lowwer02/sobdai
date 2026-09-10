@@ -242,6 +242,7 @@ function verifies_every_failure_code_reachable(): void {
     'missing_lo_distribution',
     'missing_duplicate_prevention', // documented; not currently emitted
     'invalid_lo_target',
+    'invalid_document_quotas',
   ]
   // The currently-emitted set is a subset; the documented-but-not-emitted
   // codes are kept in the union for forward compat. This test just verifies
@@ -289,12 +290,144 @@ function verifies_assembly_request_omits_per_set_illustrative_tables(): void {
     'coverageRules',
     'loDistribution',
     'duplicatePrevention',
+    // Document Quota Closure: present only when the Blueprint declares the
+    // 'quantified-physical' Document Allocation mode (null otherwise). The
+    // ADVISORY per-set tables (documentSetCounts etc.) remain omitted — the
+    // quotas are the authored-quantified subset promoted to hard contracts.
+    'documentQuotas',
     'exclusions',
     'meta',
   ])
   for (const k of keys) {
     assert.ok(allowedKeys.has(k), `AssemblyRequest carries unexpected key: ${k}`)
   }
+  // The fixture declares no Document Allocation mode → quotas stay null
+  // (legacy advisory behavior; Document Quota Closure gate is OFF).
+  assert.equal(req.documentQuotas ?? null, null)
+}
+
+// ─── Quantified-physical V1: uniform per-Set Document quota vectors ─────────
+
+/**
+ * Build a fixture variant with the given Distribution Master Table
+ * (จำนวนข้อต่อ Document ต่อ Set) and — unless `declare` is false — the
+ * `Document Allocation: quantified-physical` metadata declaration.
+ */
+function buildFromQuantifiedFixture(
+  masterTableHeader: string,
+  masterTableRows: readonly string[],
+  declare = true
+): ReturnType<typeof buildAssemblyRequest> {
+  let source = buildStage5CompleteBlueprint()
+    .replace(
+      '| Document | S1 | S2 | S3 | S4 | S5 | รวม |\n|---|---|---|---|---|---|---|',
+      masterTableHeader
+    )
+    .replace(
+      '| 1. พ.ร.บ.ทดสอบ 2560 | **20** | 13 | 12 | 13 | 13 | 71 |\n| 2. พ.ร.บ.อีกอัน 2562 | 5 | 5 | 10 | 5 | 8 | 33 |',
+      masterTableRows.join('\n')
+    )
+  if (declare) {
+    source = source.replace(
+      '**Position ID**: `test-position`',
+      '**Position ID**: `test-position` | **Document Allocation**: quantified-physical'
+    )
+  }
+  const r = loadBlueprint(source)
+  if (!r.ok) throw new Error(`load failed: ${r.reason}`)
+  const meta = normalizeMetadata(r.document.metadata)
+  const ast = projectToBlueprintAst(r.document, meta)
+  return buildAssemblyRequest(ast, meta)
+}
+
+/** Map<document, count> for one Set's carried quotas. */
+function quotaVectorOf(request: AssemblyRequest, setNumber: number): Map<string, number> {
+  const quotas = request.documentQuotas ?? []
+  return new Map(
+    quotas
+      .filter((q) => q.setNumber === setNumber)
+      .map((q) => [q.document, q.count] as const)
+  )
+}
+
+function verifies_quantified_uniform_2set_quotas_pass(): void {
+  // Two authored Sets, identical quota vectors, each summing to 100.
+  const result = buildFromQuantifiedFixture(
+    '| Document | S1 | S2 | รวม |\n|---|---|---|---|',
+    [
+      '| 1. พ.ร.บ.ทดสอบ 2560 | 60 | 60 | 120 |',
+      '| 2. พ.ร.บ.อีกอัน 2562 | 40 | 40 | 80 |',
+    ]
+  )
+  if (!result.ok) return assert.fail(`uniform 2-Set must pass: ${result.message}`)
+  assert.equal(result.request.target.sets, 5) // no targetSetCount option → RUN_TARGET
+  const quotas = result.request.documentQuotas ?? []
+  assert.equal(quotas.length, 4, '2 documents × 2 authored Sets')
+  for (const setNumber of [1, 2] as const) {
+    const vector = quotaVectorOf(result.request, setNumber)
+    assert.equal(vector.size, 2)
+    assert.equal([...vector.values()].reduce((a, b) => a + b, 0), 100)
+    assert.equal(vector.get('พ.ร.บ.ทดสอบ 2560'), 60)
+    assert.equal(vector.get('พ.ร.บ.อีกอัน 2562'), 40)
+  }
+  assert.deepEqual(
+    Object.fromEntries([...quotaVectorOf(result.request, 2)].sort()),
+    Object.fromEntries([...quotaVectorOf(result.request, 1)].sort()),
+    'both authored Sets carry the SAME per-Document quota vector'
+  )
+}
+
+function verifies_quantified_uniform_3set_quotas_pass(): void {
+  const result = buildFromQuantifiedFixture(
+    '| Document | S1 | S2 | S3 | รวม |\n|---|---|---|---|---|',
+    [
+      '| 1. พ.ร.บ.ทดสอบ 2560 | 55 | 55 | 55 | 165 |',
+      '| 2. พ.ร.บ.อีกอัน 2562 | 45 | 45 | 45 | 135 |',
+    ]
+  )
+  if (!result.ok) return assert.fail(`uniform 3-Set must pass: ${result.message}`)
+  const quotas = result.request.documentQuotas ?? []
+  assert.equal(quotas.length, 6, '2 documents × 3 authored Sets')
+  for (const setNumber of [1, 2, 3] as const) {
+    const vector = quotaVectorOf(result.request, setNumber)
+    assert.equal([...vector.values()].reduce((a, b) => a + b, 0), 100)
+    assert.equal(vector.get('พ.ร.บ.ทดสอบ 2560'), 55)
+    assert.equal(vector.get('พ.ร.บ.อีกอัน 2562'), 45)
+  }
+}
+
+function verifies_quantified_non_uniform_quotas_refused(): void {
+  // Every Set still sums to 100, but Set 2's vector (60/40) differs from
+  // Set 1's (55/45) — an unsupported quantified-physical V1 shape.
+  const result = buildFromQuantifiedFixture(
+    '| Document | S1 | S2 | S3 | รวม |\n|---|---|---|---|---|',
+    [
+      '| 1. พ.ร.บ.ทดสอบ 2560 | 55 | 60 | 55 | 170 |',
+      '| 2. พ.ร.บ.อีกอัน 2562 | 45 | 40 | 45 | 130 |',
+    ]
+  )
+  assert.equal(result.ok, false, 'non-uniform per-Set quotas must be refused')
+  if (result.ok) return
+  assert.equal(result.code, 'invalid_document_quotas')
+  assert.match(result.message, /Set 2 differ from Set 1/)
+  assert.match(result.message, /SAME per-Document quota vector/)
+  // The first canonically-sorted differing Document is named with both counts.
+  assert.match(result.message, /พ\.ร\.บ\.ทดสอบ 2560' is authored 60 versus 55/)
+}
+
+function verifies_non_uniform_table_without_declaration_stays_advisory(): void {
+  // Same non-uniform Master Table, but NO Document Allocation declaration:
+  // the counts stay advisory (legacy behavior) and must NOT be refused.
+  const result = buildFromQuantifiedFixture(
+    '| Document | S1 | S2 | S3 | รวม |\n|---|---|---|---|---|',
+    [
+      '| 1. พ.ร.บ.ทดสอบ 2560 | 55 | 60 | 55 | 170 |',
+      '| 2. พ.ร.บ.อีกอัน 2562 | 45 | 40 | 45 | 130 |',
+    ],
+    false
+  )
+  if (!result.ok) return assert.fail('legacy Blueprint must build despite non-uniform counts')
+  assert.equal(result.request.documentQuotas ?? null, null)
 }
 
 // ─── runner ─────────────────────────────────────────────────────────────────
@@ -319,6 +452,10 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: 'determinism: byte-identical AST → byte-identical request', fn: verifies_builder_is_deterministic },
   { name: 'immutability: builder does not mutate input AST', fn: verifies_builder_does_not_mutate_input_ast },
   { name: 'Integration Spec §4.4: per-Set illustrative tables NOT carried', fn: verifies_assembly_request_omits_per_set_illustrative_tables },
+  { name: 'quantified-physical V1: uniform 2-Set quota vectors → PASS', fn: verifies_quantified_uniform_2set_quotas_pass },
+  { name: 'quantified-physical V1: uniform 3-Set quota vectors → PASS', fn: verifies_quantified_uniform_3set_quotas_pass },
+  { name: 'quantified-physical V1: non-uniform per-Set quotas (each Set sums 100) → REFUSED invalid_document_quotas', fn: verifies_quantified_non_uniform_quotas_refused },
+  { name: 'quantified-physical V1: non-uniform table WITHOUT declaration stays advisory (legacy unchanged)', fn: verifies_non_uniform_table_without_declaration_stays_advisory },
 ]
 
 let passed = 0

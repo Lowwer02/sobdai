@@ -69,6 +69,8 @@ export const KNOWN_METADATA_KEYS: ReadonlySet<string> = new Set([
   'blueprintVersion',
   'position_id',
   'positionId',
+  'document_allocation',
+  'documentAllocation',
   'title',
 ])
 

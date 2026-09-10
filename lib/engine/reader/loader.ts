@@ -86,6 +86,15 @@ export interface BlueprintMetadata {
    */
   positionId: string | null
   /**
+   * The Document Allocation mode declared in the document. Source: the
+   * blockquote key "**Document Allocation**: quantified-physical" (Document
+   * Quota Closure). 'quantified-physical' opts the Blueprint's authored
+   * per-Document per-Set counts in as AUTHORITATIVE PHYSICAL QUOTAS; null
+   * (absent) keeps the historical advisory treatment (legacy Blueprints,
+   * e.g. KSB, are unaffected).
+   */
+  documentAllocation?: string | null
+  /**
    * The document title (the H1 text). Null when the document has no H1.
    * Stored verbatim (no trimming of internal whitespace).
    */
@@ -309,6 +318,7 @@ function metadataFromFrontmatter(
     engineVersion: pick('engine_version') ?? pick('engineVersion'),
     blueprintVersion: pick('blueprint_version') ?? pick('blueprintVersion'),
     positionId: pick('position_id') ?? pick('positionId'),
+    documentAllocation: pick('document_allocation') ?? pick('documentAllocation'),
     title: pick('title'),
     sourceLine,
     form: 'yaml-frontmatter',
@@ -335,6 +345,7 @@ function metadataFromBlockquote(ast: MarkdownAst, body: string): BlueprintMetada
   let engineVersion: string | null = null
   let blueprintVersion: string | null = null
   let positionId: string | null = null
+  let documentAllocation: string | null = null
   let sourceLine: number | null = null
 
   // The v3.0 metadata blockquote: scan blockquote and paragraph nodes for the
@@ -345,10 +356,12 @@ function metadataFromBlockquote(ast: MarkdownAst, body: string): BlueprintMetada
     const ev = matchKey(text, 'Engine Version')
     const bv = matchKey(text, 'Blueprint Version')
     const pid = matchKey(text, 'Position ID')
-    if (ev || bv || pid) {
+    const da = matchKey(text, 'Document Allocation')
+    if (ev || bv || pid || da) {
       if (engineVersion === null && ev) engineVersion = ev
       if (blueprintVersion === null && bv) blueprintVersion = bv
       if (positionId === null && pid) positionId = pid
+      if (documentAllocation === null && da) documentAllocation = da
       if (sourceLine === null) sourceLine = node.location.startLine
     }
   }
@@ -362,7 +375,7 @@ function metadataFromBlockquote(ast: MarkdownAst, body: string): BlueprintMetada
   const form: BlueprintMetadata['form'] =
     sourceLine === null ? 'none' : 'blockquote'
 
-  return { engineVersion, blueprintVersion, positionId, title, sourceLine, form }
+  return { engineVersion, blueprintVersion, positionId, documentAllocation, title, sourceLine, form }
 }
 
 /**

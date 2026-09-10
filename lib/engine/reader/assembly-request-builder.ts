@@ -57,6 +57,7 @@ import type {
   AssemblyRequestMeta,
   CoverageRule,
   DistributionConstraints,
+  DocumentQuotaEntry,
   DocumentRegistryEntry,
   DuplicatePreventionRule,
   EnforcementLevel,
@@ -102,6 +103,7 @@ export type BuildFailureCode =
   | 'missing_lo_distribution' // no LO Definitions → can't build loDistribution
   | 'missing_duplicate_prevention' // no Duplicate Policies → can't build duplicatePrevention
   | 'invalid_lo_target' // an authored LO Target cell is non-integer or outside its authored range
+  | 'invalid_document_quotas' // quantified-physical declared but the authored per-Set Document counts are missing/invalid/sum != perSet, or the per-Set vectors are not identical (V1 uniform-marginals invariant)
 
 // ─── Defaults / constants ───────────────────────────────────────────────────
 
@@ -195,6 +197,20 @@ export function buildAssemblyRequest(
     }
   }
 
+  // 1b. Quantified Document quotas (Document Quota Closure). Active ONLY when
+  // the Blueprint explicitly declares the 'quantified-physical' Document
+  // Allocation mode — an absent declaration keeps the historical advisory
+  // treatment of Master-Table counts (legacy Blueprints, e.g. KSB v3.0.1,
+  // are byte-for-byte unaffected). When declared, the authored per-Document
+  // per-Set counts are validated fail-closed (non-negative integers, every
+  // Document in the Registry, per-Set sum exactly target.perSet) and carried
+  // into the AssemblyRequest as AUTHORITATIVE PHYSICAL QUOTAS.
+  const quotaResult = deriveDocumentQuotas(ast, canonicalMeta)
+  if (!quotaResult.ok) {
+    return { ok: false, code: 'invalid_document_quotas', message: quotaResult.message }
+  }
+  const documentQuotas = quotaResult.quotas
+
   // 2. Identity block.
   const identity: AssemblyRequestIdentity = {
     blueprint_id: canonicalMeta.positionId,
@@ -256,6 +272,7 @@ export function buildAssemblyRequest(
     distributionConstraints,
     coverageRules,
     loDistribution,
+    documentQuotas,
     duplicatePrevention,
     exclusions: [], // Runtime-only; Stage 6 emits empty.
     meta: { specVersion: SPEC_VERSION },
@@ -329,6 +346,129 @@ function buildLoDistribution(ast: BlueprintAst): LoDistribution {
 
   return { targets, typeMap }
 }
+
+// ─── Quantified Document quotas (Document Quota Closure) ────────────────────
+
+/**
+ * Derive the AssemblyRequest's quantified Document quotas from the Blueprint
+ * AST's authored Master-Table counts.
+ *
+ * Gate (backward-compatibility): active ONLY when the Blueprint explicitly
+ * declares `**Document Allocation**: quantified-physical` in its metadata.
+ * Without the declaration the authored counts stay advisory — the historical
+ * behavior for every pre-existing Blueprint (e.g. KSB v3.0.1) is preserved
+ * byte-for-byte and this function returns `{ ok: true, quotas: null }`.
+ *
+ * When declared, the authored counts are AUTHORITATIVE PHYSICAL QUOTAS and
+ * are validated fail-closed:
+ *   - every authored count is a non-negative integer,
+ *   - every authored Document name is in the Document Registry,
+ *   - the per-Set sum of counts equals target.perSet exactly,
+ *   - every authored Set carries the SAME per-Document quota vector
+ *     (quantified-physical V1 requires identical per-Set Document marginals —
+ *     the Ranking allocator's exact aggregate + peel decomposition relies on
+ *     this invariant; non-uniform vectors are an unsupported shape).
+ * Any violation refuses the build ('invalid_document_quotas').
+ *
+ * Pure and deterministic. Authored order is preserved.
+ */
+function deriveDocumentQuotas(
+  ast: BlueprintAst,
+  canonicalMeta: CanonicalBlueprintMetadata
+): { ok: true; quotas: readonly DocumentQuotaEntry[] | null } | { ok: false; message: string } {
+  if (canonicalMeta.documentAllocation !== 'quantified-physical') {
+    return { ok: true, quotas: null }
+  }
+  if (ast.documentSetCounts.length === 0) {
+    return {
+      ok: false,
+      message:
+        "Cannot build AssemblyRequest: Document Allocation mode is 'quantified-physical' but the Blueprint authors no per-Document per-Set counts in the Distribution Master Table.",
+    }
+  }
+  const registryNames = new Set(ast.tierAssignments.map((ta) => ta.documentName))
+  const perSetSum = new Map<number, number>()
+  for (const cell of ast.documentSetCounts) {
+    if (!Number.isInteger(cell.count) || cell.count < 0) {
+      return {
+        ok: false,
+        message: `Cannot build AssemblyRequest: quantified Document quota for '${cell.documentName}' Set ${cell.setNumber} is not a non-negative integer (${cell.count}).`,
+      }
+    }
+    if (!registryNames.has(cell.documentName)) {
+      return {
+        ok: false,
+        message: `Cannot build AssemblyRequest: quantified Document quota references '${cell.documentName}', which is not in the Document Registry (Tier Mapping).`,
+      }
+    }
+    perSetSum.set(cell.setNumber, (perSetSum.get(cell.setNumber) ?? 0) + cell.count)
+  }
+  for (const [setNumber, sum] of [...perSetSum.entries()].sort((a, b) => a[0] - b[0])) {
+    if (sum !== RUN_TARGET.perSet) {
+      return {
+        ok: false,
+        message: `Cannot build AssemblyRequest: quantified Document quotas for Set ${setNumber} sum to ${sum}, not target.perSet (${RUN_TARGET.perSet}). Authored Document quotas must partition the per-Set size exactly.`,
+      }
+    }
+  }
+
+  // Quantified-physical V1 invariant: every authored Set must carry the SAME
+  // per-Document quota vector. The Ranking allocator's global aggregate +
+  // deterministic per-Set peel is exact only when all Sets share identical
+  // Document marginals (LO marginals are already set-wide by contract); a
+  // non-uniform vector is an unsupported shape for quantified-physical V1 and
+  // is refused here, before any request can reach Ranking/Solver. Comparison
+  // is by canonical Document identity (registry name) + count — authored
+  // display order is irrelevant. Like the per-Set sum check above, this
+  // covers every authored Set: Stage 6 treats all authored quota cells as
+  // authoritative (they are all validated and all carried).
+  const vectorBySet = new Map<number, Map<string, number>>()
+  for (const cell of ast.documentSetCounts) {
+    const vector = vectorBySet.get(cell.setNumber) ?? new Map<string, number>()
+    vector.set(cell.documentName, (vector.get(cell.documentName) ?? 0) + cell.count)
+    vectorBySet.set(cell.setNumber, vector)
+  }
+  const sortedSets = [...vectorBySet.entries()].sort((a, b) => a[0] - b[0])
+  const [firstSetNumber, firstVector] = sortedSets[0]!
+  for (const [setNumber, vector] of sortedSets) {
+    if (setNumber === firstSetNumber) continue
+    const mismatch = findQuotaVectorMismatch(firstVector, vector)
+    if (mismatch !== null) {
+      return {
+        ok: false,
+        message: `Cannot build AssemblyRequest: quantified Document quotas for Set ${setNumber} differ from Set ${firstSetNumber} — Document '${mismatch.document}' is authored ${mismatch.count} versus ${mismatch.firstCount}. Document Allocation 'quantified-physical' V1 requires every Set to carry the SAME per-Document quota vector (identical per-Set Document marginals).`,
+      }
+    }
+  }
+  const quotas: DocumentQuotaEntry[] = ast.documentSetCounts
+    .filter((cell) => cell.count > 0)
+    .map((cell) => ({
+      setNumber: cell.setNumber,
+      document: cell.documentName,
+      count: cell.count,
+    }))
+  return { ok: true, quotas }
+}
+
+/**
+ * Find the first (canonically sorted) Document whose quota count differs
+ * between two per-Set quota vectors, or null when the vectors are identical.
+ * Documents missing from one side count as 0. Pure and deterministic.
+ */
+function findQuotaVectorMismatch(
+  first: ReadonlyMap<string, number>,
+  other: ReadonlyMap<string, number>
+): { document: string; firstCount: number; count: number } | null {
+  for (const document of [...new Set([...first.keys(), ...other.keys()])].sort()) {
+    const firstCount = first.get(document)
+    const count = other.get(document)
+    if (firstCount !== count) {
+      return { document, firstCount: firstCount ?? 0, count: count ?? 0 }
+    }
+  }
+  return null
+}
+
 
 /**
  * Build the DuplicatePreventionRule[] from the AST's Duplicate Policies.
