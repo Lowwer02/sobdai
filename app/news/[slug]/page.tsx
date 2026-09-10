@@ -40,6 +40,7 @@ import AdSenseUnit from '@/components/adsense/AdSenseUnit'
 import { getAdsenseDetailConfig, type AdsenseDetailConfig } from '@/lib/adsense'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
+import { getCanonicalPositionLinks, type CanonicalPositionLink } from '@/lib/positions-public'
 
 /**
  * Viewport width where the two-column layout activates: the editorial column
@@ -238,6 +239,7 @@ async function resolveNewsRedirect(path: string): Promise<boolean> {
 interface RelatedPackageRow {
   id: string
   slug: string
+  position_id: string | null
   exam_year: string
   current_price: number
   original_price: number
@@ -252,6 +254,7 @@ interface RelatedPackageRow {
 interface RelatedContent {
   packages: PackageCardData[]
   summaries: PublicSummaryTarget[]
+  positions: CanonicalPositionLink[]
 }
 
 /**
@@ -285,7 +288,7 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
       .select(
         `sort_order, package_id, packages!inner (
           id, slug, exam_year, current_price, original_price, difficulty,
-          description, logo_url, organizations ( name, logo_url ), positions ( name )
+          description, logo_url, position_id, organizations ( name, logo_url ), positions ( name )
         )`
       )
       .eq('news_id', newsId)
@@ -307,9 +310,12 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
     .filter(r => r.packages)
     .map(r => ({ ...r.packages!, sort_order: r.sort_order }))
 
-  const counts = cleanPkgRows.length
-    ? await getPackagePublicCounts(cleanPkgRows.map(p => p.id))
-    : {}
+  const [counts, canonicalPositions] = await Promise.all([
+    cleanPkgRows.length
+      ? getPackagePublicCounts(cleanPkgRows.map(p => p.id))
+      : Promise.resolve({}),
+    getCanonicalPositionLinks(cleanPkgRows.map((pkg) => pkg.position_id)),
+  ])
   const packages: PackageCardData[] = cleanPkgRows.map(p => ({
     id: p.id,
     slug: p.slug,
@@ -337,7 +343,16 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
     summaryTargets,
   )
 
-  return { packages, summaries }
+  const positions = Array.from(
+    new Map(
+      cleanPkgRows
+        .map((pkg) => pkg.position_id ? canonicalPositions.get(pkg.position_id) : null)
+        .filter((position): position is CanonicalPositionLink => Boolean(position))
+        .map((position) => [position.id, position]),
+    ).values(),
+  )
+
+  return { packages, summaries, positions }
 })
 
 // ─── Metadata ───────────────────────────────────────────────────────────────
@@ -434,6 +449,10 @@ export default async function NewsDetailPage({
   // fetch, and the rail shows exactly the relation/order the bottom section
   // would have shown.
   const hasRailContent = related.packages.length > 0 || affiliateProducts.length > 0
+  const packageOnlyDesktopHideClassName =
+    related.summaries.length === 0 ? 'news-related-desktop-hidden' : undefined
+  const relatedSectionClassName =
+    related.positions.length > 0 ? undefined : packageOnlyDesktopHideClassName
 
   const socialFollowPlacement = homepageSettings.social_follow.placements.news_detail_end
   const resolvedSocialChannels = resolveSocialFollowChannels(
@@ -801,12 +820,10 @@ export default async function NewsDetailPage({
             exactly where they are, and a news item with packages but no
             summaries hides the whole section on Desktop (nothing would remain
             under the heading). */}
-        {(related.packages.length > 0 || related.summaries.length > 0) && (
+        {(related.packages.length > 0 || related.summaries.length > 0 || related.positions.length > 0) && (
           <section
             aria-label="เนื้อหาที่เกี่ยวข้อง"
-            className={
-              related.summaries.length === 0 ? 'news-related-desktop-hidden' : undefined
-            }
+            className={relatedSectionClassName}
             style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)' }}
           >
             <h2
@@ -824,6 +841,34 @@ export default async function NewsDetailPage({
             {/* Related Packages — the MOBILE presentation; hidden >= 1180px
                 where the desktop rail block (NewsRailPackages) takes over with
                 the same `related.packages` data. */}
+            {related.positions.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <h3
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--gold-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    marginBottom: 12,
+                  }}
+                >
+                  ตำแหน่งที่เกี่ยวข้อง
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {related.positions.map((position) => (
+                    <Link
+                      key={position.id}
+                      href={`/positions/${encodeURIComponent(position.slug)}`}
+                      className="inline-flex items-center rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/5 px-3 py-1.5 text-sm text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/10 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    >
+                      {position.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {related.packages.length > 0 && (
               <div
                 className="news-related-packages-block"

@@ -11,6 +11,7 @@ import { getAdsenseDetailConfig, type AdsenseDetailConfig } from '@/lib/adsense'
 
 interface ArticleDetailProps {
   article: PublicArticleDetail
+  relatedPositions?: Array<{ id: string; slug: string; name: string }>
 }
 
 function formatDate(s?: string | null): string {
@@ -36,7 +37,7 @@ function isDifferentDate(pub?: string | null, upd?: string | null): boolean {
   return Math.abs(d2 - d1) > 60_000
 }
 
-export default function ArticleDetail({ article }: ArticleDetailProps) {
+export default function ArticleDetail({ article, relatedPositions = [] }: ArticleDetailProps) {
   const publishedDateStr = formatDate(article.published_at)
   const updatedDateStr = formatDate(article.updated_at)
   const showUpdated = isDifferentDate(article.published_at, article.updated_at) && Boolean(updatedDateStr)
@@ -130,6 +131,21 @@ export default function ArticleDetail({ article }: ArticleDetailProps) {
           </div>
         </div>
       </header>
+
+      {relatedPositions.length > 0 && (
+        <section aria-label="ตำแหน่งที่เกี่ยวข้อง" className="flex flex-wrap items-center gap-2 border-b border-[#D4AF37]/15 pb-6">
+          <span className="text-xs font-semibold text-[#A1866B]">ตำแหน่งที่เกี่ยวข้อง:</span>
+          {relatedPositions.map((position) => (
+            <Link
+              key={position.id}
+              href={`/positions/${encodeURIComponent(position.slug)}`}
+              className="rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/5 px-3 py-1.5 text-xs text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/10 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+            >
+              {position.name}
+            </Link>
+          ))}
+        </section>
+      )}
 
       {/* Cover Image (16:9) */}
       {article.cover_image_url ? (

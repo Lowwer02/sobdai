@@ -5,6 +5,10 @@ import {
   getPublishedArticleSitemapRows,
   getActiveAuthorsSitemapRows,
 } from '@/lib/articles-public'
+import {
+  getIndexablePositionHubEntries,
+  getPositionSitemapSlugs,
+} from '@/lib/positions-public'
 
 type SitemapEntry = MetadataRoute.Sitemap[number]
 
@@ -19,13 +23,43 @@ type SitemapEntry = MetadataRoute.Sitemap[number]
  * Failures degrade to an empty list rather than failing the whole sitemap build.
  */
 async function getDynamicRoutes(): Promise<SitemapEntry[]> {
-  const [news, packages, articles, authors] = await Promise.all([
+  const [news, packages, articles, authors, positions] = await Promise.all([
     getNewsRoutes(),
     getPackageRoutes(),
     getArticleRoutes(),
     getAuthorRoutes(),
+    getPositionRoutes(),
   ])
-  return [...news, ...packages, ...articles, ...authors]
+  return [...news, ...packages, ...articles, ...authors, ...positions]
+}
+
+/**
+ * Position pages share the public loader's index-readiness gate. The hub is
+ * included only when at least one detail page qualifies; Position entries
+ * intentionally omit lastModified because relation changes are not captured
+ * by the entity timestamp.
+ */
+async function getPositionRoutes(): Promise<SitemapEntry[]> {
+  try {
+    const pages = await getIndexablePositionHubEntries()
+    const slugs = getPositionSitemapSlugs(pages)
+    if (slugs.length === 0) return []
+
+    return [
+      {
+        url: absoluteUrl('/positions'),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      },
+      ...slugs.map((slug) => ({
+        url: absoluteUrl(`/positions/${encodeURIComponent(slug)}`),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      })),
+    ]
+  } catch {
+    return []
+  }
 }
 
 /**
