@@ -358,3 +358,31 @@ export function freePackageClaimed(
     },
   })
 }
+
+/**
+ * Track when a sample exam completed result upsell is viewed.
+ */
+export function trackSampleResultUpsellView(
+  packageId: string | number,
+  examSetId: string | number
+): void {
+  pushToDataLayer({
+    event: 'sample_result_upsell_view',
+    package_id: String(packageId),
+    exam_set_id: String(examSetId),
+  })
+}
+
+/**
+ * Track when a sample exam completed result upsell CTA is clicked.
+ */
+export function trackSampleResultUpsellClick(
+  packageId: string | number,
+  examSetId: string | number
+): void {
+  pushToDataLayer({
+    event: 'sample_result_upsell_click',
+    package_id: String(packageId),
+    exam_set_id: String(examSetId),
+  })
+}

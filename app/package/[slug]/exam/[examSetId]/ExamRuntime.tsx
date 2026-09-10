@@ -23,6 +23,8 @@ import { completeExam, startExam, submitExam } from '@/lib/analytics'
 import QuestionBookmarkButton from '@/components/exams/QuestionBookmarkButton'
 import QuestionNavigator from '@/components/exams/QuestionNavigator'
 import NewsSocialFollowLink from '@/components/news/NewsSocialFollowLink'
+import SampleExamResultUpsellModal from '@/components/exams/SampleExamResultUpsellModal'
+import SampleExamResultUpsellCard from '@/components/exams/SampleExamResultUpsellCard'
 
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
@@ -56,6 +58,7 @@ interface ExamRuntimeProps {
   mode?: string
   /** Phase 1F: server-rendered saved-question state (questionId → bookmark). */
   bookmarkState?: BookmarkStateMap
+  isPackageOwner?: boolean
   examResultSocialFollow?: {
     heading: string
     description: string
@@ -69,6 +72,7 @@ export default function ExamRuntime({
   questions: rawQuestions,
   mode,
   bookmarkState = {},
+  isPackageOwner = false,
   examResultSocialFollow,
 }: ExamRuntimeProps) {
   // ── Assessment domain boundary ─────────────────────────────────────────
@@ -102,6 +106,7 @@ export default function ExamRuntime({
   const [status, setStatus] = useState<'IN_PROGRESS' | 'CONFIRM_SUBMIT' | 'REVIEW'>('IN_PROGRESS')
   const [isExplanationExpanded, setIsExplanationExpanded] = useState(false)
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
+  const [isUpsellModalOpen, setIsUpsellModalOpen] = useState(false)
 
   // Outcome: null until the attempt terminates. The Result view reads from
   // this object rather than recomputing inline. (Constitution AI-005: once
@@ -483,6 +488,13 @@ export default function ExamRuntime({
           // can record provenance. Kept independent of the session-close block
           // below so a missing/stranded session still yields provenance.
           setPersistedAttemptId(persisted.id)
+
+          // Sample Exam Result Upsell V1:
+          // The modal triggers strictly upon successful attempt finalization
+          // for non-owner sample exam completions.
+          if (examSet.is_sample && !isPackageOwner) {
+            setIsUpsellModalOpen(true)
+          }
         }
         if (persisted.success && persisted.id && sessionId) {
           // Best-effort session close. If THIS call fails we log and proceed —
@@ -755,6 +767,21 @@ export default function ExamRuntime({
   if (status === 'REVIEW' && currentIndex === -1) {
     return (
       <div className="min-h-screen bg-[#0F0B07] py-12 px-4">
+        {/* Completion-triggered dismissible modal */}
+        <SampleExamResultUpsellModal
+          isOpen={isUpsellModalOpen}
+          onClose={() => setIsUpsellModalOpen(false)}
+          packageId={pkg.id}
+          packageSlug={pkg.slug}
+          packageName={pkg.name}
+          examSetId={examSet.id}
+          currentPrice={pkg.current_price}
+          originalPrice={pkg.original_price}
+          score={score}
+          total={questions.length}
+          accuracy={accuracy}
+        />
+
         <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-bottom-8 duration-500">
           
           <div className="text-center">
@@ -848,6 +875,18 @@ export default function ExamRuntime({
               กลับหน้าหลัก
             </Link>
           </div>
+
+          {/* Non-blocking Upsell Card (for finalized non-owner sample exams) */}
+          {examSet.is_sample && !isPackageOwner && Boolean(persistedAttemptId) && (
+            <SampleExamResultUpsellCard
+              packageId={pkg.id}
+              packageSlug={pkg.slug}
+              packageName={pkg.name}
+              examSetId={examSet.id}
+              currentPrice={pkg.current_price}
+              originalPrice={pkg.original_price}
+            />
+          )}
 
           {/* Social Follow Card (Phase 4 — Exam Result CTA) */}
           {examResultSocialFollow && examResultSocialFollow.channels.length > 0 && (
