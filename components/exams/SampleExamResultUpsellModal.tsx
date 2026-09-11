@@ -143,7 +143,7 @@ export default function SampleExamResultUpsellModal({
           {/* Header pill */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0F0B07] border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold rounded-full mb-5">
             <Sparkles size={13} fill="currentColor" />
-            <span>ทำข้อสอบตัวอย่างเสร็จแล้ว 🎯</span>
+            <span>ทำข้อสอบตัวอย่างเสร็จแล้ว</span>
           </div>
 
           {/* Optional score context */}
