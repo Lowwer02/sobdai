@@ -1,6 +1,6 @@
 # Position V1 production SQL runbook
 
-The application migration is [094_position_entities_v1.sql](../supabase/migrations/094_position_entities_v1.sql). It is structural only and does not seed the initial production entity or mapping. Production SQL is operator-owned; do not execute this runbook from the feature worktree.
+The application migrations are [094_position_entities_v1.sql](../supabase/migrations/094_position_entities_v1.sql) followed by [095_position_entities_acl_grants.sql](../supabase/migrations/095_position_entities_acl_grants.sql). Migration 094 is structural only and does not seed the initial production entity or mapping. Production SQL is operator-owned; do not execute this runbook from the feature worktree.
 
 ## Before SQL: read-only preflight
 
@@ -17,7 +17,9 @@ where version = '093'
 select version, name
 from supabase_migrations.schema_migrations
 where version = '094'
-   or name ilike '%position_entities_v1%';
+   or version = '095'
+   or name ilike '%position_entities_v1%'
+   or name ilike '%position_entities_acl_grants%';
 
 select
   to_regclass('public.positions') as positions_table,
@@ -45,13 +47,16 @@ where table_schema = 'public'
   and column_name = 'position_entity_id';
 ```
 
-Expected: the payment migration owns 093; 094 is not already recorded; `positions`, `article_authors`, `profiles`, `extensions.uuid_generate_v4()`, and `handle_updated_at()` exist; the four required `positions` columns and four hardened `profiles` columns exist; `position_entities` and `positions.position_entity_id` are absent before execution. The migration itself repeats the object-shape checks and fails closed if the baseline is unsafe.
+Expected: the payment migration owns 093; 094 and 095 are not already recorded; `positions`, `article_authors`, `profiles`, `extensions.uuid_generate_v4()`, and `handle_updated_at()` exist; the four required `positions` columns and four hardened `profiles` columns exist; `position_entities` and `positions.position_entity_id` are absent before execution. Migration 094 repeats the object-shape checks and fails closed if the baseline is unsafe.
 
 ## Execution
 
-1. Run the complete `094_position_entities_v1.sql` once through the normal migration process. Do not run a fragment, a superseded Position V1 migration, or historical migrations 090–093.
-2. Do not run the audited mapping block until migration 094 succeeds.
-3. The migration installs `replace_position_entity_mappings(uuid, uuid[])`. The RPC is owner-gated, rejects GEN/placeholder rows and conflicting ownership, and clears/replaces mappings in one transaction.
+1. Verify the prerequisite Production baseline above.
+2. Run the complete `094_position_entities_v1.sql` once through the normal migration process. Do not run a fragment, a superseded Position V1 migration, or historical migrations 090–093.
+3. Run the 094 schema/RLS/RPC verification below and require it to pass.
+4. Run the complete `095_position_entities_acl_grants.sql` once through the normal migration process.
+5. Run the effective ACL/RLS verification below and require it to pass.
+6. Continue to the audited mapping block only after both 094 and 095 pass. Production must apply 094 then 095 before Position V1 application is promoted.
 
 If the migration transaction fails, stop. Verify that the transaction rolled back and that no partial Position V1 object remains before requesting a new review. Do not rerun partial manual fragments or attempt destructive repair.
 
@@ -105,9 +110,42 @@ where n.nspname = 'public'
 
 Expected: `public.position_entities` exists; the position column is nullable; the FK references `public.position_entities(id)` with `ON DELETE SET NULL`; the slug unique index and mapping/status indexes exist; RLS is enabled; the published-only SELECT policy and authenticated content-manager policy exist; the mapping RPC is executable by `authenticated` but not `anon`.
 
+## ACL verification after migration 095
+
+```sql
+select grantee, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name = 'position_entities'
+  and grantee in ('anon', 'authenticated', 'service_role')
+order by grantee, privilege_type;
+
+select
+  has_table_privilege('anon', 'public.position_entities', 'SELECT') as anon_select,
+  has_table_privilege('anon', 'public.position_entities', 'INSERT') as anon_insert,
+  has_table_privilege('anon', 'public.position_entities', 'UPDATE') as anon_update,
+  has_table_privilege('anon', 'public.position_entities', 'DELETE') as anon_delete,
+  has_table_privilege('authenticated', 'public.position_entities', 'SELECT') as authenticated_select,
+  has_table_privilege('authenticated', 'public.position_entities', 'INSERT') as authenticated_insert,
+  has_table_privilege('authenticated', 'public.position_entities', 'UPDATE') as authenticated_update,
+  has_table_privilege('authenticated', 'public.position_entities', 'DELETE') as authenticated_delete,
+  has_table_privilege('service_role', 'public.position_entities', 'SELECT') as service_select,
+  has_table_privilege('service_role', 'public.position_entities', 'INSERT') as service_insert,
+  has_table_privilege('service_role', 'public.position_entities', 'UPDATE') as service_update,
+  has_table_privilege('service_role', 'public.position_entities', 'DELETE') as service_delete;
+
+select c.relname as table_name, c.relrowsecurity as rls_enabled
+from pg_catalog.pg_class c
+join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname = 'position_entities';
+```
+
+Expected: `anon_select = true` and all anonymous write privileges are `false`; all four authenticated table privileges are `true`; all four service-role privileges are `true`; and `rls_enabled = true`. These ACLs only make the existing 094 policies reachable—RLS remains the row-level authority. If migration 095 fails, stop and inspect the migration history and effective ACL state. Do not apply ad-hoc grant fragments.
+
 ## Audited initial mapping
 
-This block is intentionally separate from migration 094 so editor-owned content is not silently seeded by schema deployment. It creates one `draft` entity and maps only the five verified organization-scoped rows. It does not fabricate editorial copy or publish the entity.
+This block is intentionally separate from migrations 094 and 095 so editor-owned content is not silently seeded by schema deployment. It creates one `draft` entity and maps only the five verified organization-scoped rows. It does not fabricate editorial copy or publish the entity.
 
 ```sql
 begin;
