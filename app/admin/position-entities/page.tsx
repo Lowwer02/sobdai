@@ -41,7 +41,7 @@ export default async function PositionEntitiesPage() {
         positions: positionsByEntity.get(entity.id) ?? [],
       }))}
       canManage={hasPermission(profile.role, 'system.manage')}
-      migrationError={error ? 'ยังไม่พบตาราง Position Entity กรุณาติดตั้ง migration 093 ก่อน' : undefined}
+      migrationError={error ? 'ยังไม่พบตาราง Position Entity กรุณาติดตั้ง migration 094 ก่อน' : undefined}
     />
   )
 }

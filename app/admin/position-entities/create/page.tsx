@@ -1,21 +1,24 @@
 import { requirePermission } from '@/lib/auth/server-protect'
+import { isOperationalPositionPlaceholder } from '@/lib/position-entity'
 import PositionEntityForm, { type PositionEntityFormPosition } from '../PositionEntityForm'
 
 export default async function CreatePositionEntityPage() {
   const { supabase } = await requirePermission('system.manage')
   const { data } = await supabase
     .from('positions')
-    .select('id, name, organizations(name, short_name)')
+    .select('id, code, name, organizations(name, short_name)')
     .order('name', { ascending: true })
 
-  const positions: PositionEntityFormPosition[] = (data ?? []).map((row: any) => {
-    const organization = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations
-    return {
-      id: row.id,
-      name: row.name,
-      organizationName: organization?.short_name || organization?.name || null,
-    }
-  })
+  const positions: PositionEntityFormPosition[] = (data ?? [])
+    .filter((row: any) => !isOperationalPositionPlaceholder({ code: row.code, name: row.name }))
+    .map((row: any) => {
+      const organization = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations
+      return {
+        id: row.id,
+        name: row.name,
+        organizationName: organization?.short_name || organization?.name || null,
+      }
+    })
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-20">

@@ -82,6 +82,59 @@ export function isPositionPlaceholderName(value: unknown): boolean {
   )
 }
 
+export interface PositionMappingCandidate {
+  id: string
+  code?: string | null
+  name?: string | null
+  organization_id?: string | null
+  position_entity_id?: string | null
+}
+
+/** Keep operational placeholder rows out of canonical Position mappings. */
+export function isOperationalPositionPlaceholder(
+  position: Pick<PositionMappingCandidate, 'code' | 'name'>,
+): boolean {
+  return [position.code, position.name].some(
+    (value) => typeof value === 'string' && value.trim().length > 0 && isPositionPlaceholderName(value),
+  )
+}
+
+export type PositionMappingValidation =
+  | { valid: true; positionIds: string[] }
+  | {
+      valid: false
+      reason: 'missing_entity' | 'duplicate_position' | 'missing_position' | 'placeholder' | 'conflict'
+      positionId?: string
+    }
+
+/** Validate a requested mapping set before the database transaction runs. */
+export function validatePositionMappingSelection(
+  entityId: string | null | undefined,
+  requestedPositionIds: readonly string[],
+  positions: readonly PositionMappingCandidate[],
+): PositionMappingValidation {
+  if (!entityId) return { valid: false, reason: 'missing_entity' }
+
+  const positionIds = requestedPositionIds.map((id) => id.trim())
+  if (new Set(positionIds).size !== positionIds.length) {
+    return { valid: false, reason: 'duplicate_position' }
+  }
+
+  const byId = new Map(positions.map((position) => [position.id, position]))
+  for (const positionId of positionIds) {
+    const position = byId.get(positionId)
+    if (!position) return { valid: false, reason: 'missing_position', positionId }
+    if (isOperationalPositionPlaceholder(position)) {
+      return { valid: false, reason: 'placeholder', positionId }
+    }
+    if (position.position_entity_id && position.position_entity_id !== entityId) {
+      return { valid: false, reason: 'conflict', positionId }
+    }
+  }
+
+  return { valid: true, positionIds }
+}
+
 function readableOverview(value: unknown): string {
   return normalizePositionText(value)
     .replace(/[`*_>#\[\]{}()]/g, ' ')

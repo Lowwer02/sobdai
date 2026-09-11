@@ -15,6 +15,7 @@ import {
   selectIndexablePositionPages,
   selectPositionPageBySlug,
   sortPositionContent,
+  type PositionEditorialIdentity,
   type PositionEntityIndexRecord,
   type PositionSource,
 } from '@/lib/position-entity'

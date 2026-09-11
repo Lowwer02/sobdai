@@ -28,11 +28,18 @@ export async function createPackageAction(formData: FormData) {
 
     // Fetch codes for auto-generation
     const [{ data: org }, { data: pos }] = await Promise.all([
-      supabase.from('organizations').select('code').eq('id', orgId).single(),
+      supabase.from('organizations').select('id, code').eq('id', orgId).single(),
       supabase.from('positions').select('code, organization_id').eq('id', posId).single(),
     ])
 
-    const ownership = validatePackageOrganizationPosition(org ? orgId : null, pos?.organization_id)
+    if (!org || !pos) {
+      return { success: false, error: 'ไม่พบหน่วยงานหรือตำแหน่งที่เลือก' }
+    }
+    if (org.id !== orgId || pos.organization_id !== org.id) {
+      return { success: false, error: 'ตำแหน่งที่เลือกไม่ได้อยู่ในหน่วยงานเดียวกับแพ็กเกจ' }
+    }
+
+    const ownership = validatePackageOrganizationPosition(org.id, pos.organization_id)
     const ownershipError = packageOwnershipError(ownership)
     if (ownershipError) return { success: false, error: ownershipError }
 
@@ -104,11 +111,18 @@ export async function updatePackageAction(id: string, formData: FormData) {
 
     // Fetch codes for auto-generation
     const [{ data: org }, { data: pos }] = await Promise.all([
-      supabase.from('organizations').select('code').eq('id', orgId).single(),
+      supabase.from('organizations').select('id, code').eq('id', orgId).single(),
       supabase.from('positions').select('code, organization_id').eq('id', posId).single(),
     ])
 
-    const ownership = validatePackageOrganizationPosition(org ? orgId : null, pos?.organization_id)
+    if (!org || !pos) {
+      return { success: false, error: 'ไม่พบหน่วยงานหรือตำแหน่งที่เลือก' }
+    }
+    if (org.id !== orgId || pos.organization_id !== org.id) {
+      return { success: false, error: 'ตำแหน่งที่เลือกไม่ได้อยู่ในหน่วยงานเดียวกับแพ็กเกจ' }
+    }
+
+    const ownership = validatePackageOrganizationPosition(org.id, pos.organization_id)
     const ownershipError = packageOwnershipError(ownership)
     if (ownershipError) return { success: false, error: ownershipError }
 

@@ -1,16 +1,61 @@
 # Position V1 production SQL runbook
 
-The application migration is [093_position_entities_v1.sql](../supabase/migrations/093_position_entities_v1.sql). It is structural only and does not execute the initial production mapping.
+The application migration is [094_position_entities_v1.sql](../supabase/migrations/094_position_entities_v1.sql). It is structural only and does not seed the initial production entity or mapping. Production SQL is operator-owned; do not execute this runbook from the feature worktree.
 
-Run the following in the Supabase SQL Editor as a database operator, in order:
+## Before SQL: read-only preflight
 
-1. Apply migration `093_position_entities_v1.sql` through the normal migration process. Do not run the mapping block before the migration succeeds.
-2. Run the preflight verification below. It must show the new table and nullable `positions.position_entity_id`.
-3. Run the audited initial mapping block below. It creates one `draft` entity and maps only the five verified organization-scoped rows. It does not fabricate editorial copy or publish the entity.
-4. Run the post-mapping verification below.
-5. An authorized editor completes `overview_markdown`, `seo_title`/`seo_description` as needed, and HTTPS `sources` in `/admin/position-entities`. Publish only after the editorial and index-readiness requirements are met.
+Run these checks in the Supabase SQL Editor as a database operator. Do not continue if any expected result differs.
 
-## Preflight verification
+```sql
+-- The Production 093 slot belongs to the payment-rejected notification migration.
+select version, name
+from supabase_migrations.schema_migrations
+where version = '093'
+   or name ilike '%payment_rejected_notification%';
+
+-- Position V1 must be installed only once and must not already be partially present.
+select version, name
+from supabase_migrations.schema_migrations
+where version = '094'
+   or name ilike '%position_entities_v1%';
+
+select
+  to_regclass('public.positions') as positions_table,
+  to_regclass('public.article_authors') as article_authors_table,
+  to_regclass('public.profiles') as profiles_table,
+  to_regnamespace('extensions') as extensions_schema,
+  to_regprocedure('extensions.uuid_generate_v4()') as uuid_generator,
+  to_regprocedure('public.handle_updated_at()') as updated_at_trigger_function;
+
+select table_name, column_name, data_type, is_nullable
+from information_schema.columns
+where table_schema = 'public'
+  and (
+    (table_name = 'positions' and column_name in ('id', 'code', 'name', 'organization_id'))
+    or (table_name = 'profiles' and column_name in ('id', 'role', 'status', 'deleted_at'))
+  )
+order by table_name, column_name;
+
+select to_regclass('public.position_entities') as position_entities_table;
+
+select column_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'positions'
+  and column_name = 'position_entity_id';
+```
+
+Expected: the payment migration owns 093; 094 is not already recorded; `positions`, `article_authors`, `profiles`, `extensions.uuid_generate_v4()`, and `handle_updated_at()` exist; the four required `positions` columns and four hardened `profiles` columns exist; `position_entities` and `positions.position_entity_id` are absent before execution. The migration itself repeats the object-shape checks and fails closed if the baseline is unsafe.
+
+## Execution
+
+1. Run the complete `094_position_entities_v1.sql` once through the normal migration process. Do not run a fragment, a superseded Position V1 migration, or historical migrations 090–093.
+2. Do not run the audited mapping block until migration 094 succeeds.
+3. The migration installs `replace_position_entity_mappings(uuid, uuid[])`. The RPC is owner-gated, rejects GEN/placeholder rows and conflicting ownership, and clears/replaces mappings in one transaction.
+
+If the migration transaction fails, stop. Verify that the transaction rolled back and that no partial Position V1 object remains before requesting a new review. Do not rerun partial manual fragments or attempt destructive repair.
+
+## Migration verification
 
 ```sql
 select to_regclass('public.position_entities') as position_entities_table;
@@ -25,13 +70,44 @@ select conname, pg_get_constraintdef(oid)
 from pg_catalog.pg_constraint
 where conrelid = 'public.positions'::regclass
   and conname = 'positions_position_entity_id_fkey';
+
+select indexname, indexdef
+from pg_catalog.pg_indexes
+where schemaname = 'public'
+  and tablename in ('position_entities', 'positions')
+  and (
+    indexname ilike '%position_entities%slug%'
+    or indexname = 'positions_position_entity_id_idx'
+    or indexname = 'position_entities_status_updated_idx'
+  )
+order by indexname;
+
+select c.relname as table_name, c.relrowsecurity as rls_enabled
+from pg_catalog.pg_class c
+join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname = 'position_entities';
+
+select policyname, permissive, roles, cmd, qual, with_check
+from pg_catalog.pg_policies
+where schemaname = 'public'
+  and tablename = 'position_entities'
+order by policyname;
+
+select p.oid::regprocedure as function_name,
+       has_function_privilege('anon', p.oid, 'execute') as anon_execute,
+       has_function_privilege('authenticated', p.oid, 'execute') as authenticated_execute
+from pg_catalog.pg_proc p
+join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname = 'replace_position_entity_mappings';
 ```
 
-Expected: `position_entities_table` is `public.position_entities`; the position column is nullable; and the FK references `public.position_entities(id)` with `ON DELETE SET NULL`.
+Expected: `public.position_entities` exists; the position column is nullable; the FK references `public.position_entities(id)` with `ON DELETE SET NULL`; the slug unique index and mapping/status indexes exist; RLS is enabled; the published-only SELECT policy and authenticated content-manager policy exist; the mapping RPC is executable by `authenticated` but not `anon`.
 
 ## Audited initial mapping
 
-This block is intentionally separate from the migration so the editor-owned entity content is not silently seeded by schema deployment. The exact IDs were verified during the bounded preflight inventory against the role name and organization IDs shown in the `values` list.
+This block is intentionally separate from migration 094 so editor-owned content is not silently seeded by schema deployment. It creates one `draft` entity and maps only the five verified organization-scoped rows. It does not fabricate editorial copy or publish the entity.
 
 ```sql
 begin;
@@ -116,7 +192,7 @@ left join public.articles a
 where pe.slug = 'policy-and-plan-analyst'
 group by pe.id, pe.slug, pe.name, pe.status;
 
-select p.id, p.name, p.organization_id, p.position_entity_id
+select p.id, p.code, p.name, p.organization_id, p.position_entity_id
 from public.positions p
 where p.position_entity_id = (
   select id from public.position_entities where slug = 'policy-and-plan-analyst'
@@ -133,4 +209,4 @@ join public.positions pos on pos.id = pkg.position_id
 where pkg.organization_id is distinct from pos.organization_id;
 ```
 
-Expected from the audited live snapshot: one `draft` entity, five mapped positions, four published packages, two distinct published News items, and six distinct published Articles reachable through the existing package relations. The final two checks were zero during preflight. Because the entity remains `draft`, the public hub/detail/sitemap intentionally expose no indexable Position URL until editorial publication.
+Expected from the audited snapshot: one `draft` entity, five mapped positions, four published packages, two distinct published News items, and six distinct published Articles reachable through existing package relations. The final two checks were zero during preflight. Because the entity remains `draft`, the public hub/detail/sitemap intentionally expose no indexable Position URL until editorial publication.
