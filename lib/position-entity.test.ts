@@ -2,21 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import {
-  buildPositionSeoContract,
-  derivePublishedPositionContentIds,
-  derivePublishedPositionPackageIds,
-  hasUniquePositionIntent,
-  hasUniquePositionOverview,
-  isPositionEntityIndexReady,
-  isPositionPlaceholderName,
-  isStablePositionSlug,
-  positionIndexability,
-  selectIndexablePositionPages,
-  selectPositionPageBySlug,
-  selectPublishedPackages,
-  selectPublishedPositionContent,
-} from './position-entity.ts'
+import { buildPositionSeoContract, derivePublishedPositionContentIds, derivePublishedPositionPackageIds, hasUniquePositionIntent, hasUniquePositionOverview, isPositionEntityIndexReady, isOperationalPositionPlaceholder, isPositionPlaceholderName, isStablePositionSlug, positionIndexability, selectIndexablePositionPages, selectPositionPageBySlug, selectPublishedPackages, selectPublishedPositionContent, validatePositionMappingSelection } from './position-entity.ts'
 
 const overview = 'ข้อมูลภาพรวมของตำแหน่งนี้อธิบายขอบเขตงานและบริบทการทำงานจากแหล่งข้อมูลที่ตรวจสอบได้อย่างเป็นระบบ'
 const baseEntity = {
@@ -61,6 +47,41 @@ test('draft, archived, placeholder, and thin entities fail the gate', () => {
   assert.equal(isPositionEntityIndexReady(baseEntity, { ...readySignals, articleCount: 0 }, [baseEntity]), false)
   assert.equal(isPositionEntityIndexReady({ ...baseEntity, sources: [] }, readySignals, [baseEntity]), false)
   assert.deepEqual(positionIndexability(false), { index: false, follow: true, includeInSitemap: false })
+})
+
+test('operational placeholder positions are rejected before mapping', () => {
+  assert.equal(isOperationalPositionPlaceholder({ code: 'GEN', name: 'นักวิเคราะห์นโยบายและแผน' }), true)
+  assert.equal(isOperationalPositionPlaceholder({ code: 'P-001', name: 'General Position' }), true)
+  assert.equal(isOperationalPositionPlaceholder({ code: 'P-001', name: 'นักวิเคราะห์นโยบายและแผน' }), false)
+
+  const result = validatePositionMappingSelection('entity-1', ['position-gen'], [
+    {
+      id: 'position-gen',
+      code: 'GEN',
+      name: 'นักวิเคราะห์นโยบายและแผน',
+      organization_id: 'org-1',
+      position_entity_id: null,
+    },
+  ])
+  assert.deepEqual(result, { valid: false, reason: 'placeholder', positionId: 'position-gen' })
+})
+
+test('mapping validator rejects conflicts while accepting exact owned selections', () => {
+  const positions = [
+    { id: 'position-1', code: 'P-001', name: 'นักวิเคราะห์นโยบายและแผน', organization_id: 'org-1', position_entity_id: 'entity-1' },
+    { id: 'position-2', code: 'P-002', name: 'นักวิชาการศึกษา', organization_id: 'org-2', position_entity_id: null },
+  ]
+  assert.deepEqual(validatePositionMappingSelection('entity-1', ['position-1', 'position-2'], positions), {
+    valid: true,
+    positionIds: ['position-1', 'position-2'],
+  })
+  assert.deepEqual(validatePositionMappingSelection('entity-1', ['position-2', 'position-2'], positions), {
+    valid: false,
+    reason: 'duplicate_position',
+  })
+  assert.deepEqual(validatePositionMappingSelection('entity-1', ['position-1'], [
+    { ...positions[0], position_entity_id: 'entity-2' },
+  ]), { valid: false, reason: 'conflict', positionId: 'position-1' })
 })
 
 test('overview and primary intent remain unique across canonical entities', () => {

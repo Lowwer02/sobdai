@@ -7,6 +7,9 @@ const actions = readFileSync(fileURLToPath(new URL('../admin/packages/actions.ts
 
 test('Package create and update actions load position organization ownership before writing', () => {
   assert.match(actions, /validatePackageOrganizationPosition/)
+  assert.equal((actions.match(/select\('id, code'\)/g) || []).length, 2)
   assert.equal((actions.match(/select\('code, organization_id'\)/g) || []).length, 2)
+  assert.equal((actions.match(/if \(!org \|\| !pos\)/g) || []).length, 2)
+  assert.equal((actions.match(/pos\.organization_id !== org\.id/g) || []).length, 2)
   assert.equal((actions.match(/packageOwnershipError\(ownership\)/g) || []).length, 2)
 })

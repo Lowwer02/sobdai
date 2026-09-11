@@ -9,6 +9,7 @@ import {
   isStablePositionSlug,
   normalizePositionText,
   parsePositionSourcesJson,
+  validatePositionMappingSelection,
 } from '@/lib/position-entity'
 
 export type PositionEntityActionState = {
@@ -42,16 +43,15 @@ function formIds(formData: FormData): string[] {
 
 function safeActionError(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : ''
-  if (/position_entities|position_entity_id|schema cache|relation .* does not exist/i.test(message)) {
-    return 'ยังไม่พร้อมใช้งาน: กรุณาให้ผู้ดูแลระบบติดตั้ง migration 093 ก่อน'
+  if (/position_entities|position_entity_id|replace_position_entity_mappings|schema cache|relation .* does not exist/i.test(message)) {
+    return 'ยังไม่พร้อมใช้งาน: กรุณาให้ผู้ดูแลระบบติดตั้ง migration 094 ก่อน'
   }
   return fallback
 }
 
 /**
- * Save one canonical Position entity and its organization-scoped mappings.
- * Mapping mutations intentionally use the existing system.manage boundary,
- * which is the current RLS boundary for changing `public.positions`.
+ * Save one canonical Position entity and replace its organization-scoped
+ * mappings through the owner-gated transactional database operation.
  */
 export async function savePositionEntityAction(
   id: string | null,
@@ -108,24 +108,38 @@ export async function savePositionEntityAction(
     const positionIds = formIds(formData)
     if (positionIds.length > 2000) return { error: 'เลือกตำแหน่งได้ไม่เกิน 2,000 รายการ' }
 
-    let selectedPositions: Array<{ id: string; position_entity_id: string | null }> = []
+    let selectedPositions: Array<{
+      id: string
+      code: string | null
+      name: string | null
+      organization_id: string | null
+      position_entity_id: string | null
+    }> = []
     if (positionIds.length > 0) {
       const { data, error } = await supabase
         .from('positions')
-        .select('id, position_entity_id')
+        .select('id, code, name, organization_id, position_entity_id')
         .in('id', positionIds)
       if (error) throw error
-      selectedPositions = (data ?? []) as Array<{ id: string; position_entity_id: string | null }>
+      selectedPositions = (data ?? []) as typeof selectedPositions
       if (selectedPositions.length !== positionIds.length) {
         return { error: 'พบตำแหน่งที่เลือกไม่ครบ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง' }
       }
     }
 
-    const conflictingPosition = selectedPositions.find(
-      (position) => position.position_entity_id && position.position_entity_id !== id,
+    const mappingValidation = validatePositionMappingSelection(
+      id ?? '__new_position_entity__',
+      positionIds,
+      selectedPositions,
     )
-    if (conflictingPosition) {
-      return { error: 'มีตำแหน่งที่เลือกถูกผูกกับ Position Entity อื่นแล้ว' }
+    if (!mappingValidation.valid) {
+      if (mappingValidation.reason === 'placeholder') {
+        return { error: 'ไม่อนุญาตให้ผูกตำแหน่ง GEN หรือ placeholder กับ Position Entity' }
+      }
+      if (mappingValidation.reason === 'conflict') {
+        return { error: 'มีตำแหน่งที่เลือกถูกผูกกับ Position Entity อื่นแล้ว' }
+      }
+      return { error: 'รายการ mapping ตำแหน่งไม่ถูกต้อง กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง' }
     }
 
     const publishedAt = status === 'published'
@@ -165,22 +179,18 @@ export async function savePositionEntityAction(
 
     if (!entityId) return { error: 'ไม่พบรหัส Position Entity หลังบันทึก' }
 
-    const { error: clearError } = await supabase
-      .from('positions')
-      .update({ position_entity_id: null })
-      .eq('position_entity_id', entityId)
-    if (clearError) throw clearError
+    const { data: mappingResult, error: mappingError } = await supabase.rpc(
+      'replace_position_entity_mappings',
+      {
+        p_entity_id: entityId,
+        p_position_ids: positionIds,
+      },
+    )
+    if (mappingError) throw mappingError
 
-    if (positionIds.length > 0) {
-      const { data: linked, error: linkError } = await supabase
-        .from('positions')
-        .update({ position_entity_id: entityId })
-        .in('id', positionIds)
-        .select('id')
-      if (linkError) throw linkError
-      if (!linked || linked.length !== positionIds.length) {
-        return { error: 'บันทึก mapping ตำแหน่งไม่ครบ กรุณาตรวจสอบสิทธิ์แล้วลองอีกครั้ง' }
-      }
+    const result = mappingResult as { entity_id?: unknown; mapped_count?: unknown } | null
+    if (result?.entity_id !== entityId || result.mapped_count !== positionIds.length) {
+      return { error: 'บันทึก mapping ตำแหน่งไม่ครบ กรุณาตรวจสอบสิทธิ์แล้วลองอีกครั้ง' }
     }
   } catch (error) {
     console.error('Position Entity action failed:', error)

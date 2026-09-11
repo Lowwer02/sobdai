@@ -310,10 +310,11 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
     .filter(r => r.packages)
     .map(r => ({ ...r.packages!, sort_order: r.sort_order }))
 
+  const countsPromise: Promise<Awaited<ReturnType<typeof getPackagePublicCounts>>> = cleanPkgRows.length
+    ? getPackagePublicCounts(cleanPkgRows.map(p => p.id))
+    : Promise.resolve({})
   const [counts, canonicalPositions] = await Promise.all([
-    cleanPkgRows.length
-      ? getPackagePublicCounts(cleanPkgRows.map(p => p.id))
-      : Promise.resolve({}),
+    countsPromise,
     getCanonicalPositionLinks(cleanPkgRows.map((pkg) => pkg.position_id)),
   ])
   const packages: PackageCardData[] = cleanPkgRows.map(p => ({

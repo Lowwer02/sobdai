@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth/server-protect'
-import { normalizePositionSources, serializePositionSources } from '@/lib/position-entity'
+import { isOperationalPositionPlaceholder, normalizePositionSources, serializePositionSources } from '@/lib/position-entity'
 import PositionEntityForm, { type PositionEntityFormPosition } from '../../PositionEntityForm'
 
 export default async function EditPositionEntityPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,13 +14,16 @@ export default async function EditPositionEntityPage({ params }: { params: Promi
       .maybeSingle(),
     supabase
       .from('positions')
-      .select('id, name, organization_id, position_entity_id, organizations(name, short_name)')
+      .select('id, code, name, organization_id, position_entity_id, organizations(name, short_name)')
       .order('name', { ascending: true }),
   ])
 
   if (entityError || !entity) notFound()
 
-  const positionOptions: PositionEntityFormPosition[] = (positions ?? []).map((row: any) => {
+  const availablePositions = (positions ?? []).filter(
+    (row: any) => !isOperationalPositionPlaceholder({ code: row.code, name: row.name }),
+  )
+  const positionOptions: PositionEntityFormPosition[] = availablePositions.map((row: any) => {
     const organization = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations
     return {
       id: row.id,
@@ -28,7 +31,7 @@ export default async function EditPositionEntityPage({ params }: { params: Promi
       organizationName: organization?.short_name || organization?.name || null,
     }
   })
-  const mappedPositionIds = (positions ?? [])
+  const mappedPositionIds = availablePositions
     .filter((row: any) => row.position_entity_id === entity.id)
     .map((row: any) => row.id)
 
