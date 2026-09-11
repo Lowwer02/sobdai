@@ -815,15 +815,12 @@ export default async function NewsDetailPage({
 
         {/* Related content — the conversion path (News → Package → Summary).
             Editor-curated via news_packages / news_summaries. Renders NOTHING
-            when there are no relations (no empty boxes). Cards are reused; the
-            section can also contain canonical Position links derived from the
-            related package mappings.
+            when there are no relations (no empty boxes). Cards are reused.
             On Desktop (>= 1180px) the related PACKAGES live in the right rail,
             so only the packages block hides here — related summaries stay
             exactly where they are, and a news item with packages but no
             summaries hides the whole section on Desktop (nothing would remain
-            under the heading). Position links keep the section visible when
-            they are the only related content. */}
+            under the heading). */}
         {(related.packages.length > 0 || related.summaries.length > 0 || related.positions.length > 0) && (
           <section
             aria-label="เนื้อหาที่เกี่ยวข้อง"
@@ -873,9 +870,6 @@ export default async function NewsDetailPage({
               </div>
             )}
 
-            {/* Related Packages — the MOBILE presentation; hidden >= 1180px
-                where the desktop rail block (NewsRailPackages) takes over with
-                the same `related.packages` data. */}
             {related.packages.length > 0 && (
               <div
                 className="news-related-packages-block"

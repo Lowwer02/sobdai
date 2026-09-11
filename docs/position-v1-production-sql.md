@@ -1,6 +1,6 @@
 # Position V1 production SQL runbook
 
-The application migrations are [094_position_entities_v1.sql](../supabase/migrations/094_position_entities_v1.sql) followed by [095_position_entities_acl_grants.sql](../supabase/migrations/095_position_entities_acl_grants.sql). Migration 094 is structural only and does not seed the initial production entity or mapping. Production SQL is operator-owned; do not execute this runbook from the feature worktree.
+Production Position V1 is applied through migration 095. Migration 096 is the pending ACL-normalization follow-up: it repairs inherited broad table privileges without changing the owner/postgres ACL, RLS, policies, RPC, schema, or data. This runbook verifies the already-applied 094/095 state and applies 096 once; do not rerun 094 or 095. Production SQL is operator-owned; do not execute this runbook from the feature worktree.
 
 ## Before SQL: read-only preflight
 
@@ -13,13 +13,13 @@ from supabase_migrations.schema_migrations
 where version = '093'
    or name ilike '%payment_rejected_notification%';
 
--- Position V1 must be installed only once and must not already be partially present.
+-- Position V1 094/095 must already be recorded; 096 is the pending migration.
 select version, name
 from supabase_migrations.schema_migrations
-where version = '094'
-   or version = '095'
+where version in ('094', '095', '096')
    or name ilike '%position_entities_v1%'
-   or name ilike '%position_entities_acl_grants%';
+   or name ilike '%position_entities_acl_grants%'
+   or name ilike '%position_entities_acl_normalization%';
 
 select
   to_regclass('public.positions') as positions_table,
@@ -47,20 +47,19 @@ where table_schema = 'public'
   and column_name = 'position_entity_id';
 ```
 
-Expected: the payment migration owns 093; 094 and 095 are not already recorded; `positions`, `article_authors`, `profiles`, `extensions.uuid_generate_v4()`, and `handle_updated_at()` exist; the four required `positions` columns and four hardened `profiles` columns exist; `position_entities` and `positions.position_entity_id` are absent before execution. Migration 094 repeats the object-shape checks and fails closed if the baseline is unsafe.
+Expected: the payment migration owns 093; 094 and 095 are recorded successfully; 096 is not recorded yet; `positions`, `article_authors`, `profiles`, `extensions.uuid_generate_v4()`, and `handle_updated_at()` exist; the four required `positions` columns and four hardened `profiles` columns exist; `position_entities` and `positions.position_entity_id` already exist before execution. Do not rerun 094 or 095. Migration 096 only normalizes the Position Entity table ACL.
 
 ## Execution
 
-1. Verify the prerequisite Production baseline above.
-2. Run the complete `094_position_entities_v1.sql` once through the normal migration process. Do not run a fragment, a superseded Position V1 migration, or historical migrations 090–093.
-3. Run the 094 schema/RLS/RPC verification below and require it to pass.
-4. Run the complete `095_position_entities_acl_grants.sql` once through the normal migration process.
-5. Run the effective ACL/RLS verification below and require it to pass.
-6. Continue to the audited mapping block only after both 094 and 095 pass. Production must apply 094 then 095 before Position V1 application is promoted.
+1. Verify the already-applied 094/095 state and the prerequisite Production baseline above. Do not rerun 094 or 095.
+2. Run the existing 094 schema/RLS/RPC verification below and require it to pass before changing ACL state.
+3. Run the complete `096_position_entities_acl_normalization.sql` once through the normal migration process. Do not run an ad-hoc revoke/grant fragment or historical migrations 090–093.
+4. Run the effective ACL/RLS verification below and require the exact 096 target to pass.
+5. Continue to the audited mapping block only after 096 passes. Production must retain the successful 094/095 history and apply 096 before Position V1 application is promoted.
 
-If the migration transaction fails, stop. Verify that the transaction rolled back and that no partial Position V1 object remains before requesting a new review. Do not rerun partial manual fragments or attempt destructive repair.
+If migration 096 fails, stop and inspect migration history plus the effective ACL. Do not rerun 094 or 095, apply ad-hoc grant/revoke fragments, or attempt destructive repair.
 
-## Migration verification
+## Existing 094/095 verification before 096
 
 ```sql
 select to_regclass('public.position_entities') as position_entities_table;
@@ -110,7 +109,7 @@ where n.nspname = 'public'
 
 Expected: `public.position_entities` exists; the position column is nullable; the FK references `public.position_entities(id)` with `ON DELETE SET NULL`; the slug unique index and mapping/status indexes exist; RLS is enabled; the published-only SELECT policy and authenticated content-manager policy exist; the mapping RPC is executable by `authenticated` but not `anon`.
 
-## ACL verification after migration 095
+## ACL verification after migration 096
 
 ```sql
 select grantee, privilege_type
@@ -125,14 +124,26 @@ select
   has_table_privilege('anon', 'public.position_entities', 'INSERT') as anon_insert,
   has_table_privilege('anon', 'public.position_entities', 'UPDATE') as anon_update,
   has_table_privilege('anon', 'public.position_entities', 'DELETE') as anon_delete,
+  has_table_privilege('anon', 'public.position_entities', 'TRUNCATE') as anon_truncate,
+  has_table_privilege('anon', 'public.position_entities', 'REFERENCES') as anon_references,
+  has_table_privilege('anon', 'public.position_entities', 'TRIGGER') as anon_trigger,
+  has_table_privilege('anon', 'public.position_entities', 'MAINTAIN') as anon_maintain,
   has_table_privilege('authenticated', 'public.position_entities', 'SELECT') as authenticated_select,
   has_table_privilege('authenticated', 'public.position_entities', 'INSERT') as authenticated_insert,
   has_table_privilege('authenticated', 'public.position_entities', 'UPDATE') as authenticated_update,
   has_table_privilege('authenticated', 'public.position_entities', 'DELETE') as authenticated_delete,
+  has_table_privilege('authenticated', 'public.position_entities', 'TRUNCATE') as authenticated_truncate,
+  has_table_privilege('authenticated', 'public.position_entities', 'REFERENCES') as authenticated_references,
+  has_table_privilege('authenticated', 'public.position_entities', 'TRIGGER') as authenticated_trigger,
+  has_table_privilege('authenticated', 'public.position_entities', 'MAINTAIN') as authenticated_maintain,
   has_table_privilege('service_role', 'public.position_entities', 'SELECT') as service_select,
   has_table_privilege('service_role', 'public.position_entities', 'INSERT') as service_insert,
   has_table_privilege('service_role', 'public.position_entities', 'UPDATE') as service_update,
-  has_table_privilege('service_role', 'public.position_entities', 'DELETE') as service_delete;
+  has_table_privilege('service_role', 'public.position_entities', 'DELETE') as service_delete,
+  has_table_privilege('service_role', 'public.position_entities', 'TRUNCATE') as service_truncate,
+  has_table_privilege('service_role', 'public.position_entities', 'REFERENCES') as service_references,
+  has_table_privilege('service_role', 'public.position_entities', 'TRIGGER') as service_trigger,
+  has_table_privilege('service_role', 'public.position_entities', 'MAINTAIN') as service_maintain;
 
 select c.relname as table_name, c.relrowsecurity as rls_enabled
 from pg_catalog.pg_class c
@@ -141,11 +152,11 @@ where n.nspname = 'public'
   and c.relname = 'position_entities';
 ```
 
-Expected: `anon_select = true` and all anonymous write privileges are `false`; all four authenticated table privileges are `true`; all four service-role privileges are `true`; and `rls_enabled = true`. These ACLs only make the existing 094 policies reachable—RLS remains the row-level authority. If migration 095 fails, stop and inspect the migration history and effective ACL state. Do not apply ad-hoc grant fragments.
+Expected: `anon_select = true` and every other anonymous privilege is `false`; authenticated and service-role SELECT/INSERT/UPDATE/DELETE are `true`; their TRUNCATE/REFERENCES/TRIGGER/MAINTAIN privileges are `false`; `rls_enabled = true`; and the owner/postgres ACL remains unchanged. Migration 096 only normalizes table ACLs—the existing 094 policies and mapping RPC remain authoritative/unchanged. If migration 096 fails, stop and inspect migration history and effective ACL state. Do not apply ad-hoc grant/revoke fragments.
 
 ## Audited initial mapping
 
-This block is intentionally separate from migrations 094 and 095 so editor-owned content is not silently seeded by schema deployment. It creates one `draft` entity and maps only the five verified organization-scoped rows. It does not fabricate editorial copy or publish the entity.
+This block is intentionally separate from migrations 094, 095, and 096 so editor-owned content is not silently seeded by schema or ACL deployment. It creates one `draft` entity and maps only the five verified organization-scoped rows. It does not fabricate editorial copy or publish the entity.
 
 ```sql
 begin;
