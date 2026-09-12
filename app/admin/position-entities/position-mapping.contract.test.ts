@@ -23,3 +23,15 @@ test('create and edit mapping options filter the same operational placeholders',
     assert.match(page, /name: row\.name/)
   }
 })
+
+test('"use server" module exports only async functions', () => {
+  assert.match(action, /^['"]use server['"]/m)
+  const runtimeExports = action
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('export ') && !line.startsWith('export type'))
+  assert.ok(runtimeExports.length > 0, 'expected at least one server action export')
+  for (const line of runtimeExports) {
+    assert.match(line, /^export async function/, `non-async runtime export: ${line}`)
+  }
+})

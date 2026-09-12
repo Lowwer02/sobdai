@@ -3,10 +3,8 @@
 import Link from 'next/link'
 import { useActionState } from 'react'
 import { ArrowLeft, Save } from 'lucide-react'
-import {
-  INITIAL_POSITION_ENTITY_ACTION_STATE,
-  savePositionEntityAction,
-} from './actions'
+import { INITIAL_POSITION_ENTITY_ACTION_STATE } from './action-state'
+import { savePositionEntityAction } from './actions'
 import { POSITION_ENTITY_STATUS_VALUES } from '@/lib/position-entity'
 
 export interface PositionEntityFormPosition {

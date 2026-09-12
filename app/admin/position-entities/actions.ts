@@ -11,12 +11,7 @@ import {
   parsePositionSourcesJson,
   validatePositionMappingSelection,
 } from '@/lib/position-entity'
-
-export type PositionEntityActionState = {
-  error?: string
-}
-
-export const INITIAL_POSITION_ENTITY_ACTION_STATE: PositionEntityActionState = {}
+import type { PositionEntityActionState } from './action-state'
 
 type ExistingPositionEntity = {
   id: string
