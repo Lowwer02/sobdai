@@ -547,7 +547,19 @@ async function runProof() {
     )
     assert.equal(paidCancelError.code, '40001')
     assert.equal((await getOrderState(client, paidFixture.orderId)).status, 'paid')
-    pass(7, 'paid manual order cannot be cancelled')
+    const paidRevokeResult = await runAs(client, ids.manager, () => query(
+      client,
+      "update public.orders set status = 'cancelled' where id = $1 returning id, status",
+      [paidFixture.orderId],
+    ))
+    assert.deepEqual(paidRevokeResult.rows[0], { id: paidFixture.orderId, status: 'cancelled' })
+    const paidAccessAfterRevoke = await runAs(client, ids.buyer, () => query(
+      client,
+      'select id from public.orders where user_id = $1 and package_id = $2 and status in (\'paid\', \'free\')',
+      [ids.buyer, paidFixture.packageId],
+    ))
+    assert.equal(paidAccessAfterRevoke.rows.length, 0)
+    pass(7, 'paid manual order remains generically revocable and loses paid access')
     pass(20, 'canonical approval still works and grants through the order authority')
 
     const freeFixture = await createFixture(client, 'free', {

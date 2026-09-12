@@ -24,6 +24,7 @@ interface OrdersClientProps {
   statusFilter: string
   canManagePayments: boolean
   paymentEvidenceLoaded: boolean
+  paymentReviewUnavailable: boolean
 }
 
 export default function OrdersClient({
@@ -36,6 +37,7 @@ export default function OrdersClient({
   statusFilter,
   canManagePayments,
   paymentEvidenceLoaded,
+  paymentReviewUnavailable,
 }: OrdersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -72,27 +74,51 @@ export default function OrdersClient({
     if (!confirmModal.orderId) return
     setActingOnId(confirmModal.orderId)
     setConfirmModal({ isOpen: false, orderId: null, action: null })
-    await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.CANCELLED)
-    toastEvent('ยกเลิกสิทธิ์เข้าถึงสำเร็จ')
-    setActingOnId(null)
+    try {
+      const result = await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.CANCELLED)
+      if (result.success) {
+        toastEvent('ยกเลิกสิทธิ์เข้าถึงสำเร็จ')
+        router.refresh()
+      } else {
+        toastEvent(result.error || 'ยกเลิกสิทธิ์เข้าถึงไม่สำเร็จ', 'error')
+      }
+    } finally {
+      setActingOnId(null)
+    }
   }
 
   const handleRestore = async () => {
     if (!confirmModal.orderId) return
     setActingOnId(confirmModal.orderId)
     setConfirmModal({ isOpen: false, orderId: null, action: null })
-    await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.PAID)
-    toastEvent('คืนสิทธิ์เข้าถึงสำเร็จ')
-    setActingOnId(null)
+    try {
+      const result = await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.PAID)
+      if (result.success) {
+        toastEvent('คืนสิทธิ์เข้าถึงสำเร็จ')
+        router.refresh()
+      } else {
+        toastEvent(result.error || 'คืนสิทธิ์เข้าถึงไม่สำเร็จ', 'error')
+      }
+    } finally {
+      setActingOnId(null)
+    }
   }
 
   const handleComplete = async () => {
     if (!confirmModal.orderId) return
     setActingOnId(confirmModal.orderId)
     setConfirmModal({ isOpen: false, orderId: null, action: null })
-    await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.PAID)
-    toastEvent('เปลี่ยนสถานะเป็นชำระเงินแล้วสำเร็จ')
-    setActingOnId(null)
+    try {
+      const result = await updateOrderStatus(confirmModal.orderId, ORDER_STATUS.PAID)
+      if (result.success) {
+        toastEvent('เปลี่ยนสถานะเป็นชำระเงินแล้วสำเร็จ')
+        router.refresh()
+      } else {
+        toastEvent(result.error || 'เปลี่ยนสถานะไม่สำเร็จ', 'error')
+      }
+    } finally {
+      setActingOnId(null)
+    }
   }
 
   const handleCancelUnpaid = async () => {
@@ -205,7 +231,13 @@ export default function OrdersClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
-              {orders.length === 0 ? (
+              {paymentReviewUnavailable ? (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                    ไม่สามารถโหลดคิวตรวจสอบการชำระเงินได้ กรุณารีเฟรชแล้วลองใหม่
+                  </td>
+                </tr>
+              ) : orders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-12 text-center text-[#A1866B]">
                     No orders found.

@@ -54,11 +54,16 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
     // cancellation RPC. The database trigger remains the final boundary for
     // direct table callers.
     if (newStatus === ORDER_STATUS.PAID || newStatus === ORDER_STATUS.CANCELLED) {
-      const { data: order } = await supabase
+      const { data: order, error: orderLookupError } = await supabase
         .from('orders')
         .select('payment_provider, status')
         .eq('id', orderId)
         .maybeSingle()
+
+      if (orderLookupError) {
+        console.error('[ORDERS] order status lookup failed:', orderLookupError.message)
+        return { success: false, error: 'ไม่สามารถตรวจสอบสถานะคำสั่งซื้อได้ กรุณาลองใหม่' }
+      }
 
       if (newStatus === ORDER_STATUS.PAID && order?.payment_provider === 'promptpay_manual') {
         return {
@@ -67,7 +72,11 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
         }
       }
 
-      if (newStatus === ORDER_STATUS.CANCELLED && order?.payment_provider === 'promptpay_manual') {
+      if (
+        newStatus === ORDER_STATUS.CANCELLED
+        && order?.payment_provider === 'promptpay_manual'
+        && order.status === ORDER_STATUS.PENDING
+      ) {
         return {
           success: false,
           error: 'Unpaid PromptPay orders must be cancelled from the payment cancellation action.',

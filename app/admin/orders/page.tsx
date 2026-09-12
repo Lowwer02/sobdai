@@ -22,19 +22,25 @@ export default async function OrdersPage({
   const to = from + limit - 1
 
   let paymentReviewOrderIds: string[] | null = null
+  let paymentReviewUnavailable = false
 
   if (normalizedStatusFilter === 'payment_submitted') {
     if (!canReviewPayments) {
       paymentReviewOrderIds = []
     } else {
-      const { data: submittedPayments } = await supabase
+      const { data: submittedPayments, error: paymentReviewError } = await supabase
         .from('payment_submissions')
         .select('order_id')
         .eq('status', 'submitted')
 
-      paymentReviewOrderIds = Array.from(
-        new Set((submittedPayments || []).map((payment: any) => payment.order_id)),
-      )
+      if (paymentReviewError) {
+        console.error('[PAYMENT] payment review queue query failed:', paymentReviewError.message)
+        paymentReviewUnavailable = true
+      } else {
+        paymentReviewOrderIds = Array.from(
+          new Set((submittedPayments || []).map((payment: any) => payment.order_id)),
+        )
+      }
     }
   }
 
@@ -45,7 +51,9 @@ export default async function OrdersPage({
   if (search) {
     query = query.ilike('profiles.email', `%${search}%`)
   }
-  if (paymentReviewOrderIds) {
+  if (paymentReviewUnavailable) {
+    query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+  } else if (paymentReviewOrderIds) {
     // A value that cannot be a real UUID keeps the queue empty without
     // widening the query when there are no submissions.
     query = paymentReviewOrderIds.length > 0
@@ -107,6 +115,7 @@ export default async function OrdersPage({
       statusFilter={statusFilter || 'all'}
       canManagePayments={canReviewPayments}
       paymentEvidenceLoaded={canReviewPayments && !paymentRowsError}
+      paymentReviewUnavailable={paymentReviewUnavailable}
     />
   )
 }
