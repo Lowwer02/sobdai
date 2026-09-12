@@ -50,19 +50,27 @@ export async function updateOrderStatus(orderId: string, newStatus: OrderStatus)
     const { supabase } = await requirePermission('financial.manage')
 
     // Manual PromptPay orders may only become paid through the locked payment
-    // review RPC. Keep the existing generic order control for Omise/legacy
-    // orders, but do not let it bypass slip review for M1.
-    if (newStatus === ORDER_STATUS.PAID) {
+    // review RPC and may only become cancelled through the locked unpaid-order
+    // cancellation RPC. The database trigger remains the final boundary for
+    // direct table callers.
+    if (newStatus === ORDER_STATUS.PAID || newStatus === ORDER_STATUS.CANCELLED) {
       const { data: order } = await supabase
         .from('orders')
-        .select('payment_provider')
+        .select('payment_provider, status')
         .eq('id', orderId)
         .maybeSingle()
 
-      if (order?.payment_provider === 'promptpay_manual') {
+      if (newStatus === ORDER_STATUS.PAID && order?.payment_provider === 'promptpay_manual') {
         return {
           success: false,
           error: 'PromptPay orders must be approved from the payment review page.',
+        }
+      }
+
+      if (newStatus === ORDER_STATUS.CANCELLED && order?.payment_provider === 'promptpay_manual') {
+        return {
+          success: false,
+          error: 'Unpaid PromptPay orders must be cancelled from the payment cancellation action.',
         }
       }
     }
@@ -174,5 +182,46 @@ export async function rejectPayment(paymentSubmissionId: string, rejectionReason
   } catch (error) {
     console.error('[PAYMENT] reject payment action failed:', error)
     return { success: false, error: 'Payment submission could not be rejected.' }
+  }
+}
+
+export async function cancelManualPaymentOrder(orderId: string) {
+  try {
+    const { supabase } = await requirePermission('financial.manage')
+
+    if (!isUuid(orderId)) {
+      return { success: false, error: 'Invalid order.' }
+    }
+
+    const { data, error } = await supabase.rpc('cancel_manual_payment_order', {
+      p_order_id: orderId,
+    })
+
+    if (error) {
+      console.error('[PAYMENT] cancel unpaid manual order failed:', error.message)
+      return {
+        success: false,
+        error: 'คำสั่งซื้อนี้ไม่สามารถยกเลิกได้ อาจมีหลักฐานการชำระเงินหรือสถานะเปลี่ยนแล้ว',
+      }
+    }
+
+    const row = Array.isArray(data) ? data[0] : data
+    if (!row?.order_id || row.status !== 'cancelled') {
+      return {
+        success: false,
+        error: 'คำสั่งซื้อนี้ไม่สามารถยกเลิกได้ อาจมีหลักฐานการชำระเงินหรือสถานะเปลี่ยนแล้ว',
+      }
+    }
+
+    revalidatePath('/admin/orders')
+    revalidatePath(`/admin/orders/${orderId}`)
+    revalidatePath('/orders')
+    return { success: true, orderId }
+  } catch (error) {
+    console.error('[PAYMENT] cancel unpaid manual order action failed:', error)
+    return {
+      success: false,
+      error: 'คำสั่งซื้อนี้ไม่สามารถยกเลิกได้ อาจมีหลักฐานการชำระเงินหรือสถานะเปลี่ยนแล้ว',
+    }
   }
 }

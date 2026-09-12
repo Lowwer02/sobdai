@@ -60,19 +60,25 @@ export default async function OrdersPage({
   const { data: rawOrders, count } = await query
 
   const orderIds = (rawOrders || []).map((order: any) => order.id)
-  const { data: paymentRows } = canReviewPayments && orderIds.length > 0
+  const paymentRowsQuery = canReviewPayments && orderIds.length > 0
     ? await supabase
       .from('payment_submissions')
       .select('order_id, status, submitted_at, created_at')
       .in('order_id', orderIds)
       .order('created_at', { ascending: false })
-    : { data: [] as any[] }
+    : { data: [] as any[], error: null }
+  const { data: paymentRows, error: paymentRowsError } = paymentRowsQuery
 
   const latestPaymentByOrder = new Map<string, any>()
+  const paymentSubmissionCountByOrder = new Map<string, number>()
   for (const payment of paymentRows || []) {
     if (!latestPaymentByOrder.has(payment.order_id)) {
       latestPaymentByOrder.set(payment.order_id, payment)
     }
+    paymentSubmissionCountByOrder.set(
+      payment.order_id,
+      (paymentSubmissionCountByOrder.get(payment.order_id) || 0) + 1,
+    )
   }
 
   const orders = (rawOrders || []).map((o: any) => ({
@@ -81,6 +87,7 @@ export default async function OrdersPage({
     package_name: o.packages?.name || 'Unknown Package',
     manual_payment_status: latestPaymentByOrder.get(o.id)?.status || null,
     manual_payment_submitted_at: latestPaymentByOrder.get(o.id)?.submitted_at || null,
+    manual_payment_submission_count: paymentSubmissionCountByOrder.get(o.id) || 0,
   }))
 
   const totalPages = count ? Math.ceil(count / limit) : 0
@@ -98,6 +105,8 @@ export default async function OrdersPage({
       currentPage={page}
       search={search}
       statusFilter={statusFilter || 'all'}
+      canManagePayments={canReviewPayments}
+      paymentEvidenceLoaded={canReviewPayments && !paymentRowsError}
     />
   )
 }

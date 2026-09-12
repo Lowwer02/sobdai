@@ -6,8 +6,10 @@ import {
   isUuid,
   paymentSlipExtension,
   PAYMENT_SLIP_MAX_BYTES,
+  PAYMENT_SUBMISSION_LIMIT_ERROR,
   sanitizeOriginalFilename,
   MANUAL_PAYMENT_PROVIDER,
+  isPaymentSubmissionLimitError,
 } from '@/lib/payment/manual'
 import {
   attemptPaymentSubmissionNotification,
@@ -216,10 +218,18 @@ export async function POST(request: Request) {
       }
 
       if (!recoveredSubmission) {
-        if (shouldDeleteAfterSubmissionError({ recoveredSubmission, recoveryError: null })) {
+        if (shouldDeleteAfterSubmissionError({
+          recoveredSubmission,
+          recoveryError: null,
+          submissionError,
+        })) {
           await removeUploadedObject(adminSupabase, objectPath)
           uploadedPath = null
-          return NextResponse.json({ error: 'ไม่สามารถบันทึกสลิปได้ กรุณาลองใหม่' }, { status: 409 })
+          return NextResponse.json({
+            error: isPaymentSubmissionLimitError(submissionError)
+              ? PAYMENT_SUBMISSION_LIMIT_ERROR
+              : 'ไม่สามารถบันทึกสลิปได้ กรุณาลองใหม่',
+          }, { status: 409 })
         }
 
         uploadedPath = null

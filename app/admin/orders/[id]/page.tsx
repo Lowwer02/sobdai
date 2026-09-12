@@ -92,6 +92,7 @@ export default async function OrderPaymentDetailPage({
         packageSlug: pkg?.slug || null,
       }}
       submissions={submissions}
+      submissionsLoaded={!submissionsError}
     />
   )
 }

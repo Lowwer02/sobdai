@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import MyOrdersClient from './MyOrdersClient'
 import type { Metadata } from 'next'
 import { createPageMetadata } from '@/lib/seo'
+import type { PaymentSubmissionStatus } from '@/lib/payment/manual'
 
 export const metadata: Metadata = createPageMetadata({
   title: 'ประวัติการสั่งซื้อ | Sobdai',
@@ -40,5 +41,41 @@ export default async function MyOrdersPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  return <MyOrdersClient orders={(orders || []) as any} />
+  const orderRows = orders || []
+  const orderIds = orderRows.map((order: any) => order.id)
+  let paymentRows: any[] = []
+  let paymentEvidenceAvailable = true
+
+  if (orderIds.length > 0) {
+    const paymentResult = await supabase
+      .from('payment_submissions')
+      .select('order_id, status, created_at')
+      .in('order_id', orderIds)
+      .order('created_at', { ascending: false })
+    paymentRows = paymentResult.data || []
+    paymentEvidenceAvailable = !paymentResult.error
+  }
+
+  const paymentStateByOrder = new Map<string, { count: number; latestStatus: PaymentSubmissionStatus | null }>()
+  for (const payment of paymentRows || []) {
+    const current = paymentStateByOrder.get(payment.order_id)
+    paymentStateByOrder.set(payment.order_id, {
+      count: (current?.count || 0) + 1,
+      latestStatus: current?.latestStatus || (payment.status as PaymentSubmissionStatus),
+    })
+  }
+
+  return (
+    <MyOrdersClient
+      orders={orderRows.map((order: any) => {
+        const paymentState = paymentStateByOrder.get(order.id)
+        return {
+          ...order,
+          payment_submission_count: paymentEvidenceAvailable ? paymentState?.count || 0 : null,
+          latest_payment_submission_status: paymentEvidenceAvailable ? paymentState?.latestStatus || null : null,
+          payment_evidence_available: paymentEvidenceAvailable,
+        }
+      }) as any}
+    />
+  )
 }

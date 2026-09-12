@@ -5,7 +5,12 @@ import Link from 'next/link'
 import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
 import { ORDER_STATUS } from '@/lib/orderUtils'
-import { grantPackageAccess, updateOrderStatus } from './actions'
+import {
+  cancelManualPaymentOrder,
+  grantPackageAccess,
+  updateOrderStatus,
+} from './actions'
+import { getPaymentStatusPresentation, MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
 
@@ -17,6 +22,8 @@ interface OrdersClientProps {
   currentPage: number
   search: string
   statusFilter: string
+  canManagePayments: boolean
+  paymentEvidenceLoaded: boolean
 }
 
 export default function OrdersClient({
@@ -26,7 +33,9 @@ export default function OrdersClient({
   totalPages,
   currentPage,
   search,
-  statusFilter
+  statusFilter,
+  canManagePayments,
+  paymentEvidenceLoaded,
 }: OrdersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -39,7 +48,7 @@ export default function OrdersClient({
   const [selectedUser, setSelectedUser] = useState('')
   const [selectedPackage, setSelectedPackage] = useState('')
   const [error, setError] = useState('')
-  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: 'revoke' | 'restore' | 'complete' | null }>({ isOpen: false, orderId: null, action: null })
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: 'revoke' | 'restore' | 'complete' | 'cancel-unpaid' | null }>({ isOpen: false, orderId: null, action: null })
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(window.location.search)
@@ -86,10 +95,25 @@ export default function OrdersClient({
     setActingOnId(null)
   }
 
+  const handleCancelUnpaid = async () => {
+    if (!confirmModal.orderId) return
+    setActingOnId(confirmModal.orderId)
+    setConfirmModal({ isOpen: false, orderId: null, action: null })
+    const result = await cancelManualPaymentOrder(confirmModal.orderId)
+    if (result.success) {
+      toastEvent('ยกเลิกคำสั่งซื้อแล้ว')
+      router.refresh()
+    } else {
+      toastEvent(result.error || 'ไม่สามารถยกเลิกคำสั่งซื้อได้', 'error')
+    }
+    setActingOnId(null)
+  }
+
   const confirmAction = () => {
     if (confirmModal.action === 'revoke') handleRevoke()
     else if (confirmModal.action === 'restore') handleRestore()
     else if (confirmModal.action === 'complete') handleComplete()
+    else if (confirmModal.action === 'cancel-unpaid') handleCancelUnpaid()
   }
 
   const handleGrant = async (e: React.FormEvent) => {
@@ -187,7 +211,32 @@ export default function OrdersClient({
                     No orders found.
                   </td>
                 </tr>
-              ) : orders.map((order) => (
+              ) : orders.map((order) => {
+                const paymentStatus = getPaymentStatusPresentation({
+                  orderStatus: order.status,
+                  paymentProvider: order.payment_provider,
+                  submissionCount: order.manual_payment_submission_count,
+                  latestSubmissionStatus: order.manual_payment_status,
+                  evidenceReadAvailable: order.payment_provider !== MANUAL_PAYMENT_PROVIDER || paymentEvidenceLoaded,
+                })
+                const canCancelUnpaidManualOrder =
+                  canManagePayments
+                  && paymentEvidenceLoaded
+                  &&
+                  order.payment_provider === MANUAL_PAYMENT_PROVIDER
+                  && order.status === ORDER_STATUS.PENDING
+                  && order.manual_payment_submission_count === 0
+                const statusClass = paymentStatus.key === 'paid' || paymentStatus.key === 'free'
+                  ? 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20'
+                  : paymentStatus.key === 'cancelled'
+                    ? 'text-[#A1866B] bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.05)]'
+                    : paymentStatus.key === 'failed' || paymentStatus.key === 'rejected'
+                      ? 'text-red-400 bg-red-400/10 border-red-400/20'
+                      : paymentStatus.key === 'refunded'
+                        ? 'text-purple-400 bg-purple-400/10 border-purple-400/20'
+                        : 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20'
+
+                return (
                 <tr key={order.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
                   <td className="p-4 text-[#A1866B] text-sm whitespace-nowrap">
                     {new Date(order.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
@@ -203,14 +252,8 @@ export default function OrdersClient({
                     <span className="text-[#D4AF37] font-bold">฿{Number(order.amount).toLocaleString()}</span>
                   </td>
                   <td className="p-4">
-                    <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${
-                      order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE ? 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20' :
-                      order.status === ORDER_STATUS.PENDING ? 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20' :
-                      order.status === ORDER_STATUS.FAILED ? 'text-red-400 bg-red-400/10 border-red-400/20' :
-                      order.status === ORDER_STATUS.REFUNDED ? 'text-purple-400 bg-purple-400/10 border-purple-400/20' :
-                      'text-red-400 bg-red-400/10 border-red-400/20'
-                    }`}>
-                      {order.status.toUpperCase()}
+                    <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${statusClass}`}>
+                      {paymentStatus.label}
                     </span>
                     {order.manual_payment_status && (
                       <div className={`mt-2 text-[11px] font-semibold ${
@@ -244,6 +287,16 @@ export default function OrdersClient({
                           {order.manual_payment_status === 'submitted' ? 'Review' : 'Details'}
                         </Link>
                       )}
+                      {canCancelUnpaidManualOrder && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'cancel-unpaid' })}
+                          disabled={actingOnId === order.id}
+                          className="px-3 py-1.5 rounded border border-red-400/30 text-xs font-bold text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          ยกเลิกคำสั่งซื้อนี้
+                        </button>
+                      )}
                       {(order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
                         <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'revoke' })}
@@ -268,7 +321,7 @@ export default function OrdersClient({
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -360,15 +413,17 @@ export default function OrdersClient({
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ isOpen: false, orderId: null, action: null })}
         onConfirm={confirmAction}
-        title={confirmModal.action === 'revoke' ? 'ยกเลิกสิทธิ์เข้าถึง' : 'คืนสิทธิ์เข้าถึง'}
+        title={confirmModal.action === 'cancel-unpaid' ? 'ยกเลิกคำสั่งซื้อที่ยังไม่ชำระ' : confirmModal.action === 'revoke' ? 'ยกเลิกสิทธิ์เข้าถึง' : 'คืนสิทธิ์เข้าถึง'}
         description={
-          confirmModal.action === 'revoke' 
+          confirmModal.action === 'cancel-unpaid'
+            ? 'คำสั่งซื้อที่ยังไม่มีหลักฐานการชำระเงินจะถูกเปลี่ยนเป็นยกเลิก และจะไม่เปิดสิทธิ์แพ็กเกจให้ผู้ซื้อ'
+            : confirmModal.action === 'revoke'
             ? 'คุณต้องการยกเลิกสิทธิ์เข้าถึงแพ็กเกจของผู้ใช้งานนี้ใช่หรือไม่?' 
             : 'คุณต้องการคืนสิทธิ์เข้าถึงแพ็กเกจให้ผู้ใช้งานนี้ใช่หรือไม่?'
         }
         confirmText="ยืนยัน"
         cancelText="ยกเลิก"
-        isDestructive={confirmModal.action === 'revoke'}
+        isDestructive={confirmModal.action === 'revoke' || confirmModal.action === 'cancel-unpaid'}
       />
     </div>
   )

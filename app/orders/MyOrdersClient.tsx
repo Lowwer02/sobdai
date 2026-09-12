@@ -4,6 +4,11 @@ import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Package, Search, Filter, ShoppingBag, ChevronLeft, ExternalLink } from 'lucide-react'
+import {
+  getPaymentStatusPresentation,
+  MANUAL_PAYMENT_PROVIDER,
+  type PaymentSubmissionStatus,
+} from '@/lib/payment/manual'
 
 interface Order {
   id: string
@@ -23,6 +28,9 @@ interface Order {
       logo_url: string | null
     } | null
   } | null
+  payment_submission_count?: number | null
+  latest_payment_submission_status?: PaymentSubmissionStatus | null
+  payment_evidence_available?: boolean
 }
 
 interface OrdersClientProps {
@@ -140,7 +148,16 @@ export default function MyOrdersClient({ orders }: OrdersClientProps) {
         {filteredOrders.length > 0 ? (
           <div className="space-y-4">
             {filteredOrders.map(order => {
-              const statusConfig = getStatusConfig(order.status)
+              const isManualPending = order.payment_provider === MANUAL_PAYMENT_PROVIDER && order.status === 'pending'
+              const paymentEvidenceAvailable = order.payment_evidence_available === true
+              const paymentStatus = getPaymentStatusPresentation({
+                orderStatus: order.status,
+                paymentProvider: order.payment_provider,
+                submissionCount: order.payment_submission_count,
+                latestSubmissionStatus: order.latest_payment_submission_status,
+                evidenceReadAvailable: !isManualPending || paymentEvidenceAvailable,
+              })
+              const statusConfig = getStatusConfig(paymentStatus.key === 'awaiting-upload' || paymentStatus.key === 'under-review' ? 'pending' : paymentStatus.key)
               const logoUrl = getLogoUrl(order)
               const isFree = order.status === 'free' || order.amount === 0
               const isSuccess = order.status === 'paid' || order.status === 'free'
@@ -174,7 +191,7 @@ export default function MyOrdersClient({ orders }: OrdersClientProps) {
                         </div>
                         {/* Status Badge */}
                         <span className={`flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
-                          {statusConfig.label}
+                          {paymentStatus.label}
                         </span>
                       </div>
 
@@ -200,10 +217,32 @@ export default function MyOrdersClient({ orders }: OrdersClientProps) {
                         )}
                       </div>
 
+                      {paymentStatus.description && (
+                        <p className="mt-3 text-xs leading-relaxed text-[#A1866B]">
+                          {paymentStatus.description}
+                        </p>
+                      )}
+
                       {/* Action */}
-                      {isSuccess && (
+                      {(isSuccess || (isManualPending && paymentEvidenceAvailable) || order.status === 'cancelled') && (
                         <div className="mt-4">
-                          {isAvailable ? (
+                          {isManualPending && paymentEvidenceAvailable && isAvailable ? (
+                            <Link
+                              href={`/checkout/${order.package_id}`}
+                              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#D4AF37] hover:text-[#F1D17A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded-lg px-1 -ml-1"
+                            >
+                              ดำเนินการชำระเงินต่อ
+                              <ExternalLink size={14} />
+                            </Link>
+                          ) : order.status === 'cancelled' && isAvailable ? (
+                            <Link
+                              href={`/checkout/${order.package_id}`}
+                              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#D4AF37] hover:text-[#F1D17A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded-lg px-1 -ml-1"
+                            >
+                              สั่งซื้อใหม่
+                              <ExternalLink size={14} />
+                            </Link>
+                          ) : isSuccess && isAvailable ? (
                             <Link
                               href={`/package/${order.packages!.slug}`}
                               className="inline-flex items-center gap-1.5 text-sm font-bold text-[#D4AF37] hover:text-[#F1D17A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded-lg px-1 -ml-1"

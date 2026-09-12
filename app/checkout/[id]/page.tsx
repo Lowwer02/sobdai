@@ -132,9 +132,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
       .maybeSingle()
 
     if (pendingManualOrder) {
-      const { data: latestSubmission } = await supabase
+      const { data: latestSubmission, count: submissionCount, error: submissionError } = await supabase
         .from('payment_submissions')
-        .select('status, rejection_reason')
+        .select('status, rejection_reason', { count: 'exact' })
         .eq('order_id', pendingManualOrder.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -144,8 +144,12 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
         id: pendingManualOrder.id,
         amount: Number(pendingManualOrder.amount),
         status: 'pending',
-        submissionStatus: (latestSubmission?.status as ManualPaymentOrder['submissionStatus']) || null,
-        rejectionReason: latestSubmission?.rejection_reason || null,
+        submissionStatus: submissionError
+          ? null
+          : (latestSubmission?.status as ManualPaymentOrder['submissionStatus']) || null,
+        rejectionReason: submissionError ? null : latestSubmission?.rejection_reason || null,
+        submissionCount: submissionError ? null : submissionCount || 0,
+        paymentEvidenceAvailable: !submissionError,
       }
     }
   }

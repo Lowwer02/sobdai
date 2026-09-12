@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ArrowLeft, CheckCircle, ExternalLink, FileImage, Loader2, XCircle } from 'lucide-react'
-import { approvePayment, rejectPayment } from '../actions'
+import { cancelManualPaymentOrder, approvePayment, rejectPayment } from '../actions'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import { getPaymentStatusPresentation, MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
 
 interface OrderDetail {
   id: string
@@ -46,15 +48,31 @@ function formatBytes(bytes: number) {
 export default function OrderPaymentDetailClient({
   order,
   submissions,
+  submissionsLoaded,
 }: {
   order: OrderDetail
   submissions: PaymentSubmission[]
+  submissionsLoaded: boolean
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rejectionReason, setRejectionReason] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+
+  const paymentStatus = getPaymentStatusPresentation({
+    orderStatus: order.status,
+    paymentProvider: order.paymentProvider,
+    submissionCount: submissions.length,
+    latestSubmissionStatus: submissions[0]?.status || null,
+    evidenceReadAvailable: submissionsLoaded,
+  })
+  const canCancelUnpaidManualOrder =
+    order.paymentProvider === MANUAL_PAYMENT_PROVIDER
+    && order.status === 'pending'
+    && submissionsLoaded
+    && submissions.length === 0
 
   const handleApprove = (submissionId: string) => {
     setMessage('')
@@ -81,6 +99,21 @@ export default function OrderPaymentDetailClient({
         router.refresh()
       } else {
         setError(result.error || 'ไม่สามารถปฏิเสธรายการได้')
+      }
+    })
+  }
+
+  const handleCancelUnpaidOrder = () => {
+    setMessage('')
+    setError('')
+    startTransition(async () => {
+      const result = await cancelManualPaymentOrder(order.id)
+      if (result.success) {
+        setMessage('ยกเลิกคำสั่งซื้อแล้ว และไม่ได้เปิดสิทธิ์แพ็กเกจให้ผู้ซื้อ')
+        setCancelConfirmOpen(false)
+        router.refresh()
+      } else {
+        setError(result.error || 'ไม่สามารถยกเลิกคำสั่งซื้อได้')
       }
     })
   }
@@ -116,8 +149,22 @@ export default function OrderPaymentDetailClient({
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Package</span><span className="text-right text-[#F5E9D6]">{order.packageName}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Amount snapshot</span><span className="font-bold text-[#D4AF37]">฿{order.amount.toLocaleString()}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Order status</span><span className="font-semibold text-[#F5E9D6]">{order.status.toUpperCase()}</span></div>
+          <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Payment state</span><span className="text-right font-semibold text-[#F5E9D6]">{paymentStatus.label}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Provider</span><span className="text-[#F5E9D6]">{order.paymentProvider || '—'}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Created</span><span className="text-right text-[#F5E9D6]">{formatDate(order.createdAt)}</span></div>
+          {paymentStatus.description && (
+            <p className="pt-2 text-xs leading-relaxed text-[#A1866B]">{paymentStatus.description}</p>
+          )}
+          {canCancelUnpaidManualOrder && (
+            <button
+              type="button"
+              onClick={() => setCancelConfirmOpen(true)}
+              disabled={isPending}
+              className="mt-3 inline-flex items-center justify-center rounded-lg border border-red-400/30 px-4 py-2 text-sm font-bold text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ยกเลิกคำสั่งซื้อนี้
+            </button>
+          )}
         </div>
 
         <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-6">
@@ -140,7 +187,11 @@ export default function OrderPaymentDetailClient({
           <span className="text-sm text-[#A1866B]">{submissions.length} submission{submissions.length === 1 ? '' : 's'}</span>
         </div>
 
-        {submissions.length === 0 ? (
+        {!submissionsLoaded ? (
+          <div className="mt-6 rounded-xl border border-dashed border-[rgba(255,255,255,0.1)] p-8 text-center text-sm text-[#A1866B]">
+            ไม่สามารถตรวจสอบหลักฐานการชำระเงินได้ กรุณารีเฟรชแล้วลองใหม่
+          </div>
+        ) : submissions.length === 0 ? (
           <div className="mt-6 rounded-xl border border-dashed border-[rgba(255,255,255,0.1)] p-8 text-center text-sm text-[#A1866B]">
             ยังไม่มีสลิปที่ส่งเข้ามา
           </div>
@@ -232,6 +283,18 @@ export default function OrderPaymentDetailClient({
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        isOpen={cancelConfirmOpen}
+        onClose={() => setCancelConfirmOpen(false)}
+        onConfirm={handleCancelUnpaidOrder}
+        title="ยกเลิกคำสั่งซื้อที่ยังไม่ชำระ"
+        description="คำสั่งซื้อนี้ยังไม่มีหลักฐานการชำระเงิน การยกเลิกจะไม่เปิดสิทธิ์แพ็กเกจ และผู้ซื้อสามารถเริ่มคำสั่งซื้อใหม่ได้"
+        confirmText="ยกเลิกคำสั่งซื้อนี้"
+        cancelText="กลับ"
+        isDestructive
+        isLoading={isPending}
+      />
     </div>
   )
 }

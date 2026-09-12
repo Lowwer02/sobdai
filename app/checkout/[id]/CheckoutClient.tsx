@@ -11,6 +11,9 @@ import type { SupportConfig } from '@/lib/homepageConfig'
 import {
   isPaymentSlipMimeType,
   PAYMENT_SLIP_MAX_BYTES,
+  PAYMENT_SUBMISSION_LIMIT_ERROR,
+  PAYMENT_SUBMISSION_MAX_COUNT,
+  getPaymentStatusPresentation,
   sanitizeOriginalFilename,
   type PaymentSubmissionStatus,
 } from '@/lib/payment/manual'
@@ -21,6 +24,8 @@ export interface ManualPaymentOrder {
   status: 'pending'
   submissionStatus: PaymentSubmissionStatus | null
   rejectionReason: string | null
+  submissionCount: number | null
+  paymentEvidenceAvailable: boolean
 }
 
 interface CheckoutClientProps {
@@ -134,6 +139,8 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
         status: 'pending',
         submissionStatus: null,
         rejectionReason: null,
+        submissionCount: 0,
+        paymentEvidenceAvailable: true,
       })
     } catch {
       setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
@@ -146,6 +153,16 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
     event.preventDefault()
 
     if (!manualOrder || slipSubmitting || manualOrder.submissionStatus === 'submitted') return
+
+    if (!manualOrder.paymentEvidenceAvailable) {
+      setError('ไม่สามารถตรวจสอบสถานะสลิปได้ในขณะนี้ กรุณารีเฟรชแล้วลองใหม่')
+      return
+    }
+
+    if (manualOrder.submissionCount !== null && manualOrder.submissionCount >= PAYMENT_SUBMISSION_MAX_COUNT) {
+      setError(PAYMENT_SUBMISSION_LIMIT_ERROR)
+      return
+    }
 
     if (!slipFile) {
       setError('กรุณาเลือกไฟล์สลิป')
@@ -178,7 +195,13 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
       }
 
       setManualOrder((current) => current
-        ? { ...current, submissionStatus: 'submitted', rejectionReason: null }
+        ? {
+            ...current,
+            submissionStatus: 'submitted',
+            rejectionReason: null,
+            submissionCount: (current.submissionCount ?? 0) + 1,
+            paymentEvidenceAvailable: true,
+          }
         : current)
       setSlipFile(null)
       setFileInputKey((key) => key + 1)
@@ -218,6 +241,16 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
     claimedSuccess &&
     Boolean(supportConfig?.enabled) &&
     Boolean(supportConfig?.qr_image_url?.trim())
+
+  const manualPaymentStatus = manualOrder
+    ? getPaymentStatusPresentation({
+        orderStatus: manualOrder.status,
+        paymentProvider: 'promptpay_manual',
+        submissionCount: manualOrder.submissionCount,
+        latestSubmissionStatus: manualOrder.submissionStatus,
+        evidenceReadAvailable: manualOrder.paymentEvidenceAvailable,
+      })
+    : null
 
   return (
     <div className="min-h-screen bg-[#0F0B07] font-sans pb-20">
@@ -461,42 +494,62 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
                   </div>
                 )}
 
-                {manualOrder.submissionStatus === 'submitted' ? (
+                {manualPaymentStatus?.key === 'evidence-unavailable' ? (
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-[#A1866B]">
+                    <div className="font-bold text-[#F5E9D6]">{manualPaymentStatus.label}</div>
+                    <div className="mt-1">{manualPaymentStatus.description}</div>
+                  </div>
+                ) : manualPaymentStatus?.key === 'under-review' ? (
                   <div className="rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 p-4 text-center text-sm text-[#F1D17A]">
-                    ได้รับสลิปแล้ว กำลังรอผู้ดูแลตรวจสอบ คุณจะได้รับสิทธิ์หลังการอนุมัติ
+                    <div className="font-bold">{manualPaymentStatus.label}</div>
+                    <div className="mt-1">ได้รับสลิปแล้ว คุณจะได้รับสิทธิ์หลังการอนุมัติ</div>
                   </div>
                 ) : (
                   <>
-                    {manualOrder.submissionStatus === 'rejected' && (
-                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300">
-                        สลิปก่อนหน้าถูกปฏิเสธ{manualOrder.rejectionReason ? `: ${manualOrder.rejectionReason}` : ''} กรุณาโอนใหม่และส่งหลักฐานอีกครั้ง
+                    {manualPaymentStatus?.key === 'awaiting-upload' && manualPaymentStatus.description && (
+                      <div className="rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 p-4 text-center text-sm text-[#F1D17A]">
+                        <div className="font-bold">{manualPaymentStatus.label}</div>
+                        <div className="mt-1">{manualPaymentStatus.description}</div>
                       </div>
                     )}
 
-                    <form onSubmit={handleSlipSubmit} className="space-y-3">
-                      <label htmlFor="payment-slip" className="block text-sm font-semibold text-[#F5E9D6]">
-                        แนบสลิปการโอนเงิน
-                      </label>
-                      <input
-                        key={fileInputKey}
-                        id="payment-slip"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,application/pdf"
-                        onChange={(event) => {
-                          setSlipFile(event.target.files?.[0] || null)
-                          setError('')
-                        }}
-                        className="block w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#1A140E] p-2 text-sm text-[#A1866B] file:mr-3 file:rounded-md file:border-0 file:bg-[#D4AF37] file:px-3 file:py-2 file:font-semibold file:text-[#1A140E]"
-                      />
-                      <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG, WEBP หรือ PDF ขนาดไม่เกิน 4 MB</p>
-                      <button
-                        type="submit"
-                        disabled={slipSubmitting || !slipFile}
-                        className="w-full rounded-lg bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {slipSubmitting ? 'กำลังอัปโหลดสลิป...' : 'ส่งสลิปให้ผู้ดูแลตรวจสอบ'}
-                      </button>
-                    </form>
+                    {manualPaymentStatus?.key === 'rejected' && (
+                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300">
+                        <div className="font-bold">{manualPaymentStatus.label}</div>
+                        <div className="mt-1">{manualOrder.rejectionReason ? `เหตุผล: ${manualOrder.rejectionReason}` : 'กรุณาโอนใหม่และส่งหลักฐานอีกครั้ง'}</div>
+                      </div>
+                    )}
+
+                    {manualOrder.paymentEvidenceAvailable && manualOrder.submissionCount !== null && manualOrder.submissionCount >= PAYMENT_SUBMISSION_MAX_COUNT ? (
+                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-center text-sm text-red-300">
+                        {PAYMENT_SUBMISSION_LIMIT_ERROR}
+                      </div>
+                    ) : manualOrder.paymentEvidenceAvailable ? (
+                      <form onSubmit={handleSlipSubmit} className="space-y-3">
+                        <label htmlFor="payment-slip" className="block text-sm font-semibold text-[#F5E9D6]">
+                          แนบสลิปการโอนเงิน
+                        </label>
+                        <input
+                          key={fileInputKey}
+                          id="payment-slip"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,application/pdf"
+                          onChange={(event) => {
+                            setSlipFile(event.target.files?.[0] || null)
+                            setError('')
+                          }}
+                          className="block w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#1A140E] p-2 text-sm text-[#A1866B] file:mr-3 file:rounded-md file:border-0 file:bg-[#D4AF37] file:px-3 file:py-2 file:font-semibold file:text-[#1A140E]"
+                        />
+                        <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG, WEBP หรือ PDF ขนาดไม่เกิน 4 MB</p>
+                        <button
+                          type="submit"
+                          disabled={slipSubmitting || !slipFile}
+                          className="w-full rounded-lg bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {slipSubmitting ? 'กำลังอัปโหลดสลิป...' : 'ส่งสลิปให้ผู้ดูแลตรวจสอบ'}
+                        </button>
+                      </form>
+                    ) : null}
                   </>
                 )}
               </div>
