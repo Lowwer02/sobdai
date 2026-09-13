@@ -32,6 +32,7 @@ function extractText(node: React.ReactNode): string {
 
 interface SummaryMarkdownProps {
   content: string
+  headingMode?: 'default' | 'positionEditorial'
 }
 
 /**
@@ -45,7 +46,16 @@ interface SummaryMarkdownProps {
  * used previously had no effect because @tailwindcss/typography was never
  * installed, so every style must come from this component map.
  */
-function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
+function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdownProps) {
+  const positionHeadingOccurrences = new Map<string, number>()
+  const getHeadingId = (children: React.ReactNode): string => {
+    const baseId = slugifyChildren(children)
+    if (headingMode !== 'positionEditorial') return baseId
+    const occurrence = positionHeadingOccurrences.get(baseId) ?? 0
+    positionHeadingOccurrences.set(baseId, occurrence + 1)
+    return occurrence === 0 ? baseId : `${baseId}-${occurrence + 1}`
+  }
+
   return (
     <div className="summary-content">
       <ReactMarkdown
@@ -53,7 +63,16 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
         rehypePlugins={[rehypeRaw]}
         components={{
           h1: ({ node, ...props }) => {
-            const id = slugifyChildren(props.children)
+            const id = getHeadingId(props.children)
+            if (headingMode === 'positionEditorial') {
+              return (
+                <h2
+                  id={id}
+                  className="scroll-mt-24 font-display text-3xl md:text-4xl font-bold mt-14 mb-6 text-[#F5E9D6] leading-[1.25] tracking-tight"
+                  {...props}
+                />
+              )
+            }
             return (
               <h2
                 id={id}
@@ -63,7 +82,16 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
             )
           },
           h2: ({ node, ...props }) => {
-            const id = slugifyChildren(props.children)
+            const id = getHeadingId(props.children)
+            if (headingMode === 'positionEditorial') {
+              return (
+                <h2
+                  id={id}
+                  className="scroll-mt-24 font-display text-2xl md:text-3xl font-bold mt-12 mb-5 text-[#F5E9D6] border-b border-[rgba(255,255,255,0.06)] pb-3 leading-[1.3]"
+                  {...props}
+                />
+              )
+            }
             return (
               <h3
                 id={id}
@@ -73,7 +101,7 @@ function SummaryMarkdownImpl({ content }: SummaryMarkdownProps) {
             )
           },
           h3: ({ node, ...props }) => {
-            const id = slugifyChildren(props.children)
+            const id = getHeadingId(props.children)
             return (
               <h4
                 id={id}
