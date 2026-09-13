@@ -190,15 +190,35 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
 ]
 
+export const FAQ_PAGE_TITLE = 'คำถามที่พบบ่อยเกี่ยวกับ Sobdai | FAQ'
+
 /**
  * Builds standard Schema.org FAQPage structured data directly from the
  * canonical FAQ items, guaranteeing that visible page text and structured data
  * can never diverge.
  */
-export function buildFaqPageJsonLd(items: FaqItem[]): Record<string, unknown> {
+export function buildFaqPageJsonLd(
+  items: FaqItem[],
+  options?: {
+    pageUrl?: string
+    pageName?: string
+  }
+): Record<string, unknown> {
+  const url = options?.pageUrl || 'https://sobdai.com/faq'
+  const name = options?.pageName || FAQ_PAGE_TITLE
+
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
+    '@id': `${url}#webpage`,
+    url,
+    name,
+    isPartOf: {
+      '@id': 'https://sobdai.com/#website',
+    },
+    about: {
+      '@id': 'https://sobdai.com/#organization',
+    },
     mainEntity: items.map((item) => ({
       '@type': 'Question',
       name: item.question,

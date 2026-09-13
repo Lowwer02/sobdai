@@ -12,6 +12,7 @@ const root = process.cwd()
 const faqPageSource = readFileSync(join(root, 'app/faq/page.tsx'), 'utf8')
 const faqDataSource = readFileSync(join(root, 'content/faq/faq-data.ts'), 'utf8')
 const footerSource = readFileSync(join(root, 'components/Footer.tsx'), 'utf8')
+const homePageSource = readFileSync(join(root, 'app/page.tsx'), 'utf8')
 
 test('FAQ metadata conforms to SEO specifications', () => {
   assert.match(
@@ -186,15 +187,48 @@ test('FAQ page includes structured breadcrumb and FAQPage JSON-LD', () => {
     /<StructuredData\s+data=\{faqPageJsonLd\}\s*\/>/
   )
 
+  // Exactly one FAQPage entity declared on /faq
+  const faqPageCallMatches = faqPageSource.match(/buildFaqPageJsonLd\s*\(/g)
+  assert.strictEqual(faqPageCallMatches?.length, 1, 'Exactly one FAQPage schema call on /faq')
+  const structuredDataFaqMatches = faqPageSource.match(/<StructuredData\s+data=\{faqPageJsonLd\}\s*\/>/g)
+  assert.strictEqual(structuredDataFaqMatches?.length, 1, 'Exactly one StructuredData rendering FAQPage')
+
   // Verify FAQPage JSON-LD schema generation directly from FAQ_ITEMS
   const schema = buildFaqPageJsonLd(FAQ_ITEMS) as {
+    '@context': string
     '@type': string
-    mainEntity: Array<{ '@type': string; name: string; acceptedAnswer: { text: string } }>
+    '@id': string
+    url: string
+    name: string
+    isPartOf: { '@id': string }
+    about: { '@id': string }
+    mainEntity: Array<{
+      '@type': string
+      name: string
+      acceptedAnswer: { '@type': string; text: string }
+    }>
   }
+  assert.strictEqual(schema['@context'], 'https://schema.org')
   assert.strictEqual(schema['@type'], 'FAQPage')
+  assert.strictEqual(schema['@id'], 'https://sobdai.com/faq#webpage')
+  assert.strictEqual(schema.url, 'https://sobdai.com/faq')
+  assert.strictEqual(schema.name, 'คำถามที่พบบ่อยเกี่ยวกับ Sobdai | FAQ')
+  assert.deepStrictEqual(schema.isPartOf, { '@id': 'https://sobdai.com/#website' })
+  assert.deepStrictEqual(schema.about, { '@id': 'https://sobdai.com/#organization' })
+
+  // Schema FAQ count matches visible FAQ count (14 / 14)
+  assert.strictEqual(schema.mainEntity.length, FAQ_ITEMS.length)
   assert.strictEqual(schema.mainEntity.length, 14)
-  assert.strictEqual(schema.mainEntity[0].name, 'Sobdai คืออะไร?')
-  assert.match(schema.mainEntity[0].acceptedAnswer.text, /เว็บแอปสำหรับฝึกทำแนวข้อสอบราชการ/)
+
+  // Every schema Question exists visibly on page and acceptedAnswer truthfully matches visible content
+  for (let i = 0; i < FAQ_ITEMS.length; i++) {
+    const item = FAQ_ITEMS[i]
+    const entity = schema.mainEntity[i]
+    assert.strictEqual(entity['@type'], 'Question')
+    assert.strictEqual(entity.name, item.question)
+    assert.strictEqual(entity.acceptedAnswer['@type'], 'Answer')
+    assert.strictEqual(entity.acceptedAnswer.text, item.paragraphs.join('\n\n'))
+  }
 
   // Verify that link metadata (labels, URLs) does not contaminate schema answer text
   for (const entity of schema.mainEntity) {
@@ -205,6 +239,11 @@ test('FAQ page includes structured breadcrumb and FAQPage JSON-LD', () => {
     assert.doesNotMatch(entity.acceptedAnswer.text, /อ่านเกี่ยวกับ Sobdai และที่มาโครงการ/)
     assert.doesNotMatch(entity.acceptedAnswer.text, /href=/)
   }
+})
+
+test('Homepage retains existing entity graph with no FAQPage schema', () => {
+  assert.doesNotMatch(homePageSource, /['"]FAQPage['"]/, 'Homepage must not include FAQPage schema')
+  assert.match(homePageSource, /organizationJsonLd/, 'Homepage must retain organizationJsonLd')
 })
 
 test('Footer contains links to /help and /faq near about and contact', () => {
