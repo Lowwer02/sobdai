@@ -51,6 +51,63 @@ test('Position hub renders only the shared index-qualified dataset', () => {
   assert.match(hubRoute, /<h1[^>]*>\s*ตำแหน่งงานราชการ/)
 })
 
+test('Position Hub V2 has a compact, server-rendered discovery surface', () => {
+  assert.doesNotMatch(hubRoute, /^['"]use client['"]/m)
+  assert.match(hubRoute, /getIndexablePositionHubEntries/)
+  assert.equal((hubRoute.match(/<h1\b/g) || []).length, 1)
+  assert.match(hubRoute, /<h1[^>]*>\s*ตำแหน่งงานราชการ/)
+  assert.match(hubRoute, /<h2 id="position-list-heading"[^>]*>\s*ตำแหน่งงานราชการทั้งหมด/)
+  assert.doesNotMatch(hubRoute, /<h2 id="position-list-heading"[^>]*sr-only/)
+  assert.doesNotMatch(hubRoute, /min-h-screen/)
+})
+
+test('Position Hub V2 summary and entity card remain loader-backed', () => {
+  assert.match(hubRoute, /\{pages\.length\} ตำแหน่งพร้อมสำรวจ/)
+  assert.match(hubRoute, /pages\.flatMap\(\(page\) => page\.organizations\.map\(\(organization\) => organization\.id\)\)/)
+  assert.match(hubRoute, /pages\.flatMap\(\(page\) => page\.packages\.map\(\(item\) => item\.id\)\)/)
+  assert.match(hubRoute, /\{organizationCount\} หน่วยงาน/)
+  assert.match(hubRoute, /\{packageCount\} แพ็กเกจเตรียมสอบ/)
+  assert.match(hubRoute, /buildPositionSeoDescription\(page\.entity\)/)
+  assert.match(hubRoute, /\{page\.organizations\.length\} หน่วยงาน/)
+  assert.match(hubRoute, /\{page\.packages\.length\} แพ็กเกจเตรียมสอบ/)
+  assert.match(hubRoute, /positionOrganizationsLabel/)
+})
+
+test('Position Hub V2 keeps a factual explainer and a neutral zero-entity state', () => {
+  assert.equal((hubRoute.match(/<h2\b/g) || []).length, 2)
+  assert.match(hubRoute, /<h2\b[^>]*id="position-explainer-heading"[^>]*>\s*Sobdai Position คืออะไร\?/)
+  assert.match(hubRoute, /POSITION_EXPLANATIONS/)
+  assert.match(hubRoute, /<section\s+aria-labelledby="position-explainer-heading"/)
+  assert.match(hubRoute, /noindex: pages\.length === 0/)
+  assert.match(hubRoute, /ขณะนี้ยังไม่มีตำแหน่งที่ผ่านเกณฑ์เผยแพร่สู่ดัชนีสาธารณะ/)
+  assert.doesNotMatch(hubRoute, /(?:เร็ว ๆ นี้|coming soon|กำลังเพิ่มข้อมูล)/i)
+})
+
+test('Position Hub V2 emits additive BreadcrumbList and CollectionPage ItemList JSON-LD', () => {
+  assert.match(hubRoute, /buildBreadcrumbJsonLd/)
+  assert.equal((hubRoute.match(/<StructuredData\b/g) || []).length, 2)
+  assert.match(hubRoute, /<StructuredData data=\{breadcrumbJsonLd\} \/>/)
+  assert.match(hubRoute, /<StructuredData data=\{collectionJsonLd\} \/>/)
+  assert.match(hubRoute, /'@type': 'CollectionPage'/)
+  assert.match(hubRoute, /'@type': 'ItemList'/)
+  assert.match(hubRoute, /numberOfItems: pages\.length/)
+  assert.match(hubRoute, /pages\.map\(\(page, index\)/)
+  assert.match(hubRoute, /name: page\.entity\.name/)
+  assert.match(hubRoute, /item: itemUrl/)
+  assert.match(hubRoute, /#website/)
+  assert.doesNotMatch(hubRoute, /page\.(?:news|articles)\.length/)
+})
+
+test('Position Hub V2 avoids unsupported discovery and loader-capped content claims', () => {
+  assert.doesNotMatch(hubRoute, /page\.(?:news|articles)\.length/)
+  assert.doesNotMatch(hubRoute, /(?:หมวดหมู่ตำแหน่ง|ประเภทตำแหน่ง|position category)/i)
+  assert.doesNotMatch(hubRoute, /(?:กำลังเปิดรับสมัคร|เปิดรับสมัครอยู่|สถานะเปิดรับสมัคร|สมัครได้แล้ว)/)
+  assert.doesNotMatch(hubRoute, /<(?:input|select|form)\b/)
+  assert.doesNotMatch(hubRoute, /(?:ค้นหา|ตัวกรอง|filter)/i)
+  assert.match(hubRoute, /src="\/images\/positions\/sobdai-position-mascot\.webp"/)
+  assert.match(hubRoute, /alt=""/)
+})
+
 test('Position sitemap uses the same qualification gate and omits synthetic freshness', () => {
   assert.match(sitemapRoute, /getIndexablePositionHubEntries/)
   assert.match(sitemapRoute, /getPositionSitemapSlugs/)
