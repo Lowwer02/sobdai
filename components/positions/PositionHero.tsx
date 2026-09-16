@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import type { PublicPositionAuthor } from '@/lib/positions-public'
 import styles from '@/app/positions/[slug]/positions.module.css'
@@ -6,18 +7,6 @@ interface PositionHeroProps {
   name: string
   updatedLabel: string
   author: PublicPositionAuthor | null
-}
-
-function BuildingMark() {
-  return (
-    <svg viewBox="0 0 144 144" className={styles.heroMarkIcon} aria-hidden="true">
-      <path d="M31 112h82" className={styles.heroMarkLine} />
-      <path d="M43 112V45l29-16 29 16v67" className={styles.heroMarkLine} />
-      <path d="M55 54h10M79 54h10M55 70h10M79 70h10M55 86h10M79 86h10" className={styles.heroMarkWindow} />
-      <path d="M68 112V92h16v20M72 29V19" className={styles.heroMarkLine} />
-      <circle cx="72" cy="15" r="3" className={styles.heroMarkDot} />
-    </svg>
-  )
 }
 
 function CalendarIcon() {
@@ -74,8 +63,16 @@ export default function PositionHero({ name, updatedLabel, author }: PositionHer
         )}
       </div>
 
-      <div className={styles.heroEmblem} aria-hidden="true">
-        <BuildingMark />
+      <div className={styles.heroMascot} aria-hidden="true">
+        <Image
+          src="/images/positions/policy-and-plan-analyst-mascot.webp"
+          alt=""
+          width={480}
+          height={480}
+          sizes="(min-width: 1280px) 15rem, (min-width: 901px) 16.25vw, 0px"
+          unoptimized
+          className={styles.heroMascotImage}
+        />
       </div>
     </header>
   )

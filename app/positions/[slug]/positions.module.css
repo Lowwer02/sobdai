@@ -48,7 +48,7 @@
 .hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 7.25rem;
+  grid-template-columns: minmax(0, 1fr) clamp(10rem, 16.25vw, 15rem);
   gap: clamp(1.25rem, 3vw, 2rem);
   align-items: center;
   overflow: hidden;
@@ -150,46 +150,24 @@
   color: #D4A63A;
 }
 
-.heroEmblem {
+.heroMascot {
   position: relative;
   z-index: 1;
-  display: grid;
-  width: 7.25rem;
-  height: 7.25rem;
-  place-items: center;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
   justify-self: end;
-  border: 1px solid rgba(212, 166, 58, 0.28);
-  border-radius: 1.25rem;
-  background: radial-gradient(circle, rgba(212, 166, 58, 0.16), rgba(212, 166, 58, 0.03) 68%, transparent 70%);
-  box-shadow: inset 0 0 2rem rgba(212, 166, 58, 0.06);
 }
 
-.heroMarkIcon {
-  width: 5.1rem;
-  height: 5.1rem;
-}
-
-.heroMarkLine,
-.heroMarkWindow {
-  fill: none;
-  stroke: #D4A63A;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.heroMarkLine {
-  stroke-width: 2.2;
-  stroke-opacity: 0.82;
-}
-
-.heroMarkWindow {
-  stroke-width: 2.8;
-  stroke-opacity: 0.55;
-}
-
-.heroMarkDot {
-  fill: #D4A63A;
-  fill-opacity: 0.9;
+.heroMascotImage {
+  display: block;
+  width: 100%;
+  max-width: 15rem;
+  height: auto;
+  opacity: 0.92;
+  object-fit: contain;
 }
 
 .statsSection {
@@ -1050,7 +1028,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .heroEmblem {
+  .heroMascot {
     display: none;
   }
 
