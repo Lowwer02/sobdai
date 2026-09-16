@@ -310,6 +310,7 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                         <ContentCard
                           key={s.id}
                           href={`/package/${packageSlug}/summary/${s.slug}`}
+                          prefetch={false}
                           title={s.title}
                           meta={[
                             { icon: <Clock size={11} />, text: `${s.read_time_minutes || 5} นาที` },

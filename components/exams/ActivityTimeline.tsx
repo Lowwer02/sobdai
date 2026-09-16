@@ -193,6 +193,7 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
   return (
     <Link
       href={href}
+      prefetch={isCompleted ? undefined : false}
       aria-label={ariaLabel}
       style={{
         display: 'flex',

@@ -499,6 +499,7 @@ function PublishSuccess({
               </div>
             </div>
             <Link
+              prefetch={false}
               href={`/admin/exam-sets/${examSet.id}/edit`}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-emerald-200"
             >
@@ -547,6 +548,7 @@ function PublishPartialFailure({
         {response.examSets.map((examSet) => (
           <Link
             key={examSet.id}
+            prefetch={false}
             href={`/admin/exam-sets/${examSet.id}/edit`}
             className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0F0B07] p-3 text-sm text-[#F5E9D6] hover:border-[#D4AF37]/30"
           >

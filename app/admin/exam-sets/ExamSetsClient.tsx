@@ -604,7 +604,7 @@ export default function ExamSetsClient({
                           </button>
                         )
                       })}
-                      <Link href={`/admin/exam-sets/${set.id}/edit`}>
+                      <Link prefetch={false} href={`/admin/exam-sets/${set.id}/edit`}>
                         <button type="button" className="p-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors rounded-lg hover:bg-[#D4AF37]/10" title="Edit">
                           <Edit size={16} />
                         </button>

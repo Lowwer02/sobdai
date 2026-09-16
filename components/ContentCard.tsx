@@ -28,6 +28,8 @@ export interface ContentCardMeta {
 
 export interface ContentCardProps {
   href: string
+  /** Opt out of automatic prefetching for high-cardinality card lists. */
+  prefetch?: boolean
   title: string
   description?: string
   /**
@@ -77,6 +79,7 @@ const FOOTER_STYLE: CSSProperties = {
 
 export default function ContentCard({
   href,
+  prefetch,
   title,
   description,
   meta,
@@ -86,7 +89,7 @@ export default function ContentCard({
   const tone = badge ? TONES[badge.tone] : null
 
   return (
-    <Link href={href} className="block">
+    <Link href={href} prefetch={prefetch} className="block">
       <div className={`${CARD_CLASS} relative overflow-hidden`} style={CARD_STYLE}>
         {cornerBadge && (
           <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">

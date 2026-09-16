@@ -318,6 +318,7 @@ export default function ExamNavigation({
                         <ContentCard
                           key={es.id}
                           href={`/package/${packageSlug}/exam/${es.id}`}
+                          prefetch={false}
                           title={es.name}
                           description={es.description || 'ชุดข้อสอบจำลองสนามจริง'}
                           meta={[
