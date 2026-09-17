@@ -17,6 +17,15 @@ export const ADMIN_ASSESSMENT_BLUEPRINTS = [
     sourcePath: 'Blueprint/oag_policy_plan_analyst_blueprint.md',
     packageCode: 'OAG-PPA-2026-V10',
   },
+  {
+    key: 'opsmoac-policy-plan-analyst@3.0.0',
+    id: 'opsmoac-policy-plan-analyst',
+    version: '3.0.0',
+    title: 'นักวิเคราะห์นโยบายและแผน — สำนักงานปลัดกระทรวงเกษตรและสหกรณ์',
+    description: 'Assessment Blueprint V1 · 5 sets · 100 questions per set · document-allocation only',
+    sourcePath: 'Blueprint/opsmoac_policy_plan_analyst_blueprint.md',
+    packageCode: 'OPSMOAC-PPA-2026-V10',
+  },
 ] as const
 
 export type AdminAssessmentBlueprintKey =
