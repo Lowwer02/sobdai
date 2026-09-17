@@ -141,7 +141,10 @@ export default async function PositionDetailPage({ params }: PageProps) {
         />
 
         <div className={styles.legacyContent}>
-          <PositionEditorialSection content={page.entity.overview_markdown} />
+          <PositionEditorialSection
+            content={page.entity.overview_markdown}
+            entitySlug={page.entity.slug}
+          />
 
           <div className={styles.relatedContent}>
             <PositionNewsSection items={page.news} />

@@ -1,3 +1,4 @@
+import { ArrowUpRight } from 'lucide-react'
 import styles from '@/app/positions/[slug]/positions.module.css'
 
 interface PositionStatsStripProps {
@@ -54,7 +55,7 @@ export default function PositionStatsStrip({
               <span className={styles.statAction}>{stat.actionLabel}</span>
             )}
             <span className={styles.statLabel}>{stat.label}</span>
-            <span className={styles.statArrow} aria-hidden="true">↗</span>
+            <ArrowUpRight className={styles.statArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
           </a>
         ))}
       </div>

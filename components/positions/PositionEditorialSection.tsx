@@ -1,13 +1,26 @@
+import Image from 'next/image'
+import { ZoomIn } from 'lucide-react'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import styles from '@/app/positions/[slug]/positions.module.css'
 
 interface PositionEditorialSectionProps {
   content: string | null
+  entitySlug: string
 }
 
 interface EditorialHeading {
   id: string
   text: string
+}
+
+interface EditorialInfographic {
+  path: string
+  alt: string
+}
+
+interface EditorialSegment {
+  markdown?: string
+  infographic?: EditorialInfographic
 }
 
 function cleanHeadingText(value: string): string {
@@ -16,6 +29,72 @@ function cleanHeadingText(value: string): string {
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/[*_`~]/g, '')
     .trim()
+}
+
+const editorialInfographics = {
+  work: {
+    path: '/images/positions/policy-and-plan-analyst-work-infographic.webp',
+    alt: 'อินโฟกราฟิกอธิบายหน้าที่ของนักวิเคราะห์นโยบายและแผน',
+  },
+  skills: {
+    path: '/images/positions/policy-and-plan-analyst-skills-infographic.webp',
+    alt: 'อินโฟกราฟิกทักษะสำคัญของนักวิเคราะห์นโยบายและแผน',
+  },
+  growth: {
+    path: '/images/positions/policy-and-plan-analyst-growth-infographic.webp',
+    alt: 'อินโฟกราฟิกเส้นทางการเติบโตของสายงานนักวิเคราะห์นโยบายและแผน',
+  },
+} as const
+
+const POSITION_ENTITY_SLUG = 'policy-and-plan-analyst'
+
+function headingTextFromLine(line: string): string | null {
+  const match = line.match(/^\s*(#{1,2})(?!#)\s+(.+?)\s*$/)
+  return match ? cleanHeadingText(match[2]) : null
+}
+
+function isSkillsHeading(value: string): boolean {
+  return value === 'คุณสมบัติของนักวิเคราะห์นโยบายและแผน'
+    || value === 'คุณสมบัติเด่นของนักวิเคราะห์นโยบายและแผน'
+}
+
+function buildEditorialSegments(content: string, entitySlug: string): EditorialSegment[] {
+  if (entitySlug !== POSITION_ENTITY_SLUG) return [{ markdown: content }]
+
+  const lines = content.split(/\r?\n/)
+  const segments: EditorialSegment[] = []
+  let markdownLines: string[] = []
+
+  const pushMarkdown = () => {
+    if (markdownLines.length === 0) return
+    const markdown = markdownLines.join('\n')
+    if (markdown.trim()) segments.push({ markdown })
+    markdownLines = []
+  }
+
+  for (const line of lines) {
+    const headingText = headingTextFromLine(line)
+
+    if (headingText === 'เตรียมสอบนักวิเคราะห์นโยบายและแผนอย่างไร') {
+      pushMarkdown()
+      segments.push({ infographic: editorialInfographics.growth })
+    }
+
+    markdownLines.push(line)
+
+    if (headingText === 'นักวิเคราะห์นโยบายและแผน ทำงานอะไร') {
+      pushMarkdown()
+      segments.push({ infographic: editorialInfographics.work })
+    }
+
+    if (headingText && isSkillsHeading(headingText)) {
+      pushMarkdown()
+      segments.push({ infographic: editorialInfographics.skills })
+    }
+  }
+
+  pushMarkdown()
+  return segments
 }
 
 function slugifyHeading(value: string): string {
@@ -54,8 +133,41 @@ function extractEditorialHeadings(content: string): EditorialHeading[] {
   })
 }
 
-export default function PositionEditorialSection({ content }: PositionEditorialSectionProps) {
-  const headings = content ? extractEditorialHeadings(content) : []
+function PositionInfographic({ infographic }: { infographic: EditorialInfographic }) {
+  return (
+    <figure className={styles.editorialInfographic}>
+      <a
+        href={infographic.path}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={styles.editorialInfographicLink}
+        aria-label={`เปิดภาพขนาดเต็ม: ${infographic.alt}`}
+      >
+        <Image
+          src={infographic.path}
+          alt={infographic.alt}
+          width={1672}
+          height={941}
+          sizes="(max-width: 768px) calc(100vw - 2rem), 800px"
+          className={styles.editorialInfographicImage}
+          loading="lazy"
+          unoptimized
+        />
+        <span className={styles.editorialInfographicHint}>
+          <ZoomIn size={14} aria-hidden="true" />
+          <span>ดูภาพขนาดเต็ม</span>
+        </span>
+      </a>
+    </figure>
+  )
+}
+
+export default function PositionEditorialSection({
+  content: sourceContent,
+  entitySlug,
+}: PositionEditorialSectionProps) {
+  const headings = sourceContent ? extractEditorialHeadings(sourceContent) : []
+  const segments = sourceContent ? buildEditorialSegments(sourceContent, entitySlug) : []
 
   return (
     <section
@@ -68,7 +180,7 @@ export default function PositionEditorialSection({ content }: PositionEditorialS
         <h2 id="position-overview-heading" className={styles.editorialIntroHeading}>
           ข้อมูลและบทบาทหน้าที่ของตำแหน่ง
         </h2>
-        {content && (
+        {sourceContent && (
           <p className={styles.editorialIntroDescription}>
             อ่านภาพรวมหน้าที่ คุณสมบัติ เนื้อหาการสอบ และแนวทางเตรียมตัวจากเนื้อหาที่เชื่อมโยงกับตำแหน่งนี้
           </p>
@@ -98,8 +210,16 @@ export default function PositionEditorialSection({ content }: PositionEditorialS
         )}
 
         <div id="position-editorial-body" className={`${styles.editorialBody} ${styles.editorialMarkdown}`}>
-          {content ? (
-            <SummaryMarkdown content={content} headingMode="positionEditorial" />
+          {sourceContent ? (
+            segments.map((segment, index) => (
+              segment.infographic ? (
+                <PositionInfographic key={`infographic-${index}`} infographic={segment.infographic} />
+              ) : (
+                <div key={`markdown-${index}`} className={styles.editorialMarkdownSegment}>
+                  <SummaryMarkdown content={segment.markdown || ''} headingMode="positionEditorial" />
+                </div>
+              )
+            ))
           ) : (
             <p className={styles.editorialFallback}>ข้อมูลภาพรวมของตำแหน่งนี้กำลังจัดทำ</p>
           )}

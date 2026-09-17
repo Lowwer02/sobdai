@@ -144,10 +144,27 @@ test('Position Detail V2 locks editorial anchors and the opt-in Markdown heading
   assert.match(positionEditorial, /headings\.map\(\(heading, index\)/)
   assert.match(positionEditorial, /href=\{`#\$\{heading\.id\}`\}/)
   assert.match(positionEditorial, /<ol\b/)
-  assert.match(positionEditorial, /<SummaryMarkdown content=\{content\} headingMode="positionEditorial" \/>/)
+  assert.match(positionEditorial, /<SummaryMarkdown content=\{segment\.markdown \|\| ''\} headingMode="positionEditorial" \/>/)
   assert.match(summaryMarkdown, /headingMode\?: 'default' \| 'positionEditorial'/)
   assert.match(summaryMarkdown, /headingMode = 'default'/)
   assert.match(summaryMarkdown, /headingMode !== 'positionEditorial'/)
+})
+
+test('Position-specific infographics are slug-scoped and use stable full-size image links', () => {
+  assert.match(detailRoute, /<PositionEditorialSection[\s\S]*entitySlug=\{page\.entity\.slug\}/)
+  assert.match(positionEditorial, /const POSITION_ENTITY_SLUG = 'policy-and-plan-analyst'/)
+  assert.match(positionEditorial, /if \(entitySlug !== POSITION_ENTITY_SLUG\) return \[\{ markdown: content \}\]/)
+  assert.match(positionEditorial, /<Image\b/)
+  assert.match(positionEditorial, /width=\{1672\}/)
+  assert.match(positionEditorial, /height=\{941\}/)
+  assert.match(positionEditorial, /loading="lazy"/)
+  assert.match(positionEditorial, /unoptimized/)
+  assert.match(positionEditorial, /target="_blank"/)
+  assert.match(positionEditorial, /rel="noopener noreferrer"/)
+  assert.match(positionEditorial, /aria-label=\{`เปิดภาพขนาดเต็ม: \$\{infographic\.alt\}`\}/)
+  assert.doesNotMatch(positionEditorial, /infographicMarkdown/)
+  assert.doesNotMatch(positionEditorial, /injectEditorialInfographics/)
+  assert.doesNotMatch(positionEditorial, /!\[\$\{infographic\.alt\}\]/)
 })
 
 test('Position Detail V2 keeps package logos data-driven with a same-size neutral fallback', () => {

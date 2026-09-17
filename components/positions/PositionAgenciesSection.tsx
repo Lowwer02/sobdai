@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import type {
   PublicPositionOrganization,
   PublicPositionPackage,
@@ -7,6 +8,12 @@ import styles from '@/app/positions/[slug]/positions.module.css'
 interface PositionAgenciesSectionProps {
   organizations: PublicPositionOrganization[]
   packages: PublicPositionPackage[]
+}
+
+// This route-local mapping is intentionally explicit for the one agency whose
+// current package data does not include a logo URL.
+const localOrganizationLogoUrls: Readonly<Record<string, string>> = {
+  กรมการแพทย์: '/images/positions/department-of-medical-services-logo.webp',
 }
 
 function BuildingIcon() {
@@ -24,6 +31,19 @@ function hasPublishedPackage(
   return packages.some((pkg) => (
     pkg.organization_id === organization.id || pkg.organization?.id === organization.id
   ))
+}
+
+function organizationLogoUrl(
+  organization: PublicPositionOrganization,
+  packages: readonly PublicPositionPackage[],
+): string | null {
+  const packageWithLogo = packages.find((pkg) => (
+    (pkg.organization_id === organization.id || pkg.organization?.id === organization.id) &&
+    Boolean(pkg.logo_url?.trim())
+  ))
+  return packageWithLogo?.logo_url?.trim()
+    || localOrganizationLogoUrls[organization.name.trim()]
+    || null
 }
 
 export default function PositionAgenciesSection({
@@ -53,11 +73,25 @@ export default function PositionAgenciesSection({
       <ul className={styles.agencyGrid}>
         {organizations.map((organization) => {
           const packageAvailable = hasPublishedPackage(organization, packages)
+          const logoUrl = organizationLogoUrl(organization, packages)
 
           return (
             <li key={organization.id} className={styles.agencyCard}>
               <div className={styles.agencyCardTop}>
-                <span className={styles.agencyIconWrap}><BuildingIcon /></span>
+                <span className={styles.agencyIconWrap}>
+                  {logoUrl ? (
+                    <Image
+                      src={logoUrl}
+                      alt={`โลโก้${organization.name}`}
+                      width={48}
+                      height={48}
+                      className={styles.agencyLogo}
+                      unoptimized
+                    />
+                  ) : (
+                    <BuildingIcon />
+                  )}
+                </span>
                 {packageAvailable && (
                   <span className={styles.packageBadge}>มีแพ็กเกจเตรียมสอบ</span>
                 )}
