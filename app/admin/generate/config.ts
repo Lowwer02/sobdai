@@ -18,6 +18,15 @@ export const ADMIN_ASSESSMENT_BLUEPRINTS = [
     packageCode: 'OAG-PPA-2026-V10',
   },
   {
+    key: 'oag-performance-audit-officer@3.0.0',
+    id: 'oag-performance-audit-officer',
+    version: '3.0.0',
+    title: 'นักวิชาการตรวจเงินแผ่นดิน (ดําเนินงาน) — สำนักงานการตรวจเงินแผ่นดิน',
+    description: 'Assessment Blueprint V1 · 5 sets · 100 questions per set · document-allocation only',
+    sourcePath: 'Blueprint/oag_performance_audit_officer_blueprint.md',
+    packageCode: 'OAG-PFA-2026-V10',
+  },
+  {
     key: 'opsmoac-policy-plan-analyst@3.0.0',
     id: 'opsmoac-policy-plan-analyst',
     version: '3.0.0',
