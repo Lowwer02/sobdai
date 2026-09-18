@@ -121,36 +121,34 @@ export default async function CheckoutPage({ params }: { params: Promise<{ id: s
 
   let manualOrder: ManualPaymentOrder | null = null
 
-  if (Number(pkg.current_price) > 0) {
-    const { data: pendingManualOrder } = await supabase
-      .from('orders')
-      .select('id, amount, status, payment_provider')
-      .eq('user_id', user.id)
-      .eq('package_id', id)
-      .eq('status', 'pending')
-      .eq('payment_provider', MANUAL_PAYMENT_PROVIDER)
+  const { data: pendingManualOrder } = await supabase
+    .from('orders')
+    .select('id, amount, status, payment_provider')
+    .eq('user_id', user.id)
+    .eq('package_id', id)
+    .eq('status', 'pending')
+    .eq('payment_provider', MANUAL_PAYMENT_PROVIDER)
+    .maybeSingle()
+
+  if (pendingManualOrder) {
+    const { data: latestSubmission, count: submissionCount, error: submissionError } = await supabase
+      .from('payment_submissions')
+      .select('status, rejection_reason', { count: 'exact' })
+      .eq('order_id', pendingManualOrder.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
-    if (pendingManualOrder) {
-      const { data: latestSubmission, count: submissionCount, error: submissionError } = await supabase
-        .from('payment_submissions')
-        .select('status, rejection_reason', { count: 'exact' })
-        .eq('order_id', pendingManualOrder.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      manualOrder = {
-        id: pendingManualOrder.id,
-        amount: Number(pendingManualOrder.amount),
-        status: 'pending',
-        submissionStatus: submissionError
-          ? null
-          : (latestSubmission?.status as ManualPaymentOrder['submissionStatus']) || null,
-        rejectionReason: submissionError ? null : latestSubmission?.rejection_reason || null,
-        submissionCount: submissionError ? null : submissionCount || 0,
-        paymentEvidenceAvailable: !submissionError,
-      }
+    manualOrder = {
+      id: pendingManualOrder.id,
+      amount: Number(pendingManualOrder.amount),
+      status: 'pending',
+      submissionStatus: submissionError
+        ? null
+        : (latestSubmission?.status as ManualPaymentOrder['submissionStatus']) || null,
+      rejectionReason: submissionError ? null : latestSubmission?.rejection_reason || null,
+      submissionCount: submissionError ? null : submissionCount || 0,
+      paymentEvidenceAvailable: !submissionError,
     }
   }
 

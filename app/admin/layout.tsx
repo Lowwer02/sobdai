@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2, ShoppingBag } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2, ShoppingBag, QrCode } from 'lucide-react'
 import { requireStaff } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 
@@ -19,6 +19,7 @@ const managementNav = [
   { name: 'Position Entities', href: '/admin/position-entities', icon: UserCircle2, permission: 'content.read' },
   { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
+  { name: 'Payment', href: '/admin/payment', icon: QrCode, permission: 'financial.manage' },
   { name: 'Homepage', href: '/admin/homepage', icon: Home, permission: 'content.write' },
   { name: 'Social Follow', href: '/admin/social-follow', icon: Share2, permission: 'content.write' },
   { name: 'Support', href: '/admin/support', icon: Heart, permission: 'support.manage' },
