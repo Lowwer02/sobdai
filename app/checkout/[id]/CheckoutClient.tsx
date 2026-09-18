@@ -28,6 +28,12 @@ export interface ManualPaymentOrder {
   paymentEvidenceAvailable: boolean
 }
 
+interface ManualPaymentQrDetails {
+  amount: string
+  displayName: string
+  instructionText: string
+}
+
 interface CheckoutClientProps {
   pkg: any
   userEmail: string
@@ -47,12 +53,18 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
   const [payMethod, setPayMethod] = useState<'card' | 'promptpay'>('promptpay')
   const [claimedSuccess, setClaimedSuccess] = useState(false)
   const [manualOrder, setManualOrder] = useState<ManualPaymentOrder | null>(initialManualOrder)
+  const [manualQrDetails, setManualQrDetails] = useState<ManualPaymentQrDetails | null>(null)
+  const [manualQrState, setManualQrState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>(initialManualOrder ? 'loading' : 'idle')
   const [slipFile, setSlipFile] = useState<File | null>(null)
   const [slipSubmitting, setSlipSubmitting] = useState(false)
   const [fileInputKey, setFileInputKey] = useState(0)
 
-  const discount = pkg.original_price > pkg.current_price 
-    ? Math.round(((pkg.original_price - pkg.current_price) / pkg.original_price) * 100) 
+  const currentPrice = Number(pkg.current_price)
+  const originalPrice = Number(pkg.original_price)
+  const displayedAmount = manualOrder?.amount ?? currentPrice
+
+  const discount = originalPrice > currentPrice
+    ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
     : 0
 
   useEffect(() => {
@@ -62,6 +74,32 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
     document.head.appendChild(script)
     return () => { document.head.removeChild(script) }
   }, [])
+
+  useEffect(() => {
+    if (!manualOrder || payMethod !== 'promptpay') return
+
+    let cancelled = false
+    setManualQrState('loading')
+    setManualQrDetails(null)
+
+    fetch(`/api/payment/manual/order/${manualOrder.id}/details`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null)
+        if (!response.ok || !data?.success) throw new Error(data?.error || 'payment details unavailable')
+        if (!cancelled) {
+          setManualQrDetails({
+            amount: String(data.amount),
+            displayName: String(data.displayName || ''),
+            instructionText: String(data.instructionText || ''),
+          })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setManualQrState('unavailable')
+      })
+
+    return () => { cancelled = true }
+  }, [manualOrder?.id, payMethod])
 
   const handleCardPayment = () => {
     if (manualOrder?.submissionStatus === 'submitted') {
@@ -81,10 +119,10 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
 
     window.OmiseCard.open({
       frameLabel: 'Sobdai - สอบได้',
-      amount: pkg.current_price * 100, // Satang
+      amount: currentPrice * 100, // Satang
       currency: 'THB',
       defaultPaymentMethod: 'credit_card',
-      submitLabel: `ชำระ ฿${pkg.current_price.toLocaleString()}`,
+      submitLabel: `ชำระ ฿${currentPrice.toLocaleString()}`,
       onCreateTokenSuccess: async (token: string) => {
         setLoading(true)
         try {
@@ -111,11 +149,6 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
 
   const handlePromptPay = async () => {
     if (loading || manualOrder) return
-
-    if (!supportConfig?.qr_image_url?.trim()) {
-      setError('ช่องทาง PromptPay ยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ')
-      return
-    }
 
     setLoading(true)
     setError('')
@@ -297,11 +330,11 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
           <div className="flex justify-between items-end">
             <div className="text-[#A1866B] font-medium">ยอดชำระสุทธิ</div>
             <div className="text-right">
-              {pkg.original_price > pkg.current_price && (
-                <div className="text-sm text-[#A1866B] line-through mb-1">฿{pkg.original_price.toLocaleString()}</div>
+              {!manualOrder && originalPrice > currentPrice && (
+                <div className="text-sm text-[#A1866B] line-through mb-1">฿{originalPrice.toLocaleString()}</div>
               )}
               <div className="text-3xl font-display font-bold text-[#D4AF37]">
-                ฿{pkg.current_price.toLocaleString()}
+                ฿{displayedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
           </div>
@@ -312,12 +345,12 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
               <span className="font-bold">
                 {claimedSuccess
                   ? 'เปิดใช้งานสิทธิ์เรียบร้อยแล้ว'
-                  : pkg.current_price === 0
+                  : currentPrice === 0
                     ? 'แพ็กเกจนี้เปิดให้ใช้งานฟรี'
                     : 'สิทธิ์ใช้งานแพ็กเกจนี้ตลอดชีพ'}
               </span>
               <div className="text-xs opacity-80">
-                {pkg.current_price === 0
+                {currentPrice === 0
                   ? 'ปลดล็อคเนื้อหาทั้งหมดในแพ็กเกจนี้ทันที'
                   : 'ชำระครั้งเดียว ไม่มีค่ารายเดือน'}
               </div>
@@ -326,7 +359,7 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
         </div>
 
         {/* Free or Paid Condition */}
-        {pkg.current_price === 0 ? (
+        {currentPrice === 0 ? (
           claimedSuccess ? (
             /* ── Claim Success Panel ── */
             <div className="space-y-6">
@@ -476,25 +509,45 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
                 <div className="text-center">
                   <h3 className="text-lg font-bold text-[#F5E9D6]">โอนเงินผ่าน PromptPay</h3>
                   <p className="mt-1 text-sm text-[#A1866B]">กรุณาโอนยอดให้ตรงกับคำสั่งซื้อ</p>
-                  <p className="mt-2 text-3xl font-bold text-[#D4AF37]">฿{manualOrder.amount.toLocaleString()}</p>
+                  <p className="mt-2 text-3xl font-bold text-[#D4AF37]">฿{Number(manualQrDetails?.amount ?? manualOrder.amount.toFixed(2)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
 
-                {supportConfig?.qr_image_url ? (
-                  <SupportDetails
-                    qr_image_url={supportConfig.qr_image_url}
-                    promptpay_name={supportConfig.promptpay_name}
-                    bank_name={supportConfig.bank_name}
-                    account_number={supportConfig.account_number}
-                    showPlaceholderIfEmpty={false}
-                    qrSize={220}
-                  />
-                ) : (
-                  <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-center text-sm text-red-300">
-                    ไม่พบ QR สำหรับรับชำระเงิน กรุณาติดต่อผู้ดูแลระบบ
+                <div className="rounded-lg border border-white/10 bg-white p-4 text-center">
+                  {manualQrState === 'loading' && (
+                    <div className="py-12 text-sm text-slate-600">กำลังเตรียม QR สำหรับคำสั่งซื้อนี้...</div>
+                  )}
+                  {manualQrState !== 'unavailable' && (
+                    <img
+                      src={`/api/payment/manual/order/${manualOrder.id}/qr`}
+                      alt={`QR PromptPay สำหรับชำระเงิน ฿${manualQrDetails?.amount ?? manualOrder.amount.toFixed(2)}`}
+                      width={280}
+                      height={280}
+                      className={`mx-auto h-[280px] w-[280px] ${manualQrState === 'loading' ? 'hidden' : ''}`}
+                      onLoad={() => setManualQrState('ready')}
+                      onError={() => setManualQrState('unavailable')}
+                    />
+                  )}
+                  {manualQrState === 'unavailable' && (
+                    <div className="py-8 text-sm text-red-700">ขณะนี้การชำระเงินผ่าน PromptPay ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง</div>
+                  )}
+                </div>
+
+                {manualQrState === 'ready' && manualQrDetails && (
+                  <div className="space-y-2 text-center">
+                    {manualQrDetails.displayName && (
+                      <p className="text-base font-bold text-[#F5E9D6]">{manualQrDetails.displayName}</p>
+                    )}
+                    {manualQrDetails.instructionText && (
+                      <p className="whitespace-pre-line text-sm leading-relaxed text-[#A1866B]">{manualQrDetails.instructionText}</p>
+                    )}
                   </div>
                 )}
 
-                {manualPaymentStatus?.key === 'evidence-unavailable' ? (
+                {manualQrState !== 'ready' || !manualQrDetails ? (
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-[#A1866B]">
+                    {manualQrState === 'unavailable' ? 'ยังไม่สามารถดำเนินการส่งสลิปได้ กรุณาลองใหม่ภายหลัง' : 'กำลังตรวจสอบข้อมูลการชำระเงิน...'}
+                  </div>
+                ) : manualPaymentStatus?.key === 'evidence-unavailable' ? (
                   <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-[#A1866B]">
                     <div className="font-bold text-[#F5E9D6]">{manualPaymentStatus.label}</div>
                     <div className="mt-1">{manualPaymentStatus.description}</div>
@@ -574,7 +627,7 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
               ) : payMethod === 'promptpay' ? (
                 'สร้าง QR PromptPay เพื่อชำระเงิน'
               ) : (
-                `ชำระเงิน ฿${pkg.current_price.toLocaleString()}`
+                `ชำระเงิน ฿${currentPrice.toLocaleString()}`
               )}
             </button>
             )}
