@@ -2,8 +2,9 @@
 --
 -- This migration is intentionally safe to apply while the released M1.1
 -- application is still serving traffic. It creates and protects the settings
--- surface, but does not install the final order-enforcement trigger. Operators
--- configure and verify a real recipient before applying 099_enforce.sql.
+-- surface, installs only the shared lifecycle serialization primitive, and
+-- does not enforce enabled/configured payment settings. Operators configure
+-- and verify a real recipient while disabled before applying 099_enforce.sql.
 
 set local lock_timeout = '5s';
 
@@ -21,6 +22,12 @@ begin
         raise exception using
             errcode = 'check_violation',
             message = 'M1.2 EXPAND requires public.handle_updated_at().';
+    end if;
+
+    if to_regprocedure('public.create_manual_payment_order(uuid)') is null then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'M1.2 EXPAND requires the established M1.1 manual order RPC.';
     end if;
 
     if not exists (
@@ -44,6 +51,141 @@ begin
     end if;
 end
 $payment_settings_m1_2_expand_preflight$;
+
+-- ---------------------------------------------------------------------------
+-- Preserve the released M1.1 order behavior while establishing the lifecycle
+-- lock used by the later atomic cutover. The settings state is deliberately
+-- not consulted here: 098 alone must remain compatible with M1.1.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.create_manual_payment_order(
+    p_package_id uuid
+)
+returns table (
+    order_id uuid,
+    package_id uuid,
+    amount numeric,
+    status text
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public, auth, pg_temp
+set lock_timeout = '5s'
+as $function$
+declare
+    v_actor_id uuid;
+    v_package_id uuid;
+    v_amount numeric;
+    v_existing_order_id uuid;
+    v_existing_amount numeric;
+    v_existing_status text;
+begin
+    v_actor_id := auth.uid();
+
+    if v_actor_id is null then
+        raise exception using
+            errcode = '42501',
+            message = 'Authentication is required.';
+    end if;
+
+    if p_package_id is null then
+        raise exception using
+            errcode = '22023',
+            message = 'A package is required.';
+    end if;
+
+    -- 098 serializes the whole canonical M1.1 order transaction with the
+    -- future 099 preflight. No availability/configuration check belongs here.
+    perform pg_catalog.pg_advisory_xact_lock(7281, 1201);
+
+    -- Lock the package row while taking the price snapshot. The client never
+    -- supplies the amount and cannot create an order for an unpublished/free
+    -- package through this paid-only RPC.
+    select p.id, p.current_price
+    into v_package_id, v_amount
+    from public.packages p
+    where p.id = p_package_id
+      and p.is_published = true
+      and p.current_price > 0
+    for update;
+
+    if not found then
+        raise exception using
+            errcode = '22023',
+            message = 'The package is unavailable for manual payment.';
+    end if;
+
+    if exists (
+        select 1
+        from public.orders o
+        where o.user_id = v_actor_id
+          and o.package_id = v_package_id
+          and o.status in ('paid', 'free')
+    ) then
+        raise exception using
+            errcode = '23505',
+            message = 'The user already has package access.';
+    end if;
+
+    select o.id, o.amount, o.status
+    into v_existing_order_id, v_existing_amount, v_existing_status
+    from public.orders o
+    where o.user_id = v_actor_id
+      and o.package_id = v_package_id
+      and o.status = 'pending'
+      and o.payment_provider = 'promptpay_manual'
+    order by o.created_at desc
+    limit 1
+    for update;
+
+    if found then
+        return query select v_existing_order_id, v_package_id, v_existing_amount, v_existing_status;
+        return;
+    end if;
+
+    begin
+        insert into public.orders (
+            user_id,
+            package_id,
+            amount,
+            status,
+            payment_provider
+        ) values (
+            v_actor_id,
+            v_package_id,
+            v_amount,
+            'pending',
+            'promptpay_manual'
+        )
+        returning id into v_existing_order_id;
+    exception
+        when unique_violation then
+            -- Another request won the partial-index race. Return that open
+            -- order so the client remains idempotent.
+            select o.id, o.amount, o.status
+            into v_existing_order_id, v_existing_amount, v_existing_status
+            from public.orders o
+            where o.user_id = v_actor_id
+              and o.package_id = v_package_id
+              and o.status = 'pending'
+              and o.payment_provider = 'promptpay_manual'
+            order by o.created_at desc
+            limit 1;
+
+            if not found then
+                raise;
+            end if;
+
+            return query select v_existing_order_id, v_package_id, v_existing_amount, v_existing_status;
+            return;
+    end;
+
+    return query select v_existing_order_id, v_package_id, v_amount, 'pending'::text;
+end
+$function$;
+
+comment on function public.create_manual_payment_order(uuid) is
+    'Creates or returns one lifecycle-aware pending PromptPay order using auth.uid(), a DB price snapshot, and the M1.2 lifecycle lock.';
 
 -- ---------------------------------------------------------------------------
 -- Private singleton settings. These values are not homepage/Donate config.
@@ -175,6 +317,8 @@ as $function$
 declare
     v_actor_id uuid;
     v_recipient_identifier text := coalesce(p_recipient_identifier, '');
+    v_current_recipient_type text;
+    v_current_recipient_identifier text;
 begin
     v_actor_id := auth.uid();
 
@@ -230,6 +374,33 @@ begin
 
     perform pg_catalog.pg_advisory_xact_lock(7281, 1201);
 
+    select ps.recipient_type, ps.recipient_identifier
+    into v_current_recipient_type, v_current_recipient_identifier
+    from public.payment_settings ps
+    where ps.id = 1
+    for update;
+
+    if not found then
+        raise exception using
+            errcode = 'P0002',
+            message = 'Payment settings are not initialized.';
+    end if;
+
+    if v_current_recipient_type is distinct from 'ewallet'
+       or v_current_recipient_identifier is distinct from v_recipient_identifier
+    then
+        if exists (
+            select 1
+            from public.orders o
+            where o.status = 'pending'
+              and o.payment_provider = 'promptpay_manual'
+        ) then
+            raise exception using
+                errcode = '55006',
+                message = 'ยังมีคำสั่งซื้อ PromptPay ที่รอชำระอยู่ กรุณาจัดการคำสั่งซื้อเหล่านั้นก่อนเปลี่ยนผู้รับเงิน';
+        end if;
+    end if;
+
     return query
     update public.payment_settings
     set enabled = p_enabled,
@@ -257,7 +428,7 @@ end
 $function$;
 
 comment on function public.update_payment_settings(boolean, text, text, text) is
-    'Financial-manager-only PromptPay settings update; serialized on the M1.2 lifecycle lock.';
+    'Financial-manager-only PromptPay settings update; serialized on the M1.2 lifecycle lock and guarded against recipient changes with pending manual orders.';
 
 revoke all on function public.payment_settings_actor_is_manager() from public, anon, authenticated, service_role;
 grant execute on function public.payment_settings_actor_is_manager() to authenticated;
@@ -268,6 +439,8 @@ notify pgrst, 'reload schema';
 
 -- Operator handoff:
 -- 1. Apply this EXPAND migration while M1.1 is live.
--- 2. Configure and verify the real recipient using /admin/payment and the
---    private ฿1.00 preview.
--- 3. Apply 099_payment_settings_m1_2_enforce.sql only after verification.
+-- 2. Drain pending promptpay_manual orders.
+-- 3. Configure and verify the real recipient while enabled remains false,
+--    using /admin/payment and the private ฿1.00 preview.
+-- 4. Apply 099_payment_settings_m1_2_enforce.sql only after verification and
+--    with zero pending promptpay_manual orders.

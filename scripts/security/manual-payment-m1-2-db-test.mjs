@@ -285,6 +285,59 @@ async function runSettingsUpdateInSecondSession(connectionString, actorId, enabl
   }
 }
 
+async function applyMigrationInTransaction(client, migrationName) {
+  await query(client, 'begin')
+  try {
+    await query(client, migrationSql(migrationName))
+    await query(client, 'commit')
+    return null
+  } catch (error) {
+    await query(client, 'rollback').catch(() => {})
+    return error
+  }
+}
+
+async function expectMigrationRejected(client, migrationName, label) {
+  const error = await applyMigrationInTransaction(client, migrationName)
+  ensure(error, `${label} unexpectedly succeeded`)
+  return error
+}
+
+async function assertLifecycleLockHeld(connectionString, label) {
+  const probe = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+  try {
+    await probe.connect()
+    await query(probe, 'begin')
+    const result = await query(probe, 'select pg_try_advisory_xact_lock(7281, 1201) as acquired')
+    assert.equal(result.rows[0].acquired, false, `${label} did not hold the lifecycle advisory lock`)
+    await query(probe, 'rollback')
+  } finally {
+    await probe.end().catch(() => {})
+  }
+}
+
+async function startMigrationInSecondSession(connectionString, migrationName) {
+  const client = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+  await client.connect()
+  await query(client, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
+  await query(client, 'begin')
+
+  const result = query(client, migrationSql(migrationName))
+    .then(async () => {
+      await query(client, 'commit')
+      return null
+    })
+    .catch(async (error) => {
+      await query(client, 'rollback').catch(() => {})
+      return error
+    })
+    .finally(async () => {
+      await client.end().catch(() => {})
+    })
+
+  return result
+}
+
 async function waitBriefly() {
   await new Promise((resolve) => setTimeout(resolve, 250))
 }
@@ -297,7 +350,9 @@ async function runProof() {
     await query(client, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
     await bootstrap(client)
 
-    // EXPAND is safe with the released M1.1 shape and does not fence orders yet.
+    // -----------------------------------------------------------------------
+    // 098 EXPAND compatibility and pre-cutover guards.
+    // -----------------------------------------------------------------------
     await query(client, migrationSql('098_payment_settings_m1_2_expand.sql'))
     const expandTrigger = await query(client, `
       select exists (
@@ -319,6 +374,41 @@ async function runProof() {
     assert.equal(expandOrder.status, 'pending')
     await cleanupOrder(client, expandOrder.order_id, expandPackage)
 
+    // The canonical M1.1 RPC holds the same transaction advisory lock that
+    // 099 will use, while retaining the old disabled/unconfigured behavior.
+    const expandLockPackage = await insertPackage(client, 'expand-lock', 764)
+    const expandCreateSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+    await expandCreateSession.connect()
+    await query(expandCreateSession, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
+    await query(expandCreateSession, 'begin')
+    await setAuthenticated(expandCreateSession, IDS.buyer)
+    const expandCreateInFlight = query(
+      expandCreateSession,
+      'select * from public.create_manual_payment_order($1)',
+      [expandLockPackage],
+    )
+    await waitBriefly()
+    await assertLifecycleLockHeld(connectionString, '098 canonical order creation')
+    const expandLockOrder = await expandCreateInFlight
+    assert.equal(expandLockOrder.rows[0].status, 'pending')
+    await resetAuthenticated(expandCreateSession)
+    await query(expandCreateSession, 'commit')
+    await expandCreateSession.end()
+    await cleanupOrder(client, expandLockOrder.rows[0].order_id, expandLockPackage)
+
+    // Destination changes are already blocked during the compatibility phase;
+    // display-only changes remain available.
+    const guardedRecipientPackage = await insertPackage(client, 'expand-recipient-guard', 765)
+    const guardedRecipientOrder = await createManualOrder(client, IDS.buyer, guardedRecipientPackage)
+    const expandRecipientError = await runAs(client, IDS.manager, () => expectRejected(
+      client,
+      '098 recipient change with pending order',
+      () => query(client, 'select * from public.update_payment_settings($1, $2, $3, $4)', [false, RECIPIENT_A, 'Blocked recipient', 'Disposable database test']),
+    ))
+    assert.equal(expandRecipientError.code, '55006')
+    assert.match(expandRecipientError.message, /ยังมีคำสั่งซื้อ PromptPay ที่รอชำระอยู่/)
+    await cleanupOrder(client, guardedRecipientOrder.order_id, guardedRecipientPackage)
+
     const invalidRecipientError = await runAs(client, IDS.manager, () => expectRejected(
       client,
       'invalid E-Wallet configuration',
@@ -326,14 +416,97 @@ async function runProof() {
     ))
     assert.equal(invalidRecipientError.code, '22023')
 
-    const managerSettings = await updateSettings(client, IDS.manager, true, RECIPIENT_A)
+    const managerSettings = await updateSettings(client, IDS.manager, false, RECIPIENT_A)
     assert.equal(managerSettings.rows[0].recipient_identifier, RECIPIENT_A)
 
-    // ENFORCE is deliberately gated on the configured-and-verified state.
-    await query(client, migrationSql('099_payment_settings_m1_2_enforce.sql'))
-    const recipientWithoutPending = await updateSettings(client, IDS.manager, true, RECIPIENT_B)
-    assert.equal(recipientWithoutPending.rows[0].recipient_identifier, RECIPIENT_B)
+    // 099 preflight must reject every unsafe state before installing any
+    // enforcement, then accept only valid recipient + disabled + zero pending.
+    await updateSettings(client, IDS.manager, false, '')
+    const missingRecipientError = await expectMigrationRejected(
+      client,
+      '099_payment_settings_m1_2_enforce.sql',
+      '099 missing recipient preflight',
+    )
+    assert.equal(missingRecipientError.code, '23514')
+    assert.match(missingRecipientError.message, /valid configured PromptPay recipient while payment remains disabled/i)
+
+    await query(client, 'alter table public.payment_settings drop constraint payment_settings_recipient_identifier_check')
+    await query(client, "update public.payment_settings set enabled = false, recipient_identifier = '' where id = 1")
+    await query(client, "update public.payment_settings set recipient_identifier = '123' where id = 1")
+    const invalidCutoverError = await expectMigrationRejected(
+      client,
+      '099_payment_settings_m1_2_enforce.sql',
+      '099 invalid recipient preflight',
+    )
+    assert.equal(invalidCutoverError.code, '23514')
+    assert.match(invalidCutoverError.message, /valid configured PromptPay recipient/i)
+    await query(client, 'update public.payment_settings set recipient_identifier = $1 where id = 1', [RECIPIENT_A])
+    await query(client, `
+      alter table public.payment_settings
+      add constraint payment_settings_recipient_identifier_check check (
+        recipient_identifier = '' or recipient_identifier ~ '^[0-9]{15}$'
+      )
+    `)
+
     await updateSettings(client, IDS.manager, true, RECIPIENT_A)
+    const enabledCutoverError = await expectMigrationRejected(
+      client,
+      '099_payment_settings_m1_2_enforce.sql',
+      '099 enabled=true preflight',
+    )
+    assert.equal(enabledCutoverError.code, '23514')
+    assert.match(enabledCutoverError.message, /while payment remains disabled/i)
+    await updateSettings(client, IDS.manager, false, RECIPIENT_A)
+
+    const pendingCutoverPackage = await insertPackage(client, 'cutover-pending', 766)
+    const pendingCutoverOrder = await createManualOrder(client, IDS.buyer, pendingCutoverPackage)
+    const pendingCutoverError = await expectMigrationRejected(
+      client,
+      '099_payment_settings_m1_2_enforce.sql',
+      '099 pending-order preflight',
+    )
+    assert.equal(pendingCutoverError.code, '23514')
+    assert.match(pendingCutoverError.message, /zero pending promptpay_manual orders/i)
+    await cleanupOrder(client, pendingCutoverOrder.order_id, pendingCutoverPackage)
+
+    // Two physical sessions: old M1.1 creation wins the shared lock first.
+    // 099 must wait, then reject the cutover after observing the committed
+    // pending order. It must never succeed over that order.
+    const cutoverRacePackage = await insertPackage(client, 'race-cutover', 767)
+    const cutoverRaceCreateSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+    await cutoverRaceCreateSession.connect()
+    await query(cutoverRaceCreateSession, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
+    await query(cutoverRaceCreateSession, 'begin')
+    await setAuthenticated(cutoverRaceCreateSession, IDS.buyer)
+    const cutoverRaceOrderInFlight = query(
+      cutoverRaceCreateSession,
+      'select * from public.create_manual_payment_order($1)',
+      [cutoverRacePackage],
+    )
+    const cutoverRaceOrder = await cutoverRaceOrderInFlight
+    assert.equal(cutoverRaceOrder.rows[0].status, 'pending')
+    let cutoverRaceSettled = false
+    const cutoverRaceInFlight = startMigrationInSecondSession(
+      connectionString,
+      '099_payment_settings_m1_2_enforce.sql',
+    )
+    cutoverRaceInFlight.then(() => { cutoverRaceSettled = true }, () => { cutoverRaceSettled = true })
+    await waitBriefly()
+    assert.equal(cutoverRaceSettled, false, '099 completed before the old M1.1 transaction released the lifecycle lock')
+    await resetAuthenticated(cutoverRaceCreateSession)
+    await query(cutoverRaceCreateSession, 'commit')
+    await cutoverRaceCreateSession.end()
+    const cutoverRaceError = await cutoverRaceInFlight
+    assert.ok(cutoverRaceError)
+    assert.equal(cutoverRaceError.code, '23514')
+    assert.match(cutoverRaceError.message, /zero pending promptpay_manual orders/i)
+    await cleanupOrder(client, cutoverRaceOrder.rows[0].order_id, cutoverRacePackage)
+
+    const cutoverError = await applyMigrationInTransaction(
+      client,
+      '099_payment_settings_m1_2_enforce.sql',
+    )
+    assert.equal(cutoverError, null, cutoverError?.message)
 
     const catalog = await query(client, `
       select
@@ -367,6 +540,30 @@ async function runProof() {
       order_trigger: true,
     })
 
+    assert.equal((await getSettings(client)).enabled, false)
+
+    // The old M1.1 RPC is now blocked at the final database boundary while
+    // the controlled promotion window keeps payment disabled.
+    const disabledPackage = await insertPackage(client, 'post-cutover-disabled', 768)
+    const disabledError = await runAs(client, IDS.buyer, () => expectRejected(
+      client,
+      'disabled manual order after 099',
+      () => query(client, 'select * from public.create_manual_payment_order($1)', [disabledPackage]),
+    ))
+    assert.equal(disabledError.code, '55000')
+    assert.match(disabledError.message, /PromptPay payment settings are unavailable/i)
+    const directOrderId = randomUUID()
+    await query(client, 'begin')
+    const directInsertError = await expectRejected(client, 'direct disabled manual insert', () => query(
+      client,
+      `insert into public.orders (id, user_id, package_id, amount, status, payment_provider)
+       values ($1, $2, $3, $4, 'pending', 'promptpay_manual')`,
+      [directOrderId, IDS.buyer, disabledPackage, 768],
+    ))
+    await query(client, 'commit')
+    assert.equal(directInsertError.code, '55000')
+    await query(client, 'delete from public.packages where id = $1', [disabledPackage])
+
     const managerRead = await runAs(client, IDS.manager, () => query(client, 'select * from public.payment_settings'))
     assert.equal(managerRead.rows.length, 1)
     assert.equal(managerRead.rows[0].recipient_identifier, RECIPIENT_A)
@@ -381,13 +578,21 @@ async function runProof() {
     ))
     assert.equal(supportRpcError.code, '42501')
 
+    // Promotion is complete; opening payment is a separate serialized action.
+    const enableResult = await updateSettings(client, IDS.manager, true, RECIPIENT_A)
+    assert.equal(enableResult.rows[0].enabled, true)
+    const enabledPackage = await insertPackage(client, 'post-promotion-enabled', 769)
+    const enabledOrder = await createManualOrder(client, IDS.buyer, enabledPackage)
+    assert.equal(enabledOrder.status, 'pending')
+    await cleanupOrder(client, enabledOrder.order_id, enabledPackage)
+
     // Persisted orders.amount remains the amount authority after the package changes.
-    const amountPackage = await insertPackage(client, 'amount', 764)
+    const amountPackage = await insertPackage(client, 'amount', 770)
     const amountOrder = await createManualOrder(client, IDS.buyer, amountPackage)
-    assert.equal(String(amountOrder.amount), '764')
+    assert.equal(String(amountOrder.amount), '770')
     await query(client, 'update public.packages set current_price = 9999 where id = $1', [amountPackage])
     const persistedAmount = await query(client, 'select amount::text from public.orders where id = $1', [amountOrder.order_id])
-    assert.equal(persistedAmount.rows[0].amount, '764')
+    assert.equal(persistedAmount.rows[0].amount, '770')
     const displayUpdate = await updateSettings(
       client,
       IDS.manager,
@@ -398,31 +603,56 @@ async function runProof() {
     )
     assert.equal(displayUpdate.rows[0].display_name, 'Updated M1.2 recipient')
     assert.equal(displayUpdate.rows[0].instruction_text, 'Updated disposable instruction')
-
-    // A disabled setting fails closed for a new order, while an existing order remains.
     await updateSettings(client, IDS.manager, false, RECIPIENT_A)
-    const disabledPackage = await insertPackage(client, 'disabled', 765)
-    const directOrderId = randomUUID()
-    await query(client, 'begin')
-    const directInsertError = await expectRejected(client, 'direct disabled manual insert', () => query(
-      client,
-      `insert into public.orders (id, user_id, package_id, amount, status, payment_provider)
-       values ($1, $2, $3, $4, 'pending', 'promptpay_manual')`,
-      [directOrderId, IDS.buyer, disabledPackage, 765],
-    ))
-    await query(client, 'commit')
-    assert.equal(directInsertError.code, '55000')
-    const disabledError = await runAs(client, IDS.buyer, () => expectRejected(
-      client,
-      'disabled manual order',
-      () => query(client, 'select * from public.create_manual_payment_order($1)', [disabledPackage]),
-    ))
-    assert.equal(disabledError.code, '55000')
-    assert.match(disabledError.message, /PromptPay payment settings are unavailable/i)
+    const amountOrderWhileDisabled = await query(client, 'select status, payment_provider from public.orders where id = $1', [amountOrder.order_id])
+    assert.deepEqual(amountOrderWhileDisabled.rows[0], { status: 'pending', payment_provider: 'promptpay_manual' })
+    await cleanupOrder(client, amountOrder.order_id, amountPackage)
     await updateSettings(client, IDS.manager, true, RECIPIENT_A)
 
+    // Two physical sessions: enable wins first and holds the lock; the old
+    // create waits, then observes the committed enabled state and succeeds.
+    await updateSettings(client, IDS.manager, false, RECIPIENT_A)
+    const enableRacePackage = await insertPackage(client, 'race-enable', 771)
+    const enableRaceSettingsSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+    await enableRaceSettingsSession.connect()
+    await query(enableRaceSettingsSession, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
+    await query(enableRaceSettingsSession, 'begin')
+    await setAuthenticated(enableRaceSettingsSession, IDS.manager)
+    const enableRaceSettings = await query(
+      enableRaceSettingsSession,
+      'select * from public.update_payment_settings($1, $2, $3, $4)',
+      [true, RECIPIENT_A, 'M1.2 enable race', 'Disposable database test'],
+    )
+    assert.equal(enableRaceSettings.rows[0].enabled, true)
+
+    const enableRaceCreateSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+    await enableRaceCreateSession.connect()
+    await query(enableRaceCreateSession, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
+    await query(enableRaceCreateSession, 'begin')
+    await setAuthenticated(enableRaceCreateSession, IDS.buyer)
+    const enableRaceCreateInFlight = query(
+      enableRaceCreateSession,
+      'select * from public.create_manual_payment_order($1)',
+      [enableRacePackage],
+    )
+    let enableRaceCreateSettled = false
+    enableRaceCreateInFlight.then(() => { enableRaceCreateSettled = true }, () => { enableRaceCreateSettled = true })
+    await waitBriefly()
+    assert.equal(enableRaceCreateSettled, false, 'create completed before enable released the lifecycle lock')
+    await resetAuthenticated(enableRaceSettingsSession)
+    await query(enableRaceSettingsSession, 'commit')
+    await enableRaceSettingsSession.end()
+    const enableRaceOrder = await enableRaceCreateInFlight
+    assert.equal(enableRaceOrder.rows[0].status, 'pending')
+    await resetAuthenticated(enableRaceCreateSession)
+    await query(enableRaceCreateSession, 'commit')
+    await enableRaceCreateSession.end()
+    assert.equal((await getSettings(client)).enabled, true)
+    await cleanupOrder(client, enableRaceOrder.rows[0].order_id, enableRacePackage)
+    await query(client, 'delete from public.packages where id = $1', [enableRacePackage])
+
     // Two physical sessions: create holds the lifecycle lock; disable must wait.
-    const disablePackage = await insertPackage(client, 'race-disable', 766)
+    const disablePackage = await insertPackage(client, 'race-disable', 772)
     const createSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
     await createSession.connect()
     await query(createSession, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
@@ -451,7 +681,7 @@ async function runProof() {
 
     // Two physical sessions: create wins first; recipient replacement waits and
     // then observes the committed pending order and is rejected.
-    const recipientPackage = await insertPackage(client, 'race-recipient', 767)
+    const recipientPackage = await insertPackage(client, 'race-recipient', 773)
     const recipientCreateSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
     await recipientCreateSession.connect()
     await query(recipientCreateSession, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
@@ -478,7 +708,7 @@ async function runProof() {
     await cleanupOrder(client, recipientOrderId, recipientPackage)
 
     // M1.1 cancellation and paid-transition guard remain present after M1.2.
-    const cancelPackage = await insertPackage(client, 'm1-1-regression', 768)
+    const cancelPackage = await insertPackage(client, 'm1-1-regression', 774)
     const cancelOrder = await createManualOrder(client, IDS.buyer, cancelPackage)
     const cancelResult = await runAs(client, IDS.manager, () => query(
       client,
@@ -490,7 +720,7 @@ async function runProof() {
     assert.equal(access.rows[0].count, 0)
     await cleanupOrder(client, cancelOrder.order_id, cancelPackage)
 
-    const paidPackage = await insertPackage(client, 'paid-guard', 769)
+    const paidPackage = await insertPackage(client, 'paid-guard', 775)
     const paidOrder = await createManualOrder(client, IDS.buyer, paidPackage)
     await query(client, 'begin')
     const paidError = await expectRejected(client, 'direct paid transition', () => query(
@@ -503,7 +733,7 @@ async function runProof() {
     await cleanupOrder(client, paidOrder.order_id, paidPackage)
 
     // Cross-user order visibility remains fenced by the existing RLS policy.
-    const visibilityPackage = await insertPackage(client, 'visibility', 770)
+    const visibilityPackage = await insertPackage(client, 'visibility', 776)
     const visibilityOrder = await createManualOrder(client, IDS.buyer, visibilityPackage)
     const otherView = await runAs(client, IDS.otherBuyer, () => query(client, 'select id from public.orders where id = $1', [visibilityOrder.order_id]))
     assert.equal(otherView.rows.length, 0)
@@ -514,12 +744,22 @@ async function runProof() {
       database: new URL(connectionString).pathname.slice(1),
       migration: ['088_manual_payment_foundation.sql', '097_manual_payment_m1_1.sql', '098_payment_settings_m1_2_expand.sql', '099_payment_settings_m1_2_enforce.sql'],
       tests: {
-        expandBeforeEnforce: 1,
+        expandM1_1Compatibility: 1,
+        expandCanonicalAdvisoryLock: 1,
+        expandRecipientPendingGuard: 1,
+        enforceMissingRecipientPreflight: 1,
+        enforceInvalidRecipientPreflight: 1,
+        enforceEnabledTruePreflight: 1,
+        enforcePendingPreflight: 1,
+        enforceZeroPendingDisabledCutover: 1,
+        oldOrderVsCutoverTwoSession: 1,
+        postCutoverDisabledFailClosed: 1,
         rbacAndPrivacy: 1,
         persistedAmountAuthority: 1,
         displayOnlyEdits: 1,
-        disabledFailClosed: 1,
         directInsertFailClosed: 1,
+        enableAfterPromotion: 1,
+        createVsEnableTwoSession: 1,
         createVsDisableTwoSession: 1,
         createVsRecipientTwoSession: 1,
         m1_1Cancellation: 1,
