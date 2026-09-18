@@ -1,14 +1,19 @@
 -- Sobdai M1.2 ENFORCE — database boundary and race-safe lifecycle fencing.
 --
 -- Apply only after 098 EXPAND has been applied, a real E-Wallet recipient has
--- been configured, and the private ฿1.00 QR has been scanned and verified.
--- The shared advisory lock serializes order creation with enabled/recipient
--- changes until the winning transaction commits.
+-- been configured while disabled, and the private ฿1.00 QR has been scanned
+-- and verified. The shared advisory lock serializes legacy order creation
+-- with this preflight until the winning transaction commits.
 
 set local lock_timeout = '5s';
 
 do $payment_settings_m1_2_enforce_preflight$
 begin
+    -- 098 makes canonical M1.1 manual order creation acquire this same
+    -- transaction lock. Holding it across the complete migration transaction
+    -- makes the zero-pending check and trigger installation one cutover.
+    perform pg_catalog.pg_advisory_xact_lock(7281, 1201);
+
     if to_regclass('public.payment_settings') is null then
         raise exception using
             errcode = 'check_violation',
@@ -25,13 +30,24 @@ begin
         select 1
         from public.payment_settings ps
         where ps.id = 1
-          and ps.enabled = true
+          and ps.enabled = false
           and ps.recipient_type = 'ewallet'
           and ps.recipient_identifier ~ '^[0-9]{15}$'
     ) then
         raise exception using
             errcode = 'check_violation',
-            message = 'Configure and verify a valid enabled PromptPay recipient before applying M1.2 ENFORCE.';
+            message = 'M1.2 ENFORCE requires a valid configured PromptPay recipient while payment remains disabled.';
+    end if;
+
+    if exists (
+        select 1
+        from public.orders o
+        where o.status = 'pending'
+          and o.payment_provider = 'promptpay_manual'
+    ) then
+        raise exception using
+            errcode = 'check_violation',
+            message = 'M1.2 ENFORCE requires zero pending promptpay_manual orders before cutover.';
     end if;
 end
 $payment_settings_m1_2_enforce_preflight$;
@@ -159,5 +175,6 @@ revoke all on function public.guard_payment_settings_for_manual_order() from pub
 notify pgrst, 'reload schema';
 
 -- Operator handoff:
--- Existing pending orders remain pending when enabled is set false. New paid
--- manual orders and their QR route fail closed until settings are re-enabled.
+-- 099 has been applied while payment remains disabled and zero pending manual
+-- orders existed under the shared lifecycle lock. Promote the M1.2 app, smoke
+-- test the disabled state, then enable payment through the M1.2 admin RPC.

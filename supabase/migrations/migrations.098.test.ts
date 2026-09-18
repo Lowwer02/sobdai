@@ -20,9 +20,17 @@ test('M1.2 is split into an M1.1-safe EXPAND and a gated ENFORCE migration', () 
   assert.match(expand, /insert into public\.payment_settings[\s\S]*?enabled,[\s\S]*?false/i)
   assert.match(expand, /recipient_type text not null default 'ewallet'/i)
   assert.match(expand, /recipient_identifier text not null default ''/i)
-  assert.match(enforce, /configure and verify a valid enabled PromptPay recipient/i)
+  assert.match(enforce, /valid configured PromptPay recipient while payment remains disabled/i)
+  assert.match(enforce, /requires zero pending promptpay_manual orders/i)
+  assert.match(enforce, /pg_advisory_xact_lock\(7281, 1201\)/i)
   assert.doesNotMatch(expand, /homepage_settings\.extended_config|support\.qr_image_url/i)
   assert.doesNotMatch(enforce, /drop\s+(table|column|index)/i)
+})
+
+test('098 keeps M1.1 order creation compatible while serializing the cutover lock', () => {
+  assert.match(expand, /create or replace function public\.create_manual_payment_order\(\s*p_package_id uuid[\s\S]*?pg_advisory_xact_lock\(7281, 1201\)[\s\S]*?insert into public\.orders[\s\S]*?promptpay_manual/i)
+  assert.doesNotMatch(expand, /PromptPay payment settings are unavailable/i)
+  assert.doesNotMatch(expand, /create trigger guard_payment_settings_for_manual_order/i)
 })
 
 test('settings are private and financial managers use an RPC instead of direct writes', () => {
@@ -39,6 +47,8 @@ test('settings are private and financial managers use an RPC instead of direct w
 })
 
 test('enabled changes and recipient changes share the lifecycle lock', () => {
+  assert.match(expand, /create or replace function public\.update_payment_settings\([\s\S]*?pg_advisory_xact_lock\(7281, 1201\)[\s\S]*?o\.status = 'pending'[\s\S]*?o\.payment_provider = 'promptpay_manual'/i)
+  assert.match(expand, /ยังมีคำสั่งซื้อ PromptPay ที่รอชำระอยู่ กรุณาจัดการคำสั่งซื้อเหล่านั้นก่อนเปลี่ยนผู้รับเงิน/i)
   assert.match(enforce, /old\.enabled is not distinct from new\.enabled/i)
   assert.match(enforce, /old\.recipient_type is not distinct from new\.recipient_type/i)
   assert.match(enforce, /old\.recipient_identifier is not distinct from new\.recipient_identifier/i)
