@@ -68,11 +68,14 @@ export default function OrderPaymentDetailClient({
     latestSubmissionStatus: submissions[0]?.status || null,
     evidenceReadAvailable: submissionsLoaded,
   })
+  const hasOnlyRejectedEvidence =
+    submissions.length > 0
+    && submissions.every((submission) => submission.status === 'rejected')
   const canCancelUnpaidManualOrder =
     order.paymentProvider === MANUAL_PAYMENT_PROVIDER
     && order.status === 'pending'
     && submissionsLoaded
-    && submissions.length === 0
+    && (submissions.length === 0 || hasOnlyRejectedEvidence)
 
   const handleApprove = (submissionId: string) => {
     setMessage('')
@@ -162,7 +165,9 @@ export default function OrderPaymentDetailClient({
               disabled={isPending}
               className="mt-3 inline-flex items-center justify-center rounded-lg border border-red-400/30 px-4 py-2 text-sm font-bold text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ยกเลิกคำสั่งซื้อนี้
+              {hasOnlyRejectedEvidence
+                ? 'ยกเลิกคำสั่งซื้อหลังหลักฐานไม่ผ่าน'
+                : 'ยกเลิกคำสั่งซื้อนี้'}
             </button>
           )}
         </div>
@@ -289,7 +294,9 @@ export default function OrderPaymentDetailClient({
         onClose={() => setCancelConfirmOpen(false)}
         onConfirm={handleCancelUnpaidOrder}
         title="ยกเลิกคำสั่งซื้อที่ยังไม่ชำระ"
-        description="คำสั่งซื้อนี้ยังไม่มีหลักฐานการชำระเงิน การยกเลิกจะไม่เปิดสิทธิ์แพ็กเกจ และผู้ซื้อสามารถเริ่มคำสั่งซื้อใหม่ได้"
+        description={hasOnlyRejectedEvidence
+          ? 'หลักฐานการชำระเงินทั้งหมดถูกปฏิเสธแล้ว การยกเลิกจะเก็บหลักฐานไว้เป็นประวัติ ไม่เปิดสิทธิ์แพ็กเกจ และผู้ซื้อสามารถเริ่มคำสั่งซื้อใหม่ได้'
+          : 'คำสั่งซื้อนี้ยังไม่มีหลักฐานการชำระเงิน การยกเลิกจะไม่เปิดสิทธิ์แพ็กเกจ และผู้ซื้อสามารถเริ่มคำสั่งซื้อใหม่ได้'}
         confirmText="ยกเลิกคำสั่งซื้อนี้"
         cancelText="กลับ"
         isDestructive

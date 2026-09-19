@@ -79,6 +79,7 @@ export default async function OrdersPage({
 
   const latestPaymentByOrder = new Map<string, any>()
   const paymentSubmissionCountByOrder = new Map<string, number>()
+  const paymentSubmissionsByOrder = new Map<string, any[]>()
   for (const payment of paymentRows || []) {
     if (!latestPaymentByOrder.has(payment.order_id)) {
       latestPaymentByOrder.set(payment.order_id, payment)
@@ -87,6 +88,9 @@ export default async function OrdersPage({
       payment.order_id,
       (paymentSubmissionCountByOrder.get(payment.order_id) || 0) + 1,
     )
+    const submissions = paymentSubmissionsByOrder.get(payment.order_id) || []
+    submissions.push(payment)
+    paymentSubmissionsByOrder.set(payment.order_id, submissions)
   }
 
   const orders = (rawOrders || []).map((o: any) => ({
@@ -96,6 +100,11 @@ export default async function OrdersPage({
     manual_payment_status: latestPaymentByOrder.get(o.id)?.status || null,
     manual_payment_submitted_at: latestPaymentByOrder.get(o.id)?.submitted_at || null,
     manual_payment_submission_count: paymentSubmissionCountByOrder.get(o.id) || 0,
+    manual_payment_all_rejected: (
+      paymentSubmissionsByOrder.get(o.id)?.length || 0
+    ) > 0 && (
+      paymentSubmissionsByOrder.get(o.id) || []
+    ).every((payment: any) => payment.status === 'rejected'),
   }))
 
   const totalPages = count ? Math.ceil(count / limit) : 0

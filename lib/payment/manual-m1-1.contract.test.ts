@@ -47,8 +47,15 @@ test('admin cancellation uses financial permission and canonical RPC', () => {
   assert.match(orderActions, /rpc\('cancel_manual_payment_order'/)
   assert.match(adminList, /ยกเลิกคำสั่งซื้อนี้/)
   assert.match(adminList, /manual_payment_submission_count === 0/)
-  assert.match(adminDetail, /submissions\.length === 0/)
+  assert.match(adminList, /manual_payment_all_rejected === true/)
+  assert.match(adminDetail, /submissions\.length === 0 \|\| hasOnlyRejectedEvidence/)
+  assert.match(adminDetail, /submissions\.every\(\(submission\) => submission\.status === 'rejected'\)/)
   assert.match(adminDetail, /cancelManualPaymentOrder\(order\.id\)/)
+})
+
+test('admin cancellation makes the rejected-evidence exception explicit in Thai', () => {
+  assert.match(adminList, /ยกเลิกคำสั่งซื้อหลังหลักฐานไม่ผ่าน/)
+  assert.match(adminDetail, /หลักฐานการชำระเงินทั้งหมดถูกปฏิเสธแล้ว การยกเลิกจะเก็บหลักฐานไว้เป็นประวัติ/)
 })
 
 test('evidence reads fail closed and cancellation audit stays inside the RPC', () => {

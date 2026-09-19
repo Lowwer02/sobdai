@@ -248,6 +248,73 @@ async function createManualOrder(client, actorId, packageId) {
   return result.rows[0]
 }
 
+async function insertPaymentSubmission(client, orderId, status, rejectionReason = 'Test evidence rejected') {
+  const idempotencyKey = randomUUID()
+  const storageObjectPath = `${IDS.buyer}/${orderId}/${randomUUID()}.png`
+  const isRejected = status === 'rejected'
+  const isReviewed = isRejected || status === 'approved'
+  const result = await query(client, `
+    insert into public.payment_submissions (
+      order_id,
+      idempotency_key,
+      storage_object_path,
+      original_filename,
+      mime_type,
+      file_size_bytes,
+      payment_method,
+      status,
+      reviewed_at,
+      reviewed_by,
+      rejection_reason
+    ) values ($1, $2, $3, $4, 'image/png', 128, 'promptpay_manual', $5, $6, $7, $8)
+    returning id, status
+  `, [
+    orderId,
+    idempotencyKey,
+    storageObjectPath,
+    `${status}-evidence.png`,
+    status,
+    isReviewed ? new Date().toISOString() : null,
+    isReviewed ? IDS.manager : null,
+    isRejected ? rejectionReason : null,
+  ])
+  return { ...result.rows[0], storageObjectPath, idempotencyKey }
+}
+
+async function insertStorageObject(client, storageObjectPath) {
+  await query(client, `
+    insert into storage.objects (bucket_id, name)
+    values ('payment-slips', $1)
+  `, [storageObjectPath])
+}
+
+async function removeTestArtifacts(client, orderId, packageId) {
+  await query(client, 'delete from public.payment_submissions where order_id = $1', [orderId])
+  const eventCount = await query(client, 'select count(*)::int as count from public.manual_payment_order_events where order_id = $1', [orderId])
+  if (eventCount.rows[0].count !== 0) return
+  await query(client, 'delete from public.orders where id = $1', [orderId])
+  await query(client, 'delete from public.packages where id = $1', [packageId])
+}
+
+async function openAuthenticatedTransaction(connectionString, actorId) {
+  const session = new Client({ connectionString, connectionTimeoutMillis: 10000 })
+  await session.connect()
+  await query(session, `set statement_timeout = '${STATEMENT_TIMEOUT}'`)
+  await query(session, 'begin')
+  await setAuthenticated(session, actorId)
+  return session
+}
+
+async function finishAuthenticatedTransaction(session, commit = true) {
+  if (commit) {
+    await resetAuthenticated(session)
+    await query(session, 'commit')
+  } else {
+    await query(session, 'rollback').catch(() => {})
+  }
+  await session.end()
+}
+
 async function getSettings(client) {
   const result = await query(client, 'select enabled, recipient_identifier from public.payment_settings where id = 1')
   return result.rows[0]
@@ -375,7 +442,7 @@ async function runProof() {
     await cleanupOrder(client, expandOrder.order_id, expandPackage)
 
     // The canonical M1.1 RPC holds the same transaction advisory lock that
-    // 099 will use, while retaining the old disabled/unconfigured behavior.
+    // 100 will use, while retaining the old disabled/unconfigured behavior.
     const expandLockPackage = await insertPackage(client, 'expand-lock', 764)
     const expandCreateSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
     await expandCreateSession.connect()
@@ -419,13 +486,253 @@ async function runProof() {
     const managerSettings = await updateSettings(client, IDS.manager, false, RECIPIENT_A)
     assert.equal(managerSettings.rows[0].recipient_identifier, RECIPIENT_A)
 
-    // 099 preflight must reject every unsafe state before installing any
+    const cancelCompatibilityError = await applyMigrationInTransaction(
+      client,
+      '099_manual_payment_cancel_rejected_orders.sql',
+    )
+    assert.equal(cancelCompatibilityError, null, cancelCompatibilityError?.message)
+
+    // -----------------------------------------------------------------------
+    // 099 rejected-evidence cancellation boundary.
+    // -----------------------------------------------------------------------
+    const cancellationCases = {
+      migration098Compatibility: 1,
+      migration099Compatibility: 1,
+    }
+
+    const zeroSubmissionPackage = await insertPackage(client, 'cancel-zero', 780)
+    const zeroSubmissionOrder = await createManualOrder(client, IDS.buyer, zeroSubmissionPackage)
+    const zeroSubmissionResult = await runAs(client, IDS.manager, () => query(
+      client,
+      'select * from public.cancel_manual_payment_order($1)',
+      [zeroSubmissionOrder.order_id],
+    ))
+    assert.deepEqual(zeroSubmissionResult.rows[0], {
+      order_id: zeroSubmissionOrder.order_id,
+      status: 'cancelled',
+    })
+    cancellationCases.zeroSubmissionCancel = 1
+    await removeTestArtifacts(client, zeroSubmissionOrder.order_id, zeroSubmissionPackage)
+
+    const rejectedEvidencePackage = await insertPackage(client, 'cancel-rejected', 781)
+    const rejectedEvidenceOrder = await createManualOrder(client, IDS.buyer, rejectedEvidencePackage)
+    await insertPaymentSubmission(client, rejectedEvidenceOrder.order_id, 'rejected', 'ยอดเงินไม่ตรงกับคำสั่งซื้อ')
+    await insertPaymentSubmission(client, rejectedEvidenceOrder.order_id, 'rejected', 'ภาพหลักฐานไม่ชัดเจน')
+    const rejectedEvidenceResult = await runAs(client, IDS.manager, () => query(
+      client,
+      'select * from public.cancel_manual_payment_order($1)',
+      [rejectedEvidenceOrder.order_id],
+    ))
+    assert.equal(rejectedEvidenceResult.rows[0].status, 'cancelled')
+    const rejectedEvidenceRows = await query(client, `
+      select status, rejection_reason
+      from public.payment_submissions
+      where order_id = $1
+      order by created_at
+    `, [rejectedEvidenceOrder.order_id])
+    assert.equal(rejectedEvidenceRows.rows.length, 2)
+    assert.ok(rejectedEvidenceRows.rows.every((row) => row.status === 'rejected'))
+    assert.ok(rejectedEvidenceRows.rows.every((row) => row.rejection_reason))
+    cancellationCases.allRejectedSubmissionCancel = 1
+    cancellationCases.rejectedEvidencePreserved = 1
+    const rejectedEventRows = await query(client, `
+      select event_type, from_status, to_status, payment_provider
+      from public.manual_payment_order_events
+      where order_id = $1
+    `, [rejectedEvidenceOrder.order_id])
+    assert.deepEqual(rejectedEventRows.rows, [{
+      event_type: 'cancelled',
+      from_status: 'pending',
+      to_status: 'cancelled',
+      payment_provider: 'promptpay_manual',
+    }])
+    cancellationCases.cancellationAuditEvent = 1
+    const rejectedRetryResult = await runAs(client, IDS.manager, () => query(
+      client,
+      'select * from public.cancel_manual_payment_order($1)',
+      [rejectedEvidenceOrder.order_id],
+    ))
+    assert.equal(rejectedRetryResult.rows[0].status, 'cancelled')
+    const rejectedRetryEvents = await query(client, 'select count(*)::int as count from public.manual_payment_order_events where order_id = $1', [rejectedEvidenceOrder.order_id])
+    assert.equal(rejectedRetryEvents.rows[0].count, 1)
+    cancellationCases.cancellationRetry = 1
+    await removeTestArtifacts(client, rejectedEvidenceOrder.order_id, rejectedEvidencePackage)
+
+    const submittedPackage = await insertPackage(client, 'cancel-submitted', 782)
+    const submittedOrder = await createManualOrder(client, IDS.buyer, submittedPackage)
+    await insertPaymentSubmission(client, submittedOrder.order_id, 'submitted')
+    const submittedCancelError = await runAs(client, IDS.manager, () => expectRejected(
+      client,
+      'submitted evidence prevents cancellation',
+      () => query(client, 'select * from public.cancel_manual_payment_order($1)', [submittedOrder.order_id]),
+    ))
+    assert.equal(submittedCancelError.code, '40001')
+    cancellationCases.pendingReviewPreventsCancel = 1
+    await removeTestArtifacts(client, submittedOrder.order_id, submittedPackage)
+
+    const approvedPackage = await insertPackage(client, 'cancel-approved', 783)
+    const approvedOrder = await createManualOrder(client, IDS.buyer, approvedPackage)
+    await insertPaymentSubmission(client, approvedOrder.order_id, 'approved')
+    const approvedCancelError = await runAs(client, IDS.manager, () => expectRejected(
+      client,
+      'approved evidence prevents cancellation',
+      () => query(client, 'select * from public.cancel_manual_payment_order($1)', [approvedOrder.order_id]),
+    ))
+    assert.equal(approvedCancelError.code, '40001')
+    cancellationCases.approvedEvidencePreventsCancel = 1
+    await removeTestArtifacts(client, approvedOrder.order_id, approvedPackage)
+
+    const rejectedPaidPackage = await insertPackage(client, 'cancel-paid', 784)
+    const rejectedPaidOrder = await createManualOrder(client, IDS.buyer, rejectedPaidPackage)
+    await insertPaymentSubmission(client, rejectedPaidOrder.order_id, 'approved')
+    await query(client, "update public.orders set status = 'paid' where id = $1", [rejectedPaidOrder.order_id])
+    const paidCancelError = await runAs(client, IDS.manager, () => expectRejected(
+      client,
+      'paid order prevents cancellation',
+      () => query(client, 'select * from public.cancel_manual_payment_order($1)', [rejectedPaidOrder.order_id]),
+    ))
+    assert.equal(paidCancelError.code, '40001')
+    cancellationCases.paidOrderPreventsCancel = 1
+    await removeTestArtifacts(client, rejectedPaidOrder.order_id, rejectedPaidPackage)
+
+    const freePackage = await insertPackage(client, 'cancel-free', 785)
+    const freeOrder = await createManualOrder(client, IDS.buyer, freePackage)
+    await query(client, "update public.orders set status = 'free' where id = $1", [freeOrder.order_id])
+    const freeCancelError = await runAs(client, IDS.manager, () => expectRejected(
+      client,
+      'free order prevents cancellation',
+      () => query(client, 'select * from public.cancel_manual_payment_order($1)', [freeOrder.order_id]),
+    ))
+    assert.equal(freeCancelError.code, '40001')
+    cancellationCases.freeOrderPreventsCancel = 1
+    await removeTestArtifacts(client, freeOrder.order_id, freePackage)
+
+    const nonPromptPayPackage = await insertPackage(client, 'cancel-non-promptpay', 786)
+    const nonPromptPayOrder = await createManualOrder(client, IDS.buyer, nonPromptPayPackage)
+    await query(client, "update public.orders set payment_provider = 'omise' where id = $1", [nonPromptPayOrder.order_id])
+    const nonPromptPayCancelError = await runAs(client, IDS.manager, () => expectRejected(
+      client,
+      'non-PromptPay order prevents cancellation',
+      () => query(client, 'select * from public.cancel_manual_payment_order($1)', [nonPromptPayOrder.order_id]),
+    ))
+    assert.equal(nonPromptPayCancelError.code, '40001')
+    cancellationCases.nonPromptPayPreventsCancel = 1
+    await removeTestArtifacts(client, nonPromptPayOrder.order_id, nonPromptPayPackage)
+
+    const unauthorizedPackage = await insertPackage(client, 'cancel-unauthorized', 787)
+    const unauthorizedOrder = await createManualOrder(client, IDS.buyer, unauthorizedPackage)
+    const unauthorizedCancelError = await runAs(client, IDS.buyer, () => expectRejected(
+      client,
+      'unauthorized cancellation',
+      () => query(client, 'select * from public.cancel_manual_payment_order($1)', [unauthorizedOrder.order_id]),
+    ))
+    assert.equal(unauthorizedCancelError.code, '42501')
+    cancellationCases.authorizationPreserved = 1
+    await removeTestArtifacts(client, unauthorizedOrder.order_id, unauthorizedPackage)
+
+    const directUpdatePackage = await insertPackage(client, 'cancel-direct-update', 788)
+    const directUpdateOrder = await createManualOrder(client, IDS.buyer, directUpdatePackage)
+    await query(client, 'begin')
+    const directCancelError = await expectRejected(
+      client,
+      'direct cancellation update',
+      () => query(client, "update public.orders set status = 'cancelled' where id = $1", [directUpdateOrder.order_id]),
+    )
+    await query(client, 'commit')
+    assert.equal(directCancelError.code, '42501')
+    cancellationCases.directUpdateForbidden = 1
+    await removeTestArtifacts(client, directUpdateOrder.order_id, directUpdatePackage)
+
+    // Real two-session race: cancellation acquires the order lock first, so
+    // submission waits and then fails against the committed cancelled order.
+    const cancelWinsPackage = await insertPackage(client, 'race-cancel-wins', 789)
+    const cancelWinsOrder = await createManualOrder(client, IDS.buyer, cancelWinsPackage)
+    const cancelWinsPath = `${IDS.buyer}/${cancelWinsOrder.order_id}/${randomUUID()}.png`
+    await insertStorageObject(client, cancelWinsPath)
+    const cancelWinsSession = await openAuthenticatedTransaction(connectionString, IDS.manager)
+    const cancelWinsResult = await query(
+      cancelWinsSession,
+      'select * from public.cancel_manual_payment_order($1)',
+      [cancelWinsOrder.order_id],
+    )
+    assert.equal(cancelWinsResult.rows[0].status, 'cancelled')
+    const submitAfterCancelSession = await openAuthenticatedTransaction(connectionString, IDS.buyer)
+    let submitAfterCancelSettled = false
+    const submitAfterCancelInFlight = query(
+      submitAfterCancelSession,
+      'select * from public.submit_payment_slip($1, $2, $3, $4, $5, $6)',
+      [cancelWinsOrder.order_id, randomUUID(), cancelWinsPath, 'race.png', 'image/png', 128],
+    ).then(
+      (result) => {
+        submitAfterCancelSettled = true
+        return { result, error: null }
+      },
+      (error) => {
+        submitAfterCancelSettled = true
+        return { result: null, error }
+      },
+    )
+    await waitBriefly()
+    assert.equal(submitAfterCancelSettled, false, 'submission completed while cancellation held the order lock')
+    await finishAuthenticatedTransaction(cancelWinsSession, true)
+    const submitAfterCancelOutcome = await submitAfterCancelInFlight
+    const submitAfterCancelError = submitAfterCancelOutcome.error
+    assert.ok(submitAfterCancelError)
+    assert.equal(submitAfterCancelError.code, '22023')
+    await finishAuthenticatedTransaction(submitAfterCancelSession, false)
+    const cancelWinsState = await query(client, 'select o.status, count(ps.id)::int as submissions from public.orders o left join public.payment_submissions ps on ps.order_id = o.id where o.id = $1 group by o.status', [cancelWinsOrder.order_id])
+    assert.deepEqual(cancelWinsState.rows[0], { status: 'cancelled', submissions: 0 })
+
+    // Reverse race: submission commits first while holding the same order row
+    // lock, so cancellation waits and then rejects the active evidence.
+    const submitWinsPackage = await insertPackage(client, 'race-submit-wins', 790)
+    const submitWinsOrder = await createManualOrder(client, IDS.buyer, submitWinsPackage)
+    const submitWinsPath = `${IDS.buyer}/${submitWinsOrder.order_id}/${randomUUID()}.png`
+    await insertStorageObject(client, submitWinsPath)
+    const submitWinsSession = await openAuthenticatedTransaction(connectionString, IDS.buyer)
+    const submitWinsResult = await query(
+      submitWinsSession,
+      'select * from public.submit_payment_slip($1, $2, $3, $4, $5, $6)',
+      [submitWinsOrder.order_id, randomUUID(), submitWinsPath, 'race.png', 'image/png', 128],
+    )
+    assert.equal(submitWinsResult.rows[0].status, 'submitted')
+    const cancelAfterSubmitSession = await openAuthenticatedTransaction(connectionString, IDS.manager)
+    let cancelAfterSubmitSettled = false
+    const cancelAfterSubmitInFlight = query(
+      cancelAfterSubmitSession,
+      'select * from public.cancel_manual_payment_order($1)',
+      [submitWinsOrder.order_id],
+    ).then(
+      (result) => {
+        cancelAfterSubmitSettled = true
+        return { result, error: null }
+      },
+      (error) => {
+        cancelAfterSubmitSettled = true
+        return { result: null, error }
+      },
+    )
+    await waitBriefly()
+    assert.equal(cancelAfterSubmitSettled, false, 'cancellation completed while submission held the order lock')
+    await finishAuthenticatedTransaction(submitWinsSession, true)
+    const cancelAfterSubmitOutcome = await cancelAfterSubmitInFlight
+    const cancelAfterSubmitError = cancelAfterSubmitOutcome.error
+    assert.ok(cancelAfterSubmitError)
+    assert.equal(cancelAfterSubmitError.code, '40001')
+    await finishAuthenticatedTransaction(cancelAfterSubmitSession, false)
+    const submitWinsState = await query(client, 'select o.status, count(ps.id)::int as submissions from public.orders o left join public.payment_submissions ps on ps.order_id = o.id where o.id = $1 group by o.status', [submitWinsOrder.order_id])
+    assert.deepEqual(submitWinsState.rows[0], { status: 'pending', submissions: 1 })
+    cancellationCases.cancelVsSubmitTwoSession = 1
+    await removeTestArtifacts(client, cancelWinsOrder.order_id, cancelWinsPackage)
+    await removeTestArtifacts(client, submitWinsOrder.order_id, submitWinsPackage)
+
+    // 100 preflight must reject every unsafe state before installing any
     // enforcement, then accept only valid recipient + disabled + zero pending.
     await updateSettings(client, IDS.manager, false, '')
     const missingRecipientError = await expectMigrationRejected(
       client,
-      '099_payment_settings_m1_2_enforce.sql',
-      '099 missing recipient preflight',
+      '100_payment_settings_m1_2_enforce.sql',
+      '100 missing recipient preflight',
     )
     assert.equal(missingRecipientError.code, '23514')
     assert.match(missingRecipientError.message, /valid configured PromptPay recipient while payment remains disabled/i)
@@ -435,8 +742,8 @@ async function runProof() {
     await query(client, "update public.payment_settings set recipient_identifier = '123' where id = 1")
     const invalidCutoverError = await expectMigrationRejected(
       client,
-      '099_payment_settings_m1_2_enforce.sql',
-      '099 invalid recipient preflight',
+      '100_payment_settings_m1_2_enforce.sql',
+      '100 invalid recipient preflight',
     )
     assert.equal(invalidCutoverError.code, '23514')
     assert.match(invalidCutoverError.message, /valid configured PromptPay recipient/i)
@@ -451,8 +758,8 @@ async function runProof() {
     await updateSettings(client, IDS.manager, true, RECIPIENT_A)
     const enabledCutoverError = await expectMigrationRejected(
       client,
-      '099_payment_settings_m1_2_enforce.sql',
-      '099 enabled=true preflight',
+      '100_payment_settings_m1_2_enforce.sql',
+      '100 enabled=true preflight',
     )
     assert.equal(enabledCutoverError.code, '23514')
     assert.match(enabledCutoverError.message, /while payment remains disabled/i)
@@ -460,17 +767,18 @@ async function runProof() {
 
     const pendingCutoverPackage = await insertPackage(client, 'cutover-pending', 766)
     const pendingCutoverOrder = await createManualOrder(client, IDS.buyer, pendingCutoverPackage)
+    cancellationCases.m1_1OrderAfter099 = 1
     const pendingCutoverError = await expectMigrationRejected(
       client,
-      '099_payment_settings_m1_2_enforce.sql',
-      '099 pending-order preflight',
+      '100_payment_settings_m1_2_enforce.sql',
+      '100 pending-order preflight',
     )
     assert.equal(pendingCutoverError.code, '23514')
     assert.match(pendingCutoverError.message, /zero pending promptpay_manual orders/i)
     await cleanupOrder(client, pendingCutoverOrder.order_id, pendingCutoverPackage)
 
     // Two physical sessions: old M1.1 creation wins the shared lock first.
-    // 099 must wait, then reject the cutover after observing the committed
+    // 100 must wait, then reject the cutover after observing the committed
     // pending order. It must never succeed over that order.
     const cutoverRacePackage = await insertPackage(client, 'race-cutover', 767)
     const cutoverRaceCreateSession = new Client({ connectionString, connectionTimeoutMillis: 10000 })
@@ -488,11 +796,11 @@ async function runProof() {
     let cutoverRaceSettled = false
     const cutoverRaceInFlight = startMigrationInSecondSession(
       connectionString,
-      '099_payment_settings_m1_2_enforce.sql',
+      '100_payment_settings_m1_2_enforce.sql',
     )
     cutoverRaceInFlight.then(() => { cutoverRaceSettled = true }, () => { cutoverRaceSettled = true })
     await waitBriefly()
-    assert.equal(cutoverRaceSettled, false, '099 completed before the old M1.1 transaction released the lifecycle lock')
+    assert.equal(cutoverRaceSettled, false, '100 completed before the old M1.1 transaction released the lifecycle lock')
     await resetAuthenticated(cutoverRaceCreateSession)
     await query(cutoverRaceCreateSession, 'commit')
     await cutoverRaceCreateSession.end()
@@ -504,9 +812,10 @@ async function runProof() {
 
     const cutoverError = await applyMigrationInTransaction(
       client,
-      '099_payment_settings_m1_2_enforce.sql',
+      '100_payment_settings_m1_2_enforce.sql',
     )
     assert.equal(cutoverError, null, cutoverError?.message)
+    cancellationCases.migration100Enforcement = 1
 
     const catalog = await query(client, `
       select
@@ -547,7 +856,7 @@ async function runProof() {
     const disabledPackage = await insertPackage(client, 'post-cutover-disabled', 768)
     const disabledError = await runAs(client, IDS.buyer, () => expectRejected(
       client,
-      'disabled manual order after 099',
+      'disabled manual order after 100',
       () => query(client, 'select * from public.create_manual_payment_order($1)', [disabledPackage]),
     ))
     assert.equal(disabledError.code, '55000')
@@ -742,7 +1051,7 @@ async function runProof() {
     console.log(JSON.stringify({
       status: 'PASS',
       database: new URL(connectionString).pathname.slice(1),
-      migration: ['088_manual_payment_foundation.sql', '097_manual_payment_m1_1.sql', '098_payment_settings_m1_2_expand.sql', '099_payment_settings_m1_2_enforce.sql'],
+      migration: ['088_manual_payment_foundation.sql', '097_manual_payment_m1_1.sql', '098_payment_settings_m1_2_expand.sql', '099_manual_payment_cancel_rejected_orders.sql', '100_payment_settings_m1_2_enforce.sql'],
       tests: {
         expandM1_1Compatibility: 1,
         expandCanonicalAdvisoryLock: 1,
@@ -765,6 +1074,10 @@ async function runProof() {
         m1_1Cancellation: 1,
         m1_1PaidGuard: 1,
         crossUserOrderRls: 1,
+      },
+      followUpTests: {
+        ...cancellationCases,
+        existingM1_2ConcurrencyIntegritySuite: 21,
       },
     }, null, 2))
   } finally {

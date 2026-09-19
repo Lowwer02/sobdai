@@ -257,7 +257,10 @@ export default function OrdersClient({
                   &&
                   order.payment_provider === MANUAL_PAYMENT_PROVIDER
                   && order.status === ORDER_STATUS.PENDING
-                  && order.manual_payment_submission_count === 0
+                  && (
+                    order.manual_payment_submission_count === 0
+                    || order.manual_payment_all_rejected === true
+                  )
                 const statusClass = paymentStatus.key === 'paid' || paymentStatus.key === 'free'
                   ? 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/20'
                   : paymentStatus.key === 'cancelled'
@@ -326,7 +329,9 @@ export default function OrdersClient({
                           disabled={actingOnId === order.id}
                           className="px-3 py-1.5 rounded border border-red-400/30 text-xs font-bold text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          ยกเลิกคำสั่งซื้อนี้
+                          {order.manual_payment_all_rejected
+                            ? 'ยกเลิกคำสั่งซื้อหลังหลักฐานไม่ผ่าน'
+                            : 'ยกเลิกคำสั่งซื้อนี้'}
                         </button>
                       )}
                       {(order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
