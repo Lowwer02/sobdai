@@ -175,6 +175,7 @@ revoke all on function public.guard_payment_settings_for_manual_order() from pub
 notify pgrst, 'reload schema';
 
 -- Operator handoff:
--- 099 has been applied while payment remains disabled and zero pending manual
--- orders existed under the shared lifecycle lock. Promote the M1.2 app, smoke
--- test the disabled state, then enable payment through the M1.2 admin RPC.
+-- 099 compatibility and the legacy drain have been completed, and 100 has now
+-- been applied while payment remains disabled and zero pending manual orders
+-- existed under the shared lifecycle lock. Promote the M1.2 app, smoke test
+-- the disabled state, then enable payment through the M1.2 admin RPC.
