@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 // @ts-expect-error Node's native TypeScript strip-types test runner requires the explicit .ts extension.
@@ -97,4 +98,12 @@ test('createPageMetadata handles standard indexed routes properly', () => {
       follow: true,
     },
   })
+})
+
+test('packages hub renders single subtle mascot hero companion', () => {
+  const pageSource = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+  assert.match(pageSource, /src="\/images\/packages\/sobdai-packages-mascot\.webp"/)
+  assert.match(pageSource, /alt=""/)
+  assert.match(pageSource, /aria-hidden="true"/)
+  assert.match(pageSource, /unoptimized/)
 })

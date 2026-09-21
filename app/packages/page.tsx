@@ -2,6 +2,7 @@ import { getPublicPackageCatalog } from '@/lib/publicData'
 import PackageCard from '@/components/PackageCard'
 import PackagePhaseTabs from '@/components/packages/PackagePhaseTabs'
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, BookOpen, GraduationCap } from 'lucide-react'
 import {
@@ -33,26 +34,76 @@ export default async function PackageHubPage() {
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 20px 80px' }}>
 
         {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: '44px' }}>
-          <div style={{ marginBottom: '24px' }}>
+        <header style={{ marginBottom: '28px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             <PackagePhaseTabs activePhase="all" showAllTab={true} />
           </div>
-          <h1
-            className="font-display"
+
+          <div
             style={{
-              fontSize: 'clamp(28px, 5vw, 42px)',
-              marginBottom: '12px',
-              background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              maxWidth: '940px',
+              margin: '0 auto',
             }}
+            className="flex items-center justify-between gap-4 sm:gap-6 md:gap-8 lg:gap-10"
           >
-            {PACKAGES_HUB_H1}
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '560px', margin: '0 auto' }}>
-            ศูนย์รวมแนวข้อสอบราชการออนไลน์ เลือกเตรียมตัวสอบตามหมวดหมู่ ภาค ก หรือ ภาค ข
-          </p>
+            <div className="flex-1 lg:flex-[1.35] text-center min-[360px]:text-left">
+              <h1
+                className="font-display"
+                style={{
+                  fontSize: 'clamp(24px, 4.2vw, 42px)',
+                  marginBottom: '12px',
+                  lineHeight: 1.25,
+                  color: '#f5ede0',
+                }}
+              >
+                <span className="block sm:inline">แพ็กเกจข้อสอบ</span>
+                <span
+                  className="block sm:inline"
+                  style={{
+                    background: 'linear-gradient(135deg, #f5ede0 20%, var(--gold-light) 80%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  ราชการทั้งหมด
+                </span>
+              </h1>
+              <p
+                style={{
+                  color: 'var(--text-muted)',
+                  maxWidth: '540px',
+                  lineHeight: 1.6,
+                }}
+                className="text-[13.5px] sm:text-[15px]"
+              >
+                ศูนย์รวมแนวข้อสอบราชการออนไลน์ เลือกเตรียมตัวสอบตามหมวดหมู่ ภาค ก หรือ ภาค ข
+              </p>
+            </div>
+
+            <div
+              className="relative pointer-events-none hidden shrink-0 items-center justify-center select-none min-[360px]:flex"
+              aria-hidden="true"
+            >
+              {/* Subtle gold atmosphere glow behind mascot */}
+              <div
+                className="absolute inset-0 -m-4 sm:-m-6 rounded-full pointer-events-none opacity-60"
+                style={{
+                  background: 'radial-gradient(circle, rgba(212, 168, 67, 0.18) 0%, rgba(212, 168, 67, 0.05) 50%, transparent 72%)',
+                  filter: 'blur(20px)',
+                }}
+              />
+              <Image
+                src="/images/packages/sobdai-packages-mascot.webp"
+                alt=""
+                width={480}
+                height={480}
+                sizes="(min-width: 1440px) 260px, (min-width: 1280px) 240px, (min-width: 1024px) 200px, (min-width: 768px) 160px, 104px"
+                unoptimized
+                className="relative z-10 h-auto w-[96px] min-[390px]:w-[104px] min-[430px]:w-[110px] sm:w-[160px] md:w-[200px] lg:w-[240px] xl:w-[260px] opacity-95 mix-blend-screen"
+              />
+            </div>
+          </div>
         </header>
 
         {/* Phase Navigation Cards */}
