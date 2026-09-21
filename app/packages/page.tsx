@@ -41,12 +41,12 @@ export default async function PackageHubPage() {
 
           <div
             style={{
-              maxWidth: '940px',
+              maxWidth: '860px',
               margin: '0 auto',
             }}
             className="flex items-center justify-between gap-4 sm:gap-6 md:gap-8 lg:gap-10"
           >
-            <div className="flex-1 lg:flex-[1.35] text-center min-[360px]:text-left">
+            <div className="flex-1 lg:flex-[1.15] text-center min-[360px]:text-left lg:text-center">
               <h1
                 className="font-display"
                 style={{
@@ -72,7 +72,8 @@ export default async function PackageHubPage() {
               <p
                 style={{
                   color: 'var(--text-muted)',
-                  maxWidth: '540px',
+                  maxWidth: '500px',
+                  margin: '0 auto',
                   lineHeight: 1.6,
                 }}
                 className="text-[13.5px] sm:text-[15px]"
