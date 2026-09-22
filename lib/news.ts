@@ -165,6 +165,10 @@ export interface News {
   // on legacy rows; the public detail renders ONE manual unit only when this
   // is true AND the platform env config resolves.
   adsense_enabled: boolean
+  // Agency Entity V1 (migration 102). Authoritative editorial News → Agency
+  // attribution. NULL keeps the legacy package-derived fallback on the public
+  // agency pages. Strict consistency vs related packages is app-enforced.
+  organization_id: string | null
 }
 
 /**
@@ -197,6 +201,7 @@ export interface NewsInput {
   affiliate_enabled: boolean
   affiliate_collection_id: string | null
   adsense_enabled: boolean
+  organization_id: string | null
 }
 
 export const NEWS_STATUSES: { value: NewsStatus; label: string }[] = [
@@ -284,8 +289,59 @@ function coerce(raw: any): { input: NewsInput; rawSlug: string | undefined } {
       // AdSense Conservative (M3): strict per-content opt-in boolean
       // (migration 087), shared with the articles validator via lib/adsense.
       adsense_enabled: coerceAdsenseEnabled(raw.adsense_enabled),
+      // Agency Entity V1 (migration 102): strict uuid-or-null. Existence of
+      // the organization row is checked by the server action (the table is
+      // world-readable), not by this pure coercion.
+      organization_id: coerceOptionalUuid(raw.organization_id),
     },
     rawSlug: str(raw.slug),
+  }
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function coerceOptionalUuid(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed && UUID_PATTERN.test(trimmed) ? trimmed : null
+}
+
+export type NewsOrganizationConsistency =
+  | { ok: true }
+  | { ok: false; error: string }
+
+/**
+ * STRICT News ↔ Agency consistency (Agency Entity V1, locked rule):
+ * one News row represents at most one Agency.
+ *
+ * When news.organization_id is set, EVERY related package must belong to that
+ * organization. Zero related packages is fine; any related package under a
+ * different organization is a blocking contradiction — there is deliberately
+ * no warning state for mixed organizations. When organization_id is NULL the
+ * package-derived agency attribution remains a public fallback and nothing is
+ * enforced here.
+ *
+ * Enforced by the admin server actions BEFORE any junction mutation.
+ */
+export function evaluateNewsOrganizationConsistency(
+  organizationId: string | null | undefined,
+  relatedPackageOrganizationIds: readonly (string | null | undefined)[],
+): NewsOrganizationConsistency {
+  if (!organizationId) return { ok: true }
+
+  const related = [...new Set(
+    relatedPackageOrganizationIds
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      .map((id) => id.trim()),
+  )]
+
+  if (related.length === 0) return { ok: true }
+  if (related.every((id) => id === organizationId)) return { ok: true }
+
+  return {
+    ok: false,
+    error:
+      'ข่าวนี้ถูกผูกกับหน่วยงานหนึ่งหน่วยงาน แต่มีแพ็กเกจที่เชื่อมโยงอยู่ภายใต้หน่วยงานอื่น — ปรับหน่วยงานของข่าวหรือแพ็กเกจที่เชื่อมโยงให้ตรงกันก่อนบันทึก',
   }
 }
 

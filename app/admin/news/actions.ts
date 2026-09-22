@@ -7,6 +7,7 @@ import {
   NewsInput,
   NewsStatus,
   coerceRelations,
+  evaluateNewsOrganizationConsistency,
   generateSlug,
   validateNewsDraft,
   validateNewsForPublish,
@@ -103,6 +104,11 @@ export async function updateNews(
 
   const { ok, errors, clean } = validateNewsDraft(raw)
   if (!ok) return { success: false, error: formatErrors(errors) }
+
+  // Agency Entity V1: strict News ↔ Agency consistency. When the editor sets
+  // an organization, every currently related package must belong to it.
+  const consistency = await checkNewsOrganizationConsistency(supabase, id, clean!.organization_id)
+  if (!consistency.ok) return { success: false, error: consistency.error }
 
   const newSlug = clean!.slug
   const slugChanged = newSlug && existing.slug && newSlug !== existing.slug
@@ -221,6 +227,15 @@ export async function publishNews(id: string): Promise<{ success: boolean; error
   // save before publishing). Cast through the validator which expects `any`.
   const { ok, errors } = validateNewsForPublish(existing)
   if (!ok) return { success: false, error: formatErrors(errors) }
+
+  // Agency Entity V1: publishing must not lock in a contradictory agency
+  // attribution. Re-check strict consistency against the current relations.
+  const consistency = await checkNewsOrganizationConsistency(
+    supabase,
+    id,
+    (existing as any).organization_id ?? null,
+  )
+  if (!consistency.ok) return { success: false, error: consistency.error }
 
   const patch: { status: NewsStatus; published_at?: string } = { status: 'published' }
   if (existing.published_at == null) patch.published_at = new Date().toISOString()
@@ -455,7 +470,7 @@ export async function updateRelations(
   // Verify the parent exists + is RLS-visible before touching junctions.
   const { data: existing, error: fetchError } = await supabase
     .from('news')
-    .select('id, slug')
+    .select('id, slug, organization_id')
     .eq('id', id)
     .maybeSingle()
   if (fetchError) return { success: false, error: fetchError.message }
@@ -463,6 +478,24 @@ export async function updateRelations(
 
   const pkgRows = coerceRelations(packages)
   const sumRows = coerceRelations(summaries)
+
+  // Agency Entity V1 (STRICT): validate the INCOMING package set against the
+  // row's organization BEFORE deleting any junction. A news row pinned to one
+  // agency must never gain a related package from another organization.
+  if (pkgRows.length > 0 && existing.organization_id) {
+    const { data: incomingPackages, error: orgError } = await supabase
+      .from('packages')
+      .select('id, organization_id')
+      .in('id', pkgRows.map((row) => row.id))
+    if (orgError) return { success: false, error: orgError.message }
+
+    const byId = new Map((incomingPackages ?? []).map((row: any) => [row.id, row.organization_id]))
+    const consistency = evaluateNewsOrganizationConsistency(
+      existing.organization_id,
+      pkgRows.map((row) => byId.get(row.id) ?? null),
+    )
+    if (!consistency.ok) return { success: false, error: consistency.error }
+  }
 
   // --- packages junction: full replace
   const { error: delPkgError } = await supabase
@@ -556,6 +589,9 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
     // AdSense Conservative (M3) per-content opt-in (migration 087). Strictly
     // coerced boolean by lib/adsense; default false for legacy/cleared rows.
     adsense_enabled: input.adsense_enabled,
+    // Agency Entity V1 (migration 102): authoritative editorial agency
+    // attribution; null preserves the package-derived fallback.
+    organization_id: input.organization_id,
   }
 
   if (isCreate) {
@@ -569,6 +605,31 @@ function toInsertPayload(input: NewsInput, isCreate: boolean): Record<string, un
 
 function formatErrors(errors: Record<string, string>): string {
   return Object.values(errors).join(' • ')
+}
+
+/**
+ * Agency Entity V1 helper: evaluate strict News ↔ Agency consistency between
+ * an intended organization attribution and the row's CURRENT related packages
+ * (resolved through news_packages → packages.organization_id). Returns the
+ * blocking error untouched when consistent.
+ */
+async function checkNewsOrganizationConsistency(
+  supabase: any,
+  newsId: string,
+  organizationId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!organizationId) return { ok: true }
+
+  const { data: relations, error } = await supabase
+    .from('news_packages')
+    .select('package_id, packages(organization_id)')
+    .eq('news_id', newsId)
+  if (error) return { ok: false, error: error.message }
+
+  const relatedOrganizationIds = (relations ?? []).map(
+    (row: any) => Array.isArray(row.packages) ? row.packages[0]?.organization_id : row.packages?.organization_id,
+  )
+  return evaluateNewsOrganizationConsistency(organizationId, relatedOrganizationIds)
 }
 
 /** Detect Supabase/Postgres unique-violation errors (code 23505). */

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { validateNewsDraft, validateNewsForPublish, parseDate, parseApplicationDeadline } from './news.ts'
+// (parseDate is intentionally not imported: it is a private helper in news.ts —
+// the stale import on main broke this whole file under node --test.)
+import { validateNewsDraft, validateNewsForPublish, parseApplicationDeadline, evaluateNewsOrganizationConsistency } from './news.ts'
 
 const validBasePublishPayload = {
   title: 'กรมการแพทย์ เปิดรับสมัครบุคคลเพื่อเลือกสรรเป็นพนักงานกระทรวงสาธารณสุข',
@@ -145,4 +147,61 @@ test('10. Blank optional source_date is allowed in both publish and draft', () =
   })
   assert.equal(draftResult.ok, true)
   assert.equal(draftResult.clean?.source_date, null)
+})
+
+// ─── Agency Entity V1: organization_id coercion ─────────────────────────────
+
+test('11. organization_id coerces to a strict UUID-or-null in both validators', () => {
+  const orgId = '938b56af-d344-4670-a8e9-eba2d8c5bc78'
+
+  const withOrg = validateNewsDraft({ ...validBasePublishPayload, organization_id: orgId })
+  assert.equal(withOrg.ok, true)
+  assert.equal(withOrg.clean?.organization_id, orgId)
+
+  const blankOrg = validateNewsDraft({ ...validBasePublishPayload, organization_id: '' })
+  assert.equal(blankOrg.ok, true)
+  assert.equal(blankOrg.clean?.organization_id, null)
+
+  const missingOrg = validateNewsDraft({ ...validBasePublishPayload })
+  assert.equal(missingOrg.ok, true)
+  assert.equal(missingOrg.clean?.organization_id, null)
+
+  for (const invalid of ['not-a-uuid', 42, { id: orgId }, '938b56af_d344_4670_a8e9_eba2d8c5bc78']) {
+    const result = validateNewsDraft({ ...validBasePublishPayload, organization_id: invalid as any })
+    assert.equal(result.ok, true)
+    assert.equal(result.clean?.organization_id, null, `${JSON.stringify(invalid)} must coerce to null`)
+  }
+})
+
+// ─── Agency Entity V1: STRICT News ↔ Agency consistency ─────────────────────
+
+const ORG_A = '11111111-1111-4111-8111-111111111111'
+const ORG_B = '22222222-2222-4222-8222-222222222222'
+
+test('12. NULL organization attribution never conflicts (fallback stays available)', () => {
+  assert.deepEqual(evaluateNewsOrganizationConsistency(null, [ORG_A, ORG_B]), { ok: true })
+  assert.deepEqual(evaluateNewsOrganizationConsistency(null, []), { ok: true })
+  assert.deepEqual(evaluateNewsOrganizationConsistency(undefined, [ORG_A]), { ok: true })
+})
+
+test('13. Set organization with zero related packages is consistent', () => {
+  assert.deepEqual(evaluateNewsOrganizationConsistency(ORG_A, []), { ok: true })
+  assert.deepEqual(evaluateNewsOrganizationConsistency(ORG_A, [null, undefined, '']), { ok: true })
+})
+
+test('14. Set organization with every related package in the same organization is consistent', () => {
+  assert.deepEqual(evaluateNewsOrganizationConsistency(ORG_A, [ORG_A, ORG_A, ORG_A]), { ok: true })
+  assert.deepEqual(evaluateNewsOrganizationConsistency(ORG_A, [ORG_A, ` ${ORG_A} `, ORG_A]), { ok: true })
+})
+
+test('15. ANY related package from another organization is a blocking error (strict — no mixed warning)', () => {
+  const allOther = evaluateNewsOrganizationConsistency(ORG_A, [ORG_B, ORG_B])
+  assert.equal(allOther.ok, false)
+  assert.ok(allOther.ok === false && allOther.error.includes('หน่วยงานอื่น'))
+
+  const mixed = evaluateNewsOrganizationConsistency(ORG_A, [ORG_A, ORG_B])
+  assert.equal(mixed.ok, false, 'mixed organizations must block, not warn')
+
+  const singleOther = evaluateNewsOrganizationConsistency(ORG_A, [ORG_A, ORG_A, ORG_B])
+  assert.equal(singleOther.ok, false)
 })

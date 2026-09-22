@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2, ShoppingBag, QrCode } from 'lucide-react'
+import { LayoutDashboard, Package, FileQuestion, UploadCloud, Users, ShoppingCart, BarChart, Settings, LogOut, CheckSquare, BookOpen, Building2, UserCircle2, FileText, Library, Home, Heart, Megaphone, Sparkles, Newspaper, Share2, ShoppingBag, QrCode, Landmark } from 'lucide-react'
 import { requireStaff } from '@/lib/auth/server-protect'
 import { hasPermission } from '@/lib/auth/rbac'
 
@@ -17,6 +17,10 @@ const managementNav = [
   { name: 'Organizations', href: '/admin/organizations', icon: Building2, permission: 'system.manage' },
   { name: 'Positions', href: '/admin/positions', icon: UserCircle2, permission: 'system.manage' },
   { name: 'Position Entities', href: '/admin/position-entities', icon: UserCircle2, permission: 'content.read' },
+  // Agency Entity V1: 1:1 editorial/SEO/publish profile per organization.
+  // Same content.read gate as Position Entities — save actions gate on
+  // content.write, lifecycle actions on content.publish.
+  { name: 'Agency Profiles', href: '/admin/agency-profiles', icon: Landmark, permission: 'content.read' },
   { name: 'Users', href: '/admin/users', icon: Users, permission: 'users.read' },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'orders.read' },
   { name: 'Payment', href: '/admin/payment', icon: QrCode, permission: 'financial.manage' },

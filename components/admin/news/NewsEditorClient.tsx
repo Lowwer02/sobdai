@@ -102,6 +102,7 @@ export default function NewsEditorClient({
   initialRelatedPackages = [],
   initialRelatedSummaries = [],
   affiliateCollections = [],
+  organizations = [],
 }: {
   article: News | null
   isEdit: boolean
@@ -111,6 +112,8 @@ export default function NewsEditorClient({
   initialRelatedSummaries?: RelatedItem[]
   /** Affiliate collections for the assignment select (all statuses; non-published labeled). */
   affiliateCollections?: { id: string; name: string; status: string }[]
+  /** Canonical organizations for the Agency attribution select (world-readable table). */
+  organizations?: { id: string; name: string; short_name: string | null }[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -181,6 +184,11 @@ export default function NewsEditorClient({
   // AdSense Conservative (M3): a single opt-in ONLY — placement/format/slot
   // are fixed surface contracts; account + slot ids are platform env config.
   const [adsenseEnabled, setAdsenseEnabled] = useState(article?.adsense_enabled ?? false)
+
+  // Agency Entity V1: authoritative News → Agency attribution. Empty string
+  // means "unset" — persisted as NULL so the package-derived public fallback
+  // keeps working until an editor pins the agency explicitly.
+  const [organizationId, setOrganizationId] = useState(article?.organization_id || '')
 
   // Cover image: URL held in state (carried into the payload, not a form field).
   // Create has no row id yet, so use a session UUID as the server-validated R2
@@ -359,6 +367,8 @@ export default function NewsEditorClient({
       source_name: sourceName.trim() || null,
       source_url: sourceUrl.trim() || null,
       source_date: sourceDate.trim() || null,
+      // Agency Entity V1: authoritative agency attribution (null = unset).
+      organization_id: organizationId || null,
     }
 
     if (isEdit && article) {
@@ -722,6 +732,32 @@ export default function NewsEditorClient({
         {/* Source citation metadata */}
         <section className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl p-6 space-y-4">
           <h2 className="text-[#D4AF37] font-bold font-display">แหล่งข้อมูลต้นทาง</h2>
+
+          {/* Agency Entity V1: authoritative News → Agency attribution. When
+              set, every related package must belong to this organization
+              (strict server-side consistency check). */}
+          <div>
+            <label className={labelClass}>หน่วยงานหลักของข่าว (Agency)</label>
+            <select
+              value={organizationId}
+              onChange={e => {
+                setOrganizationId(e.target.value)
+                setIsDirty(true)
+                setPublishErrors({})
+              }}
+              className={inputClass}
+            >
+              <option value="">— ไม่ระบุ (ใช้ความสัมพันธ์กับแพ็กเกจ) —</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>
+                  {org.short_name ? `${org.short_name} — ${org.name}` : org.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-[#A1866B] mt-1">
+              หากระบุหน่วยงาน แพ็กเกจที่เชื่อมโยงทั้งหมดต้องอยู่ภายใต้หน่วยงานเดียวกัน
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* ชื่อแหล่งข้อมูล */}

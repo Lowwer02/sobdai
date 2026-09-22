@@ -19,11 +19,19 @@ export default async function CreateNewsPage() {
     .select('id, name, status')
     .order('name', { ascending: true })
 
+  // Canonical organizations for the Agency attribution select (Agency Entity
+  // V1). The table is world-readable, so any staff session can populate it.
+  const organizationsRes = await supabase
+    .from('organizations')
+    .select('id, name, short_name')
+    .order('name', { ascending: true })
+
   return (
     <NewsEditorClient
       article={null}
       isEdit={false}
       affiliateCollections={(collectionsRes.data ?? []) as { id: string; name: string; status: string }[]}
+      organizations={(organizationsRes.data ?? []) as { id: string; name: string; short_name: string | null }[]}
     />
   )
 }
