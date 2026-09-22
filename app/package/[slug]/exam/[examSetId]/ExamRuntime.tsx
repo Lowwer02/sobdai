@@ -15,6 +15,7 @@ import {
 } from '@/app/assessment/session-actions'
 import { clampIndex } from '@/lib/assessment/session-types'
 import type { SessionSnapshot } from '@/lib/assessment/session-types'
+import { applyAttemptQuestionOrder } from '@/lib/assessment/attempt-order'
 import type { BookmarkStateMap } from '@/lib/assessment/saved-questions-data'
 import type { QuestionBookmarkState } from '@/lib/assessment/saved-questions-data'
 import type { ExamSet } from '@/lib/types'
@@ -91,7 +92,14 @@ export default function ExamRuntime({
   // if the relation returns arrays, the outer array ends up as
   // [[Question], [Question], ...] instead of [Question, Question, ...].
   // Normalize defensively so the Runtime always operates on a flat Question[].
-  const questions = useMemo(() => {
+  //
+  // This is the BASE list, in exam_set_questions.sort_order. The order the
+  // runtime actually consumes (`questions` below) may be replaced once, on
+  // session hydration, by the attempt-scoped order (repeat shuffle v1 — see
+  // lib/assessment/attempt-order.ts). There is deliberately exactly ONE
+  // ordered array: display, navigation, autosave position, and submit all
+  // read `questions`, never one of two inconsistent lists.
+  const baseQuestions = useMemo(() => {
     if (!Array.isArray(rawQuestions)) return []
     return rawQuestions.flatMap((item: any) => {
       if (Array.isArray(item)) return item.filter((q: any) => q && typeof q === 'object' && q.id)
@@ -99,6 +107,28 @@ export default function ExamRuntime({
       return []
     }) as Question[]
   }, [rawQuestions])
+
+  // ── Attempt question order (Repeat Exam Question Shuffle V1) ───────────
+  // `appliedQuestions` is null until the session snapshot resolves this
+  // attempt's ordering contract (question_order_version from the DB row):
+  //   version 0 → base sort_order (applied as-is),
+  //   version 1 → the frozen deterministic permutation seeded by session id.
+  // While `orderState` is 'pending' the exam UI below does not render at all,
+  // so an unstable order is never exposed: a resumed repeat attempt whose
+  // hydration failed must not fall back to base order (its saved positional
+  // current_index would point at a different question). 'Unauthorized' keeps
+  // the legacy session-less behavior (base order, in-memory only) — no row
+  // exists, so there is no saved position to desynchronize.
+  const [appliedQuestions, setAppliedQuestions] = useState<Question[] | null>(null)
+  const [orderState, setOrderState] = useState<'pending' | 'resolved' | 'error'>('pending')
+  const [hydrateAttempt, setHydrateAttempt] = useState(0)
+  const retrySessionHydration = useCallback(() => {
+    setOrderState('pending')
+    setHydrateAttempt((n) => n + 1)
+  }, [])
+
+  // The single ordered list the whole runtime consumes.
+  const questions = appliedQuestions ?? baseQuestions
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, ChoiceLetter>>({})
@@ -227,8 +257,9 @@ export default function ExamRuntime({
   // One-shot: ask the server for this user's active session for this exam set
   // + mode. If one exists, restore answers/flagged/position; for simulation,
   // restore the timer from the persisted time_used_seconds checkpoint. If the
-  // API fails, carry on in-memory (the exam must never crash because resume
-  // failed). Runs once per mount.
+  // API fails, the exam UI shows a retry state instead of starting on a
+  // potentially wrong order (V1: order depends on the session row). Re-runs
+  // only when the learner taps "ลองอีกครั้ง" (hydrateAttempt).
   useEffect(() => {
     let cancelled = false
     async function hydrate() {
@@ -236,6 +267,7 @@ export default function ExamRuntime({
       const packageId = String(pkg?.id ?? '')
       if (!examSetId || !packageId) {
         setSessionReady(true)
+        setOrderState('resolved')
         return
       }
       try {
@@ -248,6 +280,17 @@ export default function ExamRuntime({
         if (res.success && res.data) {
           const snap: SessionSnapshot = res.data
           setSessionId(snap.id)
+          // Resolve this attempt's question order FIRST, from the stored
+          // contract (0 = base sort_order, 1 = repeat shuffle v1), so that
+          // everything restored below — position included — lands against the
+          // final ordered list. current_index is positional; it stays correct
+          // because the order is deterministic per session id.
+          const ordered = applyAttemptQuestionOrder(baseQuestions, {
+            sessionId: snap.id,
+            questionOrderVersion: snap.questionOrderVersion ?? 0,
+          })
+          setAppliedQuestions(ordered)
+          setOrderState('resolved')
           // Hydrate answers (coerce to the ChoiceLetter union; anything not
           // A/B/C/D is dropped by the server validator, so the cast is safe).
           const restoredAnswers: Record<string, ChoiceLetter> = {}
@@ -258,7 +301,7 @@ export default function ExamRuntime({
           }
           setAnswers(restoredAnswers)
           setFlagged({ ...(snap.flagged ?? {}) })
-          const clamped = clampIndex(snap.currentIndex ?? 0, questions.length)
+          const clamped = clampIndex(snap.currentIndex ?? 0, ordered.length)
           setCurrentIndex(clamped)
           // Simulation only: restore the timer from the checkpoint so a refresh
           // never resets to full time (Case 4). Practice is untimed regardless.
@@ -275,13 +318,25 @@ export default function ExamRuntime({
             currentIndex: clamped,
             timeUsedSeconds: snap.timeUsedSeconds ?? 0,
           }
-        } else if (!res.success && res.error && res.error !== 'Unauthorized') {
-          // Soft-fail: log without disturbing the user. 'Unauthorized' is
-          // expected for logged-out preview and is intentionally silent.
+        } else if (res.error === 'Unauthorized') {
+          // Session-less flow (cookie expired between server render and
+          // mount, or logged-out preview): keep the legacy behavior — base
+          // order, in-memory only. No session row exists, so there is no
+          // persisted position that a different order could desynchronize.
+          setOrderState('resolved')
+        } else {
+          // Authenticated but the session could not be resolved. Do NOT start
+          // on base order: a version-1 resumed attempt would surface the
+          // wrong order and its saved current_index would point at a
+          // different question. Show the retry state instead.
           console.warn('Assessment session resume skipped:', res.error)
+          setOrderState('error')
         }
       } catch (err) {
-        if (!cancelled) console.warn('Assessment session resume failed:', err)
+        if (!cancelled) {
+          console.warn('Assessment session resume failed:', err)
+          setOrderState('error')
+        }
       } finally {
         if (!cancelled) setSessionReady(true)
       }
@@ -289,7 +344,7 @@ export default function ExamRuntime({
     hydrate()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [hydrateAttempt])
 
   // ── Phase 1A: debounced autosave ─────────────────────────────────────────
   // Saves when answers, flagged, or currentIndex change — NOT every second.
@@ -709,6 +764,45 @@ export default function ExamRuntime({
               </div>
             )}
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Attempt-order hydration gate (Repeat Exam Question Shuffle V1) ──────
+  // The exam must not start on an order that can still change: a resumed
+  // repeat attempt whose ordering depends on its session row would desync the
+  // saved positional current_index if it briefly rendered base sort_order.
+  // Pending → prepare state; error → retry UX (no new error system — one
+  // inline state, one button). All hooks have run by this point.
+  if (orderState === 'pending') {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4 text-[#A1866B]">
+          <div className="w-10 h-10 rounded-full border-2 border-[rgba(212,175,55,0.25)] border-t-[#D4AF37] animate-spin" />
+          <div className="text-sm font-bold">กำลังเตรียมข้อสอบ...</div>
+        </div>
+      </div>
+    )
+  }
+  if (orderState === 'error') {
+    return (
+      <div className="min-h-screen bg-[#0F0B07] flex items-center justify-center p-4">
+        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] p-8 rounded-2xl max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle size={32} />
+          </div>
+          <h2 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">ไม่สามารถเปิดข้อสอบได้</h2>
+          <p className="text-[#A1866B] mb-8 text-sm">
+            เกิดข้อผิดพลาดในการเชื่อมต่อ ความคืบหน้าของคุณถูกบันทึกไว้แล้ว
+            กรุณาลองอีกครั้งเพื่อกลับมาทำข้อสอบต่อในลำดับเดิม
+          </p>
+          <button type="button" onClick={retrySessionHydration} className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            ลองอีกครั้ง
+          </button>
+          <Link href={`/package/${pkg.slug}`} className="block w-full mt-3 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-colors text-center">
+            กลับหน้าหลัก
+          </Link>
         </div>
       </div>
     )

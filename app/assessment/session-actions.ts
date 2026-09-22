@@ -30,6 +30,10 @@ import { createClient } from '@/lib/supabase/server'
 import { normalizeMode } from '@/lib/assessment/types'
 import { hasInternalPackageAccess } from '@/lib/auth/rbac'
 import {
+  BASE_ORDER_VERSION,
+  nextSessionOrderVersion,
+} from '@/lib/assessment/attempt-order'
+import {
   ACCESS_ORDER_STATUSES,
   clampIndex,
   validateAnswers,
@@ -48,6 +52,10 @@ import type {
  * Map a stored row to the client-facing snapshot. Strips user_id (the Runtime
  * never needs it — it is implicit) and converts snake_case → camelCase. The
  * Runtime receives only what it needs to hydrate.
+ *
+ * question_order_version defaults to 0 when absent: on an environment where
+ * migration 101 has not run yet the column does not exist in SELECT *, and
+ * 0 (= base sort_order) is the rollout-safe legacy behavior either way.
  */
 function toSnapshot(row: AssessmentSessionRow): SessionSnapshot {
   return {
@@ -60,7 +68,16 @@ function toSnapshot(row: AssessmentSessionRow): SessionSnapshot {
     answers: row.answers ?? {},
     flagged: row.flagged ?? {},
     timeUsedSeconds: row.time_used_seconds ?? 0,
+    questionOrderVersion: row.question_order_version ?? 0,
   }
+}
+
+/**
+ * True when a PostgREST error means "column does not exist" — used solely by
+ * the session-INSERT rollout guard below (code may deploy before migration 101).
+ */
+function isUnknownColumnError(err: { code?: string; message?: string }): boolean {
+  return err?.code === 'PGRST204' || /question_order_version/.test(err?.message ?? '')
 }
 
 /**
@@ -139,6 +156,8 @@ export interface GetOrCreateSessionInput {
  *   - the exam set must exist, belong to the given package, and be published.
  *   - the caller must pass the access gate (canAccessExamSet).
  *   - never returns another user's session (RLS + the user-scoped query).
+ *   - questionOrderVersion comes from the STORED row on resume and is decided
+ *     exactly once at creation (0 = base order, 1 = repeat shuffle v1).
  *   - never throws.
  */
 export async function getOrCreateMyAssessmentSession(
@@ -203,21 +222,63 @@ export async function getOrCreateMyAssessmentSession(
     // ── 4. None found → create. If two calls race, the partial unique index
     //    makes one INSERT fail with 23505; we then re-SELECT and return the
     //    winner instead of erroring. (Case 7.)
-    const { data: created, error: insErr } = await supabase
-      .from('assessment_sessions')
-      .insert({
-        user_id: user.id,
-        exam_set_id: examSetId,
-        package_id: packageId,
-        mode,
-        status: 'in_progress',
-        current_index: 0,
-        answers: {},
-        flagged: {},
-        time_used_seconds: 0,
-      })
-      .select('*')
+
+    // ── 4a. Question-order decision — ONCE, at creation only (V1 repeat
+    //    shuffle; lib/assessment/attempt-order.ts). A prior COMPLETED attempt
+    //    of this same Exam Set (either mode — exam_attempts rows exist only
+    //    for completed Outcomes and are written server-side by persistOutcome
+    //    with user_id from the session cookie, so this existence check is
+    //    server-authoritative and never client-controlled) makes the new
+    //    session a repeat → version 1. Otherwise version 0, preserving the
+    //    first-attempt experience exactly. The decision is frozen into the
+    //    row; resume (step 3 above) only ever reads the stored value — it
+    //    never re-runs this lookup, so an in-progress attempt's order can
+    //    never change mid-flight.
+    const { data: priorAttempt, error: priorErr } = await supabase
+      .from('exam_attempts')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('exam_set_id', examSetId)
+      .limit(1)
       .maybeSingle()
+    if (priorErr) {
+      console.error('getOrCreateMyAssessmentSession: prior attempt lookup failed:', priorErr.message)
+      return { success: false, error: 'Attempt history lookup failed.' }
+    }
+    const questionOrderVersion = nextSessionOrderVersion(Boolean(priorAttempt))
+
+    // Version 0 inserts omit the column entirely (identical to the pre-feature
+    // INSERT), so only repeat sessions ever reference it.
+    const insertRow = (version: number) =>
+      supabase
+        .from('assessment_sessions')
+        .insert({
+          user_id: user.id,
+          exam_set_id: examSetId,
+          package_id: packageId,
+          mode,
+          status: 'in_progress',
+          current_index: 0,
+          answers: {},
+          flagged: {},
+          time_used_seconds: 0,
+          ...(version === BASE_ORDER_VERSION ? {} : { question_order_version: version }),
+        })
+        .select('*')
+        .maybeSingle()
+
+    let { data: created, error: insErr } = await insertRow(questionOrderVersion)
+    // Rollout guard: if this code runs where migration 101 has not been
+    // applied yet, the repeat INSERT's question_order_version is rejected as
+    // an unknown column. Retry WITHOUT it — the column DEFAULT stamps the
+    // session as version 0 (base order), i.e. exactly the pre-feature
+    // behavior. Session creation must never hard-fail on an ordering detail.
+    if (insErr && questionOrderVersion !== BASE_ORDER_VERSION && isUnknownColumnError(insErr)) {
+      console.warn('getOrCreateMyAssessmentSession: question_order_version not present yet (migration 101 pending) — creating with base order.')
+      const retry = await insertRow(BASE_ORDER_VERSION)
+      created = retry.data
+      insErr = retry.error
+    }
 
     if (insErr) {
       // Race: another call created the active session first. Re-SELECT.

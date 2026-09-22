@@ -62,6 +62,16 @@ export interface AssessmentSessionRow {
   answers: Record<string, string>     // { questionId: 'A'|'B'|'C'|'D' }
   flagged: Record<string, boolean>    // { questionId: boolean }
   time_used_seconds: number
+  /**
+   * Question ordering contract for this attempt (migration 101):
+   *   0 = base exam_set_questions.sort_order (legacy),
+   *   1 = deterministic repeat shuffle v1 (lib/assessment/attempt-order.ts).
+   * Decided ONCE at session creation; the stored value is authoritative on
+   * resume. Typed optional because environments where migration 101 has not
+   * run yet simply omit the column from SELECT * — consumers must treat
+   * undefined as 0 (base order), which is the rollout-safe default.
+   */
+  question_order_version?: number
   started_at: string
   updated_at: string
   completed_at: string | null
@@ -85,6 +95,14 @@ export interface SessionSnapshot {
   answers: Record<string, string>
   flagged: Record<string, boolean>
   timeUsedSeconds: number
+  /**
+   * The STORED question_order_version of this session row (never a
+   * recalculated "should shuffle" boolean). The Runtime feeds this, together
+   * with the session id, to applyAttemptQuestionOrder. 0 = base
+   * exam_set_questions.sort_order; 1 = repeat shuffle v1. See
+   * lib/assessment/attempt-order.ts for the version contract.
+   */
+  questionOrderVersion: number
 }
 
 // ─── Action result envelopes ────────────────────────────────────────────────
