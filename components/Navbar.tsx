@@ -8,6 +8,7 @@ import DesktopNav from './DesktopNav'
 import MobileNav from './MobileNav'
 import ConfirmDialog from './admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
+import type { SupportConfig } from '@/lib/homepageConfig'
 import { useNotificationCenter } from './NotificationBell'
 
 const AuthModal = dynamic(() => import('./AuthModal'), {
@@ -30,7 +31,11 @@ function hasPossibleSession(): boolean {
   return false
 }
 
-export default function Navbar() {
+interface NavbarProps {
+  supportConfig: SupportConfig
+}
+
+export default function Navbar({ supportConfig }: NavbarProps) {
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -204,6 +209,7 @@ export default function Navbar() {
           onRegisterClick={handleRegisterClick}
           onSignOut={handleSignOutClick}
           notifications={notificationCenter}
+          supportConfig={supportConfig}
         />
         </div>
       </header>

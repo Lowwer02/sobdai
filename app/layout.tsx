@@ -42,6 +42,7 @@ export const viewport: Viewport = {
   themeColor: THEME_COLOR,
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default async function RootLayout({
@@ -75,7 +76,7 @@ export default async function RootLayout({
           <ConsentAnalyticsLoader gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
           <ConsentManager />
           <ActivityProvider />
-          <Navbar />
+          <Navbar supportConfig={homepageSettings.support} />
           <main className="flex-grow">{children}</main>
           <Footer supportConfig={homepageSettings.support} footerConfig={homepageSettings.footer} />
           <FloatingSupport supportConfig={homepageSettings.support} />
