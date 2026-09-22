@@ -62,9 +62,8 @@ export default function FloatingSupport({ supportConfig }: FloatingSupportProps)
     <>
       {/* Floating Action Button — bottom-right, safe-area aware */}
       <div
-        className="fixed z-40"
+        className="mobile-floating-support fixed z-40"
         style={{
-          bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
           right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
         }}
       >
