@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
 import { usePathname } from 'next/navigation'
@@ -17,7 +17,6 @@ import {
   Home,
   Info,
   LibraryBig,
-  LogIn,
   LogOut,
   Mail,
   Menu,
@@ -29,6 +28,8 @@ import {
 } from 'lucide-react'
 import { trackDailyNavClick } from '@/lib/analytics'
 import type { SupportConfig } from '@/lib/homepageConfig'
+import { getActiveMobilePrimaryHref, normalizeMobilePathname, shouldShowMobileBottomNav } from '@/lib/mobile-nav-route'
+import { useConsent } from './consent/ConsentProvider'
 import NotificationBell, { type NotificationCenterState } from './NotificationBell'
 import SupportModal from './SupportModal'
 
@@ -79,8 +80,6 @@ const MORE_SECTION_PREFIXES = [
   '/privacy',
   '/cookies',
 ]
-
-const MY_AREA_PREFIXES = ['/exams', '/my-packages', '/orders', '/settings', '/notifications']
 
 interface MobileNavProps {
   user: User | null
@@ -133,17 +132,17 @@ function isMobileNavExcludedPath(pathname: string) {
   ].some((pattern) => pattern.test(pathname))
 }
 
-function isSectionActive(pathname: string, href: (typeof BOTTOM_NAV_LINKS)[number]['href']) {
-  if (href === '/') return pathname === '/'
-  if (href === '/packages') {
-    return matchesPrefix(pathname, '/packages') || matchesPrefix(pathname, '/package')
-  }
-  if (href === '/daily') return matchesPrefix(pathname, '/daily')
-  return MY_AREA_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))
-}
-
 function isMoreSectionActive(pathname: string) {
   return MORE_SECTION_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))
+}
+
+function subscribeToBrowserPathname(onChange: () => void) {
+  window.addEventListener('popstate', onChange)
+  return () => window.removeEventListener('popstate', onChange)
+}
+
+function getBrowserPathname() {
+  return normalizeMobilePathname(window.location.pathname)
 }
 
 export default function MobileNav({
@@ -156,7 +155,17 @@ export default function MobileNav({
   notifications,
   supportConfig,
 }: MobileNavProps) {
-  const pathname = usePathname() || '/'
+  const nextPathname = usePathname() || '/'
+  // Initial server/rewritten paths can differ from the URL in the address bar.
+  // Keep hydration stable, then use the browser's actual pathname for active UI.
+  const pathname = useSyncExternalStore(
+    subscribeToBrowserPathname,
+    getBrowserPathname,
+    () => normalizeMobilePathname(nextPathname),
+  )
+  const { status: consentStatus, isPreferencesOpen } = useConsent()
+  const consentUiVisible = consentStatus === 'loading' || consentStatus === 'undecided' || isPreferencesOpen
+  const activePrimaryHref = getActiveMobilePrimaryHref(pathname)
   const [menuOpen, setMenuOpen] = useState(false)
   const [legacyMenuOpen, setLegacyMenuOpen] = useState(false)
   const [supportModalOpen, setSupportModalOpen] = useState(false)
@@ -168,6 +177,7 @@ export default function MobileNav({
   const moreFocusRestoreFrameRef = useRef<number | null>(null)
   const supportHandoffFrameRef = useRef<number | null>(null)
   const isExcluded = isMobileNavExcludedPath(pathname)
+  const showBottomNav = shouldShowMobileBottomNav(isExcluded, consentStatus, isPreferencesOpen)
 
   const restoreMoreTriggerFocus = () => {
     if (moreFocusRestoreFrameRef.current !== null) {
@@ -207,6 +217,10 @@ export default function MobileNav({
       supportHandoffFrameRef.current = null
     }
   }, [pathname])
+
+  useEffect(() => {
+    if (consentUiVisible) setMenuOpen(false)
+  }, [consentUiVisible])
 
   useEffect(() => {
     const anyMenuOpen = menuOpen || legacyMenuOpen
@@ -398,6 +412,15 @@ export default function MobileNav({
 
         <div className="flex items-center gap-1">
           <NotificationBell active={Boolean(user)} center={notifications} />
+          {!user && !isExcluded && (
+            <button
+              type="button"
+              onClick={onLoginClick}
+              className="shrink-0 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37] px-3 py-2 text-[11px] font-semibold leading-none text-[#0F0B07] shadow-sm shadow-[#D4AF37]/15 transition-colors hover:bg-[#E6C453] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5E9D6]"
+            >
+              เข้าสู่ระบบ / สมัคร
+            </button>
+          )}
           {isExcluded && (
             <button
               ref={legacyMenuButtonRef}
@@ -413,11 +436,11 @@ export default function MobileNav({
         </div>
       </nav>
 
-      {!isExcluded && (
+      {showBottomNav && (
         <nav aria-label="เมนูหลักสำหรับมือถือ" className="mobile-bottom-nav lg:hidden">
           {BOTTOM_NAV_LINKS.map((item) => {
             const Icon = item.icon
-            const active = isSectionActive(pathname, item.href)
+            const active = activePrimaryHref === item.href
             const isDaily = item.key === 'daily'
 
             return (
@@ -453,7 +476,7 @@ export default function MobileNav({
         </nav>
       )}
 
-      {mounted && !isExcluded && menuOpen && createPortal(
+      {mounted && showBottomNav && menuOpen && createPortal(
         <>
           <div
             className="mobile-more-backdrop"
@@ -545,7 +568,7 @@ export default function MobileNav({
                 </button>
               )}
               <div className="mt-3">
-              {user ? (
+              {user && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-3 rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
                     {avatarUrl ? (
@@ -610,24 +633,6 @@ export default function MobileNav({
                   >
                     <LogOut size={16} aria-hidden="true" />
                     <span>ออกจากระบบ</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { closeMenu(); onLoginClick() }}
-                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[rgba(255,255,255,0.1)] px-3 py-2 text-sm font-medium text-[#F5E9D6] transition-colors hover:border-[rgba(212,175,55,0.32)] hover:text-[#D4AF37] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
-                  >
-                    <LogIn size={16} aria-hidden="true" />
-                    <span>เข้าสู่ระบบ</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { closeMenu(); onRegisterClick() }}
-                    className="flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B38F24] px-3 py-2 text-sm font-bold text-[#0F0B07] shadow-lg shadow-[#D4AF37]/15 transition-all hover:brightness-105 focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 focus-visible:ring-offset-[#140F0A]"
-                  >
-                    สมัครสมาชิกฟรี
                   </button>
                 </div>
               )}
