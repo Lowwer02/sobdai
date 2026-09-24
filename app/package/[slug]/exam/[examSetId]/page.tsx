@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, Clock, FileText, ChevronRight, Activity, Zap } from 'lucide-react'
 import ExamRuntime from './ExamRuntime'
+import ExamFocusModeShell from '@/components/ExamFocusModeShell'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import { hasInternalPackageAccess } from '@/lib/auth/rbac'
 import { createPageMetadata } from '@/lib/seo'
@@ -337,18 +338,20 @@ export default async function ExamSetPage({
 
   // If mode is selected, render Runtime (Current logic)
   return (
-    <ExamRuntime
-      pkg={pkg}
-      examSet={examSet}
-      questions={questions}
-      mode={mode}
-      bookmarkState={bookmarkState}
-      isPackageOwner={isPackageOwner}
-      examResultSocialFollow={{
-        heading: socialFollowPlacement.heading,
-        description: socialFollowPlacement.description,
-        channels: resolvedSocialChannels,
-      }}
-    />
+    <ExamFocusModeShell>
+      <ExamRuntime
+        pkg={pkg}
+        examSet={examSet}
+        questions={questions}
+        mode={mode}
+        bookmarkState={bookmarkState}
+        isPackageOwner={isPackageOwner}
+        examResultSocialFollow={{
+          heading: socialFollowPlacement.heading,
+          description: socialFollowPlacement.description,
+          channels: resolvedSocialChannels,
+        }}
+      />
+    </ExamFocusModeShell>
   )
 }

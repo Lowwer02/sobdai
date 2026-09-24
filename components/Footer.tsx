@@ -52,7 +52,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
   const renderedSocialLinks = footerConfig?.social_links || socialLinks
 
   return (
-    <footer className="mobile-bottom-nav-footer bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] pt-12 pb-24 lg:pb-12 mt-auto">
+    <footer data-site-footer="true" className="mobile-bottom-nav-footer bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] pt-12 pb-24 lg:pb-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-8 md:gap-10 lg:grid-cols-4">
 
