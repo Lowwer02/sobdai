@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw, ChevronDown, LayoutGrid, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb, BookOpen, AlertCircle, RefreshCw, ChevronDown, ChevronUp, LayoutGrid, X } from 'lucide-react'
 import DownloadShareButton from '@/components/share/DownloadShareButton'
 import { computeOutcome } from '@/lib/assessment/outcome'
 import { normalizeMode } from '@/lib/assessment/types'
@@ -30,6 +31,49 @@ import SampleExamResultUpsellCard from '@/components/exams/SampleExamResultUpsel
 // Map letter answers to corresponding choice keys
 const CHOICE_LETTERS = ['A', 'B', 'C', 'D'] as const
 type ChoiceLetter = typeof CHOICE_LETTERS[number]
+
+const CHOICE_LABELS: Record<ChoiceLetter, string> = {
+  A: 'ก.',
+  B: 'ข.',
+  C: 'ค.',
+  D: 'ง.',
+}
+
+const CHOICE_TEXT_KEYS: Record<ChoiceLetter, keyof Question> = {
+  A: 'choice_a',
+  B: 'choice_b',
+  C: 'choice_c',
+  D: 'choice_d',
+}
+
+const WRONG_REASON_KEYS: Record<ChoiceLetter, keyof Question> = {
+  A: 'why_a_wrong',
+  B: 'why_b_wrong',
+  C: 'why_c_wrong',
+  D: 'why_d_wrong',
+}
+
+function getChoiceText(question: Question, letter: ChoiceLetter) {
+  return question[CHOICE_TEXT_KEYS[letter]] as string
+}
+
+const DIALOG_FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
+function getDialogFocusableElements(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR)).filter((element) => {
+    if (element.getAttribute('aria-hidden') === 'true') return false
+    const styles = window.getComputedStyle(element)
+    return styles.display !== 'none' && styles.visibility !== 'hidden' && element.getClientRects().length > 0
+  })
+}
 
 interface Question {
   id: string
@@ -136,7 +180,16 @@ export default function ExamRuntime({
   const [status, setStatus] = useState<'IN_PROGRESS' | 'CONFIRM_SUBMIT' | 'REVIEW'>('IN_PROGRESS')
   const [isExplanationExpanded, setIsExplanationExpanded] = useState(false)
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
+  const [isHintOpen, setIsHintOpen] = useState(false)
+  const [revealedHints, setRevealedHints] = useState<Record<string, boolean>>({})
+  const [portalMounted, setPortalMounted] = useState(false)
   const [isUpsellModalOpen, setIsUpsellModalOpen] = useState(false)
+
+  const navigatorDialogRef = useRef<HTMLDivElement>(null)
+  const navigatorOverlayRef = useRef<HTMLDivElement>(null)
+  const navigatorTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const hintButtonRef = useRef<HTMLButtonElement>(null)
+  const hasMountedQuestionRef = useRef(false)
 
   // Outcome: null until the attempt terminates. The Result view reads from
   // this object rather than recomputing inline. (Constitution AI-005: once
@@ -194,18 +247,71 @@ export default function ExamRuntime({
     timeUsedSeconds: 0,
   })
 
-  // Reset expanded state when question changes
-  useEffect(() => {
-    setIsExplanationExpanded(false)
-  }, [currentIndex])
-
-  const handleSelectQuestionFromNavigator = useCallback((index: number) => {
-    setCurrentIndex(index)
+  const closeNavigator = useCallback(() => {
     setIsNavigatorOpen(false)
     if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      window.requestAnimationFrame(() => navigatorTriggerRef.current?.focus())
     }
   }, [])
+
+  const openNavigator = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    navigatorTriggerRef.current = event.currentTarget
+    setIsNavigatorOpen(true)
+  }, [])
+
+  const moveToQuestion = useCallback((index: number) => {
+    if (!Number.isInteger(index) || index < 0 || index >= questions.length) return
+    setCurrentIndex(index)
+  }, [questions.length])
+
+  const moveRelative = useCallback((delta: -1 | 1, options?: { bypassPracticeGate?: boolean }) => {
+    setCurrentIndex((previousIndex) => {
+      const nextIndex = previousIndex + delta
+      if (nextIndex < 0 || nextIndex >= questions.length) return previousIndex
+
+      if (delta > 0 && status === 'IN_PROGRESS' && isPractice && !options?.bypassPracticeGate) {
+        const currentQuestion = questions[previousIndex]
+        if (!currentQuestion || !answers[currentQuestion.id]) return previousIndex
+      }
+
+      return nextIndex
+    })
+  }, [answers, isPractice, questions, status])
+
+  const goNext = useCallback(() => moveRelative(1), [moveRelative])
+  const goPrev = useCallback(() => moveRelative(-1), [moveRelative])
+
+  const handleSelectQuestionFromNavigator = useCallback((index: number) => {
+    moveToQuestion(index)
+    closeNavigator()
+  }, [closeNavigator, moveToQuestion])
+
+  useEffect(() => {
+    setPortalMounted(true)
+  }, [])
+
+  // Reset transient feedback/panel state when changing questions, but keep the
+  // per-question hint reveal map for this mounted runtime session.
+  useEffect(() => {
+    setIsExplanationExpanded(false)
+    setIsHintOpen(false)
+
+    if (!hasMountedQuestionRef.current) {
+      hasMountedQuestionRef.current = true
+      return
+    }
+
+    if (currentIndex < 0) return
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('exam-question-content')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [currentIndex])
 
   // Track start_exam event on runtime initialization
   useEffect(() => {
@@ -415,6 +521,94 @@ export default function ExamRuntime({
     return () => clearInterval(interval)
   }, [sessionReady, sessionId, isPractice, status, doSave])
 
+  // QuestionNavigator is rendered in a body portal so the rest of the page can
+  // be made inert without also making the dialog inert. Keep focus inside,
+  // lock page scrolling, close on Escape, and restore the opening trigger.
+  useEffect(() => {
+    if (!isNavigatorOpen || !portalMounted) return
+
+    const overlay = navigatorOverlayRef.current
+    const dialog = navigatorDialogRef.current
+    if (!overlay || !dialog) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const ownedInertElements = new Map<HTMLElement, string | null>()
+    for (const child of Array.from(document.body.children)) {
+      if (!(child instanceof HTMLElement)) continue
+      if (child === overlay || child.matches('script, style')) continue
+      if (child.contains(overlay) || child.hasAttribute('inert')) continue
+
+      ownedInertElements.set(child, child.getAttribute('inert'))
+      child.setAttribute('inert', '')
+    }
+
+    const focusFirstElement = () => {
+      const focusableElements = getDialogFocusableElements(dialog)
+      ;(focusableElements[0] || dialog).focus()
+    }
+
+    const initialFocusFrame = window.requestAnimationFrame(focusFirstElement)
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeNavigator()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const focusableElements = getDialogFocusableElements(dialog)
+      if (focusableElements.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const firstFocusable = focusableElements[0]
+      const lastFocusable = focusableElements[focusableElements.length - 1]
+      const activeElement = document.activeElement
+
+      if (!dialog.contains(activeElement)) {
+        event.preventDefault()
+        ;(event.shiftKey ? lastFocusable : firstFocusable).focus()
+      } else if (event.shiftKey && activeElement === firstFocusable) {
+        event.preventDefault()
+        lastFocusable.focus()
+      } else if (!event.shiftKey && activeElement === lastFocusable) {
+        event.preventDefault()
+        firstFocusable.focus()
+      }
+    }
+
+    const handleFocusIn = (event: FocusEvent) => {
+      const target = event.target
+      if (target instanceof Node && dialog.contains(target)) return
+      focusFirstElement()
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    document.addEventListener('focusin', handleFocusIn)
+
+    return () => {
+      window.cancelAnimationFrame(initialFocusFrame)
+      window.removeEventListener('keydown', handleKeyDown, true)
+      document.removeEventListener('focusin', handleFocusIn)
+      document.body.style.overflow = previousOverflow
+
+      for (const [element, previousValue] of ownedInertElements) {
+        if (!element.isConnected || element.getAttribute('inert') !== '') continue
+        if (previousValue === null) {
+          element.removeAttribute('inert')
+        } else {
+          element.setAttribute('inert', previousValue)
+        }
+      }
+    }
+  }, [closeNavigator, isNavigatorOpen, portalMounted])
+
   // Best-effort flush when the learner navigates away. We do NOT rely on this
   // succeeding (browsers may drop async work in beforeunload); the debounced
   // autosave + 60s checkpoint are the durable path. This just narrows the
@@ -456,12 +650,6 @@ export default function ExamRuntime({
   }
 
   // Navigation
-  const goNext = () => {
-    if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1)
-  }
-  const goPrev = () => {
-    if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
-  }
   const toggleFlag = () => {
     if (!q) return
     setFlagged(prev => ({ ...prev, [q.id]: !prev[q.id] }))
@@ -477,7 +665,7 @@ export default function ExamRuntime({
     setAnswers(prev => ({ ...prev, [q.id]: letter }))
     // Auto next on answer (only for non-practice modes)
     if (!isPractice && currentIndex < questions.length - 1) {
-      setTimeout(() => goNext(), 300)
+      setTimeout(() => moveRelative(1, { bypassPracticeGate: true }), 300)
     }
   }
 
@@ -589,10 +777,10 @@ export default function ExamRuntime({
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isNavigatorOpen) {
-        setIsNavigatorOpen(false)
-        return
-      }
+      // The navigator owns Escape, Tab, and focus while it is open. Do not let
+      // arrows, number shortcuts, or flagging operate behind the dialog.
+      if (isNavigatorOpen) return
+
       if (status === 'IN_PROGRESS' && q) {
         if (e.key === 'ArrowRight') goNext()
         if (e.key === 'ArrowLeft') goPrev()
@@ -608,7 +796,7 @@ export default function ExamRuntime({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [currentIndex, status, q, isNavigatorOpen])
+  }, [currentIndex, goNext, goPrev, isNavigatorOpen, q, sessionReady, status])
 
   // Helper for rendering Question Indicators
   const renderIndicators = () => (
@@ -631,7 +819,7 @@ export default function ExamRuntime({
       return (
         <button type="button" 
           key={question.id}
-          onClick={() => setCurrentIndex(i)}
+          onClick={() => moveToQuestion(i)}
           className={`relative p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
           aria-label={`ไปข้อที่ ${i + 1}`}
         >
@@ -672,11 +860,6 @@ export default function ExamRuntime({
       }
     }
 
-    const whyWrongProp = `why_${letter.toLowerCase()}_wrong` as keyof Question
-    const whyWrongText = q[whyWrongProp] as string | null
-
-    const showExplanation = isReview && whyWrongText
-
     return (
       <div key={letter} className="mb-3">
         <button type="button" 
@@ -697,76 +880,129 @@ export default function ExamRuntime({
           {isReview && isCorrectChoice && <CheckCircle className="text-green-500 mt-1" size={20} />}
           {isReview && isSelected && !isCorrectChoice && <XCircle className="text-red-500 mt-1" size={20} />}
         </button>
-        
-        {/* Explanation specifically for this choice */}
-        {showExplanation && (
-          <div className="mt-2 ml-12 p-3 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-200/90 leading-relaxed shadow-sm animate-in fade-in slide-in-from-top-2">
-            <span className="font-bold text-red-400 block mb-1">เหตุผล:</span>
-            {whyWrongText}
-          </div>
-        )}
       </div>
     )
   }
 
-  // Practice Mode Immediate Feedback
-  const renderPracticeFeedback = () => {
-    if (!isPractice) return null
+  // Practice and review feedback share one cohesive explanation container.
+  const renderExplanationFeedback = () => {
     if (!q) return null
     const isAnswered = !!answers[q.id]
-    if (!isAnswered) return null
-    const isCorrect = answers[q.id] === q.correct_answer
+    if (status !== 'REVIEW' && (!isPractice || !isAnswered)) return null
+
+    const isCorrect = isAnswered && answers[q.id] === q.correct_answer
+    const wrongReasons = CHOICE_LETTERS
+      .filter((letter) => letter !== q.correct_answer)
+      .map((letter) => ({
+        letter,
+        text: q[WRONG_REASON_KEYS[letter]] as string | null,
+      }))
+      .filter((reason): reason is { letter: ChoiceLetter; text: string } => Boolean(reason.text?.trim()))
+    const hasReviewHint = status === 'REVIEW' && Boolean(q.hint?.trim())
+    const hasLongExplanation = Boolean(q.full_explanation && q.full_explanation.length > 150)
 
     return (
-      <div className={`mt-8 p-5 rounded-2xl border animate-in fade-in slide-in-from-top-4 duration-500 bg-[#2A1F0D] border-[#D4AF37]/30 shadow-lg`}>
+      <section className="mt-8 rounded-2xl border border-[#D4AF37]/30 bg-[#2A1F0D] p-5 shadow-lg animate-in fade-in slide-in-from-top-4 duration-500" aria-label="คำอธิบายละเอียดและเหตุผล">
         <div className="flex items-start gap-4">
           {isCorrect ? (
             <div className="bg-green-500/20 p-2 rounded-full mt-0.5">
               <CheckCircle className="text-green-500 shrink-0" size={24} />
             </div>
-          ) : (
+          ) : isAnswered ? (
             <div className="bg-red-500/20 p-2 rounded-full mt-0.5">
               <XCircle className="text-red-500 shrink-0" size={24} />
             </div>
+          ) : (
+            <div className="bg-[#D4AF37]/10 p-2 rounded-full mt-0.5">
+              <AlertCircle className="text-[#D4AF37] shrink-0" size={24} />
+            </div>
           )}
           <div className="flex-1">
-            <h4 className={`font-bold text-lg mb-1 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-              {isCorrect ? 'ตอบถูกต้อง! 🎉' : 'ตอบผิด 😅'}
+            <h4 className={`font-bold text-lg mb-1 ${isCorrect ? 'text-green-400' : isAnswered ? 'text-red-400' : 'text-[#D4AF37]'}`}>
+              {isCorrect ? 'ตอบถูกต้อง' : isAnswered ? 'ตอบไม่ถูกต้อง' : 'ยังไม่ได้ตอบ'}
             </h4>
-            <div className="text-sm font-medium text-[#A1866B] mb-3">
-              คุณตอบ: <span className="text-[#F5E9D6] mr-4">{answers[q.id]}</span>
-              คำตอบที่ถูก: <span className="text-green-400">{q.correct_answer}</span>
+            <div className="text-sm font-medium text-[#A1866B] space-y-1">
+              {isAnswered && (
+                <p>
+                  คุณตอบ: <span className="text-[#F5E9D6]">{CHOICE_LABELS[answers[q.id]]} {getChoiceText(q, answers[q.id])}</span>
+                </p>
+              )}
+              <p>
+                คำตอบที่ถูกต้อง: <span className="text-green-400">{CHOICE_LABELS[q.correct_answer]} {getChoiceText(q, q.correct_answer)}</span>
+              </p>
             </div>
-            
-            {q.full_explanation && (
-              <div className="mt-4 pt-4 border-t border-[#D4AF37]/20">
-                <span className="font-bold text-[#D4AF37] block mb-2">เหตุผลของคำตอบ:</span>
-                <div 
-                  className={`text-sm text-[#F5E9D6] leading-relaxed opacity-90 whitespace-pre-line transition-all duration-300 overflow-hidden ${
-                    !isExplanationExpanded ? 'line-clamp-3' : ''
-                  }`}
-                >
-                  {q.full_explanation}
+
+            <div className="mt-4 space-y-4 border-t border-[#D4AF37]/20 pt-4">
+              {hasReviewHint && (
+                <div>
+                  <span className="mb-1 block font-bold text-[#D4AF37]">คำใบ้</span>
+                  <p className="text-sm leading-relaxed text-[#A1866B]">{q.hint}</p>
                 </div>
-                
-                {q.full_explanation.length > 150 && (
-                  <button type="button" 
-                    onClick={() => setIsExplanationExpanded(!isExplanationExpanded)}
-                    className="mt-3 text-[#D4AF37] text-sm font-bold flex items-center gap-1 hover:text-[#F1D17A] transition-colors focus-visible:outline-none"
+              )}
+
+              {q.full_explanation && (
+                <div>
+                  <span className="mb-2 block font-bold text-[#D4AF37]">คำอธิบายละเอียดและเหตุผล</span>
+                  <div
+                    className={`whitespace-pre-line text-sm leading-relaxed text-[#F5E9D6] opacity-90 transition-all duration-300 ${hasLongExplanation && !isExplanationExpanded ? 'line-clamp-3' : ''}`}
                   >
-                    {isExplanationExpanded ? (
-                      <>▲ ซ่อนเฉลย</>
-                    ) : (
-                      <>▼ ดูเฉลยทั้งหมด</>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
+                    {q.full_explanation}
+                  </div>
+                  {hasLongExplanation && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExplanationExpanded((expanded) => !expanded)}
+                      className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[#D4AF37] transition-colors hover:text-[#F1D17A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      aria-expanded={isExplanationExpanded}
+                    >
+                      {isExplanationExpanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+                      {isExplanationExpanded ? 'ซ่อนเฉลย' : 'ดูเฉลยทั้งหมด'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {wrongReasons.length > 0 && (
+                <div>
+                  <span className="mb-2 block font-bold text-[#D4AF37]">เหตุผลตัวเลือกอื่น</span>
+                  <div className="space-y-2 text-sm leading-relaxed text-[#F5E9D6]">
+                    {wrongReasons.map(({ letter, text }) => (
+                      <p key={letter}>
+                        <span className="font-bold text-[#A1866B]">{CHOICE_LABELS[letter]}</span> {text}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {q.reference && (
+                <div className="flex items-start gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-200">
+                  <BookOpen size={16} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  <div>
+                    <span className="mb-0.5 block font-bold">อ้างอิง</span>
+                    {q.reference}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     )
+  }
+
+  const hasCurrentHint = isPractice && Boolean(q?.hint?.trim())
+  const isCurrentHintRevealed = Boolean(q && revealedHints[q.id])
+
+  const handleHintClick = () => {
+    if (!hasCurrentHint || !q) return
+    setRevealedHints((previous) => ({ ...previous, [q.id]: true }))
+    setIsHintOpen(true)
+  }
+
+  const closeHint = () => {
+    setIsHintOpen(false)
+    window.requestAnimationFrame(() => hintButtonRef.current?.focus())
   }
 
   // ── Attempt-order hydration gate (Repeat Exam Question Shuffle V1) ──────
@@ -951,7 +1187,7 @@ export default function ExamRuntime({
           )}
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <button type="button" onClick={() => setCurrentIndex(0)} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            <button type="button" onClick={() => moveToQuestion(0)} className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <BookOpen size={18} />
               ดูเฉลยอย่างละเอียด
             </button>
@@ -1043,28 +1279,34 @@ export default function ExamRuntime({
   }
 
   // MAIN RUNTIME & REVIEW VIEW
+  const isLastQuestion = currentIndex === questions.length - 1
+  const isPracticeNextDisabled = isPractice && (!q || !answers[q.id])
+  const isNextDisabled = status === 'IN_PROGRESS' ? (isPractice ? isPracticeNextDisabled : isLastQuestion) : isLastQuestion
+
   return (
-    <div className="min-h-screen pb-32 lg:pb-24 font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
+    <div className="exam-focus-runtime min-h-screen font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
       
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0F0B07] border-b border-[rgba(212,175,55,0.1)]">
+      <div data-exam-focus-header="true" className="sticky top-0 z-50 bg-[#0F0B07] border-b border-[rgba(212,175,55,0.1)]">
         {/* Progress bar */}
         <div 
           className={`absolute top-0 left-0 h-[2px] transition-all duration-300 z-50 ${status === 'REVIEW' ? 'bg-[#D4AF37]' : 'bg-[#D4AF37]'}`} 
           style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} 
         />
         
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href={status === 'REVIEW' ? '#' : `/package/${pkg.slug}`} onClick={(e) => { if (status === 'IN_PROGRESS' && !confirm('ความคืบหน้าที่บันทึกล่าสุดจะถูกเก็บไว้ คุณต้องการออกจากข้อสอบใช่หรือไม่?')) e.preventDefault(); if (status === 'REVIEW') { e.preventDefault(); setCurrentIndex(-1); } }} className="text-[#A1866B] hover:text-[#D4AF37] transition-colors p-2 -ml-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
+        <div className="max-w-4xl mx-auto flex h-14 items-center justify-between px-3 sm:px-4 lg:h-16">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+            <Link href={status === 'REVIEW' ? '#' : `/package/${pkg.slug}`} aria-label="ออกจากข้อสอบ" onClick={(e) => { if (status === 'IN_PROGRESS' && !confirm('ความคืบหน้าที่บันทึกล่าสุดจะถูกเก็บไว้ คุณต้องการออกจากข้อสอบใช่หรือไม่?')) e.preventDefault(); if (status === 'REVIEW') { e.preventDefault(); setCurrentIndex(-1); } }} className="shrink-0 rounded-lg p-2 text-[#A1866B] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[#D4AF37]">
               <ChevronLeft size={20} />
             </Link>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider font-bold text-[#A1866B] mb-0.5">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.name}</div>
+            <div className="min-w-0">
+              <div className="mb-0.5 max-w-[10rem] truncate text-[10px] font-bold uppercase tracking-wider text-[#A1866B] sm:max-w-[16rem] lg:max-w-none">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.name}</div>
               <button
                 type="button"
-                onClick={() => setIsNavigatorOpen(true)}
-                className="flex items-center gap-1.5 text-sm font-bold text-[#F5E9D6] hover:text-[#D4AF37] transition-colors lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] px-2 py-0.5 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)]"
+                onClick={openNavigator}
+                aria-expanded={isNavigatorOpen}
+                aria-controls="question-navigator-dialog"
+                className="flex items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-sm font-bold text-[#F5E9D6] transition-colors hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] lg:hidden"
                 aria-label="เปิดตัวนำทางข้อสอบ"
                 title="เปิดดูรายการข้อสอบทั้งหมด"
               >
@@ -1081,7 +1323,7 @@ export default function ExamRuntime({
                 {isPractice ? 'ไม่จำกัดเวลา' : formatTime(timeRemaining)}
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#A1866B] text-sm font-bold">
+              <div className="flex items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5 text-sm font-bold text-[#A1866B] sm:px-3">
                 <CheckCircle size={14} className={q && answers[q.id] === q.correct_answer ? "text-green-500" : "text-red-500"} />
                 <span className="hidden sm:inline">{q && answers[q.id] === q.correct_answer ? 'ตอบถูก' : 'ตอบผิด'}</span>
               </div>
@@ -1099,7 +1341,7 @@ export default function ExamRuntime({
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div id="exam-question-content" className="exam-question-content max-w-3xl mx-auto px-4 py-8">
         
         {/* Question Area */}
         <div className="mb-8">
@@ -1110,7 +1352,7 @@ export default function ExamRuntime({
               </span>
               {q.is_common !== undefined && (
                 <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold border ${q.is_common ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                  {q.is_common ? '🔥 ออกสอบบ่อย' : '📘 พื้นฐาน'}
+                  {q.is_common ? 'ออกสอบบ่อย' : 'พื้นฐาน'}
                 </span>
               )}
             </div>
@@ -1173,90 +1415,85 @@ export default function ExamRuntime({
         </div>
 
         {/* Practice Mode Placeholder */}
-        {renderPracticeFeedback()}
-
-        {/* Post-Question Explanations (Review Mode) */}
-        {status === 'REVIEW' && (
-          <div className="mt-8 space-y-4 animate-in slide-in-from-bottom-4">
-            {(q.hint || q.full_explanation) && (
-              <div className="bg-[#1A140E] rounded-xl border border-[rgba(255,255,255,0.05)] overflow-hidden">
-                <div className="px-5 py-3 border-b border-[rgba(255,255,255,0.05)] bg-[#0F0B07] flex items-center gap-2 text-sm font-bold text-[#A1866B]">
-                  <Lightbulb size={16} className="text-yellow-500" />
-                  คำอธิบายเพิ่มเติม
-                </div>
-                <div className="p-5 text-[#F5E9D6] text-sm leading-relaxed space-y-4">
-                  {q.hint && <p className="text-[#A1866B] italic">คำใบ้: {q.hint}</p>}
-                  {q.full_explanation && <div className="whitespace-pre-line">{q.full_explanation}</div>}
-                </div>
-              </div>
-            )}
-            
-            {q.reference && (
-              <div className="flex items-start gap-2 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 text-sm">
-                <BookOpen size={16} className="mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-bold block mb-0.5">อ้างอิง:</span>
-                  {q.reference}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {renderExplanationFeedback()}
 
       </div>
 
-      {/* Mobile & Tablet Navigation Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 w-full bg-[#0F0B07] border-t border-[rgba(255,255,255,0.05)] pb-safe z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          
-          <button type="button" 
-            onClick={goPrev} 
+      {hasCurrentHint && isHintOpen && isCurrentHintRevealed && q.hint && (
+        <aside id="exam-hint-panel" className="exam-hint-panel" role="region" aria-label="คำใบ้">
+          <div className="flex items-center justify-between gap-3 border-b border-[rgba(124,159,212,0.2)] pb-2">
+            <div className="flex items-center gap-2 font-bold text-[#AFC9F2]">
+              <Lightbulb size={17} aria-hidden="true" />
+              <span>คำใบ้</span>
+            </div>
+            <button
+              type="button"
+              onClick={closeHint}
+              aria-label="ปิดคำใบ้"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#A1866B] transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-[#F5E9D6] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-[#F5E9D6]">{q.hint}</p>
+        </aside>
+      )}
+
+      {/* Mobile Exam Bottom Bar — four equal, safe-area-aware columns. */}
+      <nav className="exam-mobile-bottom-bar lg:hidden" aria-label="การนำทางข้อสอบ">
+        <div className="exam-mobile-bottom-bar__grid">
+          <button
+            type="button"
+            onClick={goPrev}
             disabled={currentIndex === 0}
-            className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl transition-colors ${currentIndex === 0 ? 'text-[#A1866B] opacity-50 cursor-not-allowed' : 'text-[#F5E9D6] hover:bg-[#1A140E]'}`}
+            aria-label="ก่อนหน้า"
+            className="exam-mobile-bottom-bar__action"
           >
-            <ChevronLeft size={18} />
-            <span className="hidden sm:inline">ก่อนหน้า</span>
+            <ChevronLeft size={19} aria-hidden="true" />
+            <span>ก่อนหน้า</span>
           </button>
 
-          {/* Quick Pagination Dots */}
-          <div className="flex-1 flex justify-center px-4 overflow-x-auto custom-scrollbar no-scrollbar py-2">
-            <div className="flex items-center gap-1.5">
-              {renderIndicators()}
-            </div>
-          </div>
+          {hasCurrentHint ? (
+            <button
+              ref={hintButtonRef}
+              type="button"
+              onClick={handleHintClick}
+              aria-expanded={isHintOpen && isCurrentHintRevealed}
+              aria-controls="exam-hint-panel"
+              aria-label="คำใบ้"
+              className={`exam-mobile-bottom-bar__action ${isHintOpen && isCurrentHintRevealed ? 'exam-mobile-bottom-bar__action--active' : ''}`}
+            >
+              <Lightbulb size={18} aria-hidden="true" />
+              <span>คำใบ้</span>
+            </button>
+          ) : (
+            <span className="exam-mobile-bottom-bar__spacer" aria-hidden="true" />
+          )}
 
-          <div className="flex items-center gap-2">
-            {status === 'IN_PROGRESS' && currentIndex === questions.length - 1 ? (
-              <button type="button"
-                onClick={handleRequestSubmit}
-                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${isPractice && (!q || !answers[q.id]) ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)] shadow-none hover:shadow-none' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E]'}`}
-                disabled={isPractice && (!q || !answers[q.id])}
-              >
-                {isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ'}
-              </button>
-            ) : status === 'IN_PROGRESS' && isPractice ? (
-              <button type="button" 
-                onClick={goNext} 
-                disabled={!q || !answers[q.id]}
-                className={`flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${(!q || !answers[q.id]) ? 'bg-transparent text-[#A1866B] opacity-50 cursor-not-allowed border border-[rgba(255,255,255,0.1)]' : 'bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] shadow-[0_4px_15px_rgba(212,175,55,0.3)]'}`}
-              >
-                <span className="hidden sm:inline">ข้อถัดไป</span>
-                <ChevronRight size={18} className="sm:hidden" />
-              </button>
-            ) : (
-              <button type="button" 
-                onClick={goNext} 
-                disabled={currentIndex === questions.length - 1}
-                className={`flex items-center gap-2 font-bold px-4 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${currentIndex === questions.length - 1 ? 'text-[#A1866B] opacity-50 cursor-not-allowed' : 'bg-transparent text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)]'}`}
-              >
-                <span className="hidden sm:inline">ถัดไป</span>
-                <ChevronRight size={18} />
-              </button>
-            )}
-          </div>
-          
+          <button
+            type="button"
+            onClick={openNavigator}
+            aria-expanded={isNavigatorOpen}
+            aria-controls="question-navigator-dialog"
+            aria-label={`ข้อ ${currentIndex + 1} / ${questions.length} เปิดตัวนำทางข้อสอบ`}
+            className="exam-mobile-bottom-bar__action exam-mobile-bottom-bar__action--counter"
+          >
+            <LayoutGrid size={18} aria-hidden="true" />
+            <span>ข้อ {currentIndex + 1}/{questions.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={status === 'IN_PROGRESS' && isLastQuestion ? handleRequestSubmit : goNext}
+            disabled={isNextDisabled}
+            aria-label={status === 'IN_PROGRESS' && isLastQuestion ? (isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ') : 'ถัดไป'}
+            className="exam-mobile-bottom-bar__action"
+          >
+            <ChevronRight size={19} aria-hidden="true" />
+            <span>{status === 'IN_PROGRESS' && isLastQuestion ? (isPractice ? 'ดูผลคะแนน' : 'ส่งข้อสอบ') : 'ถัดไป'}</span>
+          </button>
         </div>
-      </div>
+      </nav>
 
       {/* Desktop Navigation Bar (Redesigned) */}
       <div className="hidden lg:flex fixed bottom-0 left-0 w-full bg-[#0F0B07] border-t border-[rgba(255,255,255,0.05)] pb-safe z-40 flex-col items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
@@ -1275,7 +1512,9 @@ export default function ExamRuntime({
 
             <button
               type="button"
-              onClick={() => setIsNavigatorOpen(true)}
+              onClick={openNavigator}
+              aria-expanded={isNavigatorOpen}
+              aria-controls="question-navigator-dialog"
               className="group flex items-center gap-2.5 px-4 py-1.5 rounded-xl border border-[rgba(255,255,255,0.1)] hover:border-[#D4AF37]/50 bg-[#1A140E]/60 text-sm font-medium text-[#A1866B] hover:text-[#F5E9D6] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
               aria-label="เปิดตัวนำทางข้อสอบ"
               title="เปิดดูรายการข้อสอบทั้งหมด"
@@ -1317,21 +1556,25 @@ export default function ExamRuntime({
       </div>
 
       {/* Question Navigator Modal Overlay (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
-      {isNavigatorOpen && (
+      {portalMounted && isNavigatorOpen && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setIsNavigatorOpen(false)}
+          ref={navigatorOverlayRef}
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm animate-in fade-in duration-200 lg:items-center lg:p-4"
+          onClick={closeNavigator}
         >
           <div
+            id="question-navigator-dialog"
+            ref={navigatorDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="question-navigator-heading"
-            className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-t-3xl lg:rounded-2xl bg-[#1A140E] border-t lg:border border-[rgba(212,175,55,0.3)] shadow-2xl animate-in slide-in-from-bottom-6 lg:zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            className="relative max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-t-3xl border-t border-[rgba(212,175,55,0.3)] bg-[#1A140E] shadow-2xl animate-in slide-in-from-bottom-6 duration-200 lg:rounded-2xl lg:border lg:zoom-in-95"
+            onClick={(event) => event.stopPropagation()}
           >
             {/* Visual Drag Handle for Mobile Bottom Sheet */}
-            <div className="pt-2.5 pb-1 lg:hidden flex justify-center pointer-events-none">
-              <div className="w-12 h-1.5 bg-[rgba(255,255,255,0.2)] rounded-full" aria-hidden="true" />
+            <div className="flex justify-center pb-1 pt-2.5 pointer-events-none lg:hidden">
+              <div className="h-1.5 w-12 rounded-full bg-[rgba(255,255,255,0.2)]" aria-hidden="true" />
             </div>
 
             <QuestionNavigator
@@ -1340,10 +1583,11 @@ export default function ExamRuntime({
               flagged={flagged}
               currentIndex={currentIndex}
               onSelectQuestion={handleSelectQuestionFromNavigator}
-              onClose={() => setIsNavigatorOpen(false)}
+              onClose={closeNavigator}
             />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
     </div>
