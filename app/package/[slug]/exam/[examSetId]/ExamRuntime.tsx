@@ -358,6 +358,17 @@ export default function ExamRuntime({
   const q = safeIndex >= 0 && safeIndex < questions.length
     ? questions[safeIndex]
     : null
+  const hasCurrentHint = isPractice
+    && status === 'IN_PROGRESS'
+    && Boolean(q && !answers[q.id] && q.hint?.trim())
+
+  // Hint is a pre-answer aid only. Close the local panel when the current
+  // question becomes answered, changes mode/status, or has no hint. The
+  // per-question reveal map intentionally remains intact for navigate-away-
+  // and-back behavior within this runtime session.
+  useEffect(() => {
+    if (!hasCurrentHint) setIsHintOpen(false)
+  }, [hasCurrentHint])
 
   // ── Phase 1A: hydrate the resume snapshot on mount ───────────────────────
   // One-shot: ask the server for this user's active session for this exam set
@@ -662,6 +673,7 @@ export default function ExamRuntime({
     // Block answering until the first hydrate completes, so a resumed answer
     // set is never clobbered by an empty initial render.
     if (!sessionReady) return
+    setIsHintOpen(false)
     setAnswers(prev => ({ ...prev, [q.id]: letter }))
     // Auto next on answer (only for non-practice modes)
     if (!isPractice && currentIndex < questions.length - 1) {
@@ -991,7 +1003,6 @@ export default function ExamRuntime({
     )
   }
 
-  const hasCurrentHint = isPractice && Boolean(q?.hint?.trim())
   const isCurrentHintRevealed = Boolean(q && revealedHints[q.id])
 
   const handleHintClick = () => {
