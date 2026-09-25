@@ -74,7 +74,7 @@ test('4: existing result overview and question review remain accessible', () => 
 
   // Question review button exists
   assert.match(examRuntime, /ดูเฉลยอย่างละเอียด/)
-  assert.match(examRuntime, /onClick=\{\(\)\s*=>\s*setCurrentIndex\(0\)\}/)
+  assert.match(examRuntime, /onClick=\{\(\)\s*=>\s*moveToQuestion\(0\)\}/)
 
   // Result metrics intact
   assert.match(examRuntime, /\{accuracy\}%/)
