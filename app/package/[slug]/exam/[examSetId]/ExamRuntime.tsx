@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Clock, Flag, CheckCircle, XCircle, Lightbulb
 import DownloadShareButton from '@/components/share/DownloadShareButton'
 import { computeOutcome } from '@/lib/assessment/outcome'
 import { normalizeMode } from '@/lib/assessment/types'
+import { resolveMockAutoAdvanceTarget } from '@/lib/assessment/mock-auto-advance'
 import type { AssessmentOutcome } from '@/lib/assessment/types'
 import { persistOutcome } from '@/app/assessment/actions'
 import {
@@ -190,6 +191,12 @@ export default function ExamRuntime({
   const navigatorTriggerRef = useRef<HTMLButtonElement | null>(null)
   const hintButtonRef = useRef<HTMLButtonElement>(null)
   const hasMountedQuestionRef = useRef(false)
+  const mockAutoAdvanceTimerRef = useRef<number | null>(null)
+  const isMountedRef = useRef(false)
+  const currentIndexRef = useRef(currentIndex)
+  const statusRef = useRef(status)
+  const modeRef = useRef(assessmentMode)
+  const questionCountRef = useRef(questions.length)
 
   // Outcome: null until the attempt terminates. The Result view reads from
   // this object rather than recomputing inline. (Constitution AI-005: once
@@ -259,12 +266,48 @@ export default function ExamRuntime({
     setIsNavigatorOpen(true)
   }, [])
 
+  const clearMockAutoAdvance = useCallback(() => {
+    if (mockAutoAdvanceTimerRef.current === null) return
+    window.clearTimeout(mockAutoAdvanceTimerRef.current)
+    mockAutoAdvanceTimerRef.current = null
+  }, [])
+
+  const scheduleMockAutoAdvance = useCallback((sourceIndex: number) => {
+    const target = resolveMockAutoAdvanceTarget({
+      mode: assessmentMode,
+      status,
+      currentIndex,
+      sourceIndex,
+      questionCount: questions.length,
+      isMounted: isMountedRef.current,
+      hasPendingTimer: mockAutoAdvanceTimerRef.current !== null,
+    })
+    if (target === null) return
+
+    mockAutoAdvanceTimerRef.current = window.setTimeout(() => {
+      mockAutoAdvanceTimerRef.current = null
+      const guardedTarget = resolveMockAutoAdvanceTarget({
+        mode: modeRef.current,
+        status: statusRef.current,
+        currentIndex: currentIndexRef.current,
+        sourceIndex,
+        questionCount: questionCountRef.current,
+        isMounted: isMountedRef.current,
+        hasPendingTimer: false,
+      })
+      if (guardedTarget === null) return
+      setCurrentIndex(guardedTarget)
+    }, 300)
+  }, [assessmentMode, currentIndex, questions.length, status])
+
   const moveToQuestion = useCallback((index: number) => {
     if (!Number.isInteger(index) || index < 0 || index >= questions.length) return
+    clearMockAutoAdvance()
     setCurrentIndex(index)
-  }, [questions.length])
+  }, [clearMockAutoAdvance, questions.length])
 
   const moveRelative = useCallback((delta: -1 | 1, options?: { bypassPracticeGate?: boolean }) => {
+    clearMockAutoAdvance()
     setCurrentIndex((previousIndex) => {
       const nextIndex = previousIndex + delta
       if (nextIndex < 0 || nextIndex >= questions.length) return previousIndex
@@ -276,7 +319,7 @@ export default function ExamRuntime({
 
       return nextIndex
     })
-  }, [answers, isPractice, questions, status])
+  }, [answers, clearMockAutoAdvance, isPractice, questions, status])
 
   const goNext = useCallback(() => moveRelative(1), [moveRelative])
   const goPrev = useCallback(() => moveRelative(-1), [moveRelative])
@@ -289,6 +332,26 @@ export default function ExamRuntime({
   useEffect(() => {
     setPortalMounted(true)
   }, [])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      clearMockAutoAdvance()
+    }
+  }, [clearMockAutoAdvance])
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex
+    statusRef.current = status
+    modeRef.current = assessmentMode
+    questionCountRef.current = questions.length
+
+    // A timer is meaningful only while an in-progress Mock is active. This
+    // also handles submit-confirmation/review transitions without waiting for
+    // the delayed callback to fire.
+    if (status !== 'IN_PROGRESS') clearMockAutoAdvance()
+  }, [assessmentMode, clearMockAutoAdvance, currentIndex, questions.length, status])
 
   // Reset transient feedback/panel state when changing questions, but keep the
   // per-question hint reveal map for this mounted runtime session.
@@ -677,7 +740,7 @@ export default function ExamRuntime({
     setAnswers(prev => ({ ...prev, [q.id]: letter }))
     // Auto next on answer (only for non-practice modes)
     if (!isPractice && currentIndex < questions.length - 1) {
-      setTimeout(() => moveRelative(1, { bypassPracticeGate: true }), 300)
+      scheduleMockAutoAdvance(currentIndex)
     }
   }
 
@@ -910,7 +973,6 @@ export default function ExamRuntime({
         text: q[WRONG_REASON_KEYS[letter]] as string | null,
       }))
       .filter((reason): reason is { letter: ChoiceLetter; text: string } => Boolean(reason.text?.trim()))
-    const hasReviewHint = status === 'REVIEW' && Boolean(q.hint?.trim())
     const hasLongExplanation = Boolean(q.full_explanation && q.full_explanation.length > 150)
 
     return (
@@ -945,13 +1007,6 @@ export default function ExamRuntime({
             </div>
 
             <div className="mt-4 space-y-4 border-t border-[#D4AF37]/20 pt-4">
-              {hasReviewHint && (
-                <div>
-                  <span className="mb-1 block font-bold text-[#D4AF37]">คำใบ้</span>
-                  <p className="text-sm leading-relaxed text-[#A1866B]">{q.hint}</p>
-                </div>
-              )}
-
               {q.full_explanation && (
                 <div>
                   <span className="mb-2 block font-bold text-[#D4AF37]">คำอธิบายละเอียดและเหตุผล</span>
@@ -1292,7 +1347,9 @@ export default function ExamRuntime({
   // MAIN RUNTIME & REVIEW VIEW
   const isLastQuestion = currentIndex === questions.length - 1
   const isPracticeNextDisabled = isPractice && (!q || !answers[q.id])
-  const isNextDisabled = status === 'IN_PROGRESS' ? (isPractice ? isPracticeNextDisabled : isLastQuestion) : isLastQuestion
+  const isNextDisabled = status === 'IN_PROGRESS'
+    ? (isPractice ? isPracticeNextDisabled : false)
+    : isLastQuestion
 
   return (
     <div className="exam-focus-runtime min-h-screen font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>

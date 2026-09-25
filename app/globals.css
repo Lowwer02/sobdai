@@ -695,6 +695,10 @@ h1, h2, h3, .heading {
 }
 
 @media (max-width: 1023px) {
+  .exam-focus-runtime [data-exam-focus-header="true"] {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
   body:has([data-exam-focus-mode="true"]) [data-site-navbar],
   body:has([data-exam-focus-mode="true"]) [data-site-footer] {
     display: none !important;
