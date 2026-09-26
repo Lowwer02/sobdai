@@ -409,9 +409,14 @@ async function readPublishedContent(table: 'news' | 'articles', ids: string[]): 
 
   try {
     const supabase = createAnonServerClient()
+    // organization_id exists on news (migration 102) but not on articles;
+    // selecting it unconditionally makes the articles read fail whole-request.
+    const columns = table === 'news'
+      ? 'id, slug, title, excerpt, status, published_at, updated_at, organization_id'
+      : 'id, slug, title, excerpt, status, published_at, updated_at'
     const { data, error } = await supabase
       .from(table)
-      .select('id, slug, title, excerpt, status, published_at, updated_at, organization_id')
+      .select(columns)
       .in('id', ids)
       .eq('status', 'published')
       .order('published_at', { ascending: false, nullsFirst: false })
