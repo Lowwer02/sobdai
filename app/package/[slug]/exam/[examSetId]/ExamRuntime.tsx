@@ -749,6 +749,14 @@ export default function ExamRuntime({
     setStatus('CONFIRM_SUBMIT')
   }
 
+  const handleRequestSubmitFromNavigator = () => {
+    // The opening trigger leaves the tree when confirmation renders, so close
+    // without restoring focus to that detached control. The navigator effect
+    // still performs its normal inert, focus-trap, and body-lock cleanup.
+    setIsNavigatorOpen(false)
+    handleRequestSubmit()
+  }
+
   const handleCancelSubmit = () => {
     setStatus('IN_PROGRESS')
   }
@@ -872,40 +880,6 @@ export default function ExamRuntime({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [currentIndex, goNext, goPrev, isNavigatorOpen, q, sessionReady, status])
-
-  // Helper for rendering Question Indicators
-  const renderIndicators = () => (
-    questions.map((question, i) => {
-      let dotClass = "w-2.5 h-2.5 rounded-full transition-all "
-      if (status === 'REVIEW') {
-        const isAnsCorrect = answers[question.id] === question.correct_answer
-        if (answers[question.id]) {
-          dotClass += isAnsCorrect ? "bg-green-500 " : "bg-red-500 "
-        } else {
-          dotClass += "bg-[rgba(255,255,255,0.1)] "
-        }
-      } else {
-        if (answers[question.id]) dotClass += "bg-[#D4AF37] "
-        else dotClass += "bg-[rgba(255,255,255,0.2)] "
-      }
-
-      const isCurrent = i === currentIndex
-
-      return (
-        <button type="button" 
-          key={question.id}
-          onClick={() => moveToQuestion(i)}
-          className={`relative p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition-colors ${isCurrent ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07]' : ''}`}
-          aria-label={`ไปข้อที่ ${i + 1}`}
-        >
-          <div className={dotClass} />
-          {status === 'IN_PROGRESS' && flagged[question.id] && (
-            <div className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-yellow-500 border border-[#0F0B07]" />
-          )}
-        </button>
-      )
-    })
-  )
 
   // Choice rendering helper
   const renderChoice = (letter: ChoiceLetter, text: string) => {
@@ -1350,6 +1324,7 @@ export default function ExamRuntime({
   const isNextDisabled = status === 'IN_PROGRESS'
     ? (isPractice ? isPracticeNextDisabled : false)
     : isLastQuestion
+  const canRequestSubmit = status === 'IN_PROGRESS'
 
   return (
     <div className="exam-focus-runtime min-h-screen font-sans" style={{ backgroundColor: '#0F0B07', color: '#F5E9D6' }}>
@@ -1363,28 +1338,16 @@ export default function ExamRuntime({
         />
         
         <div className="max-w-4xl mx-auto flex h-14 items-center justify-between px-3 sm:px-4 lg:h-16">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
             <Link href={status === 'REVIEW' ? '#' : `/package/${pkg.slug}`} aria-label="ออกจากข้อสอบ" onClick={(e) => { if (status === 'IN_PROGRESS' && !confirm('ความคืบหน้าที่บันทึกล่าสุดจะถูกเก็บไว้ คุณต้องการออกจากข้อสอบใช่หรือไม่?')) e.preventDefault(); if (status === 'REVIEW') { e.preventDefault(); setCurrentIndex(-1); } }} className="shrink-0 rounded-lg p-2 text-[#A1866B] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[#D4AF37]">
               <ChevronLeft size={20} />
             </Link>
-            <div className="min-w-0">
-              <div className="mb-0.5 max-w-[10rem] truncate text-[10px] font-bold uppercase tracking-wider text-[#A1866B] sm:max-w-[16rem] lg:max-w-none">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.name}</div>
-              <button
-                type="button"
-                onClick={openNavigator}
-                aria-expanded={isNavigatorOpen}
-                aria-controls="question-navigator-dialog"
-                className="flex items-center gap-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-sm font-bold text-[#F5E9D6] transition-colors hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] lg:hidden"
-                aria-label="เปิดตัวนำทางข้อสอบ"
-                title="เปิดดูรายการข้อสอบทั้งหมด"
-              >
-                <span>ข้อ {currentIndex + 1} / {questions.length}</span>
-                <ChevronDown size={14} className="text-[#D4AF37]" />
-              </button>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[10px] font-bold uppercase tracking-wider text-[#A1866B] sm:text-xs">{status === 'REVIEW' ? 'โหมดทบทวนเฉลย' : examSet.name}</div>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {status === 'IN_PROGRESS' ? (
               <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono text-sm font-bold transition-all ${timeRemaining < 300 ? 'border-red-500/30 text-red-400 bg-red-500/10 shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse' : 'border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.03)] text-[#D4AF37]'}`}>
                 <Clock size={14} className={timeRemaining < 300 ? "animate-pulse" : ""} />
@@ -1397,7 +1360,7 @@ export default function ExamRuntime({
               </div>
             )}
             
-            {status === 'IN_PROGRESS' && (
+            {canRequestSubmit && (
               <button type="button" 
                 onClick={handleRequestSubmit} 
                 className="hidden sm:flex bg-transparent hover:bg-[rgba(255,255,255,0.05)] text-[#D4AF37] border border-[rgba(212,175,55,0.3)] px-4 py-1.5 rounded-lg text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
@@ -1565,7 +1528,7 @@ export default function ExamRuntime({
 
       {/* Desktop Navigation Bar (Redesigned) */}
       <div className="hidden lg:flex fixed bottom-0 left-0 w-full bg-[#0F0B07] border-t border-[rgba(255,255,255,0.05)] pb-safe z-40 flex-col items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-        <div className="w-full max-w-5xl mx-auto px-8 py-5 flex flex-col gap-5">
+        <div className="w-full max-w-5xl mx-auto px-8 py-5">
           
           {/* Top Row: Prev | Counter | Next */}
           <div className="flex items-center justify-between w-full">
@@ -1613,13 +1576,6 @@ export default function ExamRuntime({
             )}
           </div>
 
-          {/* Bottom Row: Indicators (Centered) */}
-          <div className="w-full flex justify-center overflow-x-auto custom-scrollbar no-scrollbar pb-2">
-            <div className="flex items-center gap-2 px-4">
-              {renderIndicators()}
-            </div>
-          </div>
-
         </div>
       </div>
 
@@ -1652,6 +1608,8 @@ export default function ExamRuntime({
               currentIndex={currentIndex}
               onSelectQuestion={handleSelectQuestionFromNavigator}
               onClose={closeNavigator}
+              canRequestSubmit={canRequestSubmit}
+              onRequestSubmit={handleRequestSubmitFromNavigator}
             />
           </div>
         </div>,

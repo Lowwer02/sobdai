@@ -20,6 +20,10 @@ export interface QuestionNavigatorProps {
   onSelectQuestion: (index: number) => void
   /** Optional callback invoked when close button is clicked */
   onClose?: () => void
+  /** Whether the in-progress submit action is available */
+  canRequestSubmit?: boolean
+  /** Optional callback that enters the runtime's existing submit confirmation flow */
+  onRequestSubmit?: () => void
   /** Optional custom title header (defaults to "รายการข้อสอบ") */
   title?: string
   /** Optional extra CSS classes for container */
@@ -108,6 +112,8 @@ export default function QuestionNavigator({
   currentIndex,
   onSelectQuestion,
   onClose,
+  canRequestSubmit = false,
+  onRequestSubmit,
   title = 'รายการข้อสอบ',
   className = '',
 }: QuestionNavigatorProps) {
@@ -120,7 +126,7 @@ export default function QuestionNavigator({
 
   return (
     <div
-      className={`p-4 sm:p-5 text-[#F5E9D6] font-sans ${className}`}
+      className={`flex max-h-[calc(85vh-1.25rem)] flex-col p-4 text-[#F5E9D6] font-sans sm:p-5 lg:max-h-[85vh] ${className}`}
     >
       {/* Header with Two-Row Layout */}
       <div className="mb-4 pb-3 border-b border-[rgba(255,255,255,0.06)] space-y-3">
@@ -166,7 +172,7 @@ export default function QuestionNavigator({
 
       {/* Responsive Grid of Question Items */}
       <div
-        className="max-h-[380px] overflow-y-auto custom-scrollbar no-scrollbar pr-1"
+        className="min-h-0 flex-1 overflow-y-auto custom-scrollbar no-scrollbar pr-1 sm:max-h-[380px]"
         role="navigation"
         aria-label="ตัวนำทางข้อสอบ"
       >
@@ -234,6 +240,18 @@ export default function QuestionNavigator({
           })}
         </div>
       </div>
+
+      {canRequestSubmit && onRequestSubmit && (
+        <div className="mt-4 shrink-0 border-t border-[rgba(255,255,255,0.06)] pt-4 sm:hidden">
+          <button
+            type="button"
+            onClick={onRequestSubmit}
+            className="flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D4AF37] px-4 py-3 text-sm font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            ส่งข้อสอบ
+          </button>
+        </div>
+      )}
     </div>
   )
 }
