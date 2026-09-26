@@ -5,24 +5,25 @@ interface AgencyStatsStripProps {
   positionsCount: number
   packagesCount: number
   newsCount: number
+  articleCount: number
 }
 
 interface StatItem {
-  value: number | null
+  value: number
   label: string
   href: string
-  actionLabel?: string
 }
 
 export default function AgencyStatsStrip({
   positionsCount,
   packagesCount,
   newsCount,
+  articleCount,
 }: AgencyStatsStripProps) {
   const stats: StatItem[] = [
     {
       value: positionsCount,
-      label: 'ตำแหน่งที่เปิดรับ',
+      label: 'ตำแหน่งที่เกี่ยวข้อง',
       href: '#positions',
     },
     {
@@ -36,10 +37,9 @@ export default function AgencyStatsStrip({
       href: '#news',
     },
     {
-      value: null,
-      label: 'บทความแนะนำ',
+      value: articleCount,
+      label: 'บทความที่เกี่ยวข้อง',
       href: '#articles',
-      actionLabel: 'ดูเนื้อหา',
     },
   ]
 
@@ -49,11 +49,7 @@ export default function AgencyStatsStrip({
       <div className={styles.statsGrid}>
         {stats.map((stat) => (
           <a key={stat.label} href={stat.href} className={styles.statCard}>
-            {stat.value !== null ? (
-              <span className={styles.statValue}>{stat.value}</span>
-            ) : (
-              <span className={styles.statAction}>{stat.actionLabel}</span>
-            )}
+            <span className={styles.statValue}>{stat.value}</span>
             <span className={styles.statLabel}>{stat.label}</span>
             <ArrowUpRight className={styles.statArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
           </a>

@@ -14,8 +14,10 @@ const agencyNews = readFileSync(fileURLToPath(new URL('../../components/agencies
 const agencyPackages = readFileSync(fileURLToPath(new URL('../../components/agencies/AgencyPackagesSection.tsx', import.meta.url)), 'utf8')
 const agencyArticles = readFileSync(fileURLToPath(new URL('../../components/agencies/AgencyArticlesSection.tsx', import.meta.url)), 'utf8')
 const agencySources = readFileSync(fileURLToPath(new URL('../../components/agencies/AgencySourcesSection.tsx', import.meta.url)), 'utf8')
+const agenciesLoader = readFileSync(fileURLToPath(new URL('../../lib/agencies-public.ts', import.meta.url)), 'utf8')
 const agencyUiSource = [
   detailRoute,
+  hubRoute,
   agencyHero,
   agencyStats,
   agencyPositions,
@@ -84,8 +86,55 @@ test('agency UI never renders an unsafe source link', () => {
 })
 
 test('agency sections degrade silently when a dataset is empty', () => {
-  assert.match(agencyPositions, /if \(positions\.length === 0 && canonicalPositions\.length === 0\) return null/)
+  assert.match(agencyPositions, /if \(cards\.length === 0\) return null/)
   for (const source of [agencyNews, agencyPackages, agencyArticles, agencySources]) {
     assert.match(source, /if \([a-zA-Z]+\.length === 0\) return null/)
   }
+})
+
+// ─── Agency V2: presentation fixes from the first real Production profile ──
+
+test('V2: no OPEN POSITIONS eyebrow and no open-recruitment wording anywhere', () => {
+  assert.doesNotMatch(agencyUiSource, /OPEN POSITIONS/)
+  assert.doesNotMatch(agencyUiSource, /ตำแหน่งที่เปิดรับ/)
+  assert.doesNotMatch(agencyUiSource, /Open Positions/i)
+})
+
+test('V2: related-positions terminology is used consistently on hub and detail', () => {
+  assert.match(agencyPositions, /ตำแหน่งที่เกี่ยวข้อง/)
+  assert.match(agencyStats, /label: 'ตำแหน่งที่เกี่ยวข้อง'/)
+  assert.match(hubRoute, /ตำแหน่งที่เกี่ยวข้อง/)
+  assert.match(hubRoute, /\{page\.operationalPositions\.length\} ตำแหน่งที่เกี่ยวข้อง/)
+  // The section subtitle must not imply a complete staffing listing.
+  assert.match(agencyPositions, /ตำแหน่งที่ Sobdai มีข้อมูลหรือชุดเตรียมสอบที่เกี่ยวข้องกับหน่วยงานนี้/)
+})
+
+test('V2: the position section renders the shared meaningful dataset with per-card CTAs', () => {
+  assert.match(agencyPositions, /resolveAgencyPositionCards\(positions\)/)
+  assert.match(agencyPositions, /cards\.map\(\(card\) =>/)
+  assert.doesNotMatch(agencyPositions, /canonicalPositions/, 'the section must not render only mapped entities')
+  // Informational-only cards still render (no fake CTA), linked cards use the
+  // resolved href — never a fabricated /positions URL for an unmapped row.
+  assert.match(agencyPositions, /if \(!card\.cta\)/)
+  assert.match(agencyPositions, /href=\{card\.cta\.href\}/)
+  assert.doesNotMatch(agencyPositions, /href=\{`\/positions\/\$\{encodeURIComponent\(position\.slug\)\}`/)
+})
+
+test('V2: the position stat and the card list come from one dataset', () => {
+  assert.match(detailRoute, /positionsCount=\{page\.operationalPositions\.length\}/)
+  assert.match(detailRoute, /positions=\{page\.operationalPositions\}/)
+  assert.match(agencyStats, /value: positionsCount/)
+})
+
+test('V2: the article stat is numeric from the derived count', () => {
+  assert.match(agencyStats, /articleCount: number/)
+  assert.match(agencyStats, /label: 'บทความที่เกี่ยวข้อง'/)
+  assert.match(detailRoute, /articleCount=\{page\.articleCount\}/)
+  assert.doesNotMatch(agencyStats, /statAction/)
+  assert.doesNotMatch(agencyStats, /ดูเนื้อหา/)
+})
+
+test('V2: the loader keeps placeholder/GEN positions out of the shared dataset', () => {
+  assert.match(agenciesLoader, /isOperationalPositionPlaceholder/)
+  assert.match(agenciesLoader, /const meaningfulPositions = orgPositions\.filter\(/)
 })

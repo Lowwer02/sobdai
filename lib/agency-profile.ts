@@ -341,6 +341,60 @@ export function agencyOrganizationLabel(organization: {
   return normalizeAgencyText(organization.short_name) || normalizeAgencyText(organization.name)
 }
 
+export const AGENCY_POSITION_CTA_VIEW_POSITION = 'ดูข้อมูลตำแหน่ง'
+export const AGENCY_POSITION_CTA_VIEW_PACKAGE = 'ดูแพ็กเกจเตรียมสอบ'
+
+export interface AgencyPositionCardInput {
+  id: string
+  name: string
+  /** Optional canonical Position Entity link for this operational position. */
+  canonical?: { id: string; slug: string; name: string } | null
+  /** Optional first related published package (newest first) for the position. */
+  package?: { slug: string; name: string } | null
+}
+
+export interface AgencyPositionCard extends AgencyPositionCardInput {
+  /**
+   * Null on an informational-only card (no canonical entity and no related
+   * package) — the position must still render, without a fake CTA.
+   */
+  cta: { label: string; href: string } | null
+}
+
+/**
+ * Derive the renderable position-card list from the SAME meaningful
+ * operational-position dataset that feeds the position count, so cards and
+ * stats can never drift. The optional Position Entity enhances the CTA; the
+ * related package is the fallback CTA; otherwise the card stays informational.
+ */
+export function resolveAgencyPositionCards(
+  positions: readonly AgencyPositionCardInput[],
+): AgencyPositionCard[] {
+  return positions.map((position) => {
+    if (position.canonical && isStableAgencySlug(position.canonical.slug)) {
+      return {
+        ...position,
+        cta: {
+          label: AGENCY_POSITION_CTA_VIEW_POSITION,
+          href: `/positions/${encodeURIComponent(position.canonical.slug)}`,
+        },
+      }
+    }
+
+    if (position.package && position.package.slug) {
+      return {
+        ...position,
+        cta: {
+          label: AGENCY_POSITION_CTA_VIEW_PACKAGE,
+          href: `/package/${encodeURIComponent(position.package.slug)}`,
+        },
+      }
+    }
+
+    return { ...position, cta: null }
+  })
+}
+
 export function buildAgencySeoTitle(
   profile: AgencySeoRecord,
   siteName = 'Sobdai',

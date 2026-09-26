@@ -64,6 +64,10 @@ export interface PublicAgencyOperationalPosition {
   id: string
   name: string
   organization_id: string
+  /** Optional canonical Position Entity bound to this operational row. */
+  canonical: PublicAgencyCanonicalPosition | null
+  /** First related published package (newest first); fallback CTA target. */
+  package: { slug: string; name: string } | null
 }
 
 export interface PublicAgencyCanonicalPosition {
@@ -105,6 +109,8 @@ export interface PublicAgencyPageData {
   packages: PublicAgencyPackage[]
   news: PublicAgencyContentItem[]
   articles: PublicAgencyContentItem[]
+  /** Uncapped derived article count (display stat); `articles` stays capped. */
+  articleCount: number
   supportingItemCount: number
   indexReady: boolean
 }
@@ -549,10 +555,22 @@ export const getPublishedAgencyPages = cache(
       const orgPackages = (packagesByOrg.get(organization.id) ?? [])
         .map(mapPackage)
         .slice(0, MAX_PACKAGES)
+
+      // Newest-first published package per operational position — the fallback
+      // CTA for positions without a canonical Position Entity. orgPackages is
+      // already ordered created_at desc by readOrgPackages.
+      const packageByPositionId = new Map<string, { slug: string; name: string }>()
+      for (const pkg of orgPackages) {
+        if (!pkg.position_id || packageByPositionId.has(pkg.position_id)) continue
+        packageByPositionId.set(pkg.position_id, { slug: pkg.slug, name: pkg.name })
+      }
+
       const orgNews = sortAgencyContent(newsByOrg.get(organization.id) ?? [])
         .map(mapContent)
         .slice(0, MAX_RELATED_NEWS)
-      const orgArticles = sortAgencyContent(articlesByOrg.get(organization.id) ?? [])
+      const orgArticleRows = sortAgencyContent(articlesByOrg.get(organization.id) ?? [])
+      const orgArticleCount = orgArticleRows.length
+      const orgArticles = orgArticleRows
         .map(mapContent)
         .slice(0, MAX_RELATED_ARTICLES)
 
@@ -581,17 +599,25 @@ export const getPublishedAgencyPages = cache(
       return {
         profile,
         organization,
-        operationalPositions: meaningfulPositions.map((position) => ({
-          id: position.id,
-          name: position.name,
-          organization_id: position.organization_id,
-        })),
+        // Single meaningful-position dataset: this array is BOTH the position
+        // stat source and the card source — they cannot drift.
+        operationalPositions: meaningfulPositions.map((position) => {
+          const canonical = mapCanonicalPosition(position.position_entities)
+          return {
+            id: position.id,
+            name: position.name,
+            organization_id: position.organization_id,
+            canonical,
+            package: packageByPositionId.get(position.id) ?? null,
+          }
+        }),
         canonicalPositions: [...canonicalById.values()],
         packages: orgPackages,
         news: orgNews,
         articles: orgArticles,
+        articleCount: orgArticleCount,
         supportingItemCount:
-          meaningfulPositions.length + orgPackages.length + orgNews.length + orgArticles.length,
+          meaningfulPositions.length + orgPackages.length + orgNews.length + orgArticleCount,
         indexReady,
       }
     })
