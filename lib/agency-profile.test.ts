@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { agencyIndexability, buildAgencySeoContract, buildAgencySeoDescription, buildAgencySeoTitle, dedupeById, hasUniqueAgencyIntent, hasUniqueAgencyOverview, isAgencyNewsItem, isAgencyPlaceholderName, isAgencyProfileIndexReady, isAgencyProfileStatus, isMeaningfulAgencyOverview, isStableAgencySlug, normalizeAgencySources, parseAgencySourcesJson, selectAgencyPageBySlug, selectIndexableAgencyPages, selectPublishedPackages, serializeAgencySources, sortAgencyContent, } from './agency-profile.ts'
+import { agencyIndexability, buildAgencySeoContract, buildAgencySeoDescription, buildAgencySeoTitle, dedupeById, hasUniqueAgencyIntent, hasUniqueAgencyOverview, isAgencyNewsItem, isAgencyPlaceholderName, isAgencyProfileIndexReady, isAgencyProfileStatus, isMeaningfulAgencyOverview, isStableAgencySlug, normalizeAgencySources, parseAgencySourcesJson, resolveAgencyPositionCards, selectAgencyPageBySlug, selectIndexableAgencyPages, selectPublishedPackages, serializeAgencySources, sortAgencyContent, } from './agency-profile.ts'
 
 const overview =
   'สำนักงานการตรวจเงินแผ่นดินเป็นหน่วยงานตรวจสอบภาครัฐที่จัดตั้งตามพระราชบัญญัติประกอบรัฐธรรมนูญว่าด้วยการตรวจเงินแผ่นดิน ดูแลการตรวจสอบการรับ จ่าย เก็บ ใช้เงินและทรัพยากรของรัฐ พร้อมเปิดรับสมัครบุคลากรเป็นระยะ'
@@ -209,4 +209,75 @@ test('SEO contract falls back through explicit fields to the overview', () => {
   const noindexContract = buildAgencySeoContract(baseProfile, false)
   assert.equal(noindexContract.noindex, true)
   assert.equal(noindexContract.follow, true)
+})
+
+// ─── Agency V2: position card resolution (display = meaningful dataset) ────
+
+/** OAG-shaped live data: mapped PPA + unmapped PFA with a related package. */
+const oagMeaningfulPositions = [
+  {
+    id: '01e8bd4d-405b-4a1e-8b11-a4a3e2acdeb6',
+    name: 'นักวิเคราะห์นโยบายและแผน',
+    canonical: { id: 'pe-1', slug: 'policy-and-plan-analyst', name: 'นักวิเคราะห์นโยบายและแผน' },
+    package: { slug: 'oagppa2026', name: '[สตง.] นักวิเคราะห์นโยบายและแผน' },
+  },
+  {
+    id: 'fbd8edd1-0d1f-4c8f-9d1f-000000000001',
+    name: 'นักวิชาการตรวจเงินแผ่นดิน (ดำเนินงาน)',
+    canonical: null,
+    package: { slug: 'oagpfa2026', name: '[สตง.] นักวิชาการตรวจเงินแผ่นดิน (ดำเนินงาน)' },
+  },
+]
+
+test('V2: every meaningful operational position renders a card — count and cards share one dataset', () => {
+  const cards = resolveAgencyPositionCards(oagMeaningfulPositions)
+  assert.equal(cards.length, 2, 'the unmapped PFA position must not disappear')
+  assert.equal(cards.length, oagMeaningfulPositions.length, 'card count must equal the position-count dataset')
+  assert.deepEqual(
+    cards.map((card) => card.id),
+    oagMeaningfulPositions.map((position) => position.id),
+  )
+})
+
+test('V2: mapped position → canonical Position CTA', () => {
+  const [mapped] = resolveAgencyPositionCards(oagMeaningfulPositions)
+  assert.deepEqual(mapped.cta, {
+    label: 'ดูข้อมูลตำแหน่ง',
+    href: '/positions/policy-and-plan-analyst',
+  })
+})
+
+test('V2: unmapped position with a related package → package CTA (no fake /positions URL)', () => {
+  const [, unmapped] = resolveAgencyPositionCards(oagMeaningfulPositions)
+  assert.equal(unmapped.canonical, null)
+  assert.deepEqual(unmapped.cta, {
+    label: 'ดูแพ็กเกจเตรียมสอบ',
+    href: '/package/oagpfa2026',
+  })
+  assert.ok(!unmapped.cta!.href.startsWith('/positions/'))
+})
+
+test('V2: unmapped position without a package → informational card (cta null), still rendered', () => {
+  const cards = resolveAgencyPositionCards([
+    { id: 'p1', name: 'นักวิชาการ', canonical: null, package: null },
+  ])
+  assert.equal(cards.length, 1)
+  assert.equal(cards[0].cta, null)
+  assert.equal(cards[0].name, 'นักวิชาการ')
+})
+
+test('V2: a canonical entity with an unstable slug falls back to the package CTA', () => {
+  const cards = resolveAgencyPositionCards([
+    {
+      id: 'p2',
+      name: 'นักวิเคราะห์นโยบายและแผน',
+        canonical: { id: 'pe-bad', slug: 'Not_A_Slug', name: 'x' },
+      package: { slug: 'fallback-pkg', name: 'แพ็กเกจ' },
+    },
+  ])
+  assert.deepEqual(cards[0].cta, { label: 'ดูแพ็กเกจเตรียมสอบ', href: '/package/fallback-pkg' })
+})
+
+test('V2: empty dataset yields no cards', () => {
+  assert.deepEqual(resolveAgencyPositionCards([]), [])
 })

@@ -164,12 +164,10 @@ export default async function AgencyDetailPage({ params }: PageProps) {
           positionsCount={page.operationalPositions.length}
           packagesCount={page.packages.length}
           newsCount={page.news.length}
+          articleCount={page.articleCount}
         />
 
-        <AgencyPositionsSection
-          positions={page.operationalPositions}
-          canonicalPositions={page.canonicalPositions}
-        />
+        <AgencyPositionsSection positions={page.operationalPositions} />
 
         <div className={styles.legacyContent}>
           <AgencyEditorialSection content={page.profile.overview_markdown} />

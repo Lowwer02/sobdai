@@ -27,8 +27,8 @@ const AGENCY_EXPLANATIONS = [
     icon: Landmark,
   },
   {
-    title: 'ตำแหน่งที่เปิดรับ',
-    description: 'ดูตำแหน่งงานภายใต้หน่วยงาน พร้อมหน้าข้อมูลตำแหน่งฉบับสมบูรณ์เมื่อพร้อมเผยแพร่',
+    title: 'ตำแหน่งที่เกี่ยวข้อง',
+    description: 'ดูตำแหน่งที่ Sobdai มีข้อมูลหรือชุดเตรียมสอบที่เกี่ยวข้องกับแต่ละหน่วยงาน',
     icon: Briefcase,
   },
   {
@@ -230,7 +230,7 @@ export default async function AgenciesHubPage() {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-[#F7F3EC]">
                         <span className="inline-flex items-center gap-1.5">
                           <Briefcase size={15} className="text-[#D4A63A]" aria-hidden="true" />
-                          {page.operationalPositions.length} ตำแหน่ง
+                          {page.operationalPositions.length} ตำแหน่งที่เกี่ยวข้อง
                         </span>
                         <span className="h-1 w-1 rounded-full bg-[#D4A63A]/70" aria-hidden="true" />
                         <span className="inline-flex items-center gap-1.5">
@@ -271,7 +271,7 @@ export default async function AgenciesHubPage() {
                 Sobdai Agency คืออะไร?
               </h2>
               <p className="mt-4 max-w-xl text-sm leading-7 text-[#C8BBA4] sm:text-base">
-                แต่ละหน้าหน่วยงานของ Sobdai รวบรวมข้อมูลที่ช่วยให้เข้าใจหน่วยงาน ดูตำแหน่งที่เปิดรับ ติดตามข่าวรับสมัคร และเตรียมสอบจากแพ็กเกจกับบทความที่เชื่อมโยงกัน โดยแสดงเฉพาะข้อมูลที่ผ่านเกณฑ์เผยแพร่และมีแหล่งอ้างอิง
+                แต่ละหน้าหน่วยงานของ Sobdai รวบรวมข้อมูลที่ช่วยให้เข้าใจหน่วยงาน ดูตำแหน่งที่เกี่ยวข้อง ติดตามข่าวรับสมัคร และเตรียมสอบจากแพ็กเกจกับบทความที่เชื่อมโยงกัน โดยแสดงเฉพาะข้อมูลที่ผ่านเกณฑ์เผยแพร่และมีแหล่งอ้างอิง
               </p>
             </div>
 

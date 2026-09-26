@@ -1,21 +1,58 @@
 import Link from 'next/link'
-import { ArrowUpRight, Briefcase } from 'lucide-react'
-import type {
-  PublicAgencyCanonicalPosition,
-  PublicAgencyOperationalPosition,
-} from '@/lib/agencies-public'
+import { ArrowUpRight, BookOpen, Briefcase } from 'lucide-react'
+import {
+  resolveAgencyPositionCards,
+  type AgencyPositionCard,
+} from '@/lib/agency-profile'
+import type { PublicAgencyOperationalPosition } from '@/lib/agencies-public'
 import styles from '@/app/positions/[slug]/positions.module.css'
 
 interface AgencyPositionsSectionProps {
   positions: readonly PublicAgencyOperationalPosition[]
-  canonicalPositions: readonly PublicAgencyCanonicalPosition[]
 }
 
-export default function AgencyPositionsSection({
-  positions,
-  canonicalPositions,
-}: AgencyPositionsSectionProps) {
-  if (positions.length === 0 && canonicalPositions.length === 0) return null
+function PositionCard({ card }: { card: AgencyPositionCard }) {
+  // Informational-only card (no canonical Position Entity and no related
+  // package): still rendered, never a fake CTA.
+  if (!card.cta) {
+    return (
+      <div className={styles.newsCard}>
+        <span className={styles.newsIconWrap} aria-hidden="true">
+          <Briefcase className={styles.newsIcon} size={20} strokeWidth={1.5} />
+        </span>
+        <span className={styles.newsCardBody}>
+          <span className={styles.newsTitle}>{card.name}</span>
+          <span className={styles.newsExcerpt}>ข้อมูลเพิ่มเติมกำลังจัดเตรียม</span>
+        </span>
+      </div>
+    )
+  }
+
+  const isPackageCta = card.cta.href.startsWith('/package/')
+
+  return (
+    <Link href={card.cta.href} className={styles.newsCard}>
+      <span className={styles.newsIconWrap} aria-hidden="true">
+        {isPackageCta ? (
+          <BookOpen className={styles.newsIcon} size={20} strokeWidth={1.5} />
+        ) : (
+          <Briefcase className={styles.newsIcon} size={20} strokeWidth={1.5} />
+        )}
+      </span>
+      <span className={styles.newsCardBody}>
+        <span className={styles.newsTitle}>{card.name}</span>
+        <span className={styles.contentCta}>
+          {card.cta.label}
+          <ArrowUpRight size={15} aria-hidden="true" />
+        </span>
+      </span>
+    </Link>
+  )
+}
+
+export default function AgencyPositionsSection({ positions }: AgencyPositionsSectionProps) {
+  const cards = resolveAgencyPositionCards(positions)
+  if (cards.length === 0) return null
 
   return (
     <section
@@ -24,45 +61,21 @@ export default function AgencyPositionsSection({
       className={`${styles.relatedSection} ${styles.anchorSection}`}
     >
       <header className={styles.relatedSectionHeader}>
-        <p className={styles.sectionEyebrow}>OPEN POSITIONS</p>
         <h2 id="agency-positions-heading" className={styles.relatedSectionHeading}>
-          ตำแหน่งงานภายใต้หน่วยงานนี้
+          ตำแหน่งที่เกี่ยวข้อง
         </h2>
         <p className={styles.relatedSectionDescription}>
-          ตำแหน่งอยู่ภายใต้หน่วยงานนี้ พร้อมหน้าข้อมูลตำแหน่งฉบับสมบูรณ์เมื่อพร้อมเผยแพร่
+          ตำแหน่งที่ Sobdai มีข้อมูลหรือชุดเตรียมสอบที่เกี่ยวข้องกับหน่วยงานนี้
         </p>
       </header>
 
-      {canonicalPositions.length > 0 && (
-        <ul className={styles.newsGrid}>
-          {canonicalPositions.map((position) => (
-            <li key={position.id} className={styles.newsCardItem}>
-              <Link href={`/positions/${encodeURIComponent(position.slug)}`} className={styles.newsCard}>
-                <span className={styles.newsIconWrap} aria-hidden="true">
-                  <Briefcase className={styles.newsIcon} size={20} strokeWidth={1.5} />
-                </span>
-                <span className={styles.newsCardBody}>
-                  <span className={styles.newsTitle}>{position.name}</span>
-                  <span className={styles.contentCta}>
-                    ดูข้อมูลตำแหน่ง
-                    <ArrowUpRight size={15} aria-hidden="true" />
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {canonicalPositions.length === 0 && positions.length > 0 && (
-        <ul className={styles.sourcesList}>
-          {positions.map((position) => (
-            <li key={position.id} className={styles.sourceItem}>
-              <span className={styles.sourceLabel}>{position.name}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className={styles.newsGrid}>
+        {cards.map((card) => (
+          <li key={card.id} className={styles.newsCardItem}>
+            <PositionCard card={card} />
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }
