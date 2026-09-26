@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, BookOpen, Briefcase, Building2, FileText, Landmark, ShieldCheck } from 'lucide-react'
 import StructuredData from '@/components/StructuredData'
 import { buildAgencySeoDescription } from '@/lib/agency-profile'
@@ -198,9 +199,22 @@ export default async function AgenciesHubPage() {
                 >
                   <article>
                     <div className="flex items-start gap-4 sm:gap-5">
-                      <div className="rounded-2xl border border-[#D4A63A]/25 bg-[#0F0A06] p-3 text-[#D4A63A]">
-                        <Building2 size={21} aria-hidden="true" />
-                      </div>
+                      {page.organization.logo_url ? (
+                        <div className="flex h-[47px] w-[47px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#D4A63A]/25 bg-white p-1">
+                          <Image
+                            src={page.organization.logo_url}
+                            alt={page.organization.name}
+                            width={39}
+                            height={39}
+                            className="h-full w-full object-contain"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-[#D4A63A]/25 bg-[#0F0A06] p-3 text-[#D4A63A]">
+                          <Building2 size={21} aria-hidden="true" />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#D4A63A]">
                           Agency

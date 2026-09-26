@@ -9,6 +9,8 @@ import styles from '@/app/positions/[slug]/positions.module.css'
 
 interface AgencyPositionsSectionProps {
   positions: readonly PublicAgencyOperationalPosition[]
+  /** Optional extra classes (e.g. agency detail's first-section spacing). */
+  className?: string
 }
 
 function PositionCard({ card }: { card: AgencyPositionCard }) {
@@ -50,7 +52,10 @@ function PositionCard({ card }: { card: AgencyPositionCard }) {
   )
 }
 
-export default function AgencyPositionsSection({ positions }: AgencyPositionsSectionProps) {
+export default function AgencyPositionsSection({
+  positions,
+  className,
+}: AgencyPositionsSectionProps) {
   const cards = resolveAgencyPositionCards(positions)
   if (cards.length === 0) return null
 
@@ -58,7 +63,13 @@ export default function AgencyPositionsSection({ positions }: AgencyPositionsSec
     <section
       id="positions"
       aria-labelledby="agency-positions-heading"
-      className={`${styles.relatedSection} ${styles.anchorSection}`}
+      className={[
+        styles.relatedSection,
+        styles.anchorSection,
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <header className={styles.relatedSectionHeader}>
         <h2 id="agency-positions-heading" className={styles.relatedSectionHeading}>

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import type { PublicAgencyAuthor } from '@/lib/agencies-public'
 import styles from '@/app/positions/[slug]/positions.module.css'
 
@@ -7,6 +8,8 @@ interface AgencyHeroProps {
   shortName: string | null
   updatedLabel: string
   author: PublicAgencyAuthor | null
+  /** Optional organization logo; renders nothing when absent. */
+  logoUrl?: string | null
 }
 
 function CalendarIcon() {
@@ -27,10 +30,22 @@ function UserIcon() {
   )
 }
 
-export default function AgencyHero({ name, shortName, updatedLabel, author }: AgencyHeroProps) {
+export default function AgencyHero({ name, shortName, updatedLabel, author, logoUrl }: AgencyHeroProps) {
   return (
     <header className={styles.hero}>
       <div className={styles.heroContent}>
+        {logoUrl && (
+          <div className={styles.heroLogo}>
+            <Image
+              src={logoUrl}
+              alt=""
+              width={56}
+              height={56}
+              className={styles.heroLogoImage}
+              unoptimized
+            />
+          </div>
+        )}
         <p className={styles.eyebrow}>AGENCY DETAIL</p>
         <h1 className={styles.heroTitle}>{name}</h1>
         {shortName && (

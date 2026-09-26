@@ -138,3 +138,17 @@ test('V2: the loader keeps placeholder/GEN positions out of the shared dataset',
   assert.match(agenciesLoader, /isOperationalPositionPlaceholder/)
   assert.match(agenciesLoader, /const meaningfulPositions = orgPositions\.filter\(/)
 })
+
+test('V2 polish: organization logo renders with graceful fallback and the first section gets spacing', () => {
+  // Hub card: logo when the organization has one, original icon tile otherwise.
+  assert.match(hubRoute, /page\.organization\.logo_url \? \(/)
+  assert.match(hubRoute, /<Building2 size=\{21\} aria-hidden="true" \/>/)
+  assert.match(hubRoute, /unoptimized/)
+  // Hero: optional logo tile, rendered only when a logo exists.
+  assert.match(agencyHero, /logoUrl\?: string \| null/)
+  assert.match(agencyHero, /\{logoUrl && \(/)
+  assert.match(detailRoute, /logoUrl=\{page\.organization\.logo_url\}/)
+  // Positions section: agency detail passes the first-section spacing class.
+  assert.match(agencyPositions, /className\?: string/)
+  assert.match(detailRoute, /className=\{styles\.agencyFirstSection\}/)
+})

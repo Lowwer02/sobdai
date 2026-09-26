@@ -646,6 +646,32 @@
   margin-top: clamp(5rem, 8vw, 7rem);
 }
 
+/* Agency detail: the positions section follows the stats strip, not another
+   related section, so the sibling rhythm selector never applies to it. */
+.agencyFirstSection {
+  margin-top: clamp(4rem, 6vw, 5.5rem);
+}
+
+/* Hero agency logo tile (rendered only when the organization has a logo). */
+.heroLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(212, 166, 58, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.heroLogoImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .relatedSectionHeader {
   max-width: 52rem;
 }
@@ -1284,6 +1310,10 @@
 
   .relatedSection + .relatedSection {
     margin-top: 4.25rem;
+  }
+
+  .agencyFirstSection {
+    margin-top: 3.5rem;
   }
 
   .relatedSectionHeading {

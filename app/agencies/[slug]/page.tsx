@@ -158,6 +158,7 @@ export default async function AgencyDetailPage({ params }: PageProps) {
           shortName={page.organization.short_name}
           updatedLabel={updatedLabel}
           author={page.profile.author}
+          logoUrl={page.organization.logo_url}
         />
 
         <AgencyStatsStrip
@@ -167,7 +168,10 @@ export default async function AgencyDetailPage({ params }: PageProps) {
           articleCount={page.articleCount}
         />
 
-        <AgencyPositionsSection positions={page.operationalPositions} />
+        <AgencyPositionsSection
+          positions={page.operationalPositions}
+          className={styles.agencyFirstSection}
+        />
 
         <div className={styles.legacyContent}>
           <AgencyEditorialSection content={page.profile.overview_markdown} />
