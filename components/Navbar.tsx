@@ -183,8 +183,8 @@ export default function Navbar({ supportConfig }: NavbarProps) {
         data-site-navbar="true"
         className={`sticky top-0 left-0 right-0 z-50 transition-colors duration-200 border-b ${
         scrolled
-          ? 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] shadow-lg'
-          : 'bg-[#0F0B07] border-transparent'
+          ? 'bg-background border-border-subtle shadow-lg'
+          : 'bg-background border-transparent'
       }`}
       >
       {/* Desktop view */}

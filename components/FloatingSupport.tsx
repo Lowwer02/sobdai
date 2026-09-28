@@ -74,7 +74,7 @@ export default function FloatingSupport({ supportConfig }: FloatingSupportProps)
           aria-haspopup="dialog"
           aria-expanded={isModalOpen}
           onClick={() => setIsModalOpen(true)}
-          className="group flex items-center gap-2 rounded-full font-bold text-[13px] text-[#1A140E] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0B07] active:scale-95"
+          className="group flex items-center gap-2 rounded-full font-bold text-[13px] text-brand-foreground transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95"
           style={{
             // Collapsed pill: icon only on mobile, expands on hover (desktop)
             background: 'linear-gradient(135deg, #D4AF37 0%, #F1D17A 100%)',
@@ -94,7 +94,8 @@ export default function FloatingSupport({ supportConfig }: FloatingSupportProps)
             ;(e.currentTarget as HTMLButtonElement).style.transform = ''
           }}
         >
-          <Heart size={17} className="fill-[#1A140E]/70 text-[#1A140E] flex-shrink-0" />
+                    {/* Gold gradient pill is intentional brand art — identical in both themes. */}
+          <Heart size={17} className="fill-brand-foreground/70 text-brand-foreground flex-shrink-0" />
           {/* Label — visible on desktop, hidden on mobile to keep it compact */}
           <span className="hidden sm:inline whitespace-nowrap">
             {supportConfig.button_label || 'สนับสนุน Sobdai'}

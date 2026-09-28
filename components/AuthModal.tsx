@@ -213,7 +213,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-[#0F0B07]/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-overlay backdrop-blur-sm"
             onClick={onClose}
           />
 
@@ -223,15 +223,15 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="relative z-10 w-full sm:max-w-[480px] bg-[#1A140E] border-t sm:border border-[rgba(212,175,55,0.15)] sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden"
+            className="relative z-10 w-full sm:max-w-[480px] bg-card border-t sm:border border-brand/15 sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden"
           >
             {/* Subtle Gold Radial Glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[300px] h-32 bg-[#D4AF37] opacity-[0.03] blur-[50px] pointer-events-none"></div>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[300px] h-32 bg-brand-solid opacity-[0.03] blur-[50px] pointer-events-none"></div>
 
             <button 
               type="button"
               onClick={onClose}
-              className="absolute top-5 right-5 text-[#A1866B] hover:text-[#F5E9D6] transition-colors p-1 rounded-full hover:bg-[rgba(255,255,255,0.05)]"
+              className="absolute top-5 right-5 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-hover"
             >
               <X size={20} strokeWidth={2.5} />
             </button>
@@ -247,10 +247,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                     className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl shadow-[0_4px_20px_rgba(212,175,55,0.3)]"
                   />
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-bold font-display text-[#F5E9D6] mb-2">
+                <h2 className="text-2xl sm:text-3xl font-bold font-display text-foreground mb-2">
                   {mode === 'login' ? 'เข้าสู่ระบบ' : mode === 'register' ? 'สมัครสมาชิกฟรี' : 'ลืมรหัสผ่าน'}
                 </h2>
-                <p className="text-sm text-[#A1866B]">
+                <p className="text-sm text-muted-foreground">
                   {mode === 'login' 
                     ? 'ยินดีต้อนรับกลับ! เข้าสู่ระบบเพื่อทำข้อสอบต่อ' 
                     : mode === 'register' 
@@ -265,25 +265,25 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
 
               <form onSubmit={handleEmailAuth} className="space-y-5 mb-8">
                 <div>
-                  <label className="block text-[13px] font-medium text-[#A1866B] mb-1.5 uppercase tracking-wide">อีเมล</label>
+                  <label className="block text-[13px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">อีเมล</label>
                   <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
-                    className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3.5 text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full bg-input border border-border-subtle rounded-xl px-4 py-3.5 text-foreground placeholder-muted-foreground/50 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
                     placeholder="you@example.com"
                   />
                 </div>
                 {mode !== 'forgot_password' && (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[13px] font-medium text-[#A1866B] uppercase tracking-wide">รหัสผ่าน</label>
+                      <label className="block text-[13px] font-medium text-muted-foreground uppercase tracking-wide">รหัสผ่าน</label>
                       {mode === 'login' && (
                         <button 
                           type="button"
                           onClick={() => setMode('forgot_password')}
-                          className="text-[13px] font-medium text-[#D4AF37] hover:underline focus-visible:outline-none"
+                          className="text-[13px] font-medium text-brand hover:underline focus-visible:outline-none"
                         >
                           ลืมรหัสผ่าน?
                         </button>
@@ -296,13 +296,13 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                         onChange={e => setPassword(e.target.value)}
                         required
                         minLength={6}
-                        className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] rounded-xl pl-4 pr-12 py-3.5 text-[#F5E9D6] placeholder-[#A1866B]/50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                        className="w-full bg-input border border-border-subtle rounded-xl pl-4 pr-12 py-3.5 text-foreground placeholder-muted-foreground/50 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
                         placeholder="อย่างน้อย 6 ตัวอักษร"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A1866B] hover:text-[#D4AF37] transition-colors"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand transition-colors"
                       >
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -316,10 +316,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                       type="checkbox"
                       checked={consentGiven}
                       onChange={e => setConsentGiven(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-[rgba(255,255,255,0.2)] text-[#D4AF37] focus:ring-[#D4AF37] bg-transparent accent-[#D4AF37] cursor-pointer"
+                      className="mt-0.5 w-4 h-4 rounded border-muted-foreground/40 text-brand focus:ring-brand bg-transparent accent-brand cursor-pointer"
                     />
-                    <span className="text-[13px] text-[#A1866B] leading-relaxed">
-                      ฉันได้อ่านและยอมรับ <a href="/terms" target="_blank" className="text-[#D4AF37] hover:underline">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="text-[#D4AF37] hover:underline">นโยบายความเป็นส่วนตัว</a>
+                    <span className="text-[13px] text-muted-foreground leading-relaxed">
+                      ฉันได้อ่านและยอมรับ <a href="/terms" target="_blank" className="text-brand hover:underline">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="text-brand hover:underline">นโยบายความเป็นส่วนตัว</a>
                     </span>
                   </label>
                 )}
@@ -327,7 +327,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                 <button 
                   type="submit" 
                   disabled={loading || (mode === 'register' && !consentGiven)}
-                  className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#0F0B07] font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-2"
+                  className="w-full bg-brand-solid hover:bg-brand-hover text-brand-foreground font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 mt-2"
                 >
                   {loading && <Loader2 size={18} className="animate-spin" />}
                   {mode === 'login' ? 'เข้าสู่ระบบ' : mode === 'register' ? 'สร้างบัญชี' : 'ส่งลิงก์'}
@@ -338,9 +338,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                 <>
                   <div className="relative flex items-center justify-center my-6">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-[rgba(255,255,255,0.05)]"></div>
+                      <div className="w-full border-t border-border-subtle"></div>
                     </div>
-                    <div className="relative bg-[#1A140E] px-4 text-xs font-medium text-[#A1866B] uppercase tracking-wider">
+                    <div className="relative bg-card px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       หรือ
                     </div>
                   </div>
@@ -349,7 +349,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                     type="button"
                     onClick={handleGoogleAuth}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-xl text-[#F5E9D6] text-[15px] cursor-pointer hover:bg-[rgba(255,255,255,0.06)] hover:border-[rgba(212,175,55,0.3)] transition-all"
+                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-hover border border-border-subtle rounded-xl text-foreground text-[15px] cursor-pointer hover:bg-hover-strong hover:border-brand/30 transition-all"
                   >
                     <GoogleIcon />
                     {mode === 'login' ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
@@ -358,32 +358,32 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialMode = 'l
                   {/* Rate-limit nudge: shows the existing Google button as the
                       fast alternative. No duplicate button — just helper text. */}
                   {rateLimitHit && (
-                    <p className="mt-3 text-[12px] text-center text-[#D4AF37] leading-relaxed">
+                    <p className="mt-3 text-[12px] text-center text-brand leading-relaxed">
                       หรือสมัครด้วย Google เพื่อเริ่มใช้งานได้ทันที
                     </p>
                   )}
                   
                   {mode === 'register' && (
-                    <p className="mt-4 text-[11.5px] text-center text-[#A1866B]/80 leading-relaxed">
+                    <p className="mt-4 text-[11.5px] text-center text-muted-foreground/80 leading-relaxed">
                       การสมัครสมาชิกด้วย Google ถือว่าท่านยอมรับ<br/>
-                      <a href="/terms" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="hover:text-[#D4AF37] underline underline-offset-2">นโยบายความเป็นส่วนตัว</a> ของเรา
+                      <a href="/terms" target="_blank" className="hover:text-brand underline underline-offset-2">เงื่อนไขการให้บริการ</a> และ <a href="/privacy" target="_blank" className="hover:text-brand underline underline-offset-2">นโยบายความเป็นส่วนตัว</a> ของเรา
                     </p>
                   )}
                 </>
               )}
               
-              <div className="mt-8 text-center text-sm text-[#A1866B]">
+              <div className="mt-8 text-center text-sm text-muted-foreground">
                 {mode === 'login' ? (
-                  <p className="text-[#A1866B] text-[13px]">
+                  <p className="text-muted-foreground text-[13px]">
                     ยังไม่มีบัญชีใช่ไหม?{' '}
-                    <button type="button" onClick={() => setMode('register')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
+                    <button type="button" onClick={() => setMode('register')} className="text-brand font-bold hover:underline focus-visible:outline-none">
                       สมัครสมาชิกฟรี
                     </button>
                   </p>
                 ) : (
-                  <p className="text-[#A1866B] text-[13px]">
+                  <p className="text-muted-foreground text-[13px]">
                     มีบัญชีอยู่แล้ว?{' '}
-                    <button type="button" onClick={() => setMode('login')} className="text-[#D4AF37] font-bold hover:underline focus-visible:outline-none">
+                    <button type="button" onClick={() => setMode('login')} className="text-brand font-bold hover:underline focus-visible:outline-none">
                       เข้าสู่ระบบ
                     </button>
                   </p>

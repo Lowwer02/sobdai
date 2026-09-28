@@ -31,31 +31,34 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
     return () => clearTimeout(timer)
   }, [toast.duration, handleDismiss])
 
+  // Type color stays semantic (icon + border + a solid, card-tinted background
+  // via color-mix so the toast stays readable over any content in both themes).
   let Icon = CheckCircle2
-  let iconColor = 'text-[#22C55E]'
-  let bgColor = 'bg-[#112A1C]'
-  let borderColor = 'border-[#22C55E]/30'
+  let iconColor = 'text-success'
+  let borderColor = 'border-success-border'
+  let bgStyle = { backgroundColor: 'color-mix(in srgb, var(--success) 8%, var(--card))' }
 
   if (toast.type === 'error') {
     Icon = XCircle
-    iconColor = 'text-[#FF4A4A]'
-    bgColor = 'bg-[#2A1111]'
-    borderColor = 'border-[#FF4A4A]/30'
+    iconColor = 'text-destructive'
+    borderColor = 'border-destructive-border'
+    bgStyle = { backgroundColor: 'color-mix(in srgb, var(--destructive) 8%, var(--card))' }
   } else if (toast.type === 'info') {
     Icon = Info
-    iconColor = 'text-[#3B82F6]'
-    bgColor = 'bg-[#0F172A]'
-    borderColor = 'border-[#3B82F6]/30'
+    iconColor = 'text-info'
+    borderColor = 'border-info-border'
+    bgStyle = { backgroundColor: 'color-mix(in srgb, var(--info) 8%, var(--card))' }
   } else if (toast.type === 'warning') {
     Icon = AlertTriangle
-    iconColor = 'text-[#F59E0B]'
-    bgColor = 'bg-[#2A1F0D]'
-    borderColor = 'border-[#F59E0B]/30'
+    iconColor = 'text-warning'
+    borderColor = 'border-warning-border'
+    bgStyle = { backgroundColor: 'color-mix(in srgb, var(--warning) 8%, var(--card))' }
   }
 
   return (
     <div
-      className={`pointer-events-auto flex items-start sm:items-center gap-3 p-4 rounded-xl border shadow-[0_10px_40px_rgba(0,0,0,0.5)] ${bgColor} ${borderColor} max-w-sm w-full backdrop-blur-md transition-all duration-200 ease-out ${
+      style={bgStyle}
+      className={`pointer-events-auto flex items-start sm:items-center gap-3 p-4 rounded-xl border shadow-[var(--shadow-lg)] ${borderColor} max-w-sm w-full backdrop-blur-md transition-all duration-200 ease-out ${
         isExiting
           ? 'opacity-0 -translate-y-2.5 scale-95 pointer-events-none'
           : 'animate-toast-enter opacity-100 translate-y-0 scale-100'
@@ -63,13 +66,13 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
       role="alert"
     >
       <Icon className={`shrink-0 mt-0.5 sm:mt-0 ${iconColor}`} size={20} />
-      <div className="flex-1 text-[#F5E9D6] text-[14px] font-medium pr-2 leading-snug">
+      <div className="flex-1 text-foreground text-[14px] font-medium pr-2 leading-snug">
         {toast.message}
       </div>
       <button
         type="button"
         onClick={handleDismiss}
-        className="p-1 shrink-0 -mr-1 -mt-1 sm:mt-0 text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
+        className="p-1 shrink-0 -mr-1 -mt-1 sm:mt-0 text-muted-foreground hover:text-foreground hover:bg-hover rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand/50"
         aria-label="ปิดการแจ้งเตือน"
       >
         <X size={16} />

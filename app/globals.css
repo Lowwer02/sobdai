@@ -68,6 +68,274 @@
   --radius-xl: 28px;
 }
 
+/* ===================== Theme System V1 (canonical tokens) ===================== */
+/* Canonical semantic tokens for components migrated onto the theme system.
+   Dark values mirror the dominant runtime TSX palette so tokenized components
+   are visually zero-delta in dark. Names deliberately do NOT overlap the
+   legacy variables declared above — the legacy block stays byte-exact current
+   production (dark) and receives explicit Light mappings in the
+   [data-theme="light"] block below. */
+:root {
+  color-scheme: dark;
+
+  /* Canvas */
+  --background: #0f0b07;
+  --foreground: #f5e9d6;
+
+  /* Surfaces */
+  --surface: #0f0b07;
+  --surface-raised: #140f0a;
+  --surface-muted: #120d08;
+  --glass: rgba(26, 20, 14, 0.94);
+
+  /* Card */
+  --card: #1a140e;
+  --card-foreground: #f5e9d6;
+
+  /* Muted */
+  --muted: #241b12;
+  --muted-foreground: #a1866b;
+
+  /* Borders / inputs (--border itself is legacy-owned; see above) */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --input: #0f0b07;
+
+  /* Overlay / washes */
+  --overlay: rgba(10, 7, 4, 0.78);
+  --wash: rgba(212, 175, 55, 0.1);
+  --wash-strong: rgba(212, 175, 55, 0.16);
+  --hover: rgba(255, 255, 255, 0.04);
+  --hover-strong: rgba(255, 255, 255, 0.08);
+
+  /* Brand (Sobdai gold) */
+  /* --brand: accent for text/icons/links (theme-tuned for contrast).
+     --brand-solid: saturated gold FILL (buttons, current-page markers).
+     --brand-deep: gradient partner for --brand-solid. */
+  --brand: #d4af37;
+  --brand-solid: #d4af37;
+  --brand-hover: #e8c46e;
+  --brand-deep: #b38f24;
+  --brand-foreground: #1a140e;
+
+  /* Status */
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.12);
+  --success-border: rgba(34, 197, 94, 0.3);
+
+  --warning: #eab308;
+  --warning-bg: rgba(234, 179, 8, 0.12);
+  --warning-border: rgba(234, 179, 8, 0.3);
+
+  --destructive: #ef4444;
+  --destructive-bg: rgba(239, 68, 68, 0.12);
+  --destructive-border: rgba(239, 68, 68, 0.3);
+
+  --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.12);
+  --info-border: rgba(59, 130, 246, 0.3);
+
+  /* Exam semantics */
+  --exam-correct: #4caf7d;
+  --exam-correct-bg: rgba(76, 175, 125, 0.12);
+  --exam-incorrect: #e05c5c;
+  --exam-incorrect-bg: rgba(224, 92, 92, 0.12);
+  --exam-selected: #d4af37;
+  --exam-selected-bg: rgba(212, 175, 55, 0.1);
+
+  /* Mobile chrome shadows (bottom nav bar / more sheet) */
+  --shadow-nav: 0 -10px 28px rgba(0, 0, 0, 0.34);
+  --shadow-sheet: 0 -18px 52px rgba(0, 0, 0, 0.55);
+
+  /* Compatibility aliases for names current main references but never
+     defined (P0 latent gaps). Dark values match what the existing fallbacks
+     render (--bg-primary fell through to the body canvas; --card-bg had a
+     hardcoded #1A140E fallback), so dark is visually unchanged. */
+  --bg-primary: var(--background);
+  --card-bg: var(--card);
+}
+
+/* ---- Light theme: Warm Ivory + Espresso + Sobdai Gold ---- */
+/* Canonical tokens AND the legacy variables above are re-mapped here; dark
+   production values are never altered. */
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Canonical */
+  --background: #faf5ec;
+  --foreground: #2b2118;
+
+  --surface: #faf5ec;
+  --surface-raised: #fffdf8;
+  --surface-muted: #f1e9d8;
+  --glass: rgba(255, 253, 248, 0.92);
+
+  --card: #fffdf8;
+  --card-foreground: #2b2118;
+
+  --muted: #efe7d6;
+  --muted-foreground: #6f5d47;
+
+  --border-subtle: #ebe0ca;
+  --input: #fffdf8;
+
+  --overlay: rgba(43, 30, 18, 0.45);
+  --wash: rgba(178, 138, 32, 0.12);
+  --wash-strong: rgba(178, 138, 32, 0.2);
+  --hover: rgba(43, 33, 24, 0.05);
+  --hover-strong: rgba(43, 33, 24, 0.09);
+
+  /* Deepened gold for readable text/icons on ivory (~4.6:1); fills keep the
+     bright --brand-solid so the Sobdai gold bar stays identical. */
+  --brand: #8a6914;
+  --brand-solid: #d4af37;
+  --brand-hover: #6f5310;
+  --brand-deep: #a8821e;
+  --brand-foreground: #241a0e;
+
+  --success: #1a7f37;
+  --success-bg: rgba(26, 127, 55, 0.1);
+  --success-border: rgba(26, 127, 55, 0.35);
+
+  --warning: #925e0a;
+  --warning-bg: rgba(146, 94, 10, 0.1);
+  --warning-border: rgba(146, 94, 10, 0.35);
+
+  --destructive: #b3261e;
+  --destructive-bg: rgba(179, 38, 30, 0.08);
+  --destructive-border: rgba(179, 38, 30, 0.35);
+
+  --info: #1a5cb8;
+  --info-bg: rgba(26, 92, 184, 0.1);
+  --info-border: rgba(26, 92, 184, 0.35);
+
+  --exam-correct: #1a7f37;
+  --exam-correct-bg: rgba(26, 127, 55, 0.1);
+  --exam-incorrect: #b3261e;
+  --exam-incorrect-bg: rgba(179, 38, 30, 0.08);
+  --exam-selected: #8a6914;
+  --exam-selected-bg: rgba(178, 138, 32, 0.12);
+
+  --shadow-nav: 0 -10px 28px rgba(86, 62, 28, 0.12);
+  --shadow-sheet: 0 -18px 52px rgba(86, 62, 28, 0.18);
+
+  /* Legacy variables — Light mappings (dark values above are untouched). */
+  --bg-base: #faf5ec;
+  --bg-primary: #faf5ec;
+  --bg-card: #fffdf8;
+  --card-bg: #fffdf8;
+  --bg-card-hover: #f4ecdb;
+  --bg-card-2: #f1e9d8;
+  --bg-input: #fffdf8;
+  --bg-overlay: rgba(43, 30, 18, 0.45);
+
+  --gold: #8a6914;
+  --gold-light: #a8821e;
+  --gold-muted: #b08d2e;
+  --gold-tint: rgba(178, 138, 32, 0.12);
+  --gold-tint-hover: rgba(178, 138, 32, 0.2);
+
+  --green: #1a7f37;
+  --green-light: #1a7f37;
+  --green-tint: rgba(26, 127, 55, 0.1);
+
+  --red: #b3261e;
+  --red-tint: rgba(179, 38, 30, 0.08);
+
+  --text-primary: #2b2118;
+  --text-secondary: #6f5d47;
+  --text-muted: #9b876f;
+  --text-faint: #c0b096;
+
+  --border: #e3d5b8;
+  --border-hover: rgba(138, 105, 20, 0.45);
+  --border-card: #ebe0ca;
+
+  --correct: #1a7f37;
+  --correct-bg: rgba(26, 127, 55, 0.1);
+  --wrong: #b3261e;
+  --wrong-bg: rgba(179, 38, 30, 0.08);
+  --hint: #1a5cb8;
+  --hint-bg: rgba(26, 92, 184, 0.1);
+
+  --shadow-sm: 0 2px 8px rgba(86, 62, 28, 0.1);
+  --shadow-md: 0 4px 20px rgba(86, 62, 28, 0.12);
+  --shadow-lg: 0 8px 40px rgba(86, 62, 28, 0.16);
+  --shadow-gold: 0 0 20px rgba(178, 138, 32, 0.18);
+}
+
+/* Expose tokens to Tailwind as color utilities (bg-card, text-muted-foreground,
+   border-border-subtle, bg-wash, ...). `inline` keeps var() references so
+   utilities follow the active theme at runtime instead of baking one palette. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
+  --color-glass: var(--glass);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--text-faint);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-overlay: var(--overlay);
+  --color-wash: var(--wash);
+  --color-wash-strong: var(--wash-strong);
+  --color-hover: var(--hover);
+  --color-hover-strong: var(--hover-strong);
+  --color-brand: var(--brand);
+  --color-brand-solid: var(--brand-solid);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-destructive: var(--destructive);
+  --color-destructive-bg: var(--destructive-bg);
+  --color-destructive-border: var(--destructive-border);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+  --color-exam-correct: var(--exam-correct);
+  --color-exam-incorrect: var(--exam-incorrect);
+  --color-exam-selected: var(--exam-selected);
+}
+
+/* ===================== Light-theme overrides for shared primitives ===================== */
+/* Dark values in the sections above stay byte-exact current production; only
+   Light re-maps the hardcoded literals that would be unreadable on ivory. */
+[data-theme='light'] .card-glass {
+  background: var(--glass);
+}
+[data-theme='light'] .card-gold {
+  background: linear-gradient(135deg, var(--wash) 0%, var(--card) 60%);
+  border-color: color-mix(in srgb, var(--brand-solid) 20%, transparent);
+}
+[data-theme='light'] .btn-primary {
+  background: linear-gradient(135deg, var(--brand-solid) 0%, var(--brand-deep) 100%);
+}
+[data-theme='light'] .navbar {
+  background: var(--background);
+}
+[data-theme='light'] .badge-red {
+  color: var(--red);
+}
+[data-theme='light'] .summary-content .markdown-alert-warning,
+[data-theme='light'] .summary-content .markdown-alert-caution {
+  border-left-color: var(--destructive);
+}
+[data-theme='light'] .summary-content .markdown-alert-caution .markdown-alert-title,
+[data-theme='light'] .summary-content .markdown-alert-warning .markdown-alert-title {
+  color: var(--destructive);
+}
+
 /* ===================== Base ===================== */
 * {
   box-sizing: border-box;
@@ -484,9 +752,9 @@ h1, h2, h3, .heading {
   gap: 0.125rem;
   height: calc(4.75rem + env(safe-area-inset-bottom, 0px));
   padding: 0.375rem 0.625rem calc(0.375rem + env(safe-area-inset-bottom, 0px));
-  background: rgba(15, 11, 8, 0.99);
-  border-top: 1px solid rgba(212, 175, 55, 0.18);
-  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.34);
+  background: var(--surface);
+  border-top: 1px solid color-mix(in srgb, var(--brand-solid) 18%, transparent);
+  box-shadow: var(--shadow-nav);
 }
 
 .mobile-bottom-nav__item {
@@ -513,13 +781,13 @@ h1, h2, h3, .heading {
 .mobile-bottom-nav__item:hover,
 .mobile-bottom-nav__item:focus-visible {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--hover);
 }
 
 .mobile-bottom-nav__item--active {
   color: var(--gold-light);
-  background: rgba(212, 175, 55, 0.08);
-  border-color: rgba(212, 175, 55, 0.16);
+  background: var(--wash);
+  border-color: color-mix(in srgb, var(--brand-solid) 16%, transparent);
 }
 
 .mobile-bottom-nav__item--daily {
@@ -553,7 +821,7 @@ h1, h2, h3, .heading {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(15, 11, 7, 0.78);
+  background: var(--overlay);
   backdrop-filter: blur(3px);
 }
 
@@ -566,11 +834,11 @@ h1, h2, h3, .heading {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.75rem 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
-  border: 1px solid rgba(212, 175, 55, 0.18);
+  border: 1px solid color-mix(in srgb, var(--brand-solid) 18%, transparent);
   border-bottom: 0;
   border-radius: 1.5rem 1.5rem 0 0;
-  background: #140f0a;
-  box-shadow: 0 -18px 52px rgba(0, 0, 0, 0.55);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sheet);
   animation: mobile-more-sheet-in 0.22s ease-out both;
 }
 
@@ -579,7 +847,7 @@ h1, h2, h3, .heading {
   height: 0.25rem;
   margin: 0 auto 1rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--foreground) 14%, transparent);
 }
 
 .mobile-floating-support {

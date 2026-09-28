@@ -61,7 +61,7 @@ export default function ArticlePagination({
       {hasPrev ? (
         <Link
           href={buildArticlePageHref(currentPage - 1, search, category, tag)}
-          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-[#F5E9D6] bg-[#1A140E] border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-foreground bg-card border border-brand/30 hover:border-brand hover:bg-wash rounded-lg transition-colors"
           aria-label="หน้าก่อนหน้า"
         >
           <ChevronLeft size={16} />
@@ -69,7 +69,7 @@ export default function ArticlePagination({
         </Link>
       ) : (
         <span
-          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-[#A1866B]/40 bg-[#0F0B07] border border-white/5 rounded-lg cursor-not-allowed"
+          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-muted-foreground/40 bg-background border border-border-subtle rounded-lg cursor-not-allowed"
           aria-disabled="true"
         >
           <ChevronLeft size={16} />
@@ -82,7 +82,7 @@ export default function ArticlePagination({
         {pages.map((p, idx) => {
           if (p === 'ellipsis') {
             return (
-              <span key={`ellipsis-${idx}`} className="px-2 text-xs text-[#A1866B]">
+              <span key={`ellipsis-${idx}`} className="px-2 text-xs text-muted-foreground">
                 …
               </span>
             )
@@ -93,7 +93,7 @@ export default function ArticlePagination({
             return (
               <span
                 key={p}
-                className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-xs font-bold text-[#0F0B07] bg-[#D4AF37] border border-[#D4AF37] rounded-lg shadow-md"
+                className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-xs font-bold text-brand-foreground bg-brand-solid border border-brand-solid rounded-lg shadow-md"
                 aria-current="page"
               >
                 {p}
@@ -105,7 +105,7 @@ export default function ArticlePagination({
             <Link
               key={p}
               href={buildArticlePageHref(p, search, category, tag)}
-              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-xs font-semibold text-[#F5E9D6] bg-[#1A140E] border border-[#D4AF37]/20 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors"
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-xs font-semibold text-foreground bg-card border border-brand/20 hover:border-brand hover:bg-wash rounded-lg transition-colors"
               aria-label={`หน้า ${p}`}
             >
               {p}
@@ -118,7 +118,7 @@ export default function ArticlePagination({
       {hasNext ? (
         <Link
           href={buildArticlePageHref(currentPage + 1, search, category, tag)}
-          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-[#F5E9D6] bg-[#1A140E] border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-foreground bg-card border border-brand/30 hover:border-brand hover:bg-wash rounded-lg transition-colors"
           aria-label="หน้าถัดไป"
         >
           <span className="hidden sm:inline">ถัดไป</span>
@@ -126,7 +126,7 @@ export default function ArticlePagination({
         </Link>
       ) : (
         <span
-          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-[#A1866B]/40 bg-[#0F0B07] border border-white/5 rounded-lg cursor-not-allowed"
+          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-muted-foreground/40 bg-background border border-border-subtle rounded-lg cursor-not-allowed"
           aria-disabled="true"
         >
           <span className="hidden sm:inline">ถัดไป</span>

@@ -30,21 +30,21 @@ export default function AnnouncementBar({ promotion }: AnnouncementBarProps) {
         height: '44px',
         padding: '0 16px',
         borderRadius: '9999px',
-        background: 'linear-gradient(135deg, rgba(212, 168, 67, 0.08) 0%, rgba(26, 18, 8, 0.95) 100%)',
-        border: '1px solid rgba(212, 168, 67, 0.2)',
+        // Theme-aware: gold wash fading into the card surface.
+        background: 'linear-gradient(135deg, var(--wash) 0%, var(--card) 100%)',
         maxWidth: '1100px',
         margin: '16px auto 0',
         boxSizing: 'border-box',
         cursor: hasLink ? 'pointer' : 'default',
       }}
-      className="group transition-all duration-200 hover:border-[rgba(212,168,67,0.45)] hover:bg-[rgba(34,24,8,0.98)]"
+      className="group border border-brand/20 transition-all duration-200 hover:border-brand/45"
     >
       {/* Badge */}
       <span
         style={{
           background: 'var(--gold-tint)',
           color: 'var(--gold-light)',
-          border: '1px solid rgba(212, 168, 67, 0.3)',
+          border: '1px solid color-mix(in srgb, var(--brand-solid) 30%, transparent)',
           borderRadius: '9999px',
           padding: '2px 10px',
           fontSize: '11.5px',
