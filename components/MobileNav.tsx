@@ -30,6 +30,7 @@ import { trackDailyNavClick } from '@/lib/analytics'
 import type { SupportConfig } from '@/lib/homepageConfig'
 import { getActiveMobilePrimaryHref, normalizeMobilePathname, shouldShowMobileBottomNav } from '@/lib/mobile-nav-route'
 import { useConsent } from './consent/ConsentProvider'
+import { ThemeToggleInline } from './theme/ThemeToggle'
 import NotificationBell, { type NotificationCenterState } from './NotificationBell'
 import SupportModal from './SupportModal'
 
@@ -398,7 +399,7 @@ export default function MobileNav({
         <Link
           href="/"
           onClick={() => setMenuOpen(false)}
-          className="flex items-center gap-3 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg p-1 -ml-1"
+          className="flex items-center gap-3 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-lg p-1 -ml-1"
         >
           <Image
             src="/logo.png"
@@ -407,7 +408,7 @@ export default function MobileNav({
             height={32}
             className="rounded-lg shadow-sm group-hover:shadow-[0_2px_8px_rgba(212,175,55,0.3)] transition-all"
           />
-          <span className="font-display text-xl text-[#F5E9D6] tracking-wide">Sobdai</span>
+          <span className="font-display text-xl text-foreground tracking-wide">Sobdai</span>
         </Link>
 
         <div className="flex items-center gap-1">
@@ -416,7 +417,7 @@ export default function MobileNav({
             <button
               type="button"
               onClick={onLoginClick}
-              className="shrink-0 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37] px-3 py-2 text-[11px] font-semibold leading-none text-[#0F0B07] shadow-sm shadow-[#D4AF37]/15 transition-colors hover:bg-[#E6C453] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5E9D6]"
+              className="shrink-0 rounded-full border border-brand/40 bg-brand-solid px-3 py-2 text-[11px] font-semibold leading-none text-brand-foreground shadow-sm shadow-brand/15 transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
             >
               เข้าสู่ระบบ / สมัคร
             </button>
@@ -428,7 +429,7 @@ export default function MobileNav({
               onClick={() => setLegacyMenuOpen(true)}
               aria-label={legacyMenuOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
               aria-expanded={legacyMenuOpen}
-              className="relative z-[60] flex h-10 w-10 items-center justify-center rounded-full text-[#F5E9D6] transition-colors hover:text-[#D4AF37] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              className="relative z-[60] flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:text-brand focus-visible:ring-2 focus-visible:ring-brand"
             >
               <Menu size={22} strokeWidth={1.8} />
             </button>
@@ -495,8 +496,8 @@ export default function MobileNav({
 
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A1866B]">เมนูรอง</p>
-                <h2 id="mobile-more-title" className="mt-1 font-display text-2xl font-semibold text-[#F5E9D6]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">เมนูรอง</p>
+                <h2 id="mobile-more-title" className="mt-1 font-display text-2xl font-semibold text-foreground">
                   เพิ่มเติม
                 </h2>
               </div>
@@ -506,14 +507,14 @@ export default function MobileNav({
                 type="button"
                 onClick={closeMenu}
                 aria-label="ปิดเมนูเพิ่มเติม"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[#A1866B] transition-colors hover:text-[#F5E9D6] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-hover text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <X size={19} strokeWidth={1.8} />
               </button>
             </div>
 
             <div className="mt-6">
-              <p className="mb-3 text-xs font-semibold tracking-wide text-[#A1866B]">สำรวจ</p>
+              <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground">สำรวจ</p>
               <div className="grid grid-cols-2 gap-2">
                 {DISCOVERY_LINKS.map((item) => {
                   const Icon = item.icon
@@ -522,19 +523,19 @@ export default function MobileNav({
                       key={item.href}
                       href={item.href}
                       onClick={closeMenu}
-                      className="group flex min-h-12 items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.025)] px-3 py-2.5 text-sm font-medium text-[#F5E9D6] transition-colors hover:border-[rgba(212,175,55,0.32)] hover:bg-[rgba(212,175,55,0.07)] hover:text-[#F1D17A] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      className="group flex min-h-12 items-center gap-2 rounded-xl border border-border-subtle bg-hover px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-brand/30 hover:bg-wash hover:text-brand-hover focus-visible:ring-2 focus-visible:ring-brand"
                     >
-                      <Icon size={16} strokeWidth={1.8} className="shrink-0 text-[#D4AF37]" aria-hidden="true" />
+                      <Icon size={16} strokeWidth={1.8} className="shrink-0 text-brand" aria-hidden="true" />
                       <span className="min-w-0 flex-1 leading-tight">{item.label}</span>
-                      <ChevronRight size={14} className="shrink-0 text-[#6D5943] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                      <ChevronRight size={14} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                     </Link>
                   )
                 })}
               </div>
             </div>
 
-            <div className="mt-5 border-t border-[rgba(255,255,255,0.07)] pt-4">
-              <p className="mb-3 text-xs font-semibold tracking-wide text-[#A1866B]">ช่วยเหลือ</p>
+            <div className="mt-5 border-t border-border-subtle pt-4">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground">ช่วยเหลือ</p>
               <div className="grid grid-cols-2 gap-2">
                 {HELP_LINKS.map((item) => {
                   const Icon = item.icon
@@ -543,55 +544,55 @@ export default function MobileNav({
                       key={item.href}
                       href={item.href}
                       onClick={closeMenu}
-                      className="group flex min-h-12 items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.025)] px-3 py-2.5 text-sm font-medium text-[#F5E9D6] transition-colors hover:border-[rgba(212,175,55,0.32)] hover:bg-[rgba(212,175,55,0.07)] hover:text-[#F1D17A] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      className="group flex min-h-12 items-center gap-2 rounded-xl border border-border-subtle bg-hover px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-brand/30 hover:bg-wash hover:text-brand-hover focus-visible:ring-2 focus-visible:ring-brand"
                     >
-                      <Icon size={16} strokeWidth={1.8} className="shrink-0 text-[#D4AF37]" aria-hidden="true" />
+                      <Icon size={16} strokeWidth={1.8} className="shrink-0 text-brand" aria-hidden="true" />
                       <span className="min-w-0 flex-1 leading-tight">{item.label}</span>
-                      <ChevronRight size={14} className="shrink-0 text-[#6D5943] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                      <ChevronRight size={14} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                     </Link>
                   )
                 })}
               </div>
             </div>
 
-            <div className="mt-5 border-t border-[rgba(255,255,255,0.07)] pt-4">
-              <p className="mb-3 text-xs font-semibold tracking-wide text-[#A1866B]">บัญชี / การใช้งาน</p>
+            <div className="mt-5 border-t border-border-subtle pt-4">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground">บัญชี / การใช้งาน</p>
               {supportConfig.enabled && (
                 <button
                   type="button"
                   onClick={openSupportModal}
-                  className="group mt-1 flex min-h-11 w-full items-center gap-2 rounded-xl border border-[rgba(212,175,55,0.14)] bg-[rgba(212,175,55,0.035)] px-3 py-2 text-left text-sm text-[#A1866B] transition-colors hover:border-[rgba(212,175,55,0.3)] hover:bg-[rgba(212,175,55,0.07)] hover:text-[#F5E9D6] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                  className="group mt-1 flex min-h-11 w-full items-center gap-2 rounded-xl border border-brand/15 bg-wash px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-brand/30 hover:bg-wash-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand"
                 >
-                  <Heart size={16} strokeWidth={1.8} className="shrink-0 text-[#D4AF37]" aria-hidden="true" />
+                  <Heart size={16} strokeWidth={1.8} className="shrink-0 text-brand" aria-hidden="true" />
                   <span className="min-w-0 flex-1">สนับสนุน Sobdai</span>
-                  <ChevronRight size={14} className="shrink-0 text-[#6D5943] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  <ChevronRight size={14} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                 </button>
               )}
               <div className="mt-3">
               {user && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3 rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                  <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-hover px-3 py-3">
                     {avatarUrl ? (
                       <Image
                         src={avatarUrl}
                         alt="รูปโปรไฟล์"
                         width={36}
                         height={36}
-                        className="h-9 w-9 shrink-0 rounded-full border border-[#D4AF37]/30 object-cover"
+                        className="h-9 w-9 shrink-0 rounded-full border border-brand/30 object-cover"
                       />
                     ) : (
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#1A140E] text-sm font-bold text-[#D4AF37]">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand/30 bg-card text-sm font-bold text-brand">
                         {user.email?.charAt(0).toUpperCase() || 'S'}
                       </span>
                     )}
-                    <span className="min-w-0 truncate text-sm text-[#F5E9D6]">{user.email || 'บัญชีของฉัน'}</span>
+                    <span className="min-w-0 truncate text-sm text-foreground">{user.email || 'บัญชีของฉัน'}</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <Link
                       href="/settings"
                       onClick={closeMenu}
-                      className="flex min-h-11 items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.07)] px-3 py-2 text-sm text-[#F5E9D6] transition-colors hover:border-[rgba(212,175,55,0.3)] hover:text-[#D4AF37] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      className="flex min-h-11 items-center gap-2 rounded-xl border border-border-subtle px-3 py-2 text-sm text-foreground transition-colors hover:border-brand/30 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       <Settings2 size={16} aria-hidden="true" />
                       <span>โปรไฟล์</span>
@@ -599,7 +600,7 @@ export default function MobileNav({
                     <Link
                       href="/orders"
                       onClick={closeMenu}
-                      className="flex min-h-11 items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.07)] px-3 py-2 text-sm text-[#F5E9D6] transition-colors hover:border-[rgba(212,175,55,0.3)] hover:text-[#D4AF37] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      className="flex min-h-11 items-center gap-2 rounded-xl border border-border-subtle px-3 py-2 text-sm text-foreground transition-colors hover:border-brand/30 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       <FileText size={16} aria-hidden="true" />
                       <span>ประวัติการสั่งซื้อ</span>
@@ -609,7 +610,7 @@ export default function MobileNav({
                   <Link
                     href="/my-packages"
                     onClick={closeMenu}
-                    className="flex min-h-11 items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.07)] px-3 py-2 text-sm text-[#F5E9D6] transition-colors hover:border-[rgba(212,175,55,0.3)] hover:text-[#D4AF37] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                    className="flex min-h-11 items-center gap-2 rounded-xl border border-border-subtle px-3 py-2 text-sm text-foreground transition-colors hover:border-brand/30 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand"
                   >
                     <LibraryBig size={16} aria-hidden="true" />
                     <span>แพ็กเกจของฉัน</span>
@@ -619,7 +620,7 @@ export default function MobileNav({
                     <Link
                       href="/admin"
                       onClick={closeMenu}
-                      className="flex min-h-11 items-center gap-2 rounded-xl border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.05)] px-3 py-2 text-sm font-medium text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                      className="flex min-h-11 items-center gap-2 rounded-xl border border-brand/20 bg-wash px-3 py-2 text-sm font-medium text-brand transition-colors hover:bg-wash-strong focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       <ShieldCheck size={16} aria-hidden="true" />
                       <span>จัดการระบบ</span>
@@ -629,7 +630,7 @@ export default function MobileNav({
                   <button
                     type="button"
                     onClick={handleSignOutClick}
-                    className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-[rgba(239,68,68,0.16)] px-3 py-2 text-left text-sm text-red-300 transition-colors hover:bg-red-400/10 focus-visible:ring-2 focus-visible:ring-red-300"
+                    className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-destructive/20 px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive-bg focus-visible:ring-2 focus-visible:ring-destructive"
                   >
                     <LogOut size={16} aria-hidden="true" />
                     <span>ออกจากระบบ</span>
@@ -639,15 +640,20 @@ export default function MobileNav({
               </div>
             </div>
 
-            <div className="mt-5 border-t border-[rgba(255,255,255,0.07)] pt-4">
-              <p className="mb-3 text-xs font-semibold tracking-wide text-[#A1866B]">กฎหมายและความเป็นส่วนตัว</p>
+            <div className="mt-5 border-t border-border-subtle pt-4">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground">การแสดงผล</p>
+              <ThemeToggleInline />
+            </div>
+
+            <div className="mt-5 border-t border-border-subtle pt-4">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground">กฎหมายและความเป็นส่วนตัว</p>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
                 {POLICY_LINKS.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={closeMenu}
-                    className="text-xs text-[#A1866B] underline decoration-[rgba(212,175,55,0.25)] underline-offset-4 transition-colors hover:text-[#D4AF37] focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                    className="text-xs text-muted-foreground underline decoration-brand/25 underline-offset-4 transition-colors hover:text-brand focus-visible:ring-2 focus-visible:ring-brand"
                   >
                     {item.label}
                   </Link>
@@ -674,40 +680,40 @@ export default function MobileNav({
       {mounted && isExcluded && legacyMenuOpen && createPortal(
         <>
           <div
-            className="fixed inset-0 z-[55] bg-[#0F0B07]/80 backdrop-blur-md"
+            className="fixed inset-0 z-[55] bg-overlay backdrop-blur-md"
             onClick={closeLegacyMenu}
             aria-hidden="true"
           />
 
           <aside
-            className="fixed inset-y-0 right-0 z-[56] flex w-[85vw] max-w-sm flex-col border-l border-[rgba(255,255,255,0.05)] bg-[#140F0A] p-6 shadow-2xl"
+            className="fixed inset-y-0 right-0 z-[56] flex w-[85vw] max-w-sm flex-col border-l border-border-subtle bg-surface-raised p-6 shadow-2xl"
             aria-label="เมนูนำทาง"
           >
             <div className="flex-1 overflow-y-auto pb-6 pt-16">
               {user && (
-                <div className="mb-6 flex items-center gap-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-4">
+                <div className="mb-6 flex items-center gap-4 rounded-xl border border-border-subtle bg-hover p-4">
                   {avatarUrl ? (
                     <Image
                       src={avatarUrl}
                       alt="รูปโปรไฟล์"
                       width={48}
                       height={48}
-                      className="h-12 w-12 shrink-0 rounded-full border border-[#D4AF37]/30 object-cover"
+                      className="h-12 w-12 shrink-0 rounded-full border border-brand/30 object-cover"
                     />
                   ) : (
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#1A140E] text-lg font-bold text-[#D4AF37]">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand/30 bg-card text-lg font-bold text-brand">
                       {user.email?.charAt(0).toUpperCase() || 'S'}
                     </span>
                   )}
                   <div className="flex min-w-0 flex-col">
-                    <span className="text-sm text-[#A1866B]">ยินดีต้อนรับ</span>
-                    <span className="truncate text-base font-medium text-[#F5E9D6]">{user.email}</span>
+                    <span className="text-sm text-muted-foreground">ยินดีต้อนรับ</span>
+                    <span className="truncate text-base font-medium text-foreground">{user.email}</span>
                   </div>
                 </div>
               )}
 
               <nav aria-label="เมนูหลัก" className="flex flex-col gap-1">
-                <span className="mb-2 px-2 text-xs font-bold uppercase tracking-wider text-[#A1866B]">เมนูหลัก</span>
+                <span className="mb-2 px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">เมนูหลัก</span>
                 {LEGACY_NAV_LINKS.map((link) => {
                   const active = link.href === '/' ? pathname === '/' : matchesPrefix(pathname, link.href)
                   return (
@@ -723,7 +729,7 @@ export default function MobileNav({
                         }
                         closeLegacyMenu()
                       }}
-                      className={`rounded-lg px-4 py-3 text-base font-medium transition-colors ${active ? 'bg-[rgba(212,175,55,0.08)] text-[#D4AF37]' : 'text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)]'}`}
+                      className={`rounded-lg px-4 py-3 text-base font-medium transition-colors ${active ? 'bg-wash text-brand' : 'text-foreground hover:bg-hover'}`}
                     >
                       {link.label}
                     </Link>
@@ -732,16 +738,16 @@ export default function MobileNav({
               </nav>
 
               {user && (
-                <div className="mt-6 flex flex-col gap-1 border-t border-[rgba(255,255,255,0.05)] pt-6">
-                  <span className="mb-2 px-2 text-xs font-bold uppercase tracking-wider text-[#A1866B]">บัญชีของฉัน</span>
-                  <Link href="/settings" onClick={closeLegacyMenu} className="rounded-lg px-4 py-3 text-base font-medium text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)]">
+                <div className="mt-6 flex flex-col gap-1 border-t border-border-subtle pt-6">
+                  <span className="mb-2 px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">บัญชีของฉัน</span>
+                  <Link href="/settings" onClick={closeLegacyMenu} className="rounded-lg px-4 py-3 text-base font-medium text-foreground hover:bg-hover">
                     โปรไฟล์
                   </Link>
-                  <Link href="/my-packages" onClick={closeLegacyMenu} className="rounded-lg px-4 py-3 text-base font-medium text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)]">
+                  <Link href="/my-packages" onClick={closeLegacyMenu} className="rounded-lg px-4 py-3 text-base font-medium text-foreground hover:bg-hover">
                     แพ็กเกจของฉัน
                   </Link>
                   {isAdmin && (
-                    <Link href="/admin" onClick={closeLegacyMenu} className="mt-2 rounded-lg border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.05)] px-4 py-3 text-base font-medium text-[#D4AF37] hover:bg-[rgba(212,175,55,0.1)]">
+                    <Link href="/admin" onClick={closeLegacyMenu} className="mt-2 rounded-lg border border-brand/20 bg-wash px-4 py-3 text-base font-medium text-brand hover:bg-wash-strong">
                       จัดการระบบ
                     </Link>
                   )}
@@ -749,12 +755,12 @@ export default function MobileNav({
               )}
             </div>
 
-            <div className="border-t border-[rgba(255,255,255,0.05)] pb-safe pt-6">
+            <div className="border-t border-border-subtle pb-safe pt-6">
               {user ? (
                 <button
                   type="button"
                   onClick={() => { closeLegacyMenu(); onSignOut() }}
-                  className="w-full rounded-lg px-4 py-3 text-left text-base font-medium text-red-400 transition-colors hover:bg-red-400/10"
+                  className="w-full rounded-lg px-4 py-3 text-left text-base font-medium text-destructive transition-colors hover:bg-destructive-bg"
                 >
                   ออกจากระบบ
                 </button>
@@ -763,14 +769,14 @@ export default function MobileNav({
                   <button
                     type="button"
                     onClick={() => { closeLegacyMenu(); onLoginClick() }}
-                    className="w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-base font-medium text-[#F5E9D6]"
+                    className="w-full rounded-lg border border-border-subtle bg-hover px-4 py-3 text-base font-medium text-foreground"
                   >
                     เข้าสู่ระบบ
                   </button>
                   <button
                     type="button"
                     onClick={() => { closeLegacyMenu(); onRegisterClick() }}
-                    className="w-full rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#B38F24] px-4 py-3 text-base font-bold text-[#0F0B07] shadow-lg shadow-[#D4AF37]/20"
+                    className="w-full rounded-lg bg-gradient-to-r from-brand-solid to-brand-deep px-4 py-3 text-base font-bold text-brand-foreground shadow-lg shadow-brand/20"
                   >
                     สมัครสมาชิกฟรี
                   </button>

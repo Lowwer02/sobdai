@@ -106,7 +106,7 @@ export default function NewsPagination({
           {hasPrev ? (
             <Link
               href={buildNewsPageHref(currentPage - 1, search, category)}
-              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               style={{
                 ...btnBase,
                 color: 'var(--text-secondary)',
@@ -152,14 +152,14 @@ export default function NewsPagination({
             <li key={p}>
               <Link
                 href={buildNewsPageHref(p, search, category)}
-                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 style={
                   p === currentPage
                     ? {
                         ...btnBase,
-                        color: 'var(--bg-base)',
-                        backgroundColor: 'var(--gold-light)',
-                        borderColor: 'var(--gold-light)',
+                        color: 'var(--brand-foreground)',
+                        backgroundColor: 'var(--brand-solid)',
+                        borderColor: 'var(--brand-solid)',
                       }
                     : {
                         ...btnBase,
@@ -181,7 +181,7 @@ export default function NewsPagination({
           {hasNext ? (
             <Link
               href={buildNewsPageHref(currentPage + 1, search, category)}
-              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               style={{
                 ...btnBase,
                 color: 'var(--text-secondary)',

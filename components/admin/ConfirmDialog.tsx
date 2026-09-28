@@ -64,43 +64,43 @@ export default function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-[#0F0B07]/80 backdrop-blur-sm"
+      <div
+        className="absolute inset-0 bg-overlay backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Dialog */}
-      <div 
+      <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className="relative w-full max-w-md bg-[#1A140E] border border-[rgba(255,255,255,0.1)] rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-md bg-card border border-border-subtle rounded-2xl shadow-2xl overflow-hidden"
       >
         <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-full shrink-0 ${isDestructive ? 'bg-red-500/10 text-red-500' : 'bg-[#D4AF37]/10 text-[#D4AF37]'}`}>
+            <div className={`p-3 rounded-full shrink-0 ${isDestructive ? 'bg-destructive/10 text-destructive' : 'bg-wash text-brand'}`}>
               <AlertTriangle size={24} />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 id="dialog-title" className="text-xl font-bold font-display text-[#F5E9D6] mb-2">
+              <h3 id="dialog-title" className="text-xl font-bold font-display text-foreground mb-2">
                 {title}
               </h3>
-              <div className="text-[#A1866B] text-sm leading-relaxed mb-6">
+              <div className="text-muted-foreground text-sm leading-relaxed mb-6">
                 {description}
               </div>
 
               {requireTyping && (
                 <div className="mb-6">
-                  <label className="block text-xs text-[#A1866B] mb-2">
-                    พิมพ์ <strong className="text-[#F5E9D6] font-mono">{requireTyping}</strong> เพื่อยืนยัน
+                  <label className="block text-xs text-muted-foreground mb-2">
+                    พิมพ์ <strong className="text-foreground font-mono">{requireTyping}</strong> เพื่อยืนยัน
                   </label>
                   <input
                     ref={inputRef}
                     type="text"
                     value={typedValue}
                     onChange={(e) => setTypedValue(e.target.value)}
-                    className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-4 py-2 focus:outline-none focus:border-red-500/50"
+                    className="w-full bg-input border border-border-subtle text-foreground rounded-xl px-4 py-2 focus:outline-none focus:border-destructive/50"
                     placeholder={requireTyping}
                   />
                 </div>
@@ -111,7 +111,7 @@ export default function ConfirmDialog({
                   type="button"
                   onClick={onClose}
                   disabled={isLoading}
-                  className="px-4 py-2 rounded-xl text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] transition-colors text-sm font-medium disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl text-foreground hover:bg-hover transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   {cancelText}
                 </button>
@@ -119,10 +119,10 @@ export default function ConfirmDialog({
                   type="button"
                   onClick={onConfirm}
                   disabled={!canConfirm || isLoading}
-                  className={`px-4 py-2 rounded-xl text-[#0F0B07] font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDestructive 
-                      ? 'bg-red-500 hover:bg-red-400' 
-                      : 'bg-[#D4AF37] hover:bg-[#F2D06B]'
+                  className={`px-4 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDestructive
+                      ? 'bg-destructive hover:bg-destructive/90 text-white'
+                      : 'bg-brand-solid hover:bg-brand-hover text-brand-foreground'
                   }`}
                 >
                   {isLoading ? 'รอสักครู่...' : confirmText}
@@ -131,10 +131,10 @@ export default function ConfirmDialog({
             </div>
           </div>
         </div>
-        
-        <button type="button" 
+
+        <button type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-[#A1866B] hover:text-[#F5E9D6] transition-colors"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Close"
         >
           <X size={20} />

@@ -8,10 +8,12 @@ import FloatingSupport from '@/components/FloatingSupport'
 import ActivityProvider from '@/components/ActivityProvider'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import StructuredData from '@/components/StructuredData'
-import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL, THEME_COLOR, createPageMetadata } from '@/lib/seo'
+import { DEFAULT_OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL, createPageMetadata } from '@/lib/seo'
 import { ConsentProvider } from '@/components/consent/ConsentProvider'
 import { ConsentManager } from '@/components/consent/ConsentManager'
 import { ConsentAnalyticsLoader } from '@/components/consent/ConsentAnalyticsLoader'
+import ThemeProvider from '@/components/theme/ThemeProvider'
+import { THEME_BOOT_SCRIPT, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from '@/lib/theme'
 
 const sarabun = Sarabun({
   subsets: ['thai', 'latin'],
@@ -38,8 +40,14 @@ export const metadata: Metadata = {
   },
 }
 
+// Dark + Light media pair: the browser picks the right browser-chrome color
+// before JS runs and follows the OS for System users. lib/theme.ts rewrites
+// these metas when the user forces a theme different from their OS.
 export const viewport: Viewport = {
-  themeColor: THEME_COLOR,
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: THEME_COLOR_DARK },
+    { media: '(prefers-color-scheme: light)', color: THEME_COLOR_LIGHT },
+  ],
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -53,8 +61,14 @@ export default async function RootLayout({
   const homepageSettings = await getHomepageSettings()
 
   return (
-    <html lang="th" className={sarabun.variable}>
+    // Dark is the SSR baseline; suppressHydrationWarning covers the one
+    // intentional pre-paint correction (lib/theme.ts THEME_BOOT_SCRIPT) that
+    // flips data-theme to light before first paint.
+    <html lang="th" data-theme="dark" suppressHydrationWarning className={sarabun.variable}>
       <head>
+        {/* Apply a persisted non-dark theme BEFORE first paint (no flash).
+            Pattern from the Next.js "preventing flash before hydration" guide. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <StructuredData
           data={{
             '@context': 'https://schema.org',
@@ -72,16 +86,18 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${sarabun.className} min-h-screen flex flex-col`}>
-        <ConsentProvider>
-          <ConsentAnalyticsLoader gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
-          <ConsentManager />
-          <ActivityProvider />
-          <Navbar supportConfig={homepageSettings.support} />
-          <main className="flex-grow">{children}</main>
-          <Footer supportConfig={homepageSettings.support} footerConfig={homepageSettings.footer} />
-          <FloatingSupport supportConfig={homepageSettings.support} />
-          <ToastContainer />
-        </ConsentProvider>
+        <ThemeProvider>
+          <ConsentProvider>
+            <ConsentAnalyticsLoader gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+            <ConsentManager />
+            <ActivityProvider />
+            <Navbar supportConfig={homepageSettings.support} />
+            <main className="flex-grow">{children}</main>
+            <Footer supportConfig={homepageSettings.support} footerConfig={homepageSettings.footer} />
+            <FloatingSupport supportConfig={homepageSettings.support} />
+            <ToastContainer />
+          </ConsentProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

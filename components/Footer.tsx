@@ -52,16 +52,16 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
   const renderedSocialLinks = footerConfig?.social_links || socialLinks
 
   return (
-    <footer data-site-footer="true" className="mobile-bottom-nav-footer bg-[#0F0B07] border-t border-[rgba(212,175,55,0.1)] pt-12 pb-24 lg:pb-12 mt-auto">
+    <footer data-site-footer="true" className="mobile-bottom-nav-footer bg-background border-t border-brand/10 pt-12 pb-24 lg:pb-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-8 md:gap-10 lg:grid-cols-4">
 
           {/* 1. BRAND */}
           <div className="col-span-2 lg:col-span-1 flex flex-col items-start">
-            <div className="text-xl font-display font-bold text-[#D4AF37] tracking-wide mb-2">
+            <div className="text-xl font-display font-bold text-brand tracking-wide mb-2">
               {legalConfig.companyName}
             </div>
-            <p className="text-[#A1866B] text-xs leading-relaxed mb-3">
+            <p className="text-muted-foreground text-xs leading-relaxed mb-3">
               &copy; {new Date().getFullYear()} {legalConfig.companyName}. สงวนลิขสิทธิ์
             </p>
 
@@ -74,9 +74,9 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
                   aria-haspopup="dialog"
                   aria-expanded={isModalOpen}
                   onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-xs text-[#A1866B] hover:text-[#D4AF37] border border-[rgba(212,175,55,0.2)] hover:border-[rgba(212,175,55,0.4)] bg-transparent hover:bg-[rgba(212,175,55,0.05)] px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37]/50"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-brand border border-brand/20 hover:border-brand/40 bg-transparent hover:bg-wash px-3 py-1.5 rounded-lg transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-brand/50"
                 >
-                  <Heart size={13} className="text-[#A1866B]" />
+                  <Heart size={13} className="text-muted-foreground" />
                   <span>{supportConfig.button_label || 'สนับสนุน Sobdai'}</span>
                 </button>
               </div>
@@ -85,20 +85,20 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
 
           {/* 2. HELP / PRODUCT */}
           <div className="col-span-1 flex flex-col">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               ช่วยเหลือ
             </h3>
-            <nav aria-label="ช่วยเหลือและบริการ" className="flex flex-col space-y-2.5 text-sm text-[#A1866B]">
-              <Link href="/help" className="hover:text-[#F5E9D6] transition-colors">
+            <nav aria-label="ช่วยเหลือและบริการ" className="flex flex-col space-y-2.5 text-sm text-muted-foreground">
+              <Link href="/help" className="hover:text-foreground transition-colors">
                 วิธีใช้งาน
               </Link>
-              <Link href="/faq" className="hover:text-[#F5E9D6] transition-colors">
+              <Link href="/faq" className="hover:text-foreground transition-colors">
                 คำถามที่พบบ่อย
               </Link>
-              <Link href="/contact" className="hover:text-[#F5E9D6] transition-colors">
+              <Link href="/contact" className="hover:text-foreground transition-colors">
                 ติดต่อเรา
               </Link>
-              <Link href="/about" className="hover:text-[#F5E9D6] transition-colors">
+              <Link href="/about" className="hover:text-foreground transition-colors">
                 เกี่ยวกับเรา
               </Link>
             </nav>
@@ -106,17 +106,17 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
 
           {/* 3. LEGAL / SETTINGS */}
           <div className="col-span-1 flex flex-col">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               ข้อกำหนดและนโยบาย
             </h3>
-            <nav aria-label="กฎหมายและการตั้งค่า" className="flex flex-col space-y-2.5 text-sm text-[#A1866B]">
-              <Link href="/terms" className="hover:text-[#F5E9D6] transition-colors">
+            <nav aria-label="กฎหมายและการตั้งค่า" className="flex flex-col space-y-2.5 text-sm text-muted-foreground">
+              <Link href="/terms" className="hover:text-foreground transition-colors">
                 เงื่อนไขการให้บริการ
               </Link>
-              <Link href="/privacy" className="hover:text-[#F5E9D6] transition-colors">
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
                 นโยบายความเป็นส่วนตัว
               </Link>
-              <Link href="/cookies" className="hover:text-[#F5E9D6] transition-colors">
+              <Link href="/cookies" className="hover:text-foreground transition-colors">
                 นโยบายคุกกี้
               </Link>
               <div className="text-left">
@@ -127,7 +127,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
 
           {/* 4. CONNECT */}
           <div className="col-span-2 lg:col-span-1 flex flex-col pt-2 lg:pt-0">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               ติดตามเรา
             </h3>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 lg:flex-col lg:items-start lg:space-y-2.5 lg:gap-0">
@@ -137,7 +137,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
                     <span
                       key={social.key}
                       aria-disabled="true"
-                      className="inline-flex items-center gap-2 text-sm text-[#5a4a3a] cursor-not-allowed"
+                      className="inline-flex items-center gap-2 text-sm text-faint cursor-not-allowed"
                     >
                       <SocialIcon name={social.key} size={16} />
                       <span>{social.label}</span>
@@ -151,7 +151,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`ติดตาม Sobdai บน ${social.label}`}
-                    className="inline-flex items-center gap-2 text-sm text-[#A1866B] hover:text-[#F5E9D6] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37]"
+                    className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
                   >
                     <SocialIcon name={social.key} size={16} />
                     <span>{social.label}</span>
