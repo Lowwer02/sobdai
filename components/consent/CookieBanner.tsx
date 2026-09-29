@@ -16,7 +16,7 @@ export function CookieBanner() {
       aria-modal="false"
       aria-labelledby="cookie-banner-title"
       aria-describedby="cookie-banner-description"
-      className="fixed bottom-0 inset-x-0 z-50 bg-surface-raised border-t border-border shadow-2xl"
+      className="banner-safe-area fixed inset-x-3 z-50 rounded-2xl sm:inset-x-0 sm:bottom-0 sm:rounded-none bg-surface-raised border border-border shadow-[var(--shadow-lg)] sm:border-t sm:border-x-0 sm:border-b-0 overflow-hidden"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-6">
         <div className="flex-1 text-xs sm:text-sm text-muted-foreground leading-normal">

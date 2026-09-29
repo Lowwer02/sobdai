@@ -59,7 +59,7 @@ export default function ArticleDetail({ article, relatedPositions = [] }: Articl
       <div>
         <Link
           href="/articles"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm text-[#A1866B] hover:text-[#D4AF37] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded-md p-1 -ml-1"
+          className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground hover:text-brand transition-colors focus:outline-none focus:ring-2 focus:ring-brand rounded-md p-1 -ml-1"
         >
           <ArrowLeft size={16} />
           <span>กลับสู่บทความทั้งหมด</span>
@@ -67,79 +67,79 @@ export default function ArticleDetail({ article, relatedPositions = [] }: Articl
       </div>
 
       {/* Header section */}
-      <header className="space-y-4 border-b border-[#D4AF37]/15 pb-6">
+      <header className="space-y-4 border-b border-brand/15 pb-6">
         {article.category && (
           <div>
-            <span className="inline-block px-3 py-1 text-xs font-semibold bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] rounded-md max-w-full truncate">
+            <span className="inline-block px-3 py-1 text-xs font-semibold bg-wash border border-brand/30 text-brand rounded-md max-w-full truncate">
               {article.category}
             </span>
           </div>
         )}
 
-        <h1 className="text-2xl sm:text-4xl font-extrabold text-[#F5E9D6] tracking-tight leading-tight">
+        <h1 className="text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight leading-tight">
           {article.title}
         </h1>
 
         {article.excerpt && (
-          <p className="text-sm sm:text-lg text-[#A1866B] leading-relaxed">
+          <p className="text-sm sm:text-lg text-muted-foreground leading-relaxed">
             {article.excerpt}
           </p>
         )}
 
         {/* Top Metadata row */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-[#A1866B] pt-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-muted-foreground pt-2">
           {/* Author Byline */}
           {article.author ? (
             <div className="flex items-center gap-1.5">
-              <User size={15} className="text-[#D4AF37]" />
+              <User size={15} className="text-brand" />
               <span>เขียนโดย:</span>
               <Link
                 href={`/authors/${article.author.slug}`}
-                className="font-medium text-[#F5E9D6] hover:text-[#D4AF37] underline decoration-[#D4AF37]/30 hover:decoration-[#D4AF37] transition-colors"
+                className="font-medium text-foreground hover:text-brand underline decoration-brand/30 hover:decoration-brand transition-colors"
               >
                 {article.author.display_name}
               </Link>
               {article.author.role_title && (
-                <span className="text-[#A1866B]/70">· {article.author.role_title}</span>
+                <span className="text-muted-foreground/70">· {article.author.role_title}</span>
               )}
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
-              <User size={15} className="text-[#D4AF37]" />
+              <User size={15} className="text-brand" />
               <span>เขียนโดย:</span>
-              <span className="font-medium text-[#F5E9D6]">ทีมบรรณาธิการ Sobdai</span>
+              <span className="font-medium text-foreground">ทีมบรรณาธิการ Sobdai</span>
             </div>
           )}
 
           {publishedDateStr && (
             <div className="flex items-center gap-1.5">
-              <Calendar size={15} className="text-[#D4AF37]" />
+              <Calendar size={15} className="text-brand" />
               <time dateTime={article.published_at}>เผยแพร่เมื่อ {publishedDateStr}</time>
             </div>
           )}
 
           {showUpdated && (
-            <div className="flex items-center gap-1.5 text-[#A1866B]/80">
-              <RefreshCw size={14} className="text-[#D4AF37]" />
+            <div className="flex items-center gap-1.5 text-muted-foreground/80">
+              <RefreshCw size={14} className="text-brand" />
               <time dateTime={article.updated_at}>อัปเดตเมื่อ {updatedDateStr}</time>
             </div>
           )}
 
           <div className="flex items-center gap-1.5">
-            <Clock size={15} className="text-[#D4AF37]" />
+            <Clock size={15} className="text-brand" />
             <span>เวลาอ่านประมาณ {readingTime} นาที</span>
           </div>
         </div>
       </header>
 
       {relatedPositions.length > 0 && (
-        <section aria-label="ตำแหน่งที่เกี่ยวข้อง" className="flex flex-wrap items-center gap-2 border-b border-[#D4AF37]/15 pb-6">
-          <span className="text-xs font-semibold text-[#A1866B]">ตำแหน่งที่เกี่ยวข้อง:</span>
+        <section aria-label="ตำแหน่งที่เกี่ยวข้อง" className="flex flex-wrap items-center gap-2 border-b border-brand/15 pb-6">
+          <span className="text-xs font-semibold text-muted-foreground">ตำแหน่งที่เกี่ยวข้อง:</span>
           {relatedPositions.map((position) => (
             <Link
               key={position.id}
               href={`/positions/${encodeURIComponent(position.slug)}`}
-              className="rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/5 px-3 py-1.5 text-xs text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/10 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+              className="rounded-full border border-brand/30 bg-brand-solid/5 px-3 py-1.5 text-xs text-brand transition-colors hover:bg-wash focus:outline-none focus:ring-2 focus:ring-brand"
             >
               {position.name}
             </Link>
@@ -149,7 +149,7 @@ export default function ArticleDetail({ article, relatedPositions = [] }: Articl
 
       {/* Cover Image (16:9) */}
       {article.cover_image_url ? (
-        <div className="relative aspect-video w-full bg-[#1A140E] border border-[#D4AF37]/20 rounded-2xl overflow-hidden shadow-xl">
+        <div className="relative aspect-video w-full bg-card border border-brand/20 rounded-2xl overflow-hidden shadow-xl">
           <Image
             src={article.cover_image_url}
             alt={altText}
@@ -160,18 +160,18 @@ export default function ArticleDetail({ article, relatedPositions = [] }: Articl
           />
         </div>
       ) : (
-        <div className="aspect-video w-full bg-gradient-to-br from-[#1A140E] to-[#0F0B07] border border-[#D4AF37]/20 rounded-2xl flex flex-col items-center justify-center text-[#A1866B]/40 p-6">
-          <FileText size={48} className="mb-2 text-[#D4AF37]/30" />
-          <span className="text-xs font-mono text-[#A1866B]/50">Sobdai Knowledge Hub</span>
+        <div className="aspect-video w-full bg-gradient-to-br from-card to-background border border-brand/20 rounded-2xl flex flex-col items-center justify-center text-muted-foreground/40 p-6">
+          <FileText size={48} className="mb-2 text-brand/30" />
+          <span className="text-xs font-mono text-muted-foreground/50">Sobdai Knowledge Hub</span>
         </div>
       )}
 
       {/* Main Body Markdown */}
-      <div className="bg-[#1A140E]/60 border border-[#D4AF37]/15 rounded-2xl p-4 sm:p-8 max-w-full overflow-hidden">
+      <div className="bg-card/60 border border-brand/15 rounded-2xl p-4 sm:p-8 max-w-full overflow-hidden">
         {article.body_markdown ? (
           <SummaryMarkdown content={article.body_markdown} />
         ) : (
-          <p className="text-sm text-[#A1866B] italic">ไม่มีเนื้อหาบทความ</p>
+          <p className="text-sm text-muted-foreground italic">ไม่มีเนื้อหาบทความ</p>
         )}
       </div>
 
@@ -192,16 +192,16 @@ export default function ArticleDetail({ article, relatedPositions = [] }: Articl
 
       {/* Tags section */}
       {Array.isArray(article.tags) && article.tags.length > 0 && (
-        <div className="pt-4 border-t border-[#D4AF37]/15 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-[#A1866B]">
-            <TagIcon size={14} className="text-[#D4AF37]" />
+        <div className="pt-4 border-t border-brand/15 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <TagIcon size={14} className="text-brand" />
             <span>แท็ก:</span>
           </div>
           {article.tags.map((tag) => (
             <Link
               key={tag}
               href={`/articles?tag=${encodeURIComponent(tag)}`}
-              className="px-2.5 py-1 text-xs bg-[#1A140E] border border-[#D4AF37]/20 hover:border-[#D4AF37] text-[#F5E9D6] hover:text-[#D4AF37] rounded-lg transition-colors"
+              className="px-2.5 py-1 text-xs bg-card border border-brand/20 hover:border-brand text-foreground hover:text-brand rounded-lg transition-colors"
             >
               #{tag}
             </Link>

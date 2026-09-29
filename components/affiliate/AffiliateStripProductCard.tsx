@@ -60,7 +60,7 @@ export default function AffiliateStripProductCard({
       target="_blank"
       rel="nofollow sponsored noopener noreferrer"
       onClick={handleClick}
-      className="affiliate-strip-product-card affiliate-strip-card focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-xl"
+      className="affiliate-strip-product-card affiliate-strip-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-xl"
       style={{
         borderRadius: 12,
         border: '1px solid var(--border-card)',

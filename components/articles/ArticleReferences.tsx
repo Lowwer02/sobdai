@@ -41,11 +41,11 @@ export default function ArticleReferences({ sources }: ArticleReferencesProps) {
   return (
     <section
       aria-label="เอกสารและแหล่งข้อมูลอ้างอิง"
-      className="bg-[#1A140E]/80 border border-[#D4AF37]/20 rounded-2xl p-5 sm:p-7 space-y-4"
+      className="bg-card/80 border border-brand/20 rounded-2xl p-5 sm:p-7 space-y-4"
     >
-      <div className="flex items-center gap-2 border-b border-[#D4AF37]/15 pb-3">
-        <BookOpen size={18} className="text-[#D4AF37] shrink-0" />
-        <h2 className="text-base sm:text-lg font-bold text-[#F5E9D6]">
+      <div className="flex items-center gap-2 border-b border-brand/15 pb-3">
+        <BookOpen size={18} className="text-brand shrink-0" />
+        <h2 className="text-base sm:text-lg font-bold text-foreground">
           เอกสารและแหล่งข้อมูลอ้างอิง
         </h2>
       </div>
@@ -56,9 +56,9 @@ export default function ArticleReferences({ sources }: ArticleReferencesProps) {
           return (
             <li
               key={index}
-              className="flex items-start gap-2.5 text-xs sm:text-sm text-[#E5D7C5] group leading-relaxed"
+              className="flex items-start gap-2.5 text-xs sm:text-sm text-foreground group leading-relaxed"
             >
-              <span className="text-[#D4AF37]/60 font-mono text-xs select-none shrink-0 mt-0.5">
+              <span className="text-brand/60 font-mono text-xs select-none shrink-0 mt-0.5">
                 [{index + 1}]
               </span>
               <div className="flex-1 min-w-0">
@@ -66,13 +66,13 @@ export default function ArticleReferences({ sources }: ArticleReferencesProps) {
                   href={source.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#F5E9D6] hover:text-[#D4AF37] underline decoration-[#D4AF37]/30 hover:decoration-[#D4AF37] transition-colors break-words"
+                  className="inline-flex items-center gap-1 text-foreground hover:text-brand underline decoration-brand/30 hover:decoration-brand transition-colors break-words"
                 >
                   <span>{source.title}</span>
-                  <ExternalLink size={13} className="text-[#D4AF37] shrink-0 opacity-70 group-hover:opacity-100 transition-opacity ml-0.5 inline" />
+                  <ExternalLink size={13} className="text-brand shrink-0 opacity-70 group-hover:opacity-100 transition-opacity ml-0.5 inline" />
                 </a>
                 {formattedDate && (
-                  <span className="block text-[11px] sm:text-xs text-[#A1866B] mt-0.5">
+                  <span className="block text-[11px] sm:text-xs text-muted-foreground mt-0.5">
                     วันที่เอกสาร: {formattedDate}
                   </span>
                 )}

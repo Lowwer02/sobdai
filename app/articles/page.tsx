@@ -84,45 +84,45 @@ export default async function ArticlesListPage({
   const stripSplit = splitForListingStrip(res.data)
 
   return (
-    <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-background text-foreground py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Page Header / Hero */}
-        <header className="border-b border-[#D4AF37]/15 pb-6 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#D4AF37] uppercase tracking-wider">
+        <header className="border-b border-brand/15 pb-6 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-brand uppercase tracking-wider">
             <FileText size={16} />
             <span>Sobdai Knowledge Hub</span>
           </div>
 
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-[#F5E9D6] tracking-tight">
+          <h1 className="text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight">
             บทความเตรียมสอบราชการ
           </h1>
 
-          <p className="text-sm sm:text-base text-[#A1866B] max-w-3xl leading-relaxed">
+          <p className="text-sm sm:text-base text-muted-foreground max-w-3xl leading-relaxed">
             รวบรวมบทความน่ารู้ เทคนิคการสอบ คู่มือเตรียมตัวสอบข้าราชการและพนักงานราชการ
             พร้อมข้อมูลอัปเดตเพื่อช่วยให้คุณเตรียมสอบได้อย่างมั่นใจ
           </p>
 
           {(category || tag || search) && (
             <div className="flex flex-wrap items-center gap-2 pt-2">
-              <span className="text-xs text-[#A1866B]">ตัวกรองปัจจุบัน:</span>
+              <span className="text-xs text-muted-foreground">ตัวกรองปัจจุบัน:</span>
               {category && (
-                <span className="px-2.5 py-0.5 text-xs bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 rounded-md">
+                <span className="px-2.5 py-0.5 text-xs bg-wash text-brand border border-brand/30 rounded-md">
                   หมวดหมู่: {category}
                 </span>
               )}
               {tag && (
-                <span className="px-2.5 py-0.5 text-xs bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 rounded-md">
+                <span className="px-2.5 py-0.5 text-xs bg-wash text-brand border border-brand/30 rounded-md">
                   แท็ก: #{tag}
                 </span>
               )}
               {search && (
-                <span className="px-2.5 py-0.5 text-xs bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 rounded-md">
+                <span className="px-2.5 py-0.5 text-xs bg-wash text-brand border border-brand/30 rounded-md">
                   ค้นหา: &quot;{search}&quot;
                 </span>
               )}
               <Link
                 href="/articles"
-                className="text-xs text-[#A1866B] hover:text-[#D4AF37] underline ml-1 transition-colors"
+                className="text-xs text-muted-foreground hover:text-brand underline ml-1 transition-colors"
               >
                 ล้างตัวกรอง
               </Link>
@@ -141,7 +141,7 @@ export default async function ArticlesListPage({
             <div className="pt-2">
               <Link
                 href="/articles"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#1A140E] border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-semibold rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-brand/30 text-brand text-xs font-semibold rounded-lg hover:bg-wash transition-colors"
               >
                 <ArrowLeft size={14} /> กลับสู่หน้าบทความทั้งหมด
               </Link>
@@ -151,18 +151,18 @@ export default async function ArticlesListPage({
 
         {/* Success States */}
         {res.success && res.data.length === 0 && (
-          <div className="bg-[#1A140E] border border-[#D4AF37]/15 rounded-2xl p-8 sm:p-12 text-center space-y-4 my-8 max-w-xl mx-auto">
-            <SearchX className="mx-auto text-[#D4AF37]/40" size={48} />
-            <h2 className="text-lg sm:text-xl font-bold text-[#F5E9D6]">
+          <div className="bg-card border border-brand/15 rounded-2xl p-8 sm:p-12 text-center space-y-4 my-8 max-w-xl mx-auto">
+            <SearchX className="mx-auto text-brand/40" size={48} />
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">
               ไม่พบบทความที่คุณค้นหา
             </h2>
-            <p className="text-xs sm:text-sm text-[#A1866B]">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อดูบทความทั้งหมดในระบบ
             </p>
             <div className="pt-2">
               <Link
                 href="/articles"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#0F0B07] text-xs font-bold rounded-lg hover:bg-[#D4AF37]/90 transition-colors shadow-md"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-solid text-brand-foreground text-xs font-bold rounded-lg hover:bg-brand-solid/90 transition-colors shadow-md"
               >
                 ดูบทความทั้งหมด
               </Link>

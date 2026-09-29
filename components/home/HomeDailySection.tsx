@@ -45,7 +45,7 @@ function DailyStat({
         padding: '12px 14px',
         border: '1px solid var(--border-card)',
         borderRadius: 'var(--radius-md)',
-        background: 'rgba(15, 11, 8, 0.34)',
+        background: 'var(--card)',
       }}
     >
       <span
@@ -220,7 +220,7 @@ export default function HomeDailySection() {
           position: 'relative',
           overflow: 'hidden',
           padding: 'clamp(22px, 4vw, 36px)',
-          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.38)',
+          boxShadow: 'var(--shadow-lg)',
         }}
       >
         <div

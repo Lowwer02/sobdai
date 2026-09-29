@@ -83,14 +83,14 @@ export default function ArticleRailPackages({
               <Link
                 key={pkg.id}
                 href={`/package/${pkg.slug}`}
-                className="group block rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                className="group block rounded-xl focus:outline-none focus:ring-2 focus:ring-brand"
               >
-                <div className="rounded-xl border border-[#D4AF37]/20 bg-[#1A140E] p-3 transition-colors duration-300 group-hover:border-[#D4AF37]/60">
+                <div className="rounded-xl border border-[#D4AF37]/20 bg-card p-3 transition-colors duration-300 group-hover:border-[#D4AF37]/60">
                   {/* Logo + title — the compact equivalent of the bottom
                       section's card header. */}
                   <div className="flex items-start gap-2.5">
                     {pkg.logo_url || pkg.cover_image_url ? (
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-[#D4AF37]/30 bg-[#0F0B07]">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-brand/30 bg-surface-muted">
                         <Image
                           src={pkg.logo_url || pkg.cover_image_url || ''}
                           alt={pkg.name}
@@ -100,12 +100,12 @@ export default function ArticleRailPackages({
                         />
                       </div>
                     ) : (
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D4AF37]/30 bg-[#0F0B07] text-[#D4AF37]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-brand/30 bg-surface-muted text-brand">
                         <Package size={20} />
                       </div>
                     )}
                     <h3
-                      className="line-clamp-2 text-sm font-bold leading-snug text-[#F5E9D6] transition-colors group-hover:text-[#D4AF37]"
+                      className="line-clamp-2 text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-brand"
                       style={{ overflowWrap: 'anywhere' }}
                     >
                       {pkg.name}
@@ -114,7 +114,7 @@ export default function ArticleRailPackages({
 
                   {pkg.description && (
                     <p
-                      className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#A1866B]"
+                      className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground"
                       style={{ overflowWrap: 'anywhere' }}
                     >
                       {pkg.description}
@@ -123,24 +123,24 @@ export default function ArticleRailPackages({
 
                   {/* Price + CTA — same fields and formatting as the bottom
                       section's card footer. */}
-                  <div className="mt-2.5 flex items-center justify-between border-t border-[#D4AF37]/10 pt-2">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-brand/10 pt-2">
                     <div className="flex items-baseline gap-1.5">
                       {pkg.current_price !== null ? (
-                        <span className="text-base font-extrabold text-[#D4AF37]">
+                        <span className="text-base font-extrabold text-brand">
                           {formatPrice(pkg.current_price)}
                         </span>
                       ) : (
-                        <span className="text-xs text-[#A1866B]">ดูรายละเอียด</span>
+                        <span className="text-xs text-muted-foreground">ดูรายละเอียด</span>
                       )}
 
                       {hasDiscount && (
-                        <span className="text-xs text-[#A1866B]/60 line-through">
+                        <span className="text-xs text-muted-foreground/60 line-through">
                           {formatPrice(pkg.original_price)}
                         </span>
                       )}
                     </div>
 
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#D4AF37] transition-transform group-hover:translate-x-1">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand transition-transform group-hover:translate-x-1">
                       ดูแพ็กเกจ <ArrowRight size={14} />
                     </span>
                   </div>

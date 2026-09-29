@@ -335,7 +335,7 @@ export default function PackageCard({ pkg, index = 0, searchQuery, freshnessVari
             )}
             <div
               className="font-display"
-              style={{ fontSize: '22px', color: pkg.current_price === 0 ? '#22c55e' : 'var(--gold-light)', lineHeight: 1 }}
+              style={{ fontSize: '22px', color: pkg.current_price === 0 ? 'var(--success)' : 'var(--gold-light)', lineHeight: 1 }}
             >
               {pkg.current_price === 0 ? 'ฟรี' : `฿${pkg.current_price}`}
             </div>

@@ -68,7 +68,7 @@ export default function HomeInsightShowcase() {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
           <div>
@@ -80,9 +80,9 @@ export default function HomeInsightShowcase() {
                     fontWeight: 700,
                     padding: '3px 12px',
                     borderRadius: '999px',
-                    color: '#22c55e',
-                    background: 'rgba(34,197,94,0.12)',
-                    border: '1px solid rgba(34,197,94,0.3)',
+                    color: 'var(--success)',
+                    background: 'var(--success-bg)',
+                    border: '1px solid var(--success-border)',
                   }}
                 >
                   ผ่านเกณฑ์
@@ -99,7 +99,7 @@ export default function HomeInsightShowcase() {
                 style={{
                   fontSize: '10px',
                   color: 'var(--text-muted)',
-                  background: 'rgba(255,235,180,0.06)',
+                  background: 'var(--muted)',
                   padding: '2px 7px',
                   borderRadius: '3px',
                 }}
@@ -117,7 +117,7 @@ export default function HomeInsightShowcase() {
 
             {/* Score & Gauge */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '24px' }}>
-              <span className="font-display" style={{ fontSize: '48px', lineHeight: 1, fontWeight: 700, color: '#22c55e' }}>
+              <span className="font-display" style={{ fontSize: '48px', lineHeight: 1, fontWeight: 700, color: 'var(--success)' }}>
                 84%
               </span>
               <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>ความแม่นยำรวม</span>
@@ -127,11 +127,11 @@ export default function HomeInsightShowcase() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '24px' }}>
               <div style={{ background: 'var(--bg-input)', padding: '12px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-card)' }}>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: '3px' }}>ตอบถูก</div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: '#22c55e' }}>42</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success)' }}>42</div>
               </div>
               <div style={{ background: 'var(--bg-input)', padding: '12px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-card)' }}>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: '3px' }}>ตอบผิด</div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: '#e05c5c' }}>8</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--wrong)' }}>8</div>
               </div>
               <div style={{ background: 'var(--bg-input)', padding: '12px 10px', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-card)' }}>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: '3px' }}>ทำครบ</div>
@@ -185,7 +185,7 @@ export default function HomeInsightShowcase() {
                 style={{
                   fontSize: '10px',
                   color: 'var(--text-muted)',
-                  background: 'rgba(255,235,180,0.06)',
+                  background: 'var(--muted)',
                   padding: '2px 6px',
                   borderRadius: '3px',
                 }}
@@ -202,20 +202,20 @@ export default function HomeInsightShowcase() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: '4px' }}>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>พ.ร.บ. ระเบียบบริหารราชการแผ่นดิน</span>
-                  <span style={{ color: '#4caf7d', fontWeight: 600 }}>85% แม่นยำ</span>
+                  <span style={{ color: 'var(--correct)', fontWeight: 600 }}>85% แม่นยำ</span>
                 </div>
                 <div style={{ height: '4px', background: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: '85%', height: '100%', background: '#4caf7d' }} />
+                  <div style={{ width: '85%', height: '100%', background: 'var(--correct)' }} />
                 </div>
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: '4px' }}>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>พ.ร.บ. ข้อมูลข่าวสารของราชการ</span>
-                  <span style={{ color: '#e05c5c', fontWeight: 600 }}>40% ต้องทบทวน</span>
+                  <span style={{ color: 'var(--wrong)', fontWeight: 600 }}>40% ต้องทบทวน</span>
                 </div>
                 <div style={{ height: '4px', background: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: '40%', height: '100%', background: '#e05c5c' }} />
+                  <div style={{ width: '40%', height: '100%', background: 'var(--wrong)' }} />
                 </div>
               </div>
             </div>
@@ -244,7 +244,7 @@ export default function HomeInsightShowcase() {
                 style={{
                   fontSize: '10px',
                   color: 'var(--text-muted)',
-                  background: 'rgba(255,235,180,0.06)',
+                  background: 'var(--muted)',
                   padding: '2px 6px',
                   borderRadius: '3px',
                 }}
@@ -299,7 +299,7 @@ export default function HomeInsightShowcase() {
                     fontSize: '11px',
                     fontWeight: 700,
                     color: 'var(--text-muted)',
-                    background: 'rgba(255, 255, 255, 0.06)',
+                    background: 'var(--muted)',
                     padding: '3px 8px',
                     borderRadius: '4px',
                     flexShrink: 0,

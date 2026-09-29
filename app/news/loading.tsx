@@ -7,18 +7,18 @@
  */
 export default function NewsLoading() {
   return (
-    <div className="min-h-[70vh] bg-[#0F0B07]">
+    <div className="min-h-[70vh] bg-background">
       <div className="max-w-[1100px] mx-auto px-5 py-10">
         {/* Hero skeleton */}
         <div className="text-center mb-9">
-          <div className="h-10 md:h-12 w-72 mx-auto bg-[#1A140E] rounded-lg mb-3" />
-          <div className="h-4 w-80 mx-auto bg-[#1A140E] rounded" />
+          <div className="h-10 md:h-12 w-72 mx-auto bg-card rounded-lg mb-3" />
+          <div className="h-4 w-80 mx-auto bg-card rounded" />
         </div>
 
         {/* Controls skeleton */}
         <div className="max-w-[600px] mx-auto mb-8 flex flex-col gap-4">
-          <div className="h-12 w-full bg-[#1A140E] rounded-xl" />
-          <div className="h-10 w-48 mx-auto bg-[#1A140E] rounded-xl" />
+          <div className="h-12 w-full bg-card rounded-xl" />
+          <div className="h-10 w-48 mx-auto bg-card rounded-xl" />
         </div>
 
         {/* Card grid skeleton — matches PAGE_SIZE (9) so the layout doesn't
@@ -27,15 +27,15 @@ export default function NewsLoading() {
           {Array.from({ length: 9 }).map((_, i) => (
             <div
               key={i}
-              className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl overflow-hidden"
+              className="bg-card border border-border-subtle rounded-2xl overflow-hidden"
             >
-              <div className="aspect-video bg-[#0F0B07]" />
+              <div className="aspect-video bg-surface-muted" />
               <div className="p-5 space-y-3">
-                <div className="h-3 w-24 bg-[#0F0B07] rounded" />
-                <div className="h-5 w-full bg-[#0F0B07] rounded" />
-                <div className="h-5 w-2/3 bg-[#0F0B07] rounded" />
-                <div className="h-3 w-full bg-[#0F0B07] rounded" />
-                <div className="h-3 w-1/2 bg-[#0F0B07] rounded" />
+                <div className="h-3 w-24 bg-surface-muted rounded" />
+                <div className="h-5 w-full bg-surface-muted rounded" />
+                <div className="h-5 w-2/3 bg-surface-muted rounded" />
+                <div className="h-3 w-full bg-surface-muted rounded" />
+                <div className="h-3 w-1/2 bg-surface-muted rounded" />
               </div>
             </div>
           ))}

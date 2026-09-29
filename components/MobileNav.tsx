@@ -30,7 +30,7 @@ import { trackDailyNavClick } from '@/lib/analytics'
 import type { SupportConfig } from '@/lib/homepageConfig'
 import { getActiveMobilePrimaryHref, normalizeMobilePathname, shouldShowMobileBottomNav } from '@/lib/mobile-nav-route'
 import { useConsent } from './consent/ConsentProvider'
-import { ThemeToggleInline } from './theme/ThemeToggle'
+import ThemeToggle, { ThemeToggleInline } from './theme/ThemeToggle'
 import NotificationBell, { type NotificationCenterState } from './NotificationBell'
 import SupportModal from './SupportModal'
 
@@ -413,6 +413,10 @@ export default function MobileNav({
 
         <div className="flex items-center gap-1">
           <NotificationBell active={Boolean(user)} center={notifications} />
+
+          {/* Appearance control — on the top bar so Light/Dark/System is
+              discoverable without opening the More sheet. */}
+          <ThemeToggle />
           {!user && !isExcluded && (
             <button
               type="button"

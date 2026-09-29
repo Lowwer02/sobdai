@@ -43,7 +43,7 @@ export default function HomeHeroPreview() {
           padding: '24px',
           borderRadius: 'var(--radius-xl)',
           border: '1px solid rgba(212, 168, 67, 0.28)',
-          boxShadow: '0 16px 44px rgba(0, 0, 0, 0.7)',
+          boxShadow: 'var(--shadow-lg)',
         }}
       >
         {/* Header Bar */}
@@ -102,9 +102,9 @@ export default function HomeHeroPreview() {
               style={{
                 fontSize: '10px',
                 padding: '2px 8px',
-                background: 'rgba(255, 235, 180, 0.06)',
+                background: 'var(--muted)',
                 color: 'var(--text-muted)',
-                border: '1px solid rgba(255, 235, 180, 0.12)',
+                border: '1px solid var(--border-card)',
               }}
             >
               ตัวอย่างหน้าจอ
@@ -204,8 +204,8 @@ export default function HomeHeroPreview() {
               gap: '12px',
               padding: '12px 14px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(76, 175, 125, 0.12)',
-              border: '1.5px solid #4caf7d',
+              background: 'var(--correct-bg)',
+              border: '1.5px solid var(--correct)',
               fontSize: '13.5px',
               color: 'var(--text-primary)',
             }}
@@ -221,7 +221,7 @@ export default function HomeHeroPreview() {
                   justifyContent: 'center',
                   fontSize: '11px',
                   fontWeight: 700,
-                  background: '#4caf7d',
+                  background: 'var(--correct)',
                   color: '#0f0b08',
                   flexShrink: 0,
                 }}
@@ -234,8 +234,8 @@ export default function HomeHeroPreview() {
               style={{
                 fontSize: '11.5px',
                 fontWeight: 700,
-                color: '#4caf7d',
-                background: 'rgba(76, 175, 125, 0.2)',
+                color: 'var(--correct)',
+                background: 'var(--correct-bg)',
                 padding: '2px 8px',
                 borderRadius: '999px',
                 flexShrink: 0,
@@ -249,8 +249,8 @@ export default function HomeHeroPreview() {
         {/* Explanation Snippet (Clean & Punchy) */}
         <div
           style={{
-            background: 'rgba(45, 122, 79, 0.08)',
-            border: '1px solid rgba(45, 122, 79, 0.25)',
+            background: 'var(--green-tint)',
+            border: '1px solid color-mix(in srgb, var(--green) 25%, transparent)',
             borderRadius: 'var(--radius-md)',
             padding: '12px 16px',
             fontSize: '12.5px',
@@ -292,9 +292,9 @@ export default function HomeHeroPreview() {
           zIndex: 2,
           padding: '16px 18px',
           borderRadius: 'var(--radius-md)',
-          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.75)',
+          boxShadow: 'var(--shadow-lg)',
           border: '1px solid rgba(212, 168, 67, 0.35)',
-          background: 'linear-gradient(135deg, rgba(28, 20, 12, 0.98) 0%, rgba(18, 12, 8, 0.98) 100%)',
+          background: 'linear-gradient(135deg, var(--card) 0%, var(--surface-muted) 100%)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -313,8 +313,8 @@ export default function HomeHeroPreview() {
               style={{
                 fontSize: '11px',
                 fontWeight: 700,
-                color: '#4caf7d',
-                background: 'rgba(76, 175, 125, 0.15)',
+                color: 'var(--correct)',
+                background: 'var(--correct-bg)',
                 padding: '2px 7px',
                 borderRadius: '999px',
               }}
@@ -325,7 +325,7 @@ export default function HomeHeroPreview() {
               style={{
                 fontSize: '9.5px',
                 color: 'var(--text-muted)',
-                background: 'rgba(255, 235, 180, 0.06)',
+                background: 'var(--muted)',
                 padding: '1px 6px',
                 borderRadius: '3px',
               }}
@@ -339,10 +339,10 @@ export default function HomeHeroPreview() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '4px' }}>
             <span style={{ color: 'var(--text-secondary)' }}>จุดอ่อนที่ควรทบทวน: พ.ร.บ. ข้อมูลข่าวสารฯ</span>
-            <span style={{ color: '#e05c5c', fontWeight: 600 }}>45% ต้องทบทวน</span>
+            <span style={{ color: 'var(--wrong)', fontWeight: 600 }}>45% ต้องทบทวน</span>
           </div>
           <div style={{ height: '4px', background: 'var(--bg-input)', borderRadius: '2px', overflow: 'hidden' }}>
-            <div style={{ width: '45%', height: '100%', background: '#e05c5c' }} />
+            <div style={{ width: '45%', height: '100%', background: 'var(--wrong)' }} />
           </div>
         </div>
       </div>

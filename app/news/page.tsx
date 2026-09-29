@@ -233,14 +233,10 @@ export default async function NewsListPage({
         {/* Hero — owns the single <h1> */}
         <header style={{ textAlign: 'center', marginBottom: 36 }}>
           <h1
-            className="font-display"
+            className="font-display h1-gradient"
             style={{
               fontSize: 'clamp(28px, 5vw, 42px)',
               marginBottom: 10,
-              background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
             }}
           >
             {NEWS_HUB_H1}

@@ -68,14 +68,10 @@ export default function PhakKPage() {
             <PackagePhaseTabs activePhase="phak-k" showAllTab={false} />
           </div>
           <h1
-            className="font-display"
+            className="font-display h1-gradient"
             style={{
               fontSize: 'clamp(28px, 5vw, 42px)',
               marginBottom: '10px',
-              background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
             }}
           >
             {PHAK_K_H1}
@@ -87,11 +83,10 @@ export default function PhakKPage() {
 
         {/* Foundation Status Notice */}
         <div
-          className="card"
+          className="card phak-k-prep-panel"
           style={{
             padding: '28px 24px',
             textAlign: 'center',
-            background: 'linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(20,15,10,0.85) 100%)',
             borderColor: 'rgba(212,175,55,0.25)',
             marginBottom: '40px',
           }}

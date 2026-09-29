@@ -24,7 +24,7 @@ export default async function DailyAffiliatePicks({ collectionId }: DailyAffilia
 
     return (
       <div
-        className="mt-10 border-t border-[rgba(212,175,55,0.12)] pt-8"
+        className="mt-10 border-t border-brand/10 pt-8"
         data-testid="daily-completion-affiliate"
       >
         <AffiliateRail

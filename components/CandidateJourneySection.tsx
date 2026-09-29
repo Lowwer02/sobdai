@@ -81,7 +81,7 @@ export default function CandidateJourneySection() {
             style={{
               padding: 'clamp(20px, 3vw, 28px) clamp(18px, 3vw, 24px)',
               borderRadius: 'var(--radius-lg)',
-              background: 'rgba(26, 18, 8, 0.6)',
+              background: 'var(--card)',
               border: '1px solid var(--border-card)',
               display: 'flex',
               flexDirection: 'column',

@@ -128,7 +128,7 @@ export default function HeroPackageSearch({ chips, placeholder, chipLabel }: Her
                 borderRadius: '999px',
                 border: '1px solid var(--border-subtle)',
                 color: 'var(--text-muted)',
-                background: 'rgba(255, 255, 255, 0.03)',
+                background: 'var(--hover)',
                 fontSize: '12px',
                 fontWeight: 500,
                 textDecoration: 'none',

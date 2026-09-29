@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { trackDailyNavClick } from '@/lib/analytics'
 import NotificationBell, { type NotificationCenterState } from './NotificationBell'
+import ThemeToggle from './theme/ThemeToggle'
 
 const NAV_LINKS = [
   { href: '/', label: 'หน้าแรก' },
@@ -94,6 +95,7 @@ export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onR
         {user ? (
           <div className="flex items-center gap-4">
             <NotificationBell active={Boolean(user)} center={notifications} />
+            <ThemeToggle />
             
             {/* Profile Dropdown */}
             <div className="relative" ref={profileRef}>
@@ -156,6 +158,7 @@ export default function DesktopNav({ user, isAdmin, avatarUrl, onLoginClick, onR
           </div>
         ) : (
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button type="submit"
               onClick={onLoginClick}
               className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"

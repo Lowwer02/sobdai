@@ -53,19 +53,11 @@ export default async function PackageHubPage() {
                   fontSize: 'clamp(24px, 4.2vw, 42px)',
                   marginBottom: '12px',
                   lineHeight: 1.25,
-                  color: '#f5ede0',
+                  color: 'var(--foreground)',
                 }}
               >
                 <span className="block sm:inline">แพ็กเกจข้อสอบ</span>
-                <span
-                  className="block sm:inline"
-                  style={{
-                    background: 'linear-gradient(135deg, #f5ede0 20%, var(--gold-light) 80%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                >
+                <span className="block sm:inline h1-gradient">
                   ราชการทั้งหมด
                 </span>
               </h1>
@@ -94,6 +86,9 @@ export default async function PackageHubPage() {
                   filter: 'blur(20px)',
                 }}
               />
+              {/* Light theme: contained warm-dark halo so the dark-art mascot
+                  stays visible on ivory (dark keeps the gold glow only). */}
+              <div className="packages-mascot-backdrop absolute inset-1 sm:inset-3 rounded-full pointer-events-none" aria-hidden="true" />
               <Image
                 src="/images/packages/sobdai-packages-mascot.webp"
                 alt=""
@@ -101,7 +96,7 @@ export default async function PackageHubPage() {
                 height={480}
                 sizes="(min-width: 1440px) 260px, (min-width: 1280px) 240px, (min-width: 1024px) 200px, (min-width: 768px) 160px, 104px"
                 unoptimized
-                className="relative z-10 h-auto w-[96px] min-[390px]:w-[104px] min-[430px]:w-[110px] sm:w-[160px] md:w-[200px] lg:w-[240px] xl:w-[260px] opacity-95 mix-blend-screen"
+                className="packages-mascot-img relative z-10 h-auto w-[96px] min-[390px]:w-[104px] min-[430px]:w-[110px] sm:w-[160px] md:w-[200px] lg:w-[240px] xl:w-[260px] opacity-95 mix-blend-screen"
               />
             </div>
           </div>
@@ -167,30 +162,32 @@ export default async function PackageHubPage() {
 
             {/* ภาค ข Card */}
             <div
-              className="card"
+              className="card phak-khor-accent-card"
               style={{
                 padding: '28px 24px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                background: 'linear-gradient(135deg, rgba(212,175,55,0.06) 0%, rgba(20,15,10,0.9) 100%)',
                 borderRadius: '16px',
                 border: '1px solid rgba(212,175,55,0.3)',
               }}
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(212,175,55,0.15)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(212,175,55,0.15)', color: '#d4a843', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <BookOpen size={20} />
                   </div>
-                  <span className="badge badge-gold" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                  <span
+                    className="badge"
+                    style={{ fontSize: '11px', padding: '3px 8px', background: 'rgba(212,175,55,0.15)', color: '#e8c46e', border: '1px solid rgba(212,175,55,0.3)' }}
+                  >
                     ภาค ข เฉพาะตำแหน่ง
                   </span>
                 </div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#f5e9d6', marginBottom: '8px' }}>
                   แนวข้อสอบภาค ข
                 </h2>
-                <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 20px' }}>
+                <p style={{ fontSize: '13.5px', color: '#c4a882', lineHeight: 1.6, margin: '0 0 20px' }}>
                   คลังข้อสอบเฉพาะตำแหน่งและหน่วยงาน แยกตามกรมและกระทรวง มีแบบฝึกหัดพร้อมเฉลยละเอียดและจับเวลาจริง
                 </p>
               </div>
@@ -237,7 +234,7 @@ export default async function PackageHubPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  color: 'var(--gold-light)',
+                  color: 'var(--brand)',
                   fontSize: '13.5px',
                   fontWeight: 600,
                 }}

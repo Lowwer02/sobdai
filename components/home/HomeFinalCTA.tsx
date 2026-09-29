@@ -30,9 +30,9 @@ export default function HomeFinalCTA({ cta }: HomeFinalCTAProps) {
           borderRadius: 'var(--radius-xl)',
           position: 'relative',
           overflow: 'hidden',
-          background: 'linear-gradient(145deg, rgba(30, 21, 14, 0.98) 0%, rgba(18, 12, 8, 0.98) 100%)',
+          background: 'linear-gradient(145deg, var(--card) 0%, var(--surface-muted) 100%)',
           border: '1px solid rgba(212, 168, 67, 0.35)',
-          boxShadow: '0 20px 56px rgba(0, 0, 0, 0.75), 0 0 40px rgba(212, 168, 67, 0.12)',
+          boxShadow: 'var(--shadow-lg), 0 0 40px rgba(212, 168, 67, 0.12)',
         }}
       >
         {/* Ambient background glow */}

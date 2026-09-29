@@ -1111,3 +1111,75 @@ h1, h2, h3, .heading {
 .animate-toast-enter {
   animation: toast-enter 0.2s ease-out forwards;
 }
+
+/* ===================== Cookie banner placement ===================== */
+/* Mobile: floating card that clears the home-indicator safe area. The bottom
+   navigation is hidden while consent UI is undecided, so no extra offset is
+   needed; desktop keeps the full-width bottom bar anchored at 0. */
+.banner-safe-area {
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 640px) {
+  .banner-safe-area {
+    bottom: 0;
+  }
+}
+
+/* ===================== Gradient display headings ===================== */
+/* Shared hero-H1 treatment on public listing pages. Dark endpoints match the
+   original art direction (cream -> light gold); Light switches to
+   espresso -> deep gold so BOTH endpoints stay readable on ivory. */
+.h1-gradient {
+  /* Theme-aware gradient endpoint via a CUSTOM PROPERTY: theme override rules
+     must never re-declare `background` (the shorthand resets background-clip,
+     which painted the gradient across the element box instead of the glyphs).
+     Dark: cream -> light gold. Light: espresso -> deep gold (readable). */
+  --h1-gradient-to: var(--gold-light);
+  background-image: linear-gradient(135deg, var(--foreground) 30%, var(--h1-gradient-to) 70%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+[data-theme='light'] .h1-gradient {
+  --h1-gradient-to: var(--gold);
+}
+
+/* ===================== Packages hero mascot ===================== */
+/* The mascot asset is art-directed for a dark background (rendered with
+   mix-blend-screen). On Light, screen-blend washes it out entirely, so it
+   sits on a contained warm-dark circular backdrop instead — the same
+   intentional dark-surface treatment as the ภาค ข card. */
+.packages-mascot-backdrop {
+  display: none;
+}
+[data-theme='light'] .packages-mascot-backdrop {
+  display: block;
+  background: radial-gradient(circle, rgba(26, 19, 12, 0.96) 0%, rgba(26, 19, 12, 0.78) 55%, transparent 74%);
+  filter: blur(10px);
+}
+[data-theme='light'] .packages-mascot-img {
+  mix-blend-mode: normal;
+  filter: drop-shadow(0 8px 22px rgba(20, 12, 6, 0.4));
+}
+
+/* ===================== Packages hub special cards ===================== */
+/* Dark keeps the original translucent art direction. Light gives each card a
+   deliberate solid treatment instead of a muddy translucent wash. */
+:root {
+  /* Dark: current production translucent art direction (unchanged). */
+  --phak-khor-accent-bg: linear-gradient(135deg, rgba(212, 175, 55, 0.06) 0%, rgba(20, 15, 10, 0.9) 100%);
+  --phak-k-prep-bg: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(20, 15, 10, 0.85) 100%);
+}
+[data-theme='light'] {
+  /* Light: opaque deliberate treatments — inline backgrounds were moved out
+     of the components so these variables own the surface. */
+  --phak-khor-accent-bg: linear-gradient(135deg, #2a1f12 0%, #17110a 100%);
+  --phak-k-prep-bg: linear-gradient(135deg, var(--surface-raised) 0%, color-mix(in srgb, var(--brand-solid) 5%, var(--card)) 100%);
+}
+.phak-khor-accent-card {
+  background: var(--phak-khor-accent-bg);
+}
+.phak-k-prep-panel {
+  background: var(--phak-k-prep-bg);
+}

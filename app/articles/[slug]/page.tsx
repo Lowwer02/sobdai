@@ -164,8 +164,8 @@ export default async function ArticleDetailPage({
   // Query error / unexpected failure
   if (!res.success) {
     return (
-      <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-xl mx-auto bg-[#1A140E] border border-red-500/30 rounded-2xl p-8 text-center space-y-4 shadow-xl">
+      <main className="min-h-screen bg-background text-foreground py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-xl mx-auto bg-card border border-red-500/30 rounded-2xl p-8 text-center space-y-4 shadow-xl">
           <AlertTriangle className="mx-auto text-red-400" size={48} />
           <h1 className="text-xl font-bold text-red-300">เกิดข้อผิดพลาดในการโหลดบทความ</h1>
           <p className="text-xs sm:text-sm text-red-200/80">
@@ -174,7 +174,7 @@ export default async function ArticleDetailPage({
           <div className="pt-2">
             <Link
               href="/articles"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F0B07] border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-semibold rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface-muted border border-brand/30 text-brand text-xs font-semibold rounded-lg hover:bg-wash transition-colors"
             >
               <ArrowLeft size={14} /> กลับสู่หน้าบทความทั้งหมด
             </Link>
@@ -227,7 +227,7 @@ export default async function ArticleDetailPage({
   ])
 
   return (
-    <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-background text-foreground py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <StructuredData data={articleJsonLd} />
       <StructuredData data={breadcrumbJsonLd} />
       {/* Two-zone layout (affiliate M1 + desktop package rail): the editorial

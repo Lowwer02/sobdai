@@ -134,7 +134,10 @@ export default function PromotionSection({
                 style={{
                   fontSize: 'clamp(17px, 2.4vw, 22px)',
                   margin: 0,
-                  color: 'var(--gold-light)',
+                  // Fixed light-on-scrim: this text sits on the image's dark
+                  // gradient scrim (a contained image-card surface), not on
+                  // the themed page, so it stays cream in both themes.
+                  color: '#e8c46e',
                   lineHeight: 1.25,
                 }}
               >
@@ -146,7 +149,8 @@ export default function PromotionSection({
                   style={{
                     margin: 0,
                     fontSize: '13.5px',
-                    color: 'var(--text-secondary)',
+                    // Fixed light-on-scrim (see note above).
+                    color: '#c4a882',
                     lineHeight: 1.5,
                   }}
                 >

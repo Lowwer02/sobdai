@@ -57,17 +57,17 @@ export default function HomeFaqPreview() {
           <details
             key={item.id}
             id={`home-faq-${item.id}`}
-            className="group border border-[rgba(212,175,55,0.12)] rounded-xl bg-[#140E0A] hover:border-[rgba(212,175,55,0.25)] transition-colors open:border-[rgba(212,175,55,0.3)] open:bg-[#16100B]"
+            className="group border border-[rgba(212,175,55,0.12)] rounded-xl bg-card hover:border-[rgba(212,175,55,0.25)] transition-colors open:border-[rgba(212,175,55,0.3)] open:bg-surface-muted"
           >
-            <summary className="flex items-center justify-between gap-3 p-4 sm:p-5 cursor-pointer list-none select-none text-left font-display font-medium text-sm sm:text-base text-[#F5E9D6] hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 rounded-xl transition-colors min-h-[48px] [&::-webkit-details-marker]:hidden">
+            <summary className="flex items-center justify-between gap-3 p-4 sm:p-5 cursor-pointer list-none select-none text-left font-display font-medium text-sm sm:text-base text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 rounded-xl transition-colors min-h-[48px] [&::-webkit-details-marker]:hidden">
               <span className="leading-snug">{item.question}</span>
               <ChevronDown
                 size={18}
-                className="text-[#A1866B] shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-[#D4AF37]"
+                className="text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-brand"
                 aria-hidden="true"
               />
             </summary>
-            <div className="px-4 sm:px-5 pb-5 pt-1 text-[#C4A482] text-sm sm:text-[15px] leading-relaxed space-y-3 border-t border-[rgba(212,175,55,0.06)]">
+            <div className="px-4 sm:px-5 pb-5 pt-1 text-muted-foreground text-sm sm:text-[15px] leading-relaxed space-y-3 border-t border-[rgba(212,175,55,0.06)]">
               {item.paragraphs.map((paragraph, idx) => (
                 <p key={idx}>{paragraph}</p>
               ))}
@@ -75,7 +75,7 @@ export default function HomeFaqPreview() {
                 <div className="pt-1">
                   <Link
                     href={item.link.href}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-[#D4AF37] hover:text-[#F1D17A] underline underline-offset-4 decoration-[#D4AF37]/30 hover:decoration-[#D4AF37] transition-colors"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:text-brand-hover underline underline-offset-4 decoration-brand/30 hover:decoration-brand transition-colors"
                   >
                     <span>{item.link.text}</span>
                     <ArrowRight size={14} aria-hidden="true" />

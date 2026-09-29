@@ -138,7 +138,7 @@ export default function ProductValueSection() {
             padding: 'clamp(18px, 3vw, 28px)',
             borderRadius: 'var(--radius-xl)',
             border: '1px solid rgba(212, 168, 67, 0.25)',
-            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.65)',
+            boxShadow: 'var(--shadow-lg)',
             display: 'flex',
             flexDirection: 'column',
             gap: '18px',
@@ -173,9 +173,9 @@ export default function ProductValueSection() {
               style={{
                 fontSize: '10px',
                 padding: '2px 8px',
-                background: 'rgba(255, 235, 180, 0.06)',
+                background: 'var(--muted)',
                 color: 'var(--text-muted)',
-                border: '1px solid rgba(255, 235, 180, 0.12)',
+                border: '1px solid var(--border-card)',
               }}
             >
               ตัวอย่างหน้าจอ
@@ -200,7 +200,7 @@ export default function ProductValueSection() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span style={{ background: '#4caf7d', color: '#0f0b08', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>
+              <span style={{ background: 'var(--correct)', color: '#0f0b08', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>
                 คำตอบ: ข
               </span>
               <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>
@@ -235,20 +235,20 @@ export default function ProductValueSection() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>กฎหมายระเบียบบริหารราชการแผ่นดิน</span>
-                  <span style={{ color: '#4caf7d', fontWeight: 600 }}>85% แม่นยำ</span>
+                  <span style={{ color: 'var(--correct)', fontWeight: 600 }}>85% แม่นยำ</span>
                 </div>
-                <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: '85%', height: '100%', background: '#4caf7d' }} />
+                <div style={{ height: '4px', background: 'var(--muted)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: '85%', height: '100%', background: 'var(--correct)' }} />
                 </div>
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>พ.ร.บ. ข้อมูลข่าวสารของราชการ</span>
-                  <span style={{ color: '#e05c5c', fontWeight: 600 }}>45% ต้องทบทวน</span>
+                  <span style={{ color: 'var(--wrong)', fontWeight: 600 }}>45% ต้องทบทวน</span>
                 </div>
-                <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: '45%', height: '100%', background: '#e05c5c' }} />
+                <div style={{ height: '4px', background: 'var(--muted)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: '45%', height: '100%', background: 'var(--wrong)' }} />
                 </div>
               </div>
             </div>

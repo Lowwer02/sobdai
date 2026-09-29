@@ -57,7 +57,7 @@ export default function HomeExamShowcase() {
           borderRadius: 'var(--radius-xl)',
           border: '1px solid rgba(212, 168, 67, 0.28)',
           overflow: 'hidden',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)',
+          boxShadow: 'var(--shadow-lg)',
         }}
       >
         {/* Mock Runner Top Bar */}
@@ -115,9 +115,9 @@ export default function HomeExamShowcase() {
               style={{
                 fontSize: '10.5px',
                 padding: '3px 8px',
-                background: 'rgba(255, 235, 180, 0.08)',
+                background: 'var(--muted)',
                 color: 'var(--text-muted)',
-                border: '1px solid rgba(255, 235, 180, 0.15)',
+                border: '1px solid var(--border-card)',
               }}
             >
               ตัวอย่างหน้าจอ
@@ -144,14 +144,14 @@ export default function HomeExamShowcase() {
                   width: '32px',
                   height: '28px',
                   borderRadius: '6px',
-                  background: 'rgba(76, 175, 125, 0.15)',
-                  color: '#4caf7d',
+                  background: 'var(--correct-bg)',
+                  color: 'var(--correct)',
                   fontSize: '12px',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '1px solid rgba(76, 175, 125, 0.3)',
+                  border: '1px solid color-mix(in srgb, var(--correct) 30%, transparent)',
                 }}
               >
                 {num}
@@ -163,7 +163,7 @@ export default function HomeExamShowcase() {
                 height: '28px',
                 borderRadius: '6px',
                 background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-muted) 100%)',
-                color: '#1a1208',
+                color: 'var(--brand-foreground)',
                 fontSize: '12.5px',
                 fontWeight: 700,
                 display: 'flex',
@@ -235,8 +235,8 @@ export default function HomeExamShowcase() {
               style={{
                 padding: '14px 18px',
                 borderRadius: 'var(--radius-md)',
-                background: 'rgba(76, 175, 125, 0.12)',
-                border: '1.5px solid #4caf7d',
+                background: 'var(--correct-bg)',
+                border: '1.5px solid var(--correct)',
                 fontSize: '14px',
                 color: 'var(--text-primary)',
                 display: 'flex',
@@ -249,9 +249,9 @@ export default function HomeExamShowcase() {
                 <span
                   className="choice-badge"
                   style={{
-                    background: '#4caf7d',
+                    background: 'var(--correct)',
                     color: '#0f0b08',
-                    borderColor: '#4caf7d',
+                    borderColor: 'var(--correct)',
                     fontWeight: 700,
                   }}
                 >
@@ -265,8 +265,8 @@ export default function HomeExamShowcase() {
                 style={{
                   fontSize: '11.5px',
                   fontWeight: 700,
-                  color: '#4caf7d',
-                  background: 'rgba(76, 175, 125, 0.2)',
+                  color: 'var(--correct)',
+                  background: 'var(--correct-bg)',
                   padding: '3px 10px',
                   borderRadius: '999px',
                 }}
@@ -297,7 +297,7 @@ export default function HomeExamShowcase() {
           <div
             style={{
               background: 'var(--hint-bg)',
-              border: '1px solid rgba(124, 159, 212, 0.25)',
+              border: '1px solid color-mix(in srgb, var(--hint) 25%, transparent)',
               borderRadius: 'var(--radius-md)',
               padding: '14px 18px',
               marginBottom: '18px',
@@ -322,8 +322,8 @@ export default function HomeExamShowcase() {
           {/* Detailed Explanation Demonstration Box */}
           <div
             style={{
-              background: 'rgba(45, 122, 79, 0.08)',
-              border: '1px solid rgba(45, 122, 79, 0.25)',
+              background: 'var(--green-tint)',
+              border: '1px solid color-mix(in srgb, var(--green) 25%, transparent)',
               borderRadius: 'var(--radius-md)',
               padding: '20px 22px',
               fontSize: '13.5px',

@@ -110,14 +110,10 @@ export default function DownloadsPage() {
 
         <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative' }}>
           <h1
-            className="font-display"
+            className="font-display h1-gradient"
             style={{
               fontSize: 'clamp(28px, 5vw, 42px)',
               marginBottom: '16px',
-              background: 'linear-gradient(135deg, #f5ede0 30%, var(--gold-light) 70%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
             }}
           >
             คลังสื่อการเรียน

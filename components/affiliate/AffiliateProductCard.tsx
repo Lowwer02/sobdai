@@ -87,7 +87,7 @@ export default function AffiliateProductCard({
       target="_blank"
       rel="nofollow sponsored noopener noreferrer"
       onClick={handleClick}
-      className="affiliate-product-card focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-xl"
+      className="affiliate-product-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-xl"
       style={{
         display: 'flex',
         gap: 12,
