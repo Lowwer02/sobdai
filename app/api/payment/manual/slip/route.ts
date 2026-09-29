@@ -17,6 +17,7 @@ import {
   shouldDeleteUploadedPaymentSlip,
 } from '@/lib/payment/manual-slip-lifecycle'
 import { notifyPaymentSubmission } from '@/lib/payment/telegram'
+import { runPaymentVerificationForSubmission } from '@/lib/payment/verification-runner'
 
 export const runtime = 'nodejs'
 
@@ -44,12 +45,20 @@ function hasValidFileSignature(bytes: Uint8Array, mimeType: string) {
   }
 }
 
+function safeErrorCode(error: unknown) {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' && code.length > 0) return code.slice(0, 64)
+  }
+  return 'unknown'
+}
+
 async function removeUploadedObject(adminSupabase: ReturnType<typeof createAdminClient>, path: string) {
   try {
     const { error } = await adminSupabase.storage.from('payment-slips').remove([path])
-    if (error) console.error('[PAYMENT] failed to remove orphaned payment slip:', error.message)
+    if (error) console.error('[PAYMENT] failed to remove orphaned payment slip:', safeErrorCode(error))
   } catch (error) {
-    console.error('[PAYMENT] failed to remove orphaned payment slip:', error)
+    console.error('[PAYMENT] failed to remove orphaned payment slip:', safeErrorCode(error))
   }
 }
 
@@ -175,10 +184,10 @@ export async function POST(request: Request) {
       .upload(objectPath, Buffer.from(bytes), {
         contentType: mimeType,
         upsert: false,
-      })
+    })
 
     if (uploadError) {
-      console.error('[PAYMENT] payment slip upload failed:', uploadError.message)
+      console.error('[PAYMENT] payment slip upload failed:', safeErrorCode(uploadError))
       await removeUploadedObject(adminSupabase, objectPath)
       uploadedPath = null
       return NextResponse.json({ error: 'อัปโหลดสลิปไม่สำเร็จ กรุณาลองใหม่' }, { status: 500 })
@@ -203,7 +212,7 @@ export async function POST(request: Request) {
     }
 
     if (submissionError) {
-      console.error('[PAYMENT] submit payment slip failed:', submissionError.message)
+      console.error('[PAYMENT] submit payment slip failed:', safeErrorCode(submissionError))
       // An RPC error can be transport-ambiguous: PostgreSQL may have committed
       // even though the client received an error. Reconcile by idempotency key
       // before deleting anything. If reconciliation is unavailable, preserve
@@ -212,7 +221,7 @@ export async function POST(request: Request) {
         await findSubmissionByIdempotencyKey(supabase, orderId, idempotencyKey)
 
       if (recoveryError) {
-        console.error('[PAYMENT] payment slip commit state is ambiguous:', recoveryError.message)
+        console.error('[PAYMENT] payment slip commit state is ambiguous:', safeErrorCode(recoveryError))
         uploadedPath = null
         return NextResponse.json({ error: 'ระบบกำลังตรวจสอบการส่งสลิป กรุณาลองใหม่อีกครั้ง' }, { status: 503 })
       }
@@ -277,7 +286,7 @@ export async function POST(request: Request) {
       // stale read must never delete an object that may now be referenced by a
       // durable payment_submissions row.
       if (persistedSubmissionError) {
-        console.error('[PAYMENT] payment slip persistence verification failed:', persistedSubmissionError.message)
+        console.error('[PAYMENT] payment slip persistence verification failed:', safeErrorCode(persistedSubmissionError))
       }
       uploadedPath = null
       return NextResponse.json({ error: 'ระบบกำลังยืนยันการส่งสลิป กรุณาลองใหม่อีกครั้ง' }, { status: 503 })
@@ -315,7 +324,28 @@ export async function POST(request: Request) {
     if (!notification.sent) {
       // The evidence row is already committed. Notification failure must not
       // change payment status or make the customer retry the upload.
-      console.error('[PAYMENT NOTIFICATION] Telegram notification failed:', notification.error)
+      console.error('[PAYMENT NOTIFICATION] Telegram notification failed:', safeErrorCode(notification.error))
+    }
+
+    // M1.3A is intentionally shadow-only. The durable verification runner is
+    // bounded and synchronous here so a successful upload gets a persisted
+    // result before the request returns, while the database gate keeps the
+    // order pending and prevents entitlement mutation.
+    if (adminSupabase) {
+      try {
+        const verification = await runPaymentVerificationForSubmission(row.payment_submission_id, {
+          adminClient: adminSupabase,
+        })
+        console.info('[PAYMENT VERIFICATION] shadow result:', verification.decision || verification.state)
+      } catch (verificationError) {
+        const code = verificationError && typeof verificationError === 'object' && 'code' in verificationError
+          ? String((verificationError as { code?: unknown }).code || 'unavailable')
+          : 'unavailable'
+        // The evidence is already committed. A missing migration or transient
+        // analyzer dependency must not make the customer retry or expose
+        // private storage paths, OCR text, QR payloads, or full references.
+        console.error('[PAYMENT VERIFICATION] shadow run unavailable:', code)
+      }
     }
 
     uploadedPath = null
@@ -326,7 +356,7 @@ export async function POST(request: Request) {
       status: persistedSubmission.status,
     })
   } catch (error) {
-    console.error('[PAYMENT] submit payment slip route failed:', error)
+    console.error('[PAYMENT] submit payment slip route failed:', safeErrorCode(error))
     if (
       uploadedPath
       && adminSupabase

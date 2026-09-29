@@ -1,6 +1,7 @@
 export const MANUAL_PAYMENT_PROVIDER = 'promptpay_manual' as const
 
 export const PAYMENT_SLIP_MAX_BYTES = 4 * 1024 * 1024
+export const PAYMENT_SLIP_RETENTION_DAYS = 120
 export const PAYMENT_SUBMISSION_MAX_COUNT = 5
 export const PAYMENT_SUBMISSION_LIMIT_ERROR_CODE = 'P0001'
 export const PAYMENT_SUBMISSION_LIMIT_ERROR = 'ส่งหลักฐานการชำระเงินครบจำนวนที่กำหนดแล้ว กรุณาติดต่อฝ่ายสนับสนุน'
@@ -14,6 +15,22 @@ export const PAYMENT_SLIP_MIME_TYPES = [
 
 export type PaymentSlipMimeType = (typeof PAYMENT_SLIP_MIME_TYPES)[number]
 export type PaymentSubmissionStatus = 'submitted' | 'approved' | 'rejected'
+
+export const PAYMENT_ORDER_TERMINAL_STATUSES = [
+  'free',
+  'paid',
+  'failed',
+  'refunded',
+  'cancelled',
+] as const
+
+export type PaymentOrderTerminalStatus = (typeof PAYMENT_ORDER_TERMINAL_STATUSES)[number]
+
+export function paymentSlipRetentionDeadline(terminalAt: Date | string): Date {
+  const deadline = new Date(terminalAt)
+  deadline.setUTCDate(deadline.getUTCDate() + PAYMENT_SLIP_RETENTION_DAYS)
+  return deadline
+}
 
 export type PaymentStatusPresentation = {
   key: 'awaiting-upload' | 'under-review' | 'rejected' | 'evidence-unavailable' | 'paid' | 'cancelled' | 'free' | 'pending' | 'failed' | 'refunded' | 'unknown'

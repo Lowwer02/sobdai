@@ -50,6 +50,31 @@ const nextConfig: NextConfig = {
     // Required by Next.js for forbidden() to render the app/forbidden.tsx UI.
     authInterrupts: true,
   },
+  // The payment analyzer is Node-only: tesseract.js uses worker_threads and
+  // local WASM/model files. Keep those packages out of Edge/client graphs and
+  // make Next's server output tracing include their installed assets.
+  serverExternalPackages: [
+    'tesseract.js',
+    'tesseract.js-core',
+  ],
+  outputFileTracingIncludes: {
+    // OCR is executed only by the upload analyzer route and the explicit
+    // admin resume action. These are the only explicit includes; the admin
+    // orders list may still inherit the files through its shared server-action
+    // module, which is documented as bounded LOW trace overhead.
+    '/api/payment/manual/slip': [
+      'node_modules/tesseract.js-core/**/*',
+      'node_modules/tesseract.js/src/worker-script/node/index.js',
+      'vendor/tessdata_fast/4.0.0/eng.traineddata.gz',
+      'vendor/tessdata_fast/4.0.0/tha.traineddata.gz',
+    ],
+    '/admin/orders/[id]': [
+      'node_modules/tesseract.js-core/**/*',
+      'node_modules/tesseract.js/src/worker-script/node/index.js',
+      'vendor/tessdata_fast/4.0.0/eng.traineddata.gz',
+      'vendor/tessdata_fast/4.0.0/tha.traineddata.gz',
+    ],
+  },
 };
 
 export default nextConfig;

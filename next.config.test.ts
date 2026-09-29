@@ -32,3 +32,17 @@ test("image optimization cache and existing configuration contract", () => {
     },
   ])
 })
+
+test("OCR tracing is scoped to analyzer routes", () => {
+  const includes = nextConfig.outputFileTracingIncludes as Record<string, string[]> | undefined
+  assert.ok(includes)
+  assert.ok(includes['/api/payment/manual/slip'])
+  assert.ok(includes['/admin/orders/[id]'])
+  assert.equal(includes['/admin/orders'], undefined)
+  assert.equal(includes['/*'], undefined)
+  for (const patterns of Object.values(includes)) {
+    assert.ok(patterns.some((pattern) => pattern.includes('tesseract.js-core')))
+    assert.ok(patterns.some((pattern) => pattern.includes('tha.traineddata.gz')))
+    assert.ok(patterns.some((pattern) => pattern.includes('eng.traineddata.gz')))
+  }
+})

@@ -2,11 +2,17 @@
   "name": "app_build",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:security-db": "node scripts/security/sec-profile-rbac-db-test.mjs"
+    "test:security-db": "node scripts/security/sec-profile-rbac-db-test.mjs",
+    "test:payment-m13a": "tsx --test lib/payment/verification-normalize.test.ts lib/payment/verification-rules.test.ts lib/payment/verification-image.test.ts lib/payment/verification-hashes.test.ts lib/payment/verification-qr.test.ts lib/payment/verification-ocr.test.ts lib/payment/verification-analyzer.test.ts supabase/migrations/migrations.103.contract.test.ts next.config.test.ts",
+    "test:payment-m13a-db": "node scripts/security/payment-verification-m1-3a-db-test.mjs",
+    "payment:m13a:legacy-backfill": "tsx scripts/security/payment-verification-legacy-backfill.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",
@@ -17,6 +23,7 @@
     "framer-motion": "^12.41.0",
     "gray-matter": "^4.0.3",
     "html-to-image": "^1.11.13",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.21.0",
     "next": "16.3.5",
     "omise": "^1.1.0",
@@ -30,6 +37,8 @@
     "remark-github-alerts": "^0.1.1",
     "remark-parse": "^11.0.0",
     "sharp": "0.35.4",
+    "tesseract.js": "^7.0.0",
+    "tesseract.js-core": "^7.0.0",
     "unified": "^11.0.0"
   },
   "devDependencies": {
@@ -41,6 +50,7 @@
     "@types/react-dom": "^19",
     "pg": "^8.16.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

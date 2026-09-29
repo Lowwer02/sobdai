@@ -1,11 +1,20 @@
 'use server'
 
 import { requirePermission } from '@/lib/auth/server-protect'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ORDER_COMPLETED_STATUSES, OrderStatus, ORDER_STATUS } from '@/lib/orderUtils'
 import { isUuid } from '@/lib/payment/manual'
+import { runPaymentVerificationForSubmission } from '@/lib/payment/verification-runner'
 import { logAuditEvent } from '@/lib/audit/logger'
 import { revalidatePath } from 'next/cache'
 
+function safeErrorCode(error: unknown) {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' && code.length > 0) return code.slice(0, 64)
+  }
+  return 'unknown'
+}
 
 export async function grantPackageAccess(userId: string, packageId: string) {
   try {
@@ -141,6 +150,44 @@ export async function approvePayment(paymentSubmissionId: string) {
   } catch (error) {
     console.error('[PAYMENT] approve payment action failed:', error)
     return { success: false, error: 'Payment submission could not be approved.' }
+  }
+}
+
+/** Re-run the bounded shadow analyzer without changing payment or entitlement state. */
+export async function resumePaymentVerification(paymentSubmissionId: string) {
+  try {
+    const { supabase } = await requirePermission('financial.manage')
+
+    if (!isUuid(paymentSubmissionId)) {
+      return { success: false, error: 'Invalid payment submission.' }
+    }
+
+    const { data: submission, error: submissionError } = await supabase
+      .from('payment_submissions')
+      .select('id, order_id')
+      .eq('id', paymentSubmissionId)
+      .maybeSingle()
+
+    if (submissionError || !submission) {
+      return { success: false, error: 'Payment submission could not be found.' }
+    }
+
+    const result = await runPaymentVerificationForSubmission(paymentSubmissionId, {
+      adminClient: createAdminClient(),
+      force: true,
+    })
+
+    revalidatePath('/admin/orders')
+    revalidatePath(`/admin/orders/${submission.order_id}`)
+    return {
+      success: true,
+      state: result.state,
+      decision: result.decision,
+      leaseAcquired: result.leaseAcquired,
+    }
+  } catch (error) {
+    console.error('[PAYMENT VERIFICATION] resume action failed:', safeErrorCode(error))
+    return { success: false, error: 'ไม่สามารถวิเคราะห์หลักฐานการชำระเงินซ้ำได้' }
   }
 }
 

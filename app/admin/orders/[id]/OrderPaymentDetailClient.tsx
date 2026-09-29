@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ArrowLeft, CheckCircle, ExternalLink, FileImage, Loader2, XCircle } from 'lucide-react'
-import { cancelManualPaymentOrder, approvePayment, rejectPayment } from '../actions'
+import { cancelManualPaymentOrder, approvePayment, rejectPayment, resumePaymentVerification } from '../actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { getPaymentStatusPresentation, MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
 
@@ -34,6 +34,37 @@ interface PaymentSubmission {
   rejectionReason: string | null
   createdAt: string
   signedUrl: string | null
+  verification: PaymentVerification | null
+}
+
+interface PaymentVerification {
+  state: string
+  decision: string | null
+  analyzerVersion: string
+  detectedAmount: number | null
+  amountMatchState: string
+  recipientMatchState: string
+  destinationMatchState: string
+  qrKind: string | null
+  qrStructureValid: boolean | null
+  qrCrcValid: boolean | null
+  referenceExtracted: boolean
+  qrFormat: string | null
+  referenceState: string
+  imageDuplicateState: string
+  timestampState: string
+  reasonCodes: string[]
+  durationMs: number | null
+  completedAt: string | null
+}
+
+interface ShadowMetrics {
+  totalAnalyzed: number
+  strongMatch: number
+  manualReview: number
+  suspicious: number
+  analyzerError: number
+  averageDurationMs: number | null
 }
 
 function formatDate(value: string) {
@@ -45,14 +76,45 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
+function verificationTone(state: string) {
+  if (state === 'STRONG_MATCH') return 'border-green-400/20 bg-green-400/10 text-green-300'
+  if (state === 'SUSPICIOUS' || state === 'ANALYZER_ERROR') return 'border-red-400/20 bg-red-400/10 text-red-300'
+  return 'border-[#D4AF37]/20 bg-[#D4AF37]/10 text-[#D4AF37]'
+}
+
+function verificationLabel(state: string) {
+  switch (state) {
+    case 'STRONG_MATCH': return 'STRONG_MATCH'
+    case 'MANUAL_REVIEW': return 'MANUAL_REVIEW'
+    case 'SUSPICIOUS': return 'SUSPICIOUS'
+    case 'ANALYZER_ERROR': return 'ANALYZER_ERROR'
+    default: return state
+  }
+}
+
+function verificationFieldLabel(value: string) {
+  switch (value) {
+    case 'MATCH': return 'match'
+    case 'MISMATCH': return 'mismatch'
+    case 'AMBIGUOUS': return 'ambiguous'
+    case 'true': return 'valid'
+    case 'false': return 'invalid'
+    case 'VALID_UNIQUE': return 'unique'
+    case 'NONE': return 'none'
+    default: return value.toLowerCase()
+  }
+}
+
 export default function OrderPaymentDetailClient({
   order,
   submissions,
   submissionsLoaded,
+  shadowMetrics,
 }: {
   order: OrderDetail
   submissions: PaymentSubmission[]
   submissionsLoaded: boolean
+  shadowMetrics: ShadowMetrics | null
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -117,6 +179,22 @@ export default function OrderPaymentDetailClient({
         router.refresh()
       } else {
         setError(result.error || 'ไม่สามารถยกเลิกคำสั่งซื้อได้')
+      }
+    })
+  }
+
+  const handleResumeVerification = (submissionId: string) => {
+    setMessage('')
+    setError('')
+    startTransition(async () => {
+      const result = await resumePaymentVerification(submissionId)
+      if (result.success) {
+        setMessage(result.leaseAcquired
+          ? 'วิเคราะห์หลักฐานซ้ำแล้ว ผลยังอยู่ใน Shadow mode และคำสั่งซื้อยังไม่เปลี่ยนสถานะ'
+          : 'รายการนี้กำลังถูกวิเคราะห์อยู่ หรือมีผลลัพธ์ที่บันทึกไว้แล้ว')
+        router.refresh()
+      } else {
+        setError(result.error || 'ไม่สามารถวิเคราะห์หลักฐานซ้ำได้')
       }
     })
   }
@@ -189,7 +267,12 @@ export default function OrderPaymentDetailClient({
             <h2 className="text-xl font-bold text-[#F5E9D6]">Payment evidence</h2>
             <p className="text-sm text-[#A1866B]">ไฟล์ถูกเสิร์ฟด้วย signed URL ชั่วคราวสำหรับผู้มี financial.manage เท่านั้น</p>
           </div>
-          <span className="text-sm text-[#A1866B]">{submissions.length} submission{submissions.length === 1 ? '' : 's'}</span>
+          <div className="text-right text-sm text-[#A1866B]">
+            <div>{submissions.length} submission{submissions.length === 1 ? '' : 's'}</div>
+            {shadowMetrics && (
+            <div className="mt-1 text-xs">Shadow analyzed {shadowMetrics.totalAnalyzed} · strong match {shadowMetrics.strongMatch}</div>
+            )}
+          </div>
         </div>
 
         {!submissionsLoaded ? (
@@ -244,6 +327,57 @@ export default function OrderPaymentDetailClient({
                   {submission.rejectionReason && (
                     <div className="mt-4 rounded-lg border border-red-400/20 bg-red-400/5 p-3 text-sm text-red-300">
                       เหตุผลที่ปฏิเสธ: {submission.rejectionReason}
+                    </div>
+                  )}
+
+                  {submission.verification && (
+                    <div className="mt-4 rounded-lg border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-semibold text-[#F5E9D6]">Shadow analyzer QA</div>
+                        <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${verificationTone(submission.verification.state)}`}>
+                          {verificationLabel(submission.verification.state)}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-x-4 gap-y-1 text-xs text-[#A1866B] sm:grid-cols-2">
+                        <span>version: {submission.verification.analyzerVersion}</span>
+                        <span>duration: {submission.verification.durationMs === null ? '—' : `${submission.verification.durationMs} ms`}</span>
+                        <span>amount: {submission.verification.detectedAmount === null ? '—' : `฿${submission.verification.detectedAmount.toFixed(2)}`}</span>
+                        <span>QR: {submission.verification.qrKind || '—'} · structure {verificationFieldLabel(String(submission.verification.qrStructureValid))} · CRC {verificationFieldLabel(String(submission.verification.qrCrcValid))}{submission.verification.qrFormat ? ` · ${submission.verification.qrFormat}` : ''}</span>
+                        <span>reference extracted: {submission.verification.referenceExtracted ? 'yes' : 'no'}</span>
+                        <span>recipient: {verificationFieldLabel(submission.verification.recipientMatchState)}</span>
+                        <span>destination: {verificationFieldLabel(submission.verification.destinationMatchState)}</span>
+                        <span>reference: {verificationFieldLabel(submission.verification.referenceState)}</span>
+                        <span>image replay: {verificationFieldLabel(submission.verification.imageDuplicateState)}</span>
+                      </div>
+                      {submission.verification.state === 'STRONG_MATCH' ? (
+                        <p className="mt-3 text-xs leading-relaxed text-green-300">
+                          Offline evidence match — not bank/provider confirmed. This Shadow result keeps the order pending and never opens entitlement.
+                        </p>
+                      ) : submission.verification.state === 'ANALYZER_ERROR' ? (
+                        <p className="mt-3 text-xs leading-relaxed text-red-300">วิเคราะห์ไม่สำเร็จ ระบบยังไม่เปลี่ยนสถานะการชำระเงินและให้เจ้าหน้าที่ตรวจสอบต่อได้</p>
+                      ) : (
+                        <p className="mt-3 text-xs leading-relaxed text-[#A1866B]">ผลนี้เป็นสัญญาณช่วยตรวจสอบ ไม่ใช่คำสั่งอนุมัติหรือปฏิเสธ และไม่เปลี่ยนสิทธิ์ของผู้ซื้อ</p>
+                      )}
+                      {submission.verification.reasonCodes.length > 0 && (
+                        <div className="mt-2 text-xs text-[#A1866B]">
+                          reasons: {submission.verification.reasonCodes.join(', ')}
+                        </div>
+                      )}
+                      {submission.status === 'submitted'
+                        && order.status === 'pending'
+                        && submission.verification.state !== 'STRONG_MATCH'
+                        && submission.verification.state !== 'AUTO_CHECKING'
+                        && (
+                          <button
+                            type="button"
+                            onClick={() => handleResumeVerification(submission.id)}
+                            disabled={isPending}
+                            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#D4AF37]/30 px-3 py-1.5 text-xs font-bold text-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+                            วิเคราะห์ซ้ำ (Shadow)
+                          </button>
+                        )}
                     </div>
                   )}
 
