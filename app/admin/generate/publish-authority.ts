@@ -137,7 +137,9 @@ async function deriveAuthoritativePerSet(
 ): Promise<number | null> {
   try {
     const source = await readFile(
-      path.join(process.cwd(), entry.sourcePath),
+      // Static 'Blueprint' segment scopes Turbopack tracing to Blueprint/;
+      // basename() keeps the registry filename confined beneath it.
+      path.join(process.cwd(), 'Blueprint', path.basename(entry.sourcePath)),
       'utf8'
     )
     const response = runEngine(

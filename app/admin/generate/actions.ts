@@ -58,7 +58,12 @@ export async function generateAssessmentAdminAction(
     const packageCode = 'packageCode' in blueprint ? (blueprint as { packageCode?: string }).packageCode : undefined
 
     const [blueprintSource, bankRows] = await Promise.all([
-      readFile(path.join(process.cwd(), blueprint.sourcePath), 'utf8'),
+      // Static 'Blueprint' segment scopes Turbopack tracing to Blueprint/;
+      // basename() keeps the registry filename confined beneath it.
+      readFile(
+        path.join(process.cwd(), 'Blueprint', path.basename(blueprint.sourcePath)),
+        'utf8'
+      ),
       readQuestionBankMetadata(supabase, packageCode),
     ])
 
