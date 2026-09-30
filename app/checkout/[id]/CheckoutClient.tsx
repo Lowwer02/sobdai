@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { ChevronLeft, ShieldCheck, QrCode, CheckCircle2, PlayCircle, Heart } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft, Heart, PlayCircle, QrCode, ShieldCheck } from 'lucide-react'
 import SupportDetails from '@/components/SupportDetails'
+import PaymentStatusIllustration from '@/components/payment/PaymentStatusIllustration'
+import { toastEvent } from '@/hooks/useToast'
 import { freePackageClaimed } from '@/lib/analytics'
 import type { SupportConfig } from '@/lib/homepageConfig'
 import {
@@ -13,19 +15,29 @@ import {
   PAYMENT_SLIP_MAX_BYTES,
   PAYMENT_SUBMISSION_LIMIT_ERROR,
   PAYMENT_SUBMISSION_MAX_COUNT,
-  getPaymentStatusPresentation,
   sanitizeOriginalFilename,
   type PaymentSubmissionStatus,
 } from '@/lib/payment/manual'
+import {
+  customerPaymentErrorMessage,
+  getCustomerPaymentPresentation,
+  isCustomerPaymentStaleStateError,
+  type CustomerVerificationStatus,
+} from '@/lib/payment/customer'
+
+declare global {
+  interface Window { OmiseCard: any }
+}
 
 export interface ManualPaymentOrder {
   id: string
   amount: number
   status: 'pending'
   submissionStatus: PaymentSubmissionStatus | null
-  rejectionReason: string | null
+  customerVerificationStatus: CustomerVerificationStatus | null
   submissionCount: number | null
   paymentEvidenceAvailable: boolean
+  paymentSettingsAvailable: boolean
 }
 
 interface ManualPaymentQrDetails {
@@ -39,13 +51,23 @@ interface CheckoutClientProps {
   userEmail: string
   supportConfig?: SupportConfig
   initialManualOrder?: ManualPaymentOrder | null
+  manualPaymentEnabled: boolean
 }
 
-declare global {
-  interface Window { OmiseCard: any }
+function formatAmount(value: number | string) {
+  return Number(value).toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
-export default function CheckoutClient({ pkg, userEmail, supportConfig, initialManualOrder = null }: CheckoutClientProps) {
+export default function CheckoutClient({
+  pkg,
+  userEmail: _userEmail,
+  supportConfig,
+  initialManualOrder = null,
+  manualPaymentEnabled,
+}: CheckoutClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,7 +76,9 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
   const [claimedSuccess, setClaimedSuccess] = useState(false)
   const [manualOrder, setManualOrder] = useState<ManualPaymentOrder | null>(initialManualOrder)
   const [manualQrDetails, setManualQrDetails] = useState<ManualPaymentQrDetails | null>(null)
-  const [manualQrState, setManualQrState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>(initialManualOrder ? 'loading' : 'idle')
+  const [manualQrState, setManualQrState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>(
+    initialManualOrder && manualPaymentEnabled ? 'loading' : 'idle',
+  )
   const [slipFile, setSlipFile] = useState<File | null>(null)
   const [slipSubmitting, setSlipSubmitting] = useState(false)
   const [fileInputKey, setFileInputKey] = useState(0)
@@ -62,11 +86,28 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
   const currentPrice = Number(pkg.current_price)
   const originalPrice = Number(pkg.original_price)
   const displayedAmount = manualOrder?.amount ?? currentPrice
+  const presentation = manualOrder
+    ? getCustomerPaymentPresentation({
+        orderStatus: manualOrder.status,
+        paymentProvider: 'promptpay_manual',
+        submissionCount: manualOrder.submissionCount,
+        latestSubmissionStatus: manualOrder.submissionStatus,
+        verificationStatus: manualOrder.customerVerificationStatus,
+        paymentSettingsAvailable: manualOrder.paymentSettingsAvailable,
+        evidenceReadAvailable: manualOrder.paymentEvidenceAvailable,
+      })
+    : null
 
-  const discount = originalPrice > currentPrice
-    ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
-    : 0
+  const showError = (value: unknown, fallback: string) => {
+    const message = customerPaymentErrorMessage(value, fallback)
+    setError(message)
+    toastEvent(message, 'error')
+    if (isCustomerPaymentStaleStateError(value)) router.refresh()
+  }
 
+  // Preserve the existing non-manual payment path for server-side compatibility.
+  // M1.3B intentionally does not expose this legacy method in the customer UI;
+  // PromptPay is the only rendered paid method for the manual-payment flow.
   useEffect(() => {
     const script = document.createElement('script')
     script.src = 'https://cdn.omise.co/omise.js'
@@ -76,7 +117,11 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
   }, [])
 
   useEffect(() => {
-    if (!manualOrder || payMethod !== 'promptpay') return
+    if (!manualOrder || !manualPaymentEnabled) {
+      setManualQrState('idle')
+      setManualQrDetails(null)
+      return
+    }
 
     let cancelled = false
     setManualQrState('loading')
@@ -85,7 +130,7 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
     fetch(`/api/payment/manual/order/${manualOrder.id}/details`, { cache: 'no-store' })
       .then(async (response) => {
         const data = await response.json().catch(() => null)
-        if (!response.ok || !data?.success) throw new Error(data?.error || 'payment details unavailable')
+        if (!response.ok || !data?.success) throw data || new Error('payment details unavailable')
         if (!cancelled) {
           setManualQrDetails({
             amount: String(data.amount),
@@ -94,21 +139,19 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
           })
         }
       })
-      .catch(() => {
-        if (!cancelled) setManualQrState('unavailable')
+      .catch((reason) => {
+        if (!cancelled) {
+          setManualQrState('unavailable')
+          showError(reason, 'ขณะนี้ยังไม่สามารถรับชำระเงินได้ กรุณาลองใหม่ภายหลัง')
+        }
       })
 
     return () => { cancelled = true }
-  }, [manualOrder?.id, payMethod])
+  }, [manualOrder?.id, manualPaymentEnabled])
 
   const handleCardPayment = () => {
-    if (manualOrder?.submissionStatus === 'submitted') {
-      setError('ระบบได้รับสลิป PromptPay แล้ว กรุณารอการตรวจสอบ')
-      return
-    }
-
     if (!omiseLoaded || !window.OmiseCard) {
-      setError('กำลังโหลดระบบชำระเงิน กรุณารอสักครู่')
+      showError(null, 'กำลังโหลดระบบชำระเงิน กรุณารอสักครู่')
       return
     }
 
@@ -119,26 +162,26 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
 
     window.OmiseCard.open({
       frameLabel: 'Sobdai - สอบได้',
-      amount: currentPrice * 100, // Satang
+      amount: currentPrice * 100,
       currency: 'THB',
       defaultPaymentMethod: 'credit_card',
       submitLabel: `ชำระ ฿${currentPrice.toLocaleString()}`,
       onCreateTokenSuccess: async (token: string) => {
         setLoading(true)
         try {
-          const res = await fetch('/api/payment/create', {
+          const response = await fetch('/api/payment/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ packageId: pkg.id, token }),
           })
-          const data = await res.json()
-          if (data.success) {
+          const data = await response.json().catch(() => ({}))
+          if (response.ok && data.success) {
             router.push(`/package/${pkg.slug}?success=1`)
           } else {
-            setError(data.error || 'การชำระเงินไม่สำเร็จ')
+            showError(data, 'การชำระเงินไม่สำเร็จ กรุณาลองใหม่')
           }
-        } catch {
-          setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+        } catch (reason) {
+          showError(reason, 'การชำระเงินไม่สำเร็จ กรุณาลองใหม่')
         } finally {
           setLoading(false)
         }
@@ -148,21 +191,21 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
   }
 
   const handlePromptPay = async () => {
-    if (loading || manualOrder) return
+    if (loading || manualOrder || !manualPaymentEnabled) return
 
     setLoading(true)
     setError('')
 
     try {
-      const res = await fetch('/api/payment/manual/order', {
+      const response = await fetch('/api/payment/manual/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packageId: pkg.id }),
       })
-      const data = await res.json()
+      const data = await response.json().catch(() => null)
 
-      if (!res.ok || !data.success) {
-        setError(data.error || 'ไม่สามารถสร้างคำสั่งซื้อ PromptPay ได้')
+      if (!response.ok || !data?.success) {
+        showError(data, 'ไม่สามารถสร้างคำสั่งซื้อ PromptPay ได้')
         return
       }
 
@@ -171,12 +214,13 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
         amount: Number(data.amount),
         status: 'pending',
         submissionStatus: null,
-        rejectionReason: null,
+        customerVerificationStatus: null,
         submissionCount: 0,
         paymentEvidenceAvailable: true,
+        paymentSettingsAvailable: true,
       })
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+    } catch (reason) {
+      showError(reason, 'สร้างคำสั่งซื้อไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setLoading(false)
     }
@@ -187,23 +231,28 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
 
     if (!manualOrder || slipSubmitting || manualOrder.submissionStatus === 'submitted') return
 
+    if (!manualPaymentEnabled) {
+      showError(null, 'ขณะนี้ยังไม่สามารถรับชำระเงินได้ กรุณาลองใหม่ภายหลัง')
+      return
+    }
+
     if (!manualOrder.paymentEvidenceAvailable) {
-      setError('ไม่สามารถตรวจสอบสถานะสลิปได้ในขณะนี้ กรุณารีเฟรชแล้วลองใหม่')
+      showError(null, 'ไม่สามารถตรวจสอบสถานะสลิปได้ในขณะนี้ กรุณารีเฟรชแล้วลองใหม่')
       return
     }
 
     if (manualOrder.submissionCount !== null && manualOrder.submissionCount >= PAYMENT_SUBMISSION_MAX_COUNT) {
-      setError(PAYMENT_SUBMISSION_LIMIT_ERROR)
+      showError(PAYMENT_SUBMISSION_LIMIT_ERROR, PAYMENT_SUBMISSION_LIMIT_ERROR)
       return
     }
 
     if (!slipFile) {
-      setError('กรุณาเลือกไฟล์สลิป')
+      showError(null, 'กรุณาเลือกไฟล์สลิป')
       return
     }
 
     if (!isPaymentSlipMimeType(slipFile.type) || slipFile.size <= 0 || slipFile.size > PAYMENT_SLIP_MAX_BYTES) {
-      setError('รองรับไฟล์ JPG, PNG, WEBP หรือ PDF ขนาดไม่เกิน 4 MB')
+      showError(slipFile.size > PAYMENT_SLIP_MAX_BYTES ? 'ไฟล์มีขนาดใหญ่เกินไป' : 'ชนิดไฟล์ไม่รองรับ', 'ส่งหลักฐานไม่สำเร็จ กรุณาตรวจสอบไฟล์')
       return
     }
 
@@ -216,14 +265,14 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
       formData.append('idempotencyKey', crypto.randomUUID())
       formData.append('file', slipFile, sanitizeOriginalFilename(slipFile.name))
 
-      const res = await fetch('/api/payment/manual/slip', {
+      const response = await fetch('/api/payment/manual/slip', {
         method: 'POST',
         body: formData,
       })
-      const data = await res.json()
+      const data = await response.json().catch(() => null)
 
-      if (!res.ok || !data.success) {
-        setError(data.error || 'ไม่สามารถส่งสลิปได้ กรุณาลองใหม่')
+      if (!response.ok || !data?.success) {
+        showError(data, 'ส่งหลักฐานไม่สำเร็จ กรุณาลองอีกครั้ง')
         return
       }
 
@@ -231,15 +280,16 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
         ? {
             ...current,
             submissionStatus: 'submitted',
-            rejectionReason: null,
+            customerVerificationStatus: 'checking',
             submissionCount: (current.submissionCount ?? 0) + 1,
             paymentEvidenceAvailable: true,
           }
         : current)
       setSlipFile(null)
       setFileInputKey((key) => key + 1)
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+      toastEvent('ส่งหลักฐานเรียบร้อยแล้ว กำลังตรวจสอบหลักฐานการชำระเงิน', 'success')
+    } catch (reason) {
+      showError(reason, 'ส่งหลักฐานไม่สำเร็จ กรุณาลองอีกครั้ง')
     } finally {
       setSlipSubmitting(false)
     }
@@ -249,167 +299,121 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
     if (loading || claimedSuccess) return
     setLoading(true)
     setError('')
+
     try {
-      const res = await fetch('/api/payment/create', {
+      const response = await fetch('/api/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packageId: pkg.id, token: 'free_token' }), // Token can be anything for free
+        body: JSON.stringify({ packageId: pkg.id, token: 'free_token' }),
       })
-      const data = await res.json()
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        showError(data, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่')
+        return
+      }
+
       if (data.success) {
         setClaimedSuccess(true)
         freePackageClaimed(pkg.id, pkg.name)
-      } else {
-        setError(data.error || 'เกิดข้อผิดพลาด')
+        toastEvent('เปิดใช้งานแพ็กเกจเรียบร้อยแล้ว', 'success')
+        return
       }
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+
+      showError(data, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่')
+    } catch (reason) {
+      showError(reason, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setLoading(false)
     }
   }
 
-  // Voluntary Support is rendered only after successful claim, when enabled and QR exists
-  const showSupportSection =
-    claimedSuccess &&
-    Boolean(supportConfig?.enabled) &&
-    Boolean(supportConfig?.qr_image_url?.trim())
+  const showSupportSection = claimedSuccess && Boolean(supportConfig?.enabled) && Boolean(supportConfig?.qr_image_url?.trim())
 
-  const manualPaymentStatus = manualOrder
-    ? getPaymentStatusPresentation({
-        orderStatus: manualOrder.status,
-        paymentProvider: 'promptpay_manual',
-        submissionCount: manualOrder.submissionCount,
-        latestSubmissionStatus: manualOrder.submissionStatus,
-        evidenceReadAvailable: manualOrder.paymentEvidenceAvailable,
-      })
-    : null
+  const packageImage = pkg.cover_image_url || pkg.logo_url || pkg.organizations?.logo_url
+  const packageImageAlt = pkg.positions?.name || pkg.name
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] font-sans pb-20">
-      
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0F0B07] border-b border-[rgba(212,175,55,0.1)] h-16 flex items-center px-4">
-        <div className="max-w-2xl mx-auto w-full flex items-center gap-4">
-          <Link href={`/package/${pkg.slug}`} className="text-[#A1866B] hover:text-[#D4AF37] transition-colors p-2 -ml-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
+    <div className="min-h-screen bg-background pb-20 font-sans text-foreground">
+      <div className="sticky top-0 z-50 border-b border-border-subtle bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-3xl items-center gap-4 px-4">
+          <Link
+            href={`/package/${pkg.slug}`}
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-hover hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand"
+            aria-label="กลับไปหน้าแพ็กเกจ"
+          >
             <ChevronLeft size={20} />
           </Link>
-          <div className="font-bold text-[#F5E9D6]">
-            {claimedSuccess ? 'รับแพ็กเกจสำเร็จ' : 'ยืนยันคำสั่งซื้อ'}
-          </div>
+          <div className="font-bold text-foreground">{claimedSuccess ? 'รับแพ็กเกจสำเร็จ' : 'ยืนยันคำสั่งซื้อ'}</div>
         </div>
       </div>
 
-      <div className="max-w-xl mx-auto px-4 mt-8 space-y-6">
-        
-        {/* Order Summary Card */}
-        <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.2)] rounded-2xl p-6">
-          <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">สรุปแพ็กเกจ</h2>
-          
-          <div className="flex gap-4 items-start mb-6">
-            <div className="w-16 h-16 rounded-full bg-[#0F0B07] border border-[rgba(212,175,55,0.2)] flex-shrink-0 overflow-hidden shadow-[0_0_12px_rgba(212,175,55,0.1)]">
-              {pkg.cover_image_url ? (
-                <Image src={pkg.cover_image_url} alt={pkg.positions?.name || pkg.name} width={64} height={64} className="w-full h-full object-cover" />
-              ) : pkg.logo_url || pkg.organizations?.logo_url ? (
-                <Image src={pkg.logo_url || pkg.organizations?.logo_url} alt="logo" width={64} height={64} className="w-full h-full object-contain p-2" />
+      <div className="mx-auto mt-8 max-w-xl space-y-6 px-4">
+        <section className="rounded-2xl border border-border-subtle bg-card p-6 shadow-sm">
+          <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground">สรุปแพ็กเกจ</h2>
+
+          <div className="mb-6 flex items-start gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-surface p-2">
+              {packageImage ? (
+                <Image src={packageImage} alt={packageImageAlt} width={64} height={64} className="h-full w-full object-contain" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-xl font-display font-bold text-[#D4AF37]">{pkg.organizations?.name?.charAt(0) || 'O'}</span>
-                </div>
+                <span className="font-display text-xl font-bold text-brand">{pkg.organizations?.name?.charAt(0) || 'S'}</span>
               )}
             </div>
-            <div>
-              <div className="text-xs text-[#A1866B] mb-1">{pkg.organizations?.name}</div>
-              <div className="font-bold text-[#F5E9D6] mb-1 leading-snug">{pkg.positions?.name}</div>
-              <div className="text-sm text-[#A1866B]">{pkg.name}</div>
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground">{pkg.organizations?.name}</div>
+              <div className="mt-1 font-bold leading-snug text-foreground">{pkg.positions?.name}</div>
+              <div className="mt-1 text-sm text-muted-foreground">{pkg.name}</div>
             </div>
           </div>
 
-          <div className="h-px bg-gradient-to-r from-transparent via-[rgba(212,175,55,0.2)] to-transparent my-6" />
-
-          <div className="flex justify-between items-end">
-            <div className="text-[#A1866B] font-medium">ยอดชำระสุทธิ</div>
+          <div className="my-6 h-px bg-border-subtle" />
+          <div className="flex items-end justify-between gap-4">
+            <div className="font-medium text-muted-foreground">ยอดชำระสุทธิ</div>
             <div className="text-right">
               {!manualOrder && originalPrice > currentPrice && (
-                <div className="text-sm text-[#A1866B] line-through mb-1">฿{originalPrice.toLocaleString()}</div>
+                <div className="mb-1 text-sm text-muted-foreground line-through">฿{originalPrice.toLocaleString()}</div>
               )}
-              <div className="text-3xl font-display font-bold text-[#D4AF37]">
-                ฿{displayedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
+              <div className="font-display text-3xl font-bold text-brand">฿{formatAmount(displayedAmount)}</div>
             </div>
           </div>
 
-          <div className="mt-6 bg-green-500/10 border border-green-500/20 rounded-xl p-3 flex items-center gap-3 text-sm text-green-400">
-            <ShieldCheck size={18} className="flex-shrink-0" />
+          <div className="mt-6 flex items-start gap-3 rounded-xl border border-success-border bg-success-bg p-3 text-sm text-success">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
             <div>
               <span className="font-bold">
-                {claimedSuccess
-                  ? 'เปิดใช้งานสิทธิ์เรียบร้อยแล้ว'
-                  : currentPrice === 0
-                    ? 'แพ็กเกจนี้เปิดให้ใช้งานฟรี'
-                    : 'สิทธิ์ใช้งานแพ็กเกจนี้ตลอดชีพ'}
+                {claimedSuccess ? 'เปิดใช้งานสิทธิ์เรียบร้อยแล้ว' : currentPrice === 0 ? 'แพ็กเกจนี้เปิดให้ใช้งานฟรี' : 'สิทธิ์ใช้งานแพ็กเกจนี้ตลอดชีพ'}
               </span>
-              <div className="text-xs opacity-80">
-                {currentPrice === 0
-                  ? 'ปลดล็อคเนื้อหาทั้งหมดในแพ็กเกจนี้ทันที'
-                  : 'ชำระครั้งเดียว ไม่มีค่ารายเดือน'}
+              <div className="mt-1 text-xs opacity-80">
+                {currentPrice === 0 ? 'ปลดล็อกเนื้อหาทั้งหมดในแพ็กเกจนี้ทันที' : 'ชำระครั้งเดียว ไม่มีค่ารายเดือน'}
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Free or Paid Condition */}
         {currentPrice === 0 ? (
           claimedSuccess ? (
-            /* ── Claim Success Panel ── */
             <div className="space-y-6">
-              <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.25)] rounded-2xl p-6 text-center shadow-xl">
-                <div className="w-12 h-12 rounded-2xl bg-green-500/15 border border-green-500/30 flex items-center justify-center mx-auto mb-4 text-green-400">
-                  <CheckCircle2 size={24} />
-                </div>
-                <h2 className="text-xl font-bold text-[#F5E9D6] mb-2 font-display">
-                  เปิดใช้งานแพ็กเกจเรียบร้อยแล้ว
-                </h2>
-                <p className="text-sm text-[#A1866B] mb-6">
-                  คุณได้รับสิทธิ์เข้าถึงเนื้อหาและชุดข้อสอบทั้งหมดในแพ็กเกจนี้แล้ว
-                </p>
-
-                {/* Primary CTA: Start Learning */}
+              <section className="rounded-2xl border border-success-border bg-card p-6 text-center shadow-sm">
+                <PaymentStatusIllustration state="free" />
+                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">คุณได้รับสิทธิ์เข้าถึงเนื้อหาและชุดข้อสอบทั้งหมดในแพ็กเกจนี้แล้ว</p>
                 <Link
                   href={`/package/${pkg.slug}#resources`}
-                  className="w-full py-4 rounded-xl font-bold text-white bg-[#22C55E] hover:bg-[#1EA950] shadow-[0_10px_25px_rgba(34,197,94,0.25)] transition-all flex items-center justify-center gap-2 text-[16px] font-display hover:scale-[1.01]"
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-success px-5 py-4 font-bold text-success-foreground transition-colors hover:bg-success-hover focus:outline-none focus:ring-4 focus:ring-success/30"
                 >
-                  <PlayCircle size={20} />
+                  <PlayCircle size={20} aria-hidden="true" />
                   เริ่มเรียน
                 </Link>
-              </div>
+              </section>
 
-              {/* ── Voluntary Support Section (Optional, below Primary CTA) ── */}
               {showSupportSection && supportConfig && (
-                <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl p-6 text-center space-y-4">
-                  {/* Heart & Title */}
-                  <div className="flex flex-col items-center gap-2">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{
-                        background: 'rgba(212,175,55,0.08)',
-                        border: '1px solid rgba(212,175,55,0.15)',
-                      }}
-                    >
-                      <Heart size={18} className="text-[#D4AF37]" fill="rgba(212,175,55,0.2)" />
-                    </div>
-                    <h3 className="text-base font-bold text-[#F5E9D6] font-display">
-                      {supportConfig.title || 'สนับสนุน Sobdai'}
-                    </h3>
-                    {supportConfig.description && (
-                      <p className="text-xs text-[#A1866B] max-w-sm leading-relaxed">
-                        {supportConfig.description}
-                      </p>
-                    )}
+                <section className="rounded-2xl border border-border-subtle bg-card p-6 text-center">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-brand/20 bg-wash">
+                    <Heart size={18} className="text-brand" fill="currentColor" aria-hidden="true" />
                   </div>
-
-                  {/* Shared Support QR & Details */}
-                  <div className="py-2">
+                  <h2 className="mt-3 font-bold text-foreground">{supportConfig.title || 'สนับสนุน Sobdai'}</h2>
+                  {supportConfig.description && <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">{supportConfig.description}</p>}
+                  <div className="py-4">
                     <SupportDetails
                       qr_image_url={supportConfig.qr_image_url}
                       promptpay_name={supportConfig.promptpay_name}
@@ -419,226 +423,164 @@ export default function CheckoutClient({ pkg, userEmail, supportConfig, initialM
                       qrSize={180}
                     />
                   </div>
-
-                  {/* Optional CMS footer message */}
-                  {supportConfig.footer_message && (
-                    <p className="text-center text-[#D4AF37]/70 text-[12px] leading-relaxed">
-                      {supportConfig.footer_message}
-                    </p>
-                  )}
-
-                  {/* Static Checkout Disclosure */}
-                  <p className="text-[11px] text-[#A1866B]/60 leading-relaxed pt-2 border-t border-[rgba(255,255,255,0.05)]">
-                    การสนับสนุนเป็นทางเลือก ไม่จำเป็นต่อการรับหรือใช้งานแพ็กเกจฟรี
-                  </p>
-                </div>
+                  {supportConfig.footer_message && <p className="text-xs leading-relaxed text-brand">{supportConfig.footer_message}</p>}
+                  <p className="mt-4 border-t border-border-subtle pt-3 text-[11px] leading-relaxed text-muted-foreground">การสนับสนุนเป็นทางเลือก ไม่จำเป็นต่อการรับหรือใช้งานแพ็กเกจฟรี</p>
+                </section>
               )}
             </div>
           ) : (
-            /* ── Before Claim ── */
-            <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl p-6 text-center">
-              <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">รับสิทธิ์ใช้งาน</h2>
-              <p className="text-[#F5E9D6] mb-6">แพ็กเกจนี้เปิดให้ใช้งานฟรี กดปุ่มด้านล่างเพื่อรับสิทธิ์ใช้งานทันที</p>
-
-              {error && (
-                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
-                  {error}
-                </div>
-              )}
-
-              <div className="mb-6 text-[12px] text-[#A1866B] bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] p-3.5 rounded-xl flex gap-2.5 text-left leading-relaxed">
-                <ShieldCheck size={16} className="text-[#A1866B] flex-shrink-0 mt-0.5" />
-                <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
+            <section className="rounded-2xl border border-border-subtle bg-card p-6 text-center">
+              <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground">รับสิทธิ์ใช้งาน</h2>
+              <p className="mb-6 text-foreground">แพ็กเกจนี้เปิดให้ใช้งานฟรี กดปุ่มด้านล่างเพื่อรับสิทธิ์ใช้งานทันที</p>
+              {error && <div className="mb-6 rounded-xl border border-destructive-border bg-destructive-bg p-4 text-left text-sm font-medium text-destructive" role="alert">{error}</div>}
+              <div className="mb-6 flex gap-3 rounded-xl border border-border-subtle bg-surface p-3.5 text-left text-xs leading-relaxed text-muted-foreground">
+                <ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>ฉันเข้าใจและยอมรับว่า <strong className="font-medium text-foreground">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
               </div>
-
-              <button type="button"
+              <button
+                type="button"
                 onClick={handleFreeCheckout}
                 disabled={loading}
-                className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
-                  loading
-                    ? 'bg-[#A1866B] cursor-not-allowed opacity-70'
-                    : 'bg-[#D4AF37] hover:bg-[#F1D17A] shadow-[0_0_20px_rgba(212,175,55,0.3)]'
-                }`}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-solid py-4 font-bold text-brand-foreground transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-4 focus:ring-brand/30"
               >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-[#1A140E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    กำลังดำเนินการ...
-                  </>
-                ) : (
-                  'รับแพ็กเกจฟรี'
-                )}
+                {loading ? 'กำลังดำเนินการ...' : 'รับแพ็กเกจฟรี'}
               </button>
-            </div>
+            </section>
           )
         ) : (
-          /* ── Paid Checkout Panel (Unchanged) ── */
-          <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.05)] rounded-2xl p-6">
-            <h2 className="text-[#A1866B] text-sm font-bold uppercase tracking-wider mb-4">ช่องทางชำระเงิน</h2>
+          <>
+            {/* Paid Checkout Panel */}
+            <section className="rounded-2xl border border-border-subtle bg-card p-6 shadow-sm">
+            <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground">ช่องทางชำระเงิน</h2>
 
-            <div className="flex gap-3 mb-6">
-              <button type="button"
+            <div className="mb-6 flex gap-3">
+              <button
+                type="button"
                 onClick={() => setPayMethod('promptpay')}
-                className={`flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all ${
-                  payMethod === 'promptpay'
-                    ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]'
-                    : 'bg-[#0F0B07] border-[rgba(255,255,255,0.05)] text-[#A1866B] hover:border-[#D4AF37]/50'
-                }`}
+                aria-pressed={payMethod === 'promptpay'}
+                className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-brand bg-wash p-4 text-brand focus:outline-none focus:ring-2 focus:ring-brand/50"
               >
-                <QrCode size={24} />
+                <QrCode size={24} aria-hidden="true" />
                 <span className="text-sm font-bold">พร้อมเพย์</span>
               </button>
             </div>
 
-            {error && (
-              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
-                {error}
+            {error && <div className="mb-6 rounded-xl border border-destructive-border bg-destructive-bg p-4 text-sm font-medium text-destructive" role="alert">{error}</div>}
+
+            {!manualPaymentEnabled && !manualOrder ? (
+              <div className="rounded-xl border border-destructive-border bg-destructive-bg p-5">
+                <PaymentStatusIllustration state="payment_disabled" compact />
               </div>
-            )}
-
-            <div className="mb-6 text-[12px] text-[#A1866B] bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] p-3.5 rounded-xl flex gap-2.5 text-left leading-relaxed">
-              <ShieldCheck size={16} className="text-[#A1866B] flex-shrink-0 mt-0.5" />
-              <span>ฉันเข้าใจและยอมรับว่า <strong className="text-[#F5E9D6] font-medium">สินค้าดิจิทัลไม่สามารถขอคืนเงินได้</strong> หลังจากที่ได้รับสิทธิ์เข้าถึงเนื้อหาแล้ว</span>
-            </div>
-
-            {payMethod === 'promptpay' && manualOrder ? (
-              <div className="space-y-5 rounded-xl border border-[#D4AF37]/20 bg-[#0F0B07] p-4">
-                <div className="text-center">
-                  <h3 className="text-lg font-bold text-[#F5E9D6]">โอนเงินผ่าน PromptPay</h3>
-                  <p className="mt-1 text-sm text-[#A1866B]">กรุณาโอนยอดให้ตรงกับคำสั่งซื้อ</p>
-                  <p className="mt-2 text-3xl font-bold text-[#D4AF37]">฿{Number(manualQrDetails?.amount ?? manualOrder.amount.toFixed(2)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>
-
-                <div className="rounded-lg border border-white/10 bg-white p-4 text-center">
-                  {manualQrState === 'loading' && (
-                    <div className="py-12 text-sm text-slate-600">กำลังเตรียม QR สำหรับคำสั่งซื้อนี้...</div>
-                  )}
-                  {manualQrState !== 'unavailable' && (
-                    <img
-                      src={`/api/payment/manual/order/${manualOrder.id}/qr`}
-                      alt={`QR PromptPay สำหรับชำระเงิน ฿${manualQrDetails?.amount ?? manualOrder.amount.toFixed(2)}`}
-                      width={280}
-                      height={280}
-                      className={`mx-auto h-[280px] w-[280px] ${manualQrState === 'loading' ? 'hidden' : ''}`}
-                      onLoad={() => setManualQrState('ready')}
-                      onError={() => setManualQrState('unavailable')}
-                    />
-                  )}
-                  {manualQrState === 'unavailable' && (
-                    <div className="py-8 text-sm text-red-700">ขณะนี้การชำระเงินผ่าน PromptPay ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง</div>
-                  )}
-                </div>
-
-                {manualQrState === 'ready' && manualQrDetails && (
-                  <div className="space-y-2 text-center">
-                    {manualQrDetails.displayName && (
-                      <p className="text-base font-bold text-[#F5E9D6]">{manualQrDetails.displayName}</p>
-                    )}
-                    {manualQrDetails.instructionText && (
-                      <p className="whitespace-pre-line text-sm leading-relaxed text-[#A1866B]">{manualQrDetails.instructionText}</p>
-                    )}
+            ) : manualOrder && presentation ? (
+              <div className="space-y-5">
+                {(presentation.state === 'auto_checking' || presentation.state === 'under_review' || presentation.state === 'payment_disabled') && (
+                  <div className="rounded-xl border border-border-subtle bg-surface p-5">
+                    <PaymentStatusIllustration state={presentation.state} title={presentation.title} description={presentation.description} />
+                    <Link
+                      href={`/orders/${manualOrder.id}`}
+                      className="mx-auto mt-5 inline-flex w-full max-w-sm items-center justify-center rounded-xl border border-brand/40 px-4 py-3 text-sm font-bold text-brand transition-colors hover:bg-wash focus:outline-none focus:ring-2 focus:ring-brand/50"
+                    >
+                      ดูรายละเอียดคำสั่งซื้อ
+                    </Link>
                   </div>
                 )}
 
-                {manualQrState !== 'ready' || !manualQrDetails ? (
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-[#A1866B]">
-                    {manualQrState === 'unavailable' ? 'ยังไม่สามารถดำเนินการส่งสลิปได้ กรุณาลองใหม่ภายหลัง' : 'กำลังตรวจสอบข้อมูลการชำระเงิน...'}
-                  </div>
-                ) : manualPaymentStatus?.key === 'evidence-unavailable' ? (
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-[#A1866B]">
-                    <div className="font-bold text-[#F5E9D6]">{manualPaymentStatus.label}</div>
-                    <div className="mt-1">{manualPaymentStatus.description}</div>
-                  </div>
-                ) : manualPaymentStatus?.key === 'under-review' ? (
-                  <div className="rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 p-4 text-center text-sm text-[#F1D17A]">
-                    <div className="font-bold">{manualPaymentStatus.label}</div>
-                    <div className="mt-1">ได้รับสลิปแล้ว คุณจะได้รับสิทธิ์หลังการอนุมัติ</div>
-                  </div>
-                ) : (
+                {(presentation.state === 'awaiting_upload' || presentation.state === 'rejected') && (
                   <>
-                    {manualPaymentStatus?.key === 'awaiting-upload' && manualPaymentStatus.description && (
-                      <div className="rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/10 p-4 text-center text-sm text-[#F1D17A]">
-                        <div className="font-bold">{manualPaymentStatus.label}</div>
-                        <div className="mt-1">{manualPaymentStatus.description}</div>
+                    <PaymentStatusIllustration state={presentation.state} title={presentation.title} description={presentation.description} compact />
+
+                    {manualPaymentEnabled && !(presentation.state === 'rejected' && manualOrder.paymentSettingsAvailable === false) ? (
+                      <>
+                        <div className="rounded-xl border border-border-subtle bg-surface p-4 text-center">
+                          <h3 className="text-lg font-bold text-foreground">โอนเงินผ่าน PromptPay</h3>
+                          <p className="mt-1 text-sm text-muted-foreground">กรุณาโอนยอดให้ตรงกับคำสั่งซื้อ</p>
+                          <p className="mt-2 text-3xl font-bold text-brand">฿{formatAmount(manualQrDetails?.amount ?? manualOrder.amount)}</p>
+                        </div>
+
+                        <div className="rounded-lg border border-border-subtle bg-white p-4 text-center">
+                          {manualQrState === 'loading' && <div className="py-12 text-sm text-slate-600">กำลังเตรียม QR สำหรับคำสั่งซื้อนี้...</div>}
+                          {manualQrState !== 'unavailable' && (
+                            <img
+                              src={`/api/payment/manual/order/${manualOrder.id}/qr`}
+                              alt={`QR PromptPay สำหรับชำระเงิน ฿${manualQrDetails?.amount ?? formatAmount(manualOrder.amount)}`}
+                              width={280}
+                              height={280}
+                              className={`mx-auto h-auto w-[280px] max-w-full ${manualQrState === 'loading' ? 'hidden' : ''}`}
+                              onLoad={() => setManualQrState('ready')}
+                              onError={() => setManualQrState('unavailable')}
+                            />
+                          )}
+                          {manualQrState === 'unavailable' && <div className="py-8 text-sm text-red-700">ขณะนี้การชำระเงินผ่าน PromptPay ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง</div>}
+                        </div>
+
+                        {manualQrState === 'ready' && manualQrDetails && (
+                          <div className="space-y-2 text-center">
+                            {manualQrDetails.displayName && <p className="font-bold text-foreground">{manualQrDetails.displayName}</p>}
+                            {manualQrDetails.instructionText && <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{manualQrDetails.instructionText}</p>}
+                          </div>
+                        )}
+
+                        {manualQrState !== 'ready' || !manualQrDetails ? (
+                          <div className="rounded-lg border border-border-subtle bg-surface p-4 text-center text-sm text-muted-foreground">
+                            {manualQrState === 'unavailable' ? 'ยังไม่สามารถดำเนินการส่งหลักฐานได้ กรุณาลองใหม่ภายหลัง' : 'กำลังตรวจสอบข้อมูลการชำระเงิน...'}
+                          </div>
+                        ) : manualOrder.paymentEvidenceAvailable && manualOrder.submissionCount !== null && manualOrder.submissionCount >= PAYMENT_SUBMISSION_MAX_COUNT ? (
+                          <div className="rounded-lg border border-destructive-border bg-destructive-bg p-3 text-center text-sm text-destructive" role="alert">{PAYMENT_SUBMISSION_LIMIT_ERROR}</div>
+                        ) : manualOrder.paymentEvidenceAvailable ? (
+                          <form onSubmit={handleSlipSubmit} className="space-y-3">
+                            <label htmlFor="payment-slip" className="block text-sm font-semibold text-foreground">แนบสลิปการโอนเงิน</label>
+                            <input
+                              key={fileInputKey}
+                              id="payment-slip"
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,application/pdf"
+                              onChange={(event) => {
+                                setSlipFile(event.target.files?.[0] || null)
+                                setError('')
+                              }}
+                              className="block w-full rounded-lg border border-border-subtle bg-input p-2 text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-brand-solid file:px-3 file:py-2 file:font-semibold file:text-brand-foreground"
+                            />
+                            <p className="text-xs text-muted-foreground">รองรับไฟล์ JPG, PNG, WebP หรือ PDF ขนาดไม่เกิน 4 MB</p>
+                            <button
+                              type="submit"
+                              disabled={slipSubmitting || !slipFile}
+                              className="w-full rounded-lg bg-brand-solid py-3 font-bold text-brand-foreground transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-brand/50"
+                            >
+                              {slipSubmitting ? 'กำลังอัปโหลดสลิป...' : 'ส่งสลิปให้ผู้ดูแลตรวจสอบ'}
+                            </button>
+                          </form>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="rounded-xl border border-destructive-border bg-destructive-bg p-4 text-sm text-destructive" role="alert">
+                        {presentation.state === 'rejected' && manualOrder.paymentSettingsAvailable === false
+                          ? 'ขณะนี้ระบบชำระเงินยังไม่พร้อมใช้งาน กรุณากลับมาลองใหม่ภายหลัง'
+                          : 'ขณะนี้ยังไม่สามารถรับชำระเงินได้ กรุณาลองใหม่ภายหลัง'}
                       </div>
                     )}
-
-                    {manualPaymentStatus?.key === 'rejected' && (
-                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-300">
-                        <div className="font-bold">{manualPaymentStatus.label}</div>
-                        <div className="mt-1">{manualOrder.rejectionReason ? `เหตุผล: ${manualOrder.rejectionReason}` : 'กรุณาโอนใหม่และส่งหลักฐานอีกครั้ง'}</div>
-                      </div>
-                    )}
-
-                    {manualOrder.paymentEvidenceAvailable && manualOrder.submissionCount !== null && manualOrder.submissionCount >= PAYMENT_SUBMISSION_MAX_COUNT ? (
-                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-3 text-center text-sm text-red-300">
-                        {PAYMENT_SUBMISSION_LIMIT_ERROR}
-                      </div>
-                    ) : manualOrder.paymentEvidenceAvailable ? (
-                      <form onSubmit={handleSlipSubmit} className="space-y-3">
-                        <label htmlFor="payment-slip" className="block text-sm font-semibold text-[#F5E9D6]">
-                          แนบสลิปการโอนเงิน
-                        </label>
-                        <input
-                          key={fileInputKey}
-                          id="payment-slip"
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,application/pdf"
-                          onChange={(event) => {
-                            setSlipFile(event.target.files?.[0] || null)
-                            setError('')
-                          }}
-                          className="block w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#1A140E] p-2 text-sm text-[#A1866B] file:mr-3 file:rounded-md file:border-0 file:bg-[#D4AF37] file:px-3 file:py-2 file:font-semibold file:text-[#1A140E]"
-                        />
-                        <p className="text-xs text-[#A1866B]">รองรับ JPG, PNG, WEBP หรือ PDF ขนาดไม่เกิน 4 MB</p>
-                        <button
-                          type="submit"
-                          disabled={slipSubmitting || !slipFile}
-                          className="w-full rounded-lg bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {slipSubmitting ? 'กำลังอัปโหลดสลิป...' : 'ส่งสลิปให้ผู้ดูแลตรวจสอบ'}
-                        </button>
-                      </form>
-                    ) : null}
                   </>
                 )}
               </div>
             ) : (
-            <button type="button"
-              onClick={payMethod === 'card' ? handleCardPayment : handlePromptPay}
-              disabled={loading || (payMethod === 'card' && !omiseLoaded)}
-              className={`w-full py-4 rounded-xl font-bold text-[#1A140E] transition-all flex justify-center items-center gap-2 ${
-                loading || (payMethod === 'card' && !omiseLoaded)
-                  ? 'bg-[#A1866B] cursor-not-allowed opacity-70'
-                  : 'bg-[#D4AF37] hover:bg-[#F1D17A] shadow-[0_0_20px_rgba(212,175,55,0.3)]'
-              }`}
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-[#1A140E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  กำลังดำเนินการ...
-                </>
-              ) : payMethod === 'promptpay' ? (
-                'สร้าง QR PromptPay เพื่อชำระเงิน'
-              ) : (
-                `ชำระเงิน ฿${currentPrice.toLocaleString()}`
-              )}
-            </button>
+              <>
+                <div className="mb-6 flex items-start gap-3 rounded-xl border border-border-subtle bg-surface p-3.5 text-xs leading-relaxed text-muted-foreground">
+                  <ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>ระบบจะตรวจสอบยอดและหลักฐานก่อนเปิดสิทธิ์แพ็กเกจ กรุณาเก็บสลิปไว้จนกว่าการตรวจสอบจะเสร็จสิ้น</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePromptPay}
+                  disabled={loading || !manualPaymentEnabled}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-solid py-4 font-bold text-brand-foreground transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-4 focus:ring-brand/30"
+                >
+                  <QrCode size={20} aria-hidden="true" />
+                  {loading ? 'กำลังสร้างคำสั่งซื้อ...' : 'สร้าง QR PromptPay เพื่อชำระเงิน'}
+                </button>
+              </>
             )}
-
-            <p className="text-center text-xs text-[#A1866B] mt-6 leading-relaxed">
-              ระบบจะตรวจสอบยอดและหลักฐานก่อนเปิดสิทธิ์แพ็กเกจ <br/>
-              กรุณาเก็บสลิปไว้จนกว่าการตรวจสอบจะเสร็จสิ้น
-            </p>
-          </div>
+            </section>
+          </>
         )}
-
       </div>
     </div>
   )

@@ -119,6 +119,8 @@
 
   /* Status */
   --success: #22c55e;
+  --success-foreground: #052e16;
+  --success-hover: #20b95b;
   --success-bg: rgba(34, 197, 94, 0.12);
   --success-border: rgba(34, 197, 94, 0.3);
 
@@ -193,6 +195,8 @@
   --brand-foreground: #241a0e;
 
   --success: #1a7f37;
+  --success-foreground: #ffffff;
+  --success-hover: #166534;
   --success-bg: rgba(26, 127, 55, 0.1);
   --success-border: rgba(26, 127, 55, 0.35);
 
@@ -292,6 +296,8 @@
   --color-brand-deep: var(--brand-deep);
   --color-brand-foreground: var(--brand-foreground);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-hover: var(--success-hover);
   --color-success-bg: var(--success-bg);
   --color-success-border: var(--success-border);
   --color-warning: var(--warning);
