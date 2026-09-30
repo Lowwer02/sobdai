@@ -6,6 +6,11 @@ import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
 import { ORDER_STATUS } from '@/lib/orderUtils'
 import {
+  getAnalyzerTriagePresentation,
+  type AdminReviewFilter,
+  type AnalyzerTriageFilter,
+} from '@/lib/payment/admin-review'
+import {
   cancelManualPaymentOrder,
   grantPackageAccess,
   updateOrderStatus,
@@ -22,8 +27,11 @@ interface OrdersClientProps {
   currentPage: number
   search: string
   statusFilter: string
+  reviewFilter: AdminReviewFilter
+  analyzerFilter: AnalyzerTriageFilter
   canManagePayments: boolean
   paymentEvidenceLoaded: boolean
+  analyzerDataLoaded: boolean
   paymentReviewUnavailable: boolean
 }
 
@@ -35,8 +43,11 @@ export default function OrdersClient({
   currentPage,
   search,
   statusFilter,
+  reviewFilter,
+  analyzerFilter,
   canManagePayments,
   paymentEvidenceLoaded,
+  analyzerDataLoaded,
   paymentReviewUnavailable,
 }: OrdersClientProps) {
   const router = useRouter()
@@ -178,10 +189,16 @@ export default function OrdersClient({
       </div>
 
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
-        
+        <div className="border-b border-[rgba(255,255,255,0.05)] bg-[#0F0B07]/30 px-4 py-3 text-sm text-[#A1866B]">
+          {canManagePayments && reviewFilter === 'needs_review'
+            ? 'คิวเริ่มต้นแสดงคำสั่งซื้อ PromptPay ที่ยัง pending และมีหลักฐานล่าสุดรอเจ้าหน้าที่ตรวจสอบ'
+            : 'ผลวิเคราะห์เป็นข้อมูลประกอบเท่านั้น การเปลี่ยนสิทธิ์ยังต้องผ่านการอนุมัติของเจ้าหน้าที่'}
+        </div>
+
         {/* Toolbar */}
-        <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex flex-wrap gap-4 items-center justify-between">
-          <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-[rgba(255,255,255,0.05)] space-y-3">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+          <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[220px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A1866B]" size={18} />
             <input 
               type="text" 
@@ -191,8 +208,8 @@ export default function OrdersClient({
               className="w-full bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-[#D4AF37]/50"
             />
           </form>
-          
-          <div className="flex items-center gap-3">
+
+          <div className="flex flex-wrap items-center gap-3">
             <select 
               value={statusFilter} 
               onChange={(e) => updateParams({ status: e.target.value })}
@@ -205,9 +222,41 @@ export default function OrdersClient({
               <option value={ORDER_STATUS.CANCELLED}>Cancelled</option>
               <option value="refunded">Refunded</option>
               <option value="revoked">Revoked</option>
-              <option value="payment_submitted">Payment Review</option>
             </select>
+            {canManagePayments && (
+              <>
+                <select
+                  value={reviewFilter}
+                  onChange={(e) => updateParams({ review: e.target.value })}
+                  aria-label="Payment review state"
+                  className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                >
+                  <option value="needs_review">Needs review</option>
+                  <option value="checking">กำลังตรวจสอบ</option>
+                  <option value="rejected">Rejected / resubmitted</option>
+                  <option value="no_evidence">No evidence</option>
+                  <option value="all">All payment states</option>
+                </select>
+                <select
+                  value={analyzerFilter}
+                  onChange={(e) => updateParams({ triage: e.target.value })}
+                  aria-label="Analyzer triage"
+                  className="bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#D4AF37]/50"
+                >
+                  <option value="all">All analyzer signals</option>
+                  <option value="STRONG_MATCH">STRONG_MATCH — Offline match</option>
+                  <option value="MANUAL_REVIEW">MANUAL_REVIEW — ตรวจสอบด้วยเจ้าหน้าที่</option>
+                  <option value="SUSPICIOUS">SUSPICIOUS — ควรตรวจละเอียด</option>
+                  <option value="ANALYZER_ERROR">ANALYZER_ERROR — วิเคราะห์อัตโนมัติไม่สำเร็จ</option>
+                  <option value="not_analyzed">Not analyzed</option>
+                </select>
+              </>
+            )}
           </div>
+          </div>
+          {canManagePayments && !analyzerDataLoaded && reviewFilter !== 'no_evidence' && (
+            <p className="text-xs text-[#A1866B]">Analyzer triage is temporarily unavailable; review actions remain manual and authoritative.</p>
+          )}
         </div>
 
         {/* Loading Overlay */}
@@ -222,24 +271,25 @@ export default function OrdersClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0F0B07]/50 text-[#A1866B] text-xs uppercase tracking-wider border-b border-[rgba(255,255,255,0.05)]">
-                <th className="p-4 font-medium">Date</th>
+                <th className="p-4 font-medium">Order</th>
                 <th className="p-4 font-medium">Buyer</th>
                 <th className="p-4 font-medium">Package</th>
                 <th className="p-4 font-medium text-right">Amount</th>
-                <th className="p-4 font-medium">Status</th>
+                <th className="p-4 font-medium">Evidence / triage</th>
+                <th className="p-4 font-medium">Order status</th>
                 <th className="p-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(255,255,255,0.02)]">
               {paymentReviewUnavailable ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                  <td colSpan={7} className="p-12 text-center text-[#A1866B]">
                     ไม่สามารถโหลดคิวตรวจสอบการชำระเงินได้ กรุณารีเฟรชแล้วลองใหม่
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-[#A1866B]">
+                  <td colSpan={7} className="p-12 text-center text-[#A1866B]">
                     No orders found.
                   </td>
                 </tr>
@@ -251,6 +301,20 @@ export default function OrdersClient({
                   latestSubmissionStatus: order.manual_payment_status,
                   evidenceReadAvailable: order.payment_provider !== MANUAL_PAYMENT_PROVIDER || paymentEvidenceLoaded,
                 })
+                const analyzerTriage = getAnalyzerTriagePresentation(order.manual_payment_analyzer_state)
+                const reviewStateLabel = order.manual_payment_review_state === 'needs_review'
+                  ? 'Needs review'
+                  : order.manual_payment_review_state === 'checking'
+                    ? 'กำลังตรวจสอบ'
+                    : order.manual_payment_review_state === 'rejected'
+                      ? 'Rejected / resubmitted'
+                      : order.manual_payment_review_state === 'no_evidence'
+                        ? 'No evidence'
+                        : order.manual_payment_review_state === 'paid'
+                          ? 'Already paid'
+                          : order.manual_payment_review_state === 'cancelled'
+                            ? 'Cancelled'
+                            : null
                 const canCancelUnpaidManualOrder =
                   canManagePayments
                   && paymentEvidenceLoaded
@@ -274,30 +338,47 @@ export default function OrdersClient({
                 return (
                 <tr key={order.id} className="hover:bg-[#D4AF37]/[0.02] transition-colors">
                   <td className="p-4 text-[#A1866B] text-sm whitespace-nowrap">
-                    {new Date(order.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                    <div className="font-mono text-xs text-[#F5E9D6]">{order.id.slice(0, 8)}…</div>
+                    <div className="mt-1">{new Date(order.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</div>
                   </td>
                   <td className="p-4">
                     <div className="text-[#F5E9D6] font-medium text-sm">{order.user_email}</div>
                   </td>
                   <td className="p-4">
                     <div className="text-[#F5E9D6] font-medium text-sm truncate max-w-[200px]">{order.package_name}</div>
-                    <div className="text-[#A1866B] text-xs mt-0.5">{order.payment_provider || 'Unknown'}</div>
+                    <div className="text-[#A1866B] text-xs mt-0.5">{order.payment_provider === MANUAL_PAYMENT_PROVIDER ? 'PromptPay manual' : order.payment_provider || 'Unknown'}</div>
                   </td>
                   <td className="p-4 text-right">
                     <span className="text-[#D4AF37] font-bold">฿{Number(order.amount).toLocaleString()}</span>
+                  </td>
+                  <td className="p-4 min-w-[210px]">
+                    {order.payment_provider === MANUAL_PAYMENT_PROVIDER ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${analyzerTriage.tone}`}>
+                            {analyzerTriage.label}
+                          </span>
+                          {reviewStateLabel && <span className="text-[11px] font-semibold text-[#A1866B]">{reviewStateLabel}</span>}
+                        </div>
+                        <div className="mt-2 text-[11px] text-[#A1866B]">
+                          {order.manual_payment_status ? `Evidence: ${order.manual_payment_status}` : 'No evidence'}
+                          {' · '}{order.manual_payment_submission_count || 0} attempt{order.manual_payment_submission_count === 1 ? '' : 's'}
+                        </div>
+                        {order.manual_payment_submitted_at && (
+                          <div className="mt-1 text-[11px] text-[#A1866B]">
+                            latest {new Date(order.manual_payment_submitted_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                          </div>
+                        )}
+                        <div className="mt-1 text-[11px] text-sky-200/80">Analyzer is advisory only</div>
+                      </>
+                    ) : (
+                      <span className="text-xs text-[#A1866B]">—</span>
+                    )}
                   </td>
                   <td className="p-4">
                     <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${statusClass}`}>
                       {paymentStatus.label}
                     </span>
-                    {order.manual_payment_status && (
-                      <div className={`mt-2 text-[11px] font-semibold ${
-                        order.manual_payment_status === 'submitted' ? 'text-[#D4AF37]' :
-                        order.manual_payment_status === 'approved' ? 'text-[#22C55E]' : 'text-red-400'
-                      }`}>
-                        Slip: {order.manual_payment_status}
-                      </div>
-                    )}
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -310,16 +391,16 @@ export default function OrdersClient({
                           Mark Paid
                         </button>
                       )}
-                      {order.payment_provider === 'promptpay_manual' && (
+                      {canManagePayments && order.payment_provider === 'promptpay_manual' && (
                         <Link
                           href={`/admin/orders/${order.id}`}
                           className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${
-                            order.manual_payment_status === 'submitted'
+                            order.status === ORDER_STATUS.PENDING && order.manual_payment_status === 'submitted'
                               ? 'bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20'
                               : 'bg-[#0F0B07] text-[#A1866B] hover:text-[#F5E9D6]'
                           }`}
                         >
-                          {order.manual_payment_status === 'submitted' ? 'Review' : 'Details'}
+                          {order.status === ORDER_STATUS.PENDING && order.manual_payment_status === 'submitted' ? 'Review' : 'Details'}
                         </Link>
                       )}
                       {canCancelUnpaidManualOrder && (

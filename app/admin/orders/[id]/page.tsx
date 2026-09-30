@@ -55,7 +55,7 @@ export default async function OrderPaymentDetailPage({
   if (submissionIds.length > 0 && adminSupabase) {
     const { data, error } = await adminSupabase
       .from('payment_verifications')
-      .select('submission_id, state, decision, analyzer_version, detected_amount, amount_match_state, recipient_match_state, destination_match_state, qr_kind, qr_structure_valid, qr_crc_valid, reference_extracted, qr_format, reference_state, image_duplicate_state, timestamp_state, reason_codes, duration_ms, completed_at')
+      .select('submission_id, state, decision, analyzer_version, attempt_count, detected_amount, amount_match_state, recipient_match_state, destination_match_state, qr_kind, qr_structure_valid, qr_crc_valid, reference_extracted, qr_format, reference_state, image_duplicate_state, timestamp_state, reason_codes, duration_ms, completed_at')
       .in('submission_id', submissionIds)
 
     if (error) {
@@ -111,6 +111,9 @@ export default async function OrderPaymentDetailPage({
         state: verificationBySubmissionId.get(submission.id).state,
         decision: verificationBySubmissionId.get(submission.id).decision,
         analyzerVersion: verificationBySubmissionId.get(submission.id).analyzer_version,
+        attemptCount: verificationBySubmissionId.get(submission.id).attempt_count == null
+          ? null
+          : Number(verificationBySubmissionId.get(submission.id).attempt_count),
         detectedAmount: verificationBySubmissionId.get(submission.id).detected_amount === null
           ? null
           : Number(verificationBySubmissionId.get(submission.id).detected_amount),

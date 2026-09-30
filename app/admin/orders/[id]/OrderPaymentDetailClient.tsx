@@ -7,6 +7,11 @@ import { ArrowLeft, CheckCircle, ExternalLink, FileImage, Loader2, XCircle } fro
 import { cancelManualPaymentOrder, approvePayment, rejectPayment, resumePaymentVerification } from '../actions'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { getPaymentStatusPresentation, MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
+import {
+  getAdminReviewState,
+  getAnalyzerTriagePresentation,
+  STALE_REVIEW_ACTION_MESSAGE,
+} from '@/lib/payment/admin-review'
 
 interface OrderDetail {
   id: string
@@ -41,6 +46,7 @@ interface PaymentVerification {
   state: string
   decision: string | null
   analyzerVersion: string
+  attemptCount: number | null
   detectedAmount: number | null
   amountMatchState: string
   recipientMatchState: string
@@ -77,19 +83,11 @@ function formatBytes(bytes: number) {
 }
 
 function verificationTone(state: string) {
-  if (state === 'STRONG_MATCH') return 'border-green-400/20 bg-green-400/10 text-green-300'
-  if (state === 'SUSPICIOUS' || state === 'ANALYZER_ERROR') return 'border-red-400/20 bg-red-400/10 text-red-300'
-  return 'border-[#D4AF37]/20 bg-[#D4AF37]/10 text-[#D4AF37]'
+  return getAnalyzerTriagePresentation(state).tone
 }
 
 function verificationLabel(state: string) {
-  switch (state) {
-    case 'STRONG_MATCH': return 'STRONG_MATCH'
-    case 'MANUAL_REVIEW': return 'MANUAL_REVIEW'
-    case 'SUSPICIOUS': return 'SUSPICIOUS'
-    case 'ANALYZER_ERROR': return 'ANALYZER_ERROR'
-    default: return state
-  }
+  return getAnalyzerTriagePresentation(state).label
 }
 
 function verificationFieldLabel(value: string) {
@@ -97,10 +95,12 @@ function verificationFieldLabel(value: string) {
     case 'MATCH': return 'match'
     case 'MISMATCH': return 'mismatch'
     case 'AMBIGUOUS': return 'ambiguous'
+    case 'UNKNOWN': return 'not available'
     case 'true': return 'valid'
     case 'false': return 'invalid'
     case 'VALID_UNIQUE': return 'unique'
     case 'NONE': return 'none'
+    case 'ABNORMAL': return 'abnormal'
     default: return value.toLowerCase()
   }
 }
@@ -122,6 +122,8 @@ export default function OrderPaymentDetailClient({
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+  const [approveConfirm, setApproveConfirm] = useState<{ isOpen: boolean, submissionId: string | null }>({ isOpen: false, submissionId: null })
+  const [rejectConfirm, setRejectConfirm] = useState<{ isOpen: boolean, submissionId: string | null }>({ isOpen: false, submissionId: null })
 
   const paymentStatus = getPaymentStatusPresentation({
     orderStatus: order.status,
@@ -139,7 +141,40 @@ export default function OrderPaymentDetailClient({
     && submissionsLoaded
     && (submissions.length === 0 || hasOnlyRejectedEvidence)
 
-  const handleApprove = (submissionId: string) => {
+  const latestSubmission = submissions[0] || null
+  const currentReviewState = getAdminReviewState({
+    orderStatus: order.status,
+    paymentProvider: order.paymentProvider,
+    latestSubmissionStatus: latestSubmission?.status || null,
+    submissionCount: submissions.length,
+    analyzerState: latestSubmission?.verification?.state || null,
+  })
+  const currentReviewStateLabel = currentReviewState === 'needs_review'
+    ? 'Needs review'
+    : currentReviewState === 'checking'
+      ? 'กำลังตรวจสอบ'
+      : currentReviewState === 'rejected'
+        ? 'Rejected / resubmitted'
+        : currentReviewState === 'no_evidence'
+          ? 'No evidence'
+          : currentReviewState === 'paid'
+            ? 'Already paid'
+            : currentReviewState === 'cancelled'
+              ? 'Cancelled'
+              : 'Not a manual review item'
+
+  const showSafeActionError = (actionError: string | undefined, fallback: string) => {
+    setError(`${actionError || fallback} ${STALE_REVIEW_ACTION_MESSAGE}`)
+  }
+
+  const requestApprove = (submissionId: string) => {
+    setApproveConfirm({ isOpen: true, submissionId })
+  }
+
+  const handleApprove = () => {
+    if (!approveConfirm.submissionId) return
+    const submissionId = approveConfirm.submissionId
+    setApproveConfirm({ isOpen: false, submissionId: null })
     setMessage('')
     setError('')
     startTransition(async () => {
@@ -148,12 +183,20 @@ export default function OrderPaymentDetailClient({
         setMessage('อนุมัติการชำระเงินแล้ว และเปิดสิทธิ์แพ็กเกจผ่านคำสั่งซื้อเดิม')
         router.refresh()
       } else {
-        setError(result.error || 'ไม่สามารถอนุมัติรายการได้')
+        showSafeActionError(result.error, 'ไม่สามารถอนุมัติรายการได้')
       }
     })
   }
 
-  const handleReject = (submissionId: string) => {
+  const requestReject = (submissionId: string) => {
+    if (!rejectionReason.trim()) return
+    setRejectConfirm({ isOpen: true, submissionId })
+  }
+
+  const handleReject = () => {
+    if (!rejectConfirm.submissionId) return
+    const submissionId = rejectConfirm.submissionId
+    setRejectConfirm({ isOpen: false, submissionId: null })
     setMessage('')
     setError('')
     startTransition(async () => {
@@ -163,7 +206,7 @@ export default function OrderPaymentDetailClient({
         setRejectionReason('')
         router.refresh()
       } else {
-        setError(result.error || 'ไม่สามารถปฏิเสธรายการได้')
+        showSafeActionError(result.error, 'ไม่สามารถปฏิเสธรายการได้')
       }
     })
   }
@@ -178,7 +221,7 @@ export default function OrderPaymentDetailClient({
         setCancelConfirmOpen(false)
         router.refresh()
       } else {
-        setError(result.error || 'ไม่สามารถยกเลิกคำสั่งซื้อได้')
+        showSafeActionError(result.error, 'ไม่สามารถยกเลิกคำสั่งซื้อได้')
       }
     })
   }
@@ -194,7 +237,7 @@ export default function OrderPaymentDetailClient({
           : 'รายการนี้กำลังถูกวิเคราะห์อยู่ หรือมีผลลัพธ์ที่บันทึกไว้แล้ว')
         router.refresh()
       } else {
-        setError(result.error || 'ไม่สามารถวิเคราะห์หลักฐานซ้ำได้')
+        showSafeActionError(result.error, 'ไม่สามารถวิเคราะห์หลักฐานซ้ำได้')
       }
     })
   }
@@ -214,11 +257,15 @@ export default function OrderPaymentDetailClient({
       </div>
 
       {(message || error) && (
-        <div className={`rounded-xl border p-4 text-sm ${
+        <div
+          role={error ? 'alert' : 'status'}
+          aria-live="polite"
+          className={`rounded-xl border p-4 text-sm ${
           error
             ? 'border-red-400/20 bg-red-400/10 text-red-300'
             : 'border-green-400/20 bg-green-400/10 text-green-300'
-        }`}>
+        }`}
+        >
           {error || message}
         </div>
       )}
@@ -226,6 +273,7 @@ export default function OrderPaymentDetailClient({
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-6 space-y-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">Order</h2>
+          <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Order reference</span><span className="font-mono text-right text-xs text-[#F5E9D6]">{order.id}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Buyer</span><span className="text-right text-[#F5E9D6]">{order.userEmail}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Package</span><span className="text-right text-[#F5E9D6]">{order.packageName}</span></div>
           <div className="flex justify-between gap-4 text-sm"><span className="text-[#A1866B]">Amount snapshot</span><span className="font-bold text-[#D4AF37]">฿{order.amount.toLocaleString()}</span></div>
@@ -250,21 +298,29 @@ export default function OrderPaymentDetailClient({
           )}
         </div>
 
-        <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-6">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">Review rule</h2>
-          <p className="mt-3 text-sm leading-relaxed text-[#F5E9D6]">
+        <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-6 md:sticky md:top-4 md:self-start">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">Current review state</h2>
+          <div className="mt-3 inline-flex rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/10 px-3 py-1.5 text-sm font-bold text-[#F1D17A]">
+            {currentReviewStateLabel}
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-[#F5E9D6]">
             อนุมัติจะเปลี่ยน <span className="font-semibold">orders.status</span> ของ Order นี้เป็น <span className="font-semibold text-green-400">paid</span> แบบ atomic และจึงเปิดสิทธิ์เดิมของระบบ
           </p>
           <p className="mt-3 text-sm leading-relaxed text-[#A1866B]">
             ปฏิเสธจะบันทึกเหตุผลและคงสถานะ Order เป็น <span className="font-semibold text-[#D4AF37]">pending</span> เพื่อให้ผู้ใช้ส่งหลักฐานใหม่ได้
           </p>
+          {latestSubmission?.verification?.state === 'STRONG_MATCH' && (
+            <p className="mt-4 rounded-lg border border-sky-400/25 bg-sky-400/10 p-3 text-xs leading-relaxed text-sky-100">
+              ข้อมูลในหลักฐานสอดคล้องกันจากการตรวจแบบออฟไลน์ แต่ยังไม่ใช่การยืนยันธุรกรรมจากธนาคารหรือผู้ให้บริการ
+            </p>
+          )}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-6">
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-[#F5E9D6]">Payment evidence</h2>
+            <h2 className="text-xl font-bold text-[#F5E9D6]">Latest payment evidence</h2>
             <p className="text-sm text-[#A1866B]">ไฟล์ถูกเสิร์ฟด้วย signed URL ชั่วคราวสำหรับผู้มี financial.manage เท่านั้น</p>
           </div>
           <div className="text-right text-sm text-[#A1866B]">
@@ -285,8 +341,14 @@ export default function OrderPaymentDetailClient({
           </div>
         ) : (
           <div className="mt-6 space-y-5">
-            {submissions.map((submission) => {
-              const isReviewable = submission.status === 'submitted' && order.status === 'pending'
+            <div className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">Submission history</div>
+            {submissions.map((submission, submissionIndex) => {
+              const isLatestSubmission = submissionIndex === 0
+              const isReviewable = isLatestSubmission && submission.status === 'submitted' && order.status === 'pending'
+              const attemptNumber = submissions.length - submissionIndex
+              const analyzerTriage = submission.verification
+                ? getAnalyzerTriagePresentation(submission.verification.state)
+                : getAnalyzerTriagePresentation(null)
 
               return (
                 <article key={submission.id} className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0F0B07] p-4">
@@ -294,7 +356,7 @@ export default function OrderPaymentDetailClient({
                     <div>
                       <div className="flex items-center gap-2">
                         <FileImage size={16} className="text-[#D4AF37]" />
-                        <span className="font-medium text-[#F5E9D6]">{submission.originalFilename || 'payment-slip'}</span>
+                        <span className="font-medium text-[#F5E9D6]">Attempt {attemptNumber} · {submission.originalFilename || 'payment-slip'}</span>
                         <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold uppercase ${
                           submission.status === 'submitted'
                             ? 'border-[#D4AF37]/20 bg-[#D4AF37]/10 text-[#D4AF37]'
@@ -333,30 +395,33 @@ export default function OrderPaymentDetailClient({
                   {submission.verification && (
                     <div className="mt-4 rounded-lg border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-3 text-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="font-semibold text-[#F5E9D6]">Shadow analyzer QA</div>
+                        <div className="font-semibold text-[#F5E9D6]">Analyzer triage · advisory only</div>
                         <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${verificationTone(submission.verification.state)}`}>
                           {verificationLabel(submission.verification.state)}
                         </span>
                       </div>
                       <div className="mt-2 grid gap-x-4 gap-y-1 text-xs text-[#A1866B] sm:grid-cols-2">
-                        <span>version: {submission.verification.analyzerVersion}</span>
-                        <span>duration: {submission.verification.durationMs === null ? '—' : `${submission.verification.durationMs} ms`}</span>
-                        <span>amount: {submission.verification.detectedAmount === null ? '—' : `฿${submission.verification.detectedAmount.toFixed(2)}`}</span>
-                        <span>QR: {submission.verification.qrKind || '—'} · structure {verificationFieldLabel(String(submission.verification.qrStructureValid))} · CRC {verificationFieldLabel(String(submission.verification.qrCrcValid))}{submission.verification.qrFormat ? ` · ${submission.verification.qrFormat}` : ''}</span>
-                        <span>reference extracted: {submission.verification.referenceExtracted ? 'yes' : 'no'}</span>
-                        <span>recipient: {verificationFieldLabel(submission.verification.recipientMatchState)}</span>
-                        <span>destination: {verificationFieldLabel(submission.verification.destinationMatchState)}</span>
-                        <span>reference: {verificationFieldLabel(submission.verification.referenceState)}</span>
-                        <span>image replay: {verificationFieldLabel(submission.verification.imageDuplicateState)}</span>
+                        <span>จำนวนเงิน: {verificationFieldLabel(submission.verification.amountMatchState)}{submission.verification.detectedAmount === null ? '' : ` · ฿${submission.verification.detectedAmount.toFixed(2)}`}</span>
+                        <span>ผู้รับเงิน: {verificationFieldLabel(submission.verification.recipientMatchState)}</span>
+                        <span>ปลายทาง: {verificationFieldLabel(submission.verification.destinationMatchState)}</span>
+                        <span>Reference / QR: {submission.verification.referenceExtracted ? 'พบ' : 'ไม่พบ'} · {verificationFieldLabel(submission.verification.referenceState)}</span>
+                        <span>QR structure: {verificationFieldLabel(String(submission.verification.qrStructureValid))} · CRC {verificationFieldLabel(String(submission.verification.qrCrcValid))}</span>
+                        <span>Duplicate: {verificationFieldLabel(submission.verification.imageDuplicateState)}</span>
+                        <span>Time signal: {verificationFieldLabel(submission.verification.timestampState)}</span>
+                        <span>analysis duration: {submission.verification.durationMs === null ? '—' : `${submission.verification.durationMs} ms`}</span>
                       </div>
                       {submission.verification.state === 'STRONG_MATCH' ? (
-                        <p className="mt-3 text-xs leading-relaxed text-green-300">
+                        <p className="mt-3 rounded-lg border border-sky-400/25 bg-sky-400/10 p-3 text-xs leading-relaxed text-sky-100">
                           Offline evidence match — not bank/provider confirmed. This Shadow result keeps the order pending and never opens entitlement.
                         </p>
+                      ) : submission.verification.state === 'SUSPICIOUS' ? (
+                        <p className="mt-3 rounded-lg border border-orange-300/25 bg-orange-300/10 p-3 text-xs leading-relaxed text-orange-100">
+                          ควรตรวจสอบเพิ่มเติม ผลอัตโนมัติไม่ปฏิเสธและไม่เปลี่ยนสถานะคำสั่งซื้อ
+                        </p>
                       ) : submission.verification.state === 'ANALYZER_ERROR' ? (
-                        <p className="mt-3 text-xs leading-relaxed text-red-300">วิเคราะห์ไม่สำเร็จ ระบบยังไม่เปลี่ยนสถานะการชำระเงินและให้เจ้าหน้าที่ตรวจสอบต่อได้</p>
+                        <p className="mt-3 rounded-lg border border-red-300/25 bg-red-300/10 p-3 text-xs leading-relaxed text-red-100">วิเคราะห์อัตโนมัติไม่สำเร็จ — กรุณาตรวจหลักฐานด้วยตนเอง</p>
                       ) : (
-                        <p className="mt-3 text-xs leading-relaxed text-[#A1866B]">ผลนี้เป็นสัญญาณช่วยตรวจสอบ ไม่ใช่คำสั่งอนุมัติหรือปฏิเสธ และไม่เปลี่ยนสิทธิ์ของผู้ซื้อ</p>
+                        <p className="mt-3 text-xs leading-relaxed text-[#A1866B]">{analyzerTriage.description} ผลนี้ไม่ใช่คำสั่งอนุมัติหรือปฏิเสธ และไม่เปลี่ยนสิทธิ์ของผู้ซื้อ</p>
                       )}
                       {submission.verification.reasonCodes.length > 0 && (
                         <div className="mt-2 text-xs text-[#A1866B]">
@@ -383,6 +448,10 @@ export default function OrderPaymentDetailClient({
 
                   {isReviewable && (
                     <div className="mt-5 border-t border-[rgba(255,255,255,0.08)] pt-4">
+                      <div className="mb-4 rounded-lg border border-[#D4AF37]/20 bg-[#D4AF37]/5 p-3 text-xs leading-relaxed text-[#F1D17A]">
+                        การอนุมัติเป็นการตัดสินใจของเจ้าหน้าที่และจะเปิดสิทธิ์แพ็กเกจตามคำสั่งซื้อเดิม
+                        {submission.verification?.state === 'STRONG_MATCH' && ' ผล Offline match ไม่ใช่การยืนยันจากธนาคารหรือผู้ให้บริการ'}
+                      </div>
                       <label className="block text-sm font-medium text-[#F5E9D6]" htmlFor={`rejection-${submission.id}`}>
                         เหตุผลเมื่อปฏิเสธ
                       </label>
@@ -398,7 +467,7 @@ export default function OrderPaymentDetailClient({
                       <div className="mt-3 flex flex-wrap gap-3">
                         <button
                           type="button"
-                          onClick={() => handleApprove(submission.id)}
+                          onClick={() => requestApprove(submission.id)}
                           disabled={isPending}
                           className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-bold text-[#0F0B07] hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-60"
                         >
@@ -407,7 +476,7 @@ export default function OrderPaymentDetailClient({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleReject(submission.id)}
+                          onClick={() => requestReject(submission.id)}
                           disabled={isPending || !rejectionReason.trim()}
                           className="inline-flex items-center gap-2 rounded-lg border border-red-400/30 px-4 py-2 text-sm font-bold text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -422,6 +491,29 @@ export default function OrderPaymentDetailClient({
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        isOpen={approveConfirm.isOpen}
+        onClose={() => setApproveConfirm({ isOpen: false, submissionId: null })}
+        onConfirm={handleApprove}
+        title="ยืนยันการอนุมัติการชำระเงิน?"
+        description={`Order ${order.id} · ${order.packageName} · ฿${order.amount.toLocaleString()}\n\nเมื่ออนุมัติแล้ว ระบบจะเปิดสิทธิ์แพ็กเกจให้ผู้ใช้ผ่านคำสั่งซื้อเดิม การตรวจแบบออฟไลน์ไม่ใช่การยืนยันจากธนาคารหรือผู้ให้บริการ`}
+        confirmText="อนุมัติและเปิดสิทธิ์"
+        cancelText="กลับไปตรวจสอบ"
+        isLoading={isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={rejectConfirm.isOpen}
+        onClose={() => setRejectConfirm({ isOpen: false, submissionId: null })}
+        onConfirm={handleReject}
+        title="ยืนยันการปฏิเสธหลักฐาน?"
+        description="เหตุผลที่กรอกจะถูกบันทึกในประวัติการตรวจสอบ และคำสั่งซื้อจะยังคง pending เพื่อให้ผู้ซื้อส่งหลักฐานใหม่ตามกติกาเดิม"
+        confirmText="ยืนยันการปฏิเสธ"
+        cancelText="กลับไปตรวจสอบ"
+        isDestructive
+        isLoading={isPending}
+      />
 
       <ConfirmDialog
         isOpen={cancelConfirmOpen}
