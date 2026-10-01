@@ -12,13 +12,35 @@ const detailPage = read('app/admin/orders/[id]/page.tsx')
 const detailClient = read('app/admin/orders/[id]/OrderPaymentDetailClient.tsx')
 const actions = read('app/admin/orders/actions.ts')
 const rbac = read('lib/auth/rbac.ts')
+const reviewHelper = read('lib/payment/admin-review.ts')
+const confirmDialog = read('components/admin/ConfirmDialog.tsx')
+
+test('Support receives a read-only queue and no unnecessary mutation datasets', () => {
+  assert.match(queuePage, /getAdminReviewCapabilities\(profile\.role\)/)
+  assert.match(queuePage, /const users = canManageFinancial\s*\n\s*\?/)
+  assert.match(queuePage, /const packages = canManageFinancial\s*\n\s*\?/)
+  assert.match(queueClient, /canManageFinancial && isModalOpen/)
+  assert.match(queueClient, /canManageFinancial && order\.status === ORDER_STATUS\.PENDING/)
+  assert.match(detailPage, /canAccessPaymentEvidence\(/)
+})
+
+test('mutation confirmation traps focus and restores the opener', () => {
+  assert.match(confirmDialog, /aria-modal="true"/)
+  assert.match(confirmDialog, /previouslyFocusedRef/)
+  assert.match(confirmDialog, /isConnected[\s\S]*?previouslyFocused\.focus\(\)/)
+  assert.match(confirmDialog, /e\.key !== 'Tab'/)
+  assert.match(confirmDialog, /e\.shiftKey && activeElement === firstFocusable/)
+})
 
 test('review queue is server-filtered with stable review and analyzer query params', () => {
   assert.match(queuePage, /params\.review/)
   assert.match(queuePage, /params\.triage/)
   assert.match(queuePage, /payment_submissions/)
   assert.match(queuePage, /payment_verifications/)
-  assert.match(queuePage, /\.in\('id', paymentReviewOrderIds\)/)
+  assert.match(queuePage, /collectBoundedAdminReviewMatches/)
+  assert.match(queuePage, /\.in\('order_id', orderIds\)/)
+  assert.match(queuePage, /\.limit\(ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH\)/)
+  assert.match(queuePage, /\.order\('id', \{ ascending: false \}\)/)
   assert.match(queueClient, /updateParams\(\{ review: e\.target\.value \}\)/)
   assert.match(queueClient, /updateParams\(\{ triage: e\.target\.value \}\)/)
 })
@@ -28,7 +50,10 @@ test('default queue prioritizes pending manual evidence that needs human review'
   assert.match(queuePage, /reviewFilter !== 'all'/)
   assert.match(queuePage, /\.eq\('status', ORDER_STATUS\.PENDING\)/)
   assert.match(queuePage, /\.eq\('payment_provider', MANUAL_PAYMENT_PROVIDER\)/)
-  assert.match(queuePage, /payment\.status === 'submitted'/)
+  assert.match(queuePage, /matchesAdminReviewQueue\(/)
+  assert.match(reviewHelper, /input\.reviewFilter !== 'all'/)
+  assert.match(reviewHelper, /input\.analyzerFilter !== 'all'/)
+  assert.match(reviewHelper, /input\.analyzerState === input\.analyzerFilter/)
 })
 
 test('list shows safe review scan fields without raw analyzer internals', () => {
@@ -52,7 +77,7 @@ test('strong match, suspicious, and analyzer error copy remains non-authoritativ
 
 test('manual actions require a submitted pending evidence row and use confirmation UX', () => {
   assert.match(detailClient, /isLatestSubmission = submissionIndex === 0/)
-  assert.match(detailClient, /isReviewable = isLatestSubmission && submission\.status === 'submitted' && order\.status === 'pending'/)
+  assert.match(detailClient, /isReviewable = canReviewPaymentSubmission\(/)
   assert.match(detailClient, /requestApprove\(submission\.id\)/)
   assert.match(detailClient, /ยืนยันการอนุมัติการชำระเงิน\?/)
   assert.match(detailClient, /requestReject\(submission\.id\)/)
@@ -64,8 +89,11 @@ test('approve and reject remain on existing authorized RPC paths', () => {
   assert.match(actions, /requirePermission\('financial\.manage'\)/)
   assert.match(actions, /rpc\('approve_payment_submission'/)
   assert.match(actions, /rpc\('reject_payment_submission'/)
-  assert.match(actions, /APPROVE_PAYMENT_SUBMISSION/)
-  assert.match(actions, /REJECT_PAYMENT_SUBMISSION/)
+  assert.match(actions, /getPaymentReviewAuditEvent\('approve'/)
+  assert.match(actions, /getPaymentReviewAuditEvent\('reject'/)
+  assert.match(reviewHelper, /APPROVE_PAYMENT_SUBMISSION_ATTEMPT/)
+  assert.match(reviewHelper, /REJECT_PAYMENT_SUBMISSION_ATTEMPT/)
+  assert.match(reviewHelper, /action_attempt_not_state_transition/)
   assert.doesNotMatch(detailClient, /updateOrderStatus\([^)]*,\s*['"]paid['"]\)/)
 })
 

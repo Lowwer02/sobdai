@@ -8,9 +8,10 @@ import { cancelManualPaymentOrder, approvePayment, rejectPayment, resumePaymentV
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { getPaymentStatusPresentation, MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
 import {
+  canReviewPaymentSubmission,
   getAdminReviewState,
   getAnalyzerTriagePresentation,
-  STALE_REVIEW_ACTION_MESSAGE,
+  getReviewActionFailureMessage,
 } from '@/lib/payment/admin-review'
 
 interface OrderDetail {
@@ -159,12 +160,16 @@ export default function OrderPaymentDetailClient({
           ? 'No evidence'
           : currentReviewState === 'paid'
             ? 'Already paid'
-            : currentReviewState === 'cancelled'
-              ? 'Cancelled'
+          : currentReviewState === 'cancelled'
+            ? 'Cancelled'
+            : currentReviewState === 'refunded'
+              ? 'Refunded — terminal'
+              : currentReviewState === 'revoked'
+                ? 'Revoked — terminal'
               : 'Not a manual review item'
 
   const showSafeActionError = (actionError: string | undefined, fallback: string) => {
-    setError(`${actionError || fallback} ${STALE_REVIEW_ACTION_MESSAGE}`)
+    setError(getReviewActionFailureMessage(actionError, fallback))
   }
 
   const requestApprove = (submissionId: string) => {
@@ -344,7 +349,12 @@ export default function OrderPaymentDetailClient({
             <div className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">Submission history</div>
             {submissions.map((submission, submissionIndex) => {
               const isLatestSubmission = submissionIndex === 0
-              const isReviewable = isLatestSubmission && submission.status === 'submitted' && order.status === 'pending'
+              const isReviewable = canReviewPaymentSubmission({
+                orderStatus: order.status,
+                paymentProvider: order.paymentProvider,
+                submissionStatus: submission.status,
+                isLatestSubmission,
+              })
               const attemptNumber = submissions.length - submissionIndex
               const analyzerTriage = submission.verification
                 ? getAnalyzerTriagePresentation(submission.verification.state)
@@ -428,8 +438,12 @@ export default function OrderPaymentDetailClient({
                           reasons: {submission.verification.reasonCodes.join(', ')}
                         </div>
                       )}
-                      {submission.status === 'submitted'
-                        && order.status === 'pending'
+                      {canReviewPaymentSubmission({
+                        orderStatus: order.status,
+                        paymentProvider: order.paymentProvider,
+                        submissionStatus: submission.status,
+                        isLatestSubmission,
+                      })
                         && submission.verification.state !== 'STRONG_MATCH'
                         && submission.verification.state !== 'AUTO_CHECKING'
                         && (

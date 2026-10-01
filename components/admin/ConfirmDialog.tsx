@@ -31,31 +31,81 @@ export default function ConfirmDialog({
   const [typedValue, setTypedValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const wasOpenRef = useRef(false)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+
+  const getFocusableElements = () => {
+    if (!dialogRef.current) return []
+    return Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    ))
+  }
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
       setTypedValue('')
-      setTimeout(() => {
+      const focusTimer = window.setTimeout(() => {
         if (requireTyping && inputRef.current) {
           inputRef.current.focus()
-        } else if (dialogRef.current) {
-          const focusable = dialogRef.current.querySelectorAll('button:not([disabled])')
-          if (focusable.length > 0) {
-            (focusable[focusable.length - 1] as HTMLElement).focus()
-          }
+          return
         }
-      }, 50)
+        const [firstFocusable] = getFocusableElements()
+        if (firstFocusable) firstFocusable.focus()
+        else dialogRef.current?.focus()
+      }, 0)
+      wasOpenRef.current = true
+      return () => window.clearTimeout(focusTimer)
+    }
+
+    if (!isOpen && wasOpenRef.current) {
+      const previouslyFocused = previouslyFocusedRef.current
+      wasOpenRef.current = false
+      previouslyFocusedRef.current = null
+      if (previouslyFocused && previouslyFocused.isConnected) {
+        window.setTimeout(() => previouslyFocused.focus(), 0)
+      }
     }
   }, [isOpen, requireTyping])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (!isLoading) {
+          e.preventDefault()
+          onClose()
+        }
+        return
+      }
+      if (e.key !== 'Tab') return
+
+      const focusable = getFocusableElements()
+      if (focusable.length === 0) {
+        e.preventDefault()
+        dialogRef.current?.focus()
+        return
+      }
+
+      const firstFocusable = focusable[0]
+      const lastFocusable = focusable[focusable.length - 1]
+      const activeElement = document.activeElement
+      if (!dialogRef.current?.contains(activeElement)) {
+        e.preventDefault()
+        firstFocusable.focus()
+      } else if (e.shiftKey && activeElement === firstFocusable) {
+        e.preventDefault()
+        lastFocusable.focus()
+      } else if (!e.shiftKey && activeElement === lastFocusable) {
+        e.preventDefault()
+        firstFocusable.focus()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isLoading, isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -66,7 +116,7 @@ export default function ConfirmDialog({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-overlay backdrop-blur-sm"
-        onClick={onClose}
+        onClick={() => { if (!isLoading) onClose() }}
       />
 
       {/* Dialog */}
@@ -75,6 +125,8 @@ export default function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
+        aria-describedby="dialog-description"
+        tabIndex={-1}
         className="relative w-full max-w-md bg-card border border-border-subtle rounded-2xl shadow-2xl overflow-hidden"
       >
         <div className="p-6">
@@ -86,7 +138,7 @@ export default function ConfirmDialog({
               <h3 id="dialog-title" className="text-xl font-bold font-display text-foreground mb-2">
                 {title}
               </h3>
-              <div className="text-muted-foreground text-sm leading-relaxed mb-6">
+              <div id="dialog-description" className="text-muted-foreground text-sm leading-relaxed mb-6 whitespace-pre-line">
                 {description}
               </div>
 
@@ -118,6 +170,7 @@ export default function ConfirmDialog({
                 <button
                   type="button"
                   onClick={onConfirm}
+                  aria-label={confirmText}
                   disabled={!canConfirm || isLoading}
                   className={`px-4 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     isDestructive
@@ -134,6 +187,7 @@ export default function ConfirmDialog({
 
         <button type="button"
           onClick={onClose}
+          disabled={isLoading}
           className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Close"
         >

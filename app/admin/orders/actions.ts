@@ -6,6 +6,10 @@ import { ORDER_COMPLETED_STATUSES, OrderStatus, ORDER_STATUS } from '@/lib/order
 import { isUuid } from '@/lib/payment/manual'
 import { runPaymentVerificationForSubmission } from '@/lib/payment/verification-runner'
 import { logAuditEvent } from '@/lib/audit/logger'
+import {
+  getPaymentReviewAuditEvent,
+  normalizePaymentRejectionReason,
+} from '@/lib/payment/admin-review'
 import { revalidatePath } from 'next/cache'
 
 function safeErrorCode(error: unknown) {
@@ -133,10 +137,11 @@ export async function approvePayment(paymentSubmissionId: string) {
 
     try {
       await logAuditEvent({
-        action: 'APPROVE_PAYMENT_SUBMISSION',
-        entity: 'payment_submissions',
-        entity_id: paymentSubmissionId,
-        new_value: { order_id: row.order_id, status: 'approved' },
+        ...getPaymentReviewAuditEvent('approve', {
+          submissionId: paymentSubmissionId,
+          orderId: row.order_id,
+          status: 'approved',
+        }),
         user_id: profile.id,
         role: profile.role,
       })
@@ -199,10 +204,11 @@ export async function rejectPayment(paymentSubmissionId: string, rejectionReason
       return { success: false, error: 'Invalid payment submission.' }
     }
 
-    const reason = rejectionReason.trim().slice(0, 1000)
-    if (!reason) {
+    const normalizedReason = normalizePaymentRejectionReason(rejectionReason)
+    if (!normalizedReason.valid) {
       return { success: false, error: 'A rejection reason is required.' }
     }
+    const reason = normalizedReason.value
 
     const { data, error } = await supabase.rpc('reject_payment_submission', {
       p_submission_id: paymentSubmissionId,
@@ -221,10 +227,12 @@ export async function rejectPayment(paymentSubmissionId: string, rejectionReason
 
     try {
       await logAuditEvent({
-        action: 'REJECT_PAYMENT_SUBMISSION',
-        entity: 'payment_submissions',
-        entity_id: paymentSubmissionId,
-        new_value: { order_id: row.order_id, status: 'rejected', reason },
+        ...getPaymentReviewAuditEvent('reject', {
+          submissionId: paymentSubmissionId,
+          orderId: row.order_id,
+          status: 'rejected',
+          reason,
+        }),
         user_id: profile.id,
         role: profile.role,
       })

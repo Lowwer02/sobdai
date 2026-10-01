@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth/server-protect'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isUuid } from '@/lib/payment/manual'
+import { canAccessPaymentEvidence } from '@/lib/payment/admin-review'
 import OrderPaymentDetailClient from './OrderPaymentDetailClient'
 
 function relationObject(value: any) {
@@ -24,7 +25,7 @@ export default async function OrderPaymentDetailPage({
 
   if (!isUuid(id)) return notFound()
 
-  const { supabase } = await requirePermission('financial.manage')
+  const { supabase, profile } = await requirePermission('financial.manage')
   let adminSupabase: ReturnType<typeof createAdminClient> | null = null
   try {
     adminSupabase = createAdminClient()
@@ -45,6 +46,7 @@ export default async function OrderPaymentDetailPage({
     .select('id, order_id, storage_object_path, original_filename, mime_type, file_size_bytes, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, created_at')
     .eq('order_id', id)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
 
   if (submissionsError) {
     console.error('[PAYMENT] payment detail query failed:', safeErrorCode(submissionsError))
@@ -83,7 +85,12 @@ export default async function OrderPaymentDetailPage({
   const submissions = await Promise.all((rawSubmissions || []).map(async (submission: any) => {
     let signedUrl: string | null = null
 
-    if (adminSupabase) {
+    if (adminSupabase && canAccessPaymentEvidence({
+      role: profile.role,
+      requestedOrderId: id,
+      submissionId: submission.id,
+      submissionOrderId: submission.order_id,
+    })) {
       const { data, error } = await adminSupabase.storage
         .from('payment-slips')
         .createSignedUrl(submission.storage_object_path, 300)
@@ -137,7 +144,7 @@ export default async function OrderPaymentDetailPage({
     }
   }))
 
-  const profile = relationObject(order.profiles)
+  const orderProfile = relationObject(order.profiles)
   const pkg = relationObject(order.packages)
 
   return (
@@ -151,7 +158,7 @@ export default async function OrderPaymentDetailPage({
         paymentProvider: order.payment_provider,
         createdAt: order.created_at,
         updatedAt: order.updated_at,
-        userEmail: profile?.email || 'Unknown User',
+        userEmail: orderProfile?.email || 'Unknown User',
         packageName: pkg?.name || 'Unknown Package',
         packageSlug: pkg?.slug || null,
       }}

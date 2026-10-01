@@ -1,4 +1,56 @@
-import { MANUAL_PAYMENT_PROVIDER } from './manual'
+import { hasPermission } from '../auth/rbac'
+import {
+  isUuid,
+  MANUAL_PAYMENT_PROVIDER,
+  PAYMENT_SUBMISSION_MAX_COUNT,
+  type PaymentSubmissionStatus,
+} from './manual'
+
+export const ADMIN_REVIEW_PAGE_SIZE = 15
+export const ADMIN_REVIEW_ORDER_BATCH_SIZE = 50
+export const ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST = 8
+export const ADMIN_REVIEW_MAX_ORDERS_PER_REQUEST =
+  ADMIN_REVIEW_ORDER_BATCH_SIZE * ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST
+export const ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH =
+  ADMIN_REVIEW_ORDER_BATCH_SIZE * PAYMENT_SUBMISSION_MAX_COUNT
+
+/**
+ * Keep the admin list projection explicit. The relation fields are limited to
+ * the display labels required by the queue; mutation forms are loaded only for
+ * financial managers.
+ */
+export const ADMIN_REVIEW_ORDER_SELECT =
+  'id, user_id, package_id, amount, status, payment_provider, created_at, profiles!inner(email), packages!inner(name)'
+
+export const ADMIN_REVIEW_QUEUE_CAP_MESSAGE =
+  'แสดงผลคิวที่ตรวจสอบแล้วภายในขอบเขตความปลอดภัย กรุณาใช้ตัวกรองหรือค้นหาให้แคบลงเพื่อดูรายการเพิ่มเติม'
+
+export const ADMIN_REVIEW_TERMINAL_ORDER_STATUSES = [
+  'paid',
+  'free',
+  'cancelled',
+  'refunded',
+  'revoked',
+] as const
+
+export type AdminReviewTerminalOrderStatus = typeof ADMIN_REVIEW_TERMINAL_ORDER_STATUSES[number]
+
+export const PAYMENT_REVIEW_AUDIT_ACTIONS = {
+  approveAttempt: 'APPROVE_PAYMENT_SUBMISSION_ATTEMPT',
+  rejectAttempt: 'REJECT_PAYMENT_SUBMISSION_ATTEMPT',
+} as const
+
+export type AdminReviewCapabilities = {
+  canViewOrders: boolean
+  canManageFinancial: boolean
+}
+
+export function getAdminReviewCapabilities(role: string | null | undefined): AdminReviewCapabilities {
+  return {
+    canViewOrders: hasPermission(role, 'orders.read'),
+    canManageFinancial: hasPermission(role, 'financial.manage'),
+  }
+}
 
 export const ADMIN_REVIEW_FILTERS = [
   'needs_review',
@@ -21,6 +73,174 @@ export const ANALYZER_TRIAGE_FILTERS = [
 
 export type AnalyzerTriageFilter = typeof ANALYZER_TRIAGE_FILTERS[number]
 export type AnalyzerTriageState = Exclude<AnalyzerTriageFilter, 'not_analyzed' | 'all'>
+
+export type ReviewOrderedRow = {
+  id: string
+  order_id: string
+  created_at: string | null
+}
+
+export type AdminReviewCursor = {
+  createdAt: string
+  id: string
+}
+
+export function getAdminReviewCursor(row: { id: string; created_at: string | null }): AdminReviewCursor | null {
+  if (!row.created_at || !row.id) return null
+  return { createdAt: row.created_at, id: row.id }
+}
+
+export function compareReviewRowsLatest<T extends ReviewOrderedRow>(a: T, b: T): number {
+  const aTime = a.created_at ? Date.parse(a.created_at) : Number.NEGATIVE_INFINITY
+  const bTime = b.created_at ? Date.parse(b.created_at) : Number.NEGATIVE_INFINITY
+
+  if (aTime !== bTime) return bTime - aTime
+  return b.id.localeCompare(a.id)
+}
+
+export function latestByOrder<T extends ReviewOrderedRow>(rows: T[]): Map<string, T> {
+  const latest = new Map<string, T>()
+  for (const row of [...rows].sort(compareReviewRowsLatest)) {
+    if (!latest.has(row.order_id)) latest.set(row.order_id, row)
+  }
+  return latest
+}
+
+export type AdminReviewQueueMatchInput = {
+  orderStatus: string | null | undefined
+  paymentProvider: string | null | undefined
+  latestSubmissionStatus: string | null | undefined
+  submissionCount: number
+  analyzerState: string | null | undefined
+  reviewFilter: AdminReviewFilter
+  analyzerFilter: AnalyzerTriageFilter
+}
+
+export function matchesAdminReviewQueue(input: AdminReviewQueueMatchInput): boolean {
+  if (input.reviewFilter !== 'all' || input.analyzerFilter !== 'all') {
+    if (input.orderStatus !== 'pending' || input.paymentProvider !== MANUAL_PAYMENT_PROVIDER) return false
+  }
+
+  const reviewState = getAdminReviewState(input)
+  const reviewMatches = input.reviewFilter === 'all' || reviewState === input.reviewFilter
+  const analyzerMatches = input.analyzerFilter === 'all'
+    || (input.analyzerFilter === 'not_analyzed'
+      && input.latestSubmissionStatus === 'submitted'
+      && !input.analyzerState)
+    || (input.latestSubmissionStatus === 'submitted' && input.analyzerState === input.analyzerFilter)
+
+  return reviewMatches && analyzerMatches
+}
+
+export function isTerminalAdminReviewOrderStatus(
+  status: string | null | undefined,
+): status is AdminReviewTerminalOrderStatus {
+  return (ADMIN_REVIEW_TERMINAL_ORDER_STATUSES as readonly string[]).includes(status || '')
+}
+
+export function canReviewPaymentSubmission(input: {
+  orderStatus: string | null | undefined
+  paymentProvider: string | null | undefined
+  submissionStatus: PaymentSubmissionStatus | string | null | undefined
+  isLatestSubmission: boolean
+}): boolean {
+  return input.isLatestSubmission
+    && input.orderStatus === 'pending'
+    && input.paymentProvider === MANUAL_PAYMENT_PROVIDER
+    && input.submissionStatus === 'submitted'
+    && !isTerminalAdminReviewOrderStatus(input.orderStatus)
+}
+
+export function canAccessPaymentEvidence(input: {
+  role: string | null | undefined
+  requestedOrderId: string
+  submissionId: string | null | undefined
+  submissionOrderId: string | null | undefined
+}): boolean {
+  return hasPermission(input.role, 'financial.manage')
+    && isUuid(input.requestedOrderId)
+    && isUuid(input.submissionId)
+    && input.requestedOrderId === input.submissionOrderId
+}
+
+export function normalizePaymentRejectionReason(value: unknown): {
+  valid: boolean
+  value: string
+} {
+  const normalized = typeof value === 'string' ? value.trim().slice(0, 1000) : ''
+  return { valid: normalized.length > 0, value: normalized }
+}
+
+export function getReviewActionFailureMessage(actionError: string | undefined, fallback: string): string {
+  return `${actionError?.trim() || fallback} ${STALE_REVIEW_ACTION_MESSAGE}`
+}
+
+export function getPaymentReviewAuditEvent(
+  kind: 'approve' | 'reject',
+  input: { submissionId: string; orderId: string; status: string; reason?: string },
+) {
+  const isApprove = kind === 'approve'
+  return {
+    action: isApprove
+      ? PAYMENT_REVIEW_AUDIT_ACTIONS.approveAttempt
+      : PAYMENT_REVIEW_AUDIT_ACTIONS.rejectAttempt,
+    entity: 'payment_submissions',
+    entity_id: input.submissionId,
+    new_value: {
+      order_id: input.orderId,
+      status: input.status,
+      audit_semantics: 'action_attempt_not_state_transition',
+      canonical_rpc: isApprove ? 'approve_payment_submission' : 'reject_payment_submission',
+      ...(input.reason === undefined ? {} : { reason: input.reason }),
+    },
+  }
+}
+
+export type BoundedAdminReviewBatch<T> = {
+  matches: T[]
+  candidateCount: number
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+export async function collectBoundedAdminReviewMatches<T>({
+  targetCount,
+  fetchBatch,
+}: {
+  targetCount: number
+  fetchBatch: (cursor: string | null) => Promise<BoundedAdminReviewBatch<T>>
+}) {
+  const matches: T[] = []
+  let cursor: string | null = null
+  let candidateOrdersProcessed = 0
+
+  for (let batchIndex = 0; batchIndex < ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST; batchIndex += 1) {
+    const batch = await fetchBatch(cursor)
+    candidateOrdersProcessed += batch.candidateCount
+    matches.push(...batch.matches)
+
+    const canContinue = batch.hasMore && Boolean(batch.nextCursor)
+    if (matches.length >= targetCount || !canContinue) {
+      return {
+        matches,
+        batchesProcessed: batchIndex + 1,
+        candidateOrdersProcessed,
+        hasMore: canContinue,
+        capReached: false,
+      }
+    }
+
+    cursor = batch.nextCursor
+  }
+
+  return {
+    matches,
+    batchesProcessed: ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST,
+    candidateOrdersProcessed,
+    hasMore: true,
+    capReached: true,
+  }
+}
 
 export const STALE_REVIEW_ACTION_MESSAGE =
   'รายการอาจถูกตรวจสอบหรือเปลี่ยนสถานะโดยผู้ดูแลรายอื่นแล้ว กรุณารีเฟรชเพื่อดูสถานะล่าสุดก่อนลองอีกครั้ง'
@@ -107,6 +327,8 @@ export function getAdminReviewState({
 }) {
   if (orderStatus === 'paid' || orderStatus === 'free') return 'paid' as const
   if (orderStatus === 'cancelled') return 'cancelled' as const
+  if (orderStatus === 'refunded') return 'refunded' as const
+  if (orderStatus === 'revoked') return 'revoked' as const
   if (paymentProvider !== MANUAL_PAYMENT_PROVIDER) return 'other' as const
   if (submissionCount === 0) return 'no_evidence' as const
   if (latestSubmissionStatus === 'rejected') return 'rejected' as const

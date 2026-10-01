@@ -6,6 +6,7 @@ import { useState, useTransition, useCallback } from 'react'
 import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
 import { ORDER_STATUS } from '@/lib/orderUtils'
 import {
+  ADMIN_REVIEW_QUEUE_CAP_MESSAGE,
   getAnalyzerTriagePresentation,
   type AdminReviewFilter,
   type AnalyzerTriageFilter,
@@ -29,10 +30,12 @@ interface OrdersClientProps {
   statusFilter: string
   reviewFilter: AdminReviewFilter
   analyzerFilter: AnalyzerTriageFilter
-  canManagePayments: boolean
+  canManageFinancial: boolean
   paymentEvidenceLoaded: boolean
   analyzerDataLoaded: boolean
   paymentReviewUnavailable: boolean
+  queueHasMore: boolean
+  queueResultCapped: boolean
 }
 
 export default function OrdersClient({
@@ -45,10 +48,12 @@ export default function OrdersClient({
   statusFilter,
   reviewFilter,
   analyzerFilter,
-  canManagePayments,
+  canManageFinancial,
   paymentEvidenceLoaded,
   analyzerDataLoaded,
   paymentReviewUnavailable,
+  queueHasMore,
+  queueResultCapped,
 }: OrdersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -179,18 +184,20 @@ export default function OrdersClient({
           <h1 className="text-3xl font-bold font-display text-[#F5E9D6] tracking-tight">Orders</h1>
           <p className="text-[#A1866B] mt-1">Manage purchases and package access.</p>
         </div>
-        <button type="button" 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
-        >
-          <Plus size={18} />
-          Grant Access
-        </button>
+        {canManageFinancial && (
+          <button type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors"
+          >
+            <Plus size={18} />
+            Grant Access
+          </button>
+        )}
       </div>
 
       <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl overflow-hidden shadow-xl">
         <div className="border-b border-[rgba(255,255,255,0.05)] bg-[#0F0B07]/30 px-4 py-3 text-sm text-[#A1866B]">
-          {canManagePayments && reviewFilter === 'needs_review'
+          {canManageFinancial && reviewFilter === 'needs_review'
             ? 'คิวเริ่มต้นแสดงคำสั่งซื้อ PromptPay ที่ยัง pending และมีหลักฐานล่าสุดรอเจ้าหน้าที่ตรวจสอบ'
             : 'ผลวิเคราะห์เป็นข้อมูลประกอบเท่านั้น การเปลี่ยนสิทธิ์ยังต้องผ่านการอนุมัติของเจ้าหน้าที่'}
         </div>
@@ -223,7 +230,7 @@ export default function OrdersClient({
               <option value="refunded">Refunded</option>
               <option value="revoked">Revoked</option>
             </select>
-            {canManagePayments && (
+            {canManageFinancial && (
               <>
                 <select
                   value={reviewFilter}
@@ -254,8 +261,11 @@ export default function OrdersClient({
             )}
           </div>
           </div>
-          {canManagePayments && !analyzerDataLoaded && reviewFilter !== 'no_evidence' && (
+          {canManageFinancial && !analyzerDataLoaded && reviewFilter !== 'no_evidence' && (
             <p className="text-xs text-[#A1866B]">Analyzer triage is temporarily unavailable; review actions remain manual and authoritative.</p>
+          )}
+          {queueResultCapped && (
+            <p className="text-xs text-[#F1D17A]">{ADMIN_REVIEW_QUEUE_CAP_MESSAGE}</p>
           )}
         </div>
 
@@ -294,13 +304,15 @@ export default function OrdersClient({
                   </td>
                 </tr>
               ) : orders.map((order) => {
-                const paymentStatus = getPaymentStatusPresentation({
-                  orderStatus: order.status,
-                  paymentProvider: order.payment_provider,
-                  submissionCount: order.manual_payment_submission_count,
-                  latestSubmissionStatus: order.manual_payment_status,
-                  evidenceReadAvailable: order.payment_provider !== MANUAL_PAYMENT_PROVIDER || paymentEvidenceLoaded,
-                })
+                const paymentStatus = !canManageFinancial && order.payment_provider === MANUAL_PAYMENT_PROVIDER
+                  ? { key: 'unknown' as const, label: 'Payment review restricted' }
+                  : getPaymentStatusPresentation({
+                    orderStatus: order.status,
+                    paymentProvider: order.payment_provider,
+                    submissionCount: order.manual_payment_submission_count,
+                    latestSubmissionStatus: order.manual_payment_status,
+                    evidenceReadAvailable: order.payment_provider !== MANUAL_PAYMENT_PROVIDER || paymentEvidenceLoaded,
+                  })
                 const analyzerTriage = getAnalyzerTriagePresentation(order.manual_payment_analyzer_state)
                 const reviewStateLabel = order.manual_payment_review_state === 'needs_review'
                   ? 'Needs review'
@@ -312,11 +324,15 @@ export default function OrdersClient({
                         ? 'No evidence'
                         : order.manual_payment_review_state === 'paid'
                           ? 'Already paid'
-                          : order.manual_payment_review_state === 'cancelled'
-                            ? 'Cancelled'
+                        : order.manual_payment_review_state === 'cancelled'
+                          ? 'Cancelled'
+                          : order.manual_payment_review_state === 'refunded'
+                            ? 'Refunded — terminal'
+                            : order.manual_payment_review_state === 'revoked'
+                              ? 'Revoked — terminal'
                             : null
                 const canCancelUnpaidManualOrder =
-                  canManagePayments
+                  canManageFinancial
                   && paymentEvidenceLoaded
                   &&
                   order.payment_provider === MANUAL_PAYMENT_PROVIDER
@@ -352,7 +368,7 @@ export default function OrdersClient({
                     <span className="text-[#D4AF37] font-bold">฿{Number(order.amount).toLocaleString()}</span>
                   </td>
                   <td className="p-4 min-w-[210px]">
-                    {order.payment_provider === MANUAL_PAYMENT_PROVIDER ? (
+                    {order.payment_provider === MANUAL_PAYMENT_PROVIDER && canManageFinancial ? (
                       <>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${analyzerTriage.tone}`}>
@@ -372,7 +388,9 @@ export default function OrdersClient({
                         <div className="mt-1 text-[11px] text-sky-200/80">Analyzer is advisory only</div>
                       </>
                     ) : (
-                      <span className="text-xs text-[#A1866B]">—</span>
+                      <span className="text-xs text-[#A1866B]">
+                        {order.payment_provider === MANUAL_PAYMENT_PROVIDER ? 'Payment review restricted' : '—'}
+                      </span>
                     )}
                   </td>
                   <td className="p-4">
@@ -382,7 +400,7 @@ export default function OrdersClient({
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {order.status === ORDER_STATUS.PENDING && order.payment_provider !== 'promptpay_manual' && (
+                      {canManageFinancial && order.status === ORDER_STATUS.PENDING && order.payment_provider !== 'promptpay_manual' && (
                         <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'complete' })}
                           disabled={actingOnId === order.id}
@@ -391,7 +409,7 @@ export default function OrdersClient({
                           Mark Paid
                         </button>
                       )}
-                      {canManagePayments && order.payment_provider === 'promptpay_manual' && (
+                      {canManageFinancial && order.payment_provider === 'promptpay_manual' && (
                         <Link
                           href={`/admin/orders/${order.id}`}
                           className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${
@@ -415,7 +433,7 @@ export default function OrdersClient({
                             : 'ยกเลิกคำสั่งซื้อนี้'}
                         </button>
                       )}
-                      {(order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
+                      {canManageFinancial && (order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
                         <button type="button" 
                           onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'revoke' })}
                           disabled={actingOnId === order.id}
@@ -448,7 +466,7 @@ export default function OrdersClient({
         {totalPages > 1 && (
           <div className="p-4 border-t border-[rgba(255,255,255,0.05)] flex items-center justify-between">
             <div className="text-sm text-[#A1866B]">
-              Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}</span>
+              Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}{queueHasMore ? '+' : ''}</span>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" 
@@ -460,7 +478,7 @@ export default function OrdersClient({
               </button>
               <button type="button" 
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
-                disabled={currentPage >= totalPages || isPending}
+                disabled={(!queueHasMore && currentPage >= totalPages) || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
               >
                 <ChevronRight size={16} />
@@ -471,7 +489,7 @@ export default function OrdersClient({
       </div>
 
       {/* Grant Access Modal */}
-      {isModalOpen && (
+      {canManageFinancial && isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-[rgba(255,255,255,0.05)] flex justify-between items-center">

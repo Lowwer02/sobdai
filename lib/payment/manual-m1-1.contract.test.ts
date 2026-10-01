@@ -74,7 +74,7 @@ test('evidence reads fail closed and cancellation audit stays inside the RPC', (
 
 test('reject controls remain scoped to an existing submitted evidence row', () => {
   assert.match(adminDetail, /submissions\.length === 0[\s\S]*?ยังไม่มีสลิปที่ส่งเข้ามา/)
-  assert.match(adminDetail, /submission\.status === 'submitted' && order\.status === 'pending'/)
+  assert.match(adminDetail, /canReviewPaymentSubmission\(/)
   assert.match(adminDetail, /ปฏิเสธสลิป/)
 })
 
@@ -106,22 +106,23 @@ test('generic paid, free, and non-manual revoke behavior remains scoped', () => 
 })
 
 test('payment review success distinguishes empty and populated queues', () => {
-  assert.match(adminOrdersPage, /const \{ data: submittedPayments, error: paymentReviewError \} = await supabase[\s\S]*?\.eq\('status', 'submitted'\)/)
-  assert.match(adminOrdersPage, /paymentReviewOrderIds = Array\.from\([\s\S]*?submittedPayments \|\| \[\][\s\S]*?\.map/)
+  assert.match(adminOrdersPage, /collectBoundedAdminReviewMatches\(/)
+  assert.match(adminOrdersPage, /ADMIN_REVIEW_ORDER_BATCH_SIZE/)
+  assert.match(adminOrdersPage, /ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH/)
   assert.match(adminOrdersPage, /let paymentReviewUnavailable = false/)
 })
 
 test('payment review query errors render an explicit unavailable state', () => {
-  assert.match(adminOrdersPage, /if \(paymentReviewError\)[\s\S]*?paymentReviewUnavailable = true/)
+  assert.match(adminOrdersPage, /if \(batchQueryError\)[\s\S]*?paymentReviewUnavailable = true/)
   assert.match(adminOrdersPage, /paymentReviewUnavailable=\{paymentReviewUnavailable\}/)
   assert.match(adminList, /paymentReviewUnavailable: boolean/)
   assert.match(adminList, /ไม่สามารถโหลดคิวตรวจสอบการชำระเงินได้ กรุณารีเฟรชแล้วลองใหม่/)
 })
 
 test('payment review errors cannot masquerade as an empty queue or alter other filters', () => {
-  assert.match(adminOrdersPage, /if \(paymentReviewUnavailable\)[\s\S]*?00000000-0000-0000-0000-000000000000/)
-  assert.match(adminOrdersPage, /else if \(paymentReviewOrderIds\)/)
-  assert.match(adminOrdersPage, /else if \(normalizedStatusFilter && normalizedStatusFilter !== 'all'\)/)
+  assert.match(adminOrdersPage, /if \(paymentReviewUnavailable\)[\s\S]*?orders = \[\]/)
+  assert.match(adminOrdersPage, /applyOrderFilters\(/)
+  assert.match(adminOrdersPage, /statusFilter/)
   const unavailableIndex = adminList.indexOf('paymentReviewUnavailable ? (')
   const emptyIndex = adminList.indexOf('orders.length === 0 ? (')
   assert.ok(unavailableIndex >= 0 && unavailableIndex < emptyIndex)
