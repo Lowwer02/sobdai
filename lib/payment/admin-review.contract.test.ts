@@ -8,6 +8,7 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8')
 
 const queuePage = read('app/admin/orders/page.tsx')
 const queueClient = read('app/admin/orders/OrdersClient.tsx')
+const mutationControls = read('app/admin/orders/AdminOrderMutationControls.tsx')
 const detailPage = read('app/admin/orders/[id]/page.tsx')
 const detailClient = read('app/admin/orders/[id]/OrderPaymentDetailClient.tsx')
 const actions = read('app/admin/orders/actions.ts')
@@ -17,11 +18,12 @@ const confirmDialog = read('components/admin/ConfirmDialog.tsx')
 
 test('Support receives a read-only queue and no unnecessary mutation datasets', () => {
   assert.match(queuePage, /getAdminReviewCapabilities\(profile\.role\)/)
-  assert.match(queuePage, /const users = canManageFinancial\s*\n\s*\?/)
-  assert.match(queuePage, /const packages = canManageFinancial\s*\n\s*\?/)
+  assert.match(queuePage, /const users: AdminReviewQueueUser\[\] = canManageFinancial\s*\n\s*\?/)
+  assert.match(queuePage, /const packages: AdminReviewQueuePackage\[\] = canManageFinancial\s*\n\s*\?/)
   assert.match(queueClient, /canManageFinancial && isModalOpen/)
-  assert.match(queueClient, /canManageFinancial && order\.status === ORDER_STATUS\.PENDING/)
-  assert.match(detailPage, /canAccessPaymentEvidence\(/)
+  assert.match(mutationControls, /canManageFinancial && order\.status === ORDER_STATUS\.PENDING/)
+  assert.match(mutationControls, /canManageFinancial && order\.status === 'revoked'/)
+  assert.match(detailPage, /createSignedPaymentEvidenceUrl\(/)
 })
 
 test('mutation confirmation traps focus and restores the opener', () => {
@@ -40,9 +42,15 @@ test('review queue is server-filtered with stable review and analyzer query para
   assert.match(queuePage, /collectBoundedAdminReviewMatches/)
   assert.match(queuePage, /\.in\('order_id', orderIds\)/)
   assert.match(queuePage, /\.limit\(ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH\)/)
+  assert.match(queuePage, /\.limit\(ADMIN_REVIEW_ORDER_BATCH_SIZE \+ 1\)/)
+  assert.match(queuePage, /chunkAdminReviewVerificationIds\(/)
+  assert.match(queuePage, /matchCursors/)
+  assert.match(queuePage, /parseAdminReviewCursor\(params\.cursor\)/)
   assert.match(queuePage, /\.order\('id', \{ ascending: false \}\)/)
   assert.match(queueClient, /updateParams\(\{ review: e\.target\.value \}\)/)
   assert.match(queueClient, /updateParams\(\{ triage: e\.target\.value \}\)/)
+  assert.match(queueClient, /params\.delete\('cursor'\)/)
+  assert.match(queueClient, /queueNextCursor/)
 })
 
 test('default queue prioritizes pending manual evidence that needs human review', () => {
@@ -109,7 +117,8 @@ test('paid and cancelled orders keep canonical restrictions in the detail UI', (
 
 test('secure evidence access remains financial-only with bounded signed URLs', () => {
   assert.match(detailPage, /requirePermission\('financial\.manage'\)/)
-  assert.match(detailPage, /createSignedUrl\(submission\.storage_object_path, 300\)/)
+  assert.match(reviewHelper, /PAYMENT_EVIDENCE_SIGNED_URL_TTL_SECONDS = 300/)
+  assert.match(reviewHelper, /canAccessPaymentEvidence\(input\)/)
   assert.doesNotMatch(detailPage, /SUPABASE_SERVICE_ROLE_KEY/)
   assert.doesNotMatch(detailClient, /storage_object_path|rawImageHash|referenceFingerprint|provider_transaction_identity/)
 })

@@ -10,6 +10,7 @@ const manual = read('lib/payment/manual.ts')
 const slipRoute = read('app/api/payment/manual/slip/route.ts')
 const orderActions = read('app/admin/orders/actions.ts')
 const adminList = read('app/admin/orders/OrdersClient.tsx')
+const adminMutationControls = read('app/admin/orders/AdminOrderMutationControls.tsx')
 const adminDetail = read('app/admin/orders/[id]/OrderPaymentDetailClient.tsx')
 const adminOrdersPage = read('app/admin/orders/page.tsx')
 const orderUtils = read('lib/orderUtils.ts')
@@ -45,7 +46,7 @@ test('admin cancellation uses financial permission and canonical RPC', () => {
   assert.match(orderActions, /export async function cancelManualPaymentOrder/)
   assert.match(orderActions, /requirePermission\('financial\.manage'\)/)
   assert.match(orderActions, /rpc\('cancel_manual_payment_order'/)
-  assert.match(adminList, /ยกเลิกคำสั่งซื้อนี้/)
+  assert.match(adminMutationControls, /ยกเลิกคำสั่งซื้อนี้/)
   assert.match(adminList, /manual_payment_submission_count === 0/)
   assert.match(adminList, /manual_payment_all_rejected === true/)
   assert.match(adminDetail, /submissions\.length === 0 \|\| hasOnlyRejectedEvidence/)
@@ -54,7 +55,7 @@ test('admin cancellation uses financial permission and canonical RPC', () => {
 })
 
 test('admin cancellation makes the rejected-evidence exception explicit in Thai', () => {
-  assert.match(adminList, /ยกเลิกคำสั่งซื้อหลังหลักฐานไม่ผ่าน/)
+  assert.match(adminMutationControls, /ยกเลิกคำสั่งซื้อหลังหลักฐานไม่ผ่าน/)
   assert.match(adminDetail, /หลักฐานการชำระเงินทั้งหมดถูกปฏิเสธแล้ว การยกเลิกจะเก็บหลักฐานไว้เป็นประวัติ/)
 })
 
@@ -99,10 +100,10 @@ test('revoke UI reports Server Action failure and refreshes only after success',
 })
 
 test('generic paid, free, and non-manual revoke behavior remains scoped', () => {
-  assert.match(adminList, /order\.status === ORDER_STATUS\.PAID \|\| order\.status === ORDER_STATUS\.FREE/)
+  assert.match(adminMutationControls, /order\.status === ORDER_STATUS\.PAID \|\| order\.status === ORDER_STATUS\.FREE/)
   assert.match(orderActions, /order\?\.payment_provider === 'promptpay_manual'/)
   assert.match(orderActions, /order\.status === ORDER_STATUS\.PENDING/)
-  assert.match(adminList, /payment_provider !== 'promptpay_manual'/)
+  assert.match(adminMutationControls, /payment_provider !== MANUAL_PAYMENT_PROVIDER/)
 })
 
 test('payment review success distinguishes empty and populated queues', () => {

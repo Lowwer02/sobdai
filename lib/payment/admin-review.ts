@@ -13,6 +13,8 @@ export const ADMIN_REVIEW_MAX_ORDERS_PER_REQUEST =
   ADMIN_REVIEW_ORDER_BATCH_SIZE * ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST
 export const ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH =
   ADMIN_REVIEW_ORDER_BATCH_SIZE * PAYMENT_SUBMISSION_MAX_COUNT
+export const ADMIN_REVIEW_VERIFICATION_ID_CHUNK_SIZE = 50
+export const PAYMENT_EVIDENCE_SIGNED_URL_TTL_SECONDS = 300
 
 /**
  * Keep the admin list projection explicit. The relation fields are limited to
@@ -20,7 +22,7 @@ export const ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH =
  * financial managers.
  */
 export const ADMIN_REVIEW_ORDER_SELECT =
-  'id, user_id, package_id, amount, status, payment_provider, created_at, profiles!inner(email), packages!inner(name)'
+  'id, amount, status, payment_provider, created_at, profiles!inner(email), packages!inner(name)'
 
 export const ADMIN_REVIEW_QUEUE_CAP_MESSAGE =
   'แสดงผลคิวที่ตรวจสอบแล้วภายในขอบเขตความปลอดภัย กรุณาใช้ตัวกรองหรือค้นหาให้แคบลงเพื่อดูรายการเพิ่มเติม'
@@ -43,6 +45,33 @@ export const PAYMENT_REVIEW_AUDIT_ACTIONS = {
 export type AdminReviewCapabilities = {
   canViewOrders: boolean
   canManageFinancial: boolean
+}
+
+export type AdminReviewQueueOrder = {
+  id: string
+  amount: number | string
+  status: string
+  payment_provider: string | null
+  created_at: string
+  user_email: string
+  package_name: string
+  manual_payment_status: PaymentSubmissionStatus | null
+  manual_payment_submitted_at: string | null
+  manual_payment_submission_count: number
+  manual_payment_all_rejected: boolean
+  manual_payment_analyzer_state: string | null
+  manual_payment_analyzer_attempt_count: number | null
+  manual_payment_review_state: string
+}
+
+export type AdminReviewQueueUser = {
+  id: string
+  email: string
+}
+
+export type AdminReviewQueuePackage = {
+  id: string
+  name: string
 }
 
 export function getAdminReviewCapabilities(role: string | null | undefined): AdminReviewCapabilities {
@@ -88,6 +117,21 @@ export type AdminReviewCursor = {
 export function getAdminReviewCursor(row: { id: string; created_at: string | null }): AdminReviewCursor | null {
   if (!row.created_at || !row.id) return null
   return { createdAt: row.created_at, id: row.id }
+}
+
+export function serializeAdminReviewCursor(cursor: AdminReviewCursor): string {
+  return `${cursor.createdAt}|${cursor.id}`
+}
+
+export function parseAdminReviewCursor(value: unknown): AdminReviewCursor | null {
+  if (typeof value !== 'string') return null
+  const separatorIndex = value.lastIndexOf('|')
+  if (separatorIndex <= 0) return null
+
+  const createdAt = value.slice(0, separatorIndex)
+  const id = value.slice(separatorIndex + 1)
+  if (!createdAt || !isUuid(id) || Number.isNaN(Date.parse(createdAt))) return null
+  return { createdAt, id }
 }
 
 export function compareReviewRowsLatest<T extends ReviewOrderedRow>(a: T, b: T): number {
@@ -163,6 +207,27 @@ export function canAccessPaymentEvidence(input: {
     && input.requestedOrderId === input.submissionOrderId
 }
 
+export async function createSignedPaymentEvidenceUrl(input: {
+  role: string | null | undefined
+  requestedOrderId: string
+  submissionId: string | null | undefined
+  submissionOrderId: string | null | undefined
+  storageObjectPath: string | null | undefined
+  createSignedUrl: (
+    storageObjectPath: string,
+    expiresIn: number,
+  ) => Promise<{ data: { signedUrl?: string | null } | null; error: unknown }>
+}): Promise<string | null> {
+  if (!canAccessPaymentEvidence(input) || !input.storageObjectPath) return null
+
+  const { data, error } = await input.createSignedUrl(
+    input.storageObjectPath,
+    PAYMENT_EVIDENCE_SIGNED_URL_TTL_SECONDS,
+  )
+  if (error || !data?.signedUrl) return null
+  return data.signedUrl
+}
+
 export function normalizePaymentRejectionReason(value: unknown): {
   valid: boolean
   value: string
@@ -198,34 +263,72 @@ export function getPaymentReviewAuditEvent(
 
 export type BoundedAdminReviewBatch<T> = {
   matches: T[]
+  matchCursors: string[]
   candidateCount: number
   nextCursor: string | null
   hasMore: boolean
 }
 
+export function chunkAdminReviewVerificationIds(ids: string[]): string[][] {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)))
+  const chunks: string[][] = []
+  for (let index = 0; index < uniqueIds.length; index += ADMIN_REVIEW_VERIFICATION_ID_CHUNK_SIZE) {
+    chunks.push(uniqueIds.slice(index, index + ADMIN_REVIEW_VERIFICATION_ID_CHUNK_SIZE))
+  }
+  return chunks
+}
+
 export async function collectBoundedAdminReviewMatches<T>({
   targetCount,
+  startCursor = null,
   fetchBatch,
 }: {
   targetCount: number
+  startCursor?: string | null
   fetchBatch: (cursor: string | null) => Promise<BoundedAdminReviewBatch<T>>
 }) {
   const matches: T[] = []
-  let cursor: string | null = null
+  const matchCursors: string[] = []
+  let cursor: string | null = startCursor
   let candidateOrdersProcessed = 0
 
   for (let batchIndex = 0; batchIndex < ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST; batchIndex += 1) {
     const batch = await fetchBatch(cursor)
     candidateOrdersProcessed += batch.candidateCount
     matches.push(...batch.matches)
+    matchCursors.push(...batch.matchCursors.slice(0, batch.matches.length))
 
     const canContinue = batch.hasMore && Boolean(batch.nextCursor)
-    if (matches.length >= targetCount || !canContinue) {
+    if (matches.length >= targetCount) {
+      const lastDisplayedMatchCursor = matchCursors[targetCount - 1] || batch.nextCursor
+      const hasUnconsumedMatches = matches.length > targetCount
+      const candidateExistsAfterDisplayedMatch = Boolean(
+        lastDisplayedMatchCursor
+        && batch.nextCursor
+        && lastDisplayedMatchCursor !== batch.nextCursor,
+      )
+      const hasMore = Boolean(
+        lastDisplayedMatchCursor
+        && (hasUnconsumedMatches || candidateExistsAfterDisplayedMatch || canContinue),
+      )
+
+      return {
+        matches: matches.slice(0, targetCount),
+        batchesProcessed: batchIndex + 1,
+        candidateOrdersProcessed,
+        nextCursor: hasMore ? lastDisplayedMatchCursor : null,
+        hasMore,
+        capReached: false,
+      }
+    }
+
+    if (!canContinue) {
       return {
         matches,
         batchesProcessed: batchIndex + 1,
         candidateOrdersProcessed,
-        hasMore: canContinue,
+        nextCursor: null,
+        hasMore: false,
         capReached: false,
       }
     }
@@ -237,6 +340,7 @@ export async function collectBoundedAdminReviewMatches<T>({
     matches,
     batchesProcessed: ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST,
     candidateOrdersProcessed,
+    nextCursor: cursor,
     hasMore: true,
     capReached: true,
   }

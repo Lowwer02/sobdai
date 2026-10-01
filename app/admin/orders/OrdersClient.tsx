@@ -1,13 +1,15 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import Link from 'next/link'
 import { useState, useTransition, useCallback } from 'react'
-import { Search, Loader2, ChevronLeft, ChevronRight, Ban, CheckCircle, Plus, X } from 'lucide-react'
+import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle, Plus, X } from 'lucide-react'
 import { ORDER_STATUS } from '@/lib/orderUtils'
 import {
   ADMIN_REVIEW_QUEUE_CAP_MESSAGE,
   getAnalyzerTriagePresentation,
+  type AdminReviewQueueOrder,
+  type AdminReviewQueuePackage,
+  type AdminReviewQueueUser,
   type AdminReviewFilter,
   type AnalyzerTriageFilter,
 } from '@/lib/payment/admin-review'
@@ -19,11 +21,12 @@ import {
 import { getPaymentStatusPresentation, MANUAL_PAYMENT_PROVIDER } from '@/lib/payment/manual'
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { toastEvent } from '@/hooks/useToast'
+import AdminOrderMutationControls, { type AdminOrderMutationAction } from './AdminOrderMutationControls'
 
 interface OrdersClientProps {
-  orders: any[]
-  users: any[]
-  packages: any[]
+  orders: AdminReviewQueueOrder[]
+  users: AdminReviewQueueUser[]
+  packages: AdminReviewQueuePackage[]
   totalPages: number
   currentPage: number
   search: string
@@ -36,6 +39,8 @@ interface OrdersClientProps {
   paymentReviewUnavailable: boolean
   queueHasMore: boolean
   queueResultCapped: boolean
+  queueNextCursor: string | null
+  isBoundedQueue: boolean
 }
 
 export default function OrdersClient({
@@ -54,6 +59,8 @@ export default function OrdersClient({
   paymentReviewUnavailable,
   queueHasMore,
   queueResultCapped,
+  queueNextCursor,
+  isBoundedQueue,
 }: OrdersClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -66,7 +73,7 @@ export default function OrdersClient({
   const [selectedUser, setSelectedUser] = useState('')
   const [selectedPackage, setSelectedPackage] = useState('')
   const [error, setError] = useState('')
-  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: 'revoke' | 'restore' | 'complete' | 'cancel-unpaid' | null }>({ isOpen: false, orderId: null, action: null })
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, orderId: string | null, action: AdminOrderMutationAction | null }>({ isOpen: false, orderId: null, action: null })
 
   const updateParams = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(window.location.search)
@@ -74,7 +81,9 @@ export default function OrdersClient({
       if (value) params.set(key, value)
       else params.delete(key)
     })
-    if (!updates.page) params.set('page', '1')
+    const resetsQueueCursor = ['q', 'status', 'review', 'triage'].some((key) => key in updates)
+    if (resetsQueueCursor) params.delete('cursor')
+    if (!updates.page || resetsQueueCursor) params.set('page', '1')
 
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
@@ -300,7 +309,9 @@ export default function OrdersClient({
               ) : orders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-12 text-center text-[#A1866B]">
-                    No orders found.
+                    {isBoundedQueue && queueHasMore
+                      ? 'ยังค้นหาต่อได้ในช่วงข้อมูลถัดไป กรุณาไปหน้าถัดไป'
+                      : 'No orders found.'}
                   </td>
                 </tr>
               ) : orders.map((order) => {
@@ -400,60 +411,17 @@ export default function OrdersClient({
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {canManageFinancial && order.status === ORDER_STATUS.PENDING && order.payment_provider !== 'promptpay_manual' && (
-                        <button type="button" 
-                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'complete' })}
-                          disabled={actingOnId === order.id}
-                          className="px-3 py-1.5 bg-[#22C55E]/10 text-[#22C55E] text-xs font-bold rounded hover:bg-[#22C55E]/20 transition-colors"
-                        >
-                          Mark Paid
-                        </button>
-                      )}
-                      {canManageFinancial && order.payment_provider === 'promptpay_manual' && (
-                        <Link
-                          href={`/admin/orders/${order.id}`}
-                          className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${
-                            order.status === ORDER_STATUS.PENDING && order.manual_payment_status === 'submitted'
-                              ? 'bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20'
-                              : 'bg-[#0F0B07] text-[#A1866B] hover:text-[#F5E9D6]'
-                          }`}
-                        >
-                          {order.status === ORDER_STATUS.PENDING && order.manual_payment_status === 'submitted' ? 'Review' : 'Details'}
-                        </Link>
-                      )}
-                      {canCancelUnpaidManualOrder && (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'cancel-unpaid' })}
-                          disabled={actingOnId === order.id}
-                          className="px-3 py-1.5 rounded border border-red-400/30 text-xs font-bold text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {order.manual_payment_all_rejected
-                            ? 'ยกเลิกคำสั่งซื้อหลังหลักฐานไม่ผ่าน'
-                            : 'ยกเลิกคำสั่งซื้อนี้'}
-                        </button>
-                      )}
-                      {canManageFinancial && (order.status === ORDER_STATUS.PAID || order.status === ORDER_STATUS.FREE) ? (
-                        <button type="button" 
-                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'revoke' })}
-                          disabled={actingOnId === order.id}
-                          className="p-2 text-[#A1866B] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 disabled:opacity-50"
-                          title="Revoke Access"
-                        >
-                          {actingOnId === order.id ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
-                        </button>
-                      ) : order.status === 'revoked' ? (
-                        <button type="button" 
-                          onClick={() => setConfirmModal({ isOpen: true, orderId: order.id, action: 'restore' })}
-                          disabled={actingOnId === order.id}
-                          className="p-2 text-[#A1866B] hover:text-green-500 transition-colors rounded-lg hover:bg-green-500/10 disabled:opacity-50"
-                          title="Restore Access"
-                        >
-                          {actingOnId === order.id ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                        </button>
-                      ) : (
-                         <span className="text-xs text-[#A1866B]">N/A</span>
-                      )}
+                      <AdminOrderMutationControls
+                        order={order}
+                        canManageFinancial={canManageFinancial}
+                        canCancelUnpaidManualOrder={canCancelUnpaidManualOrder}
+                        actingOnId={actingOnId}
+                        onRequestAction={(action) => setConfirmModal({
+                          isOpen: true,
+                          orderId: order.id,
+                          action,
+                        })}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -463,22 +431,29 @@ export default function OrdersClient({
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {(isBoundedQueue ? currentPage > 1 || queueHasMore : totalPages > 1) && (
           <div className="p-4 border-t border-[rgba(255,255,255,0.05)] flex items-center justify-between">
             <div className="text-sm text-[#A1866B]">
               Page <span className="text-[#F5E9D6] font-medium">{currentPage}</span> of <span className="text-[#F5E9D6] font-medium">{totalPages}{queueHasMore ? '+' : ''}</span>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" 
-                onClick={() => updateParams({ page: String(currentPage - 1) })}
+                onClick={() => {
+                  if (isBoundedQueue) router.back()
+                  else updateParams({ page: String(currentPage - 1) })
+                }}
                 disabled={currentPage <= 1 || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
               >
                 <ChevronLeft size={16} />
               </button>
               <button type="button" 
-                onClick={() => updateParams({ page: String(currentPage + 1) })}
-                disabled={(!queueHasMore && currentPage >= totalPages) || isPending}
+                onClick={() => updateParams(isBoundedQueue && queueNextCursor
+                  ? { page: String(currentPage + 1), cursor: queueNextCursor }
+                  : { page: String(currentPage + 1) })}
+                disabled={(isBoundedQueue
+                  ? !queueHasMore || !queueNextCursor
+                  : (!queueHasMore && currentPage >= totalPages)) || isPending}
                 className="p-2 rounded-lg bg-[#0F0B07] border border-[rgba(255,255,255,0.1)] text-[#F5E9D6] disabled:opacity-50 hover:bg-[rgba(255,255,255,0.05)]"
               >
                 <ChevronRight size={16} />

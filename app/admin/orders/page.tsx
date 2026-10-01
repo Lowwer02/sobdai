@@ -7,6 +7,7 @@ import {
   ADMIN_REVIEW_ORDER_BATCH_SIZE,
   ADMIN_REVIEW_ORDER_SELECT,
   ADMIN_REVIEW_PAGE_SIZE,
+  chunkAdminReviewVerificationIds,
   collectBoundedAdminReviewMatches,
   getAdminReviewCapabilities,
   getAdminReviewCursor,
@@ -15,6 +16,11 @@ import {
   matchesAdminReviewQueue,
   normalizeAdminReviewFilter,
   normalizeAnalyzerTriageFilter,
+  parseAdminReviewCursor,
+  serializeAdminReviewCursor,
+  type AdminReviewQueueOrder,
+  type AdminReviewQueuePackage,
+  type AdminReviewQueueUser,
   type AdminReviewFilter,
   type AnalyzerTriageFilter,
 } from '@/lib/payment/admin-review'
@@ -28,7 +34,7 @@ function decorateOrders(
   rawOrders: any[],
   paymentRows: any[],
   verificationBySubmissionId: Map<string, any>,
-) {
+): AdminReviewQueueOrder[] {
   const latestPaymentByOrder = latestByOrder(paymentRows)
   const paymentSubmissionCountByOrder = new Map<string, number>()
   const paymentSubmissionsByOrder = new Map<string, any[]>()
@@ -53,7 +59,11 @@ function decorateOrders(
     const pkg = relationObject(order.packages)
 
     return {
-      ...order,
+      id: order.id,
+      amount: order.amount,
+      status: order.status,
+      payment_provider: order.payment_provider || null,
+      created_at: order.created_at,
       user_email: profile?.email || 'Unknown User',
       package_name: pkg?.name || 'Unknown Package',
       manual_payment_status: latestPayment?.status || null,
@@ -110,7 +120,7 @@ export default async function OrdersPage({
   const { supabase, profile } = await requirePermission('orders.read')
   const params = await searchParams
   const requestedPage = typeof params.page === 'string' ? parseInt(params.page, 10) : 1
-  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1
+  const safeRequestedPage = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const search = typeof params.q === 'string' ? params.q.trim() : ''
   const requestedStatusFilter = typeof params.status === 'string' ? params.status : ''
   const normalizedStatusFilter = requestedStatusFilter.toLowerCase()
@@ -129,6 +139,12 @@ export default async function OrdersPage({
   const statusFilter = normalizedStatusFilter === 'payment_submitted'
     ? 'all'
     : (normalizedStatusFilter || 'all')
+  const needsQueueProjection = canManageFinancial && (reviewFilter !== 'all' || analyzerFilter !== 'all')
+  const requestedQueueCursor = parseAdminReviewCursor(params.cursor)
+  const queueStartCursor = requestedQueueCursor ? serializeAdminReviewCursor(requestedQueueCursor) : null
+  const page = needsQueueProjection && safeRequestedPage > 1 && !requestedQueueCursor
+    ? 1
+    : safeRequestedPage
   const from = (page - 1) * ADMIN_REVIEW_PAGE_SIZE
   const to = from + ADMIN_REVIEW_PAGE_SIZE
 
@@ -137,8 +153,9 @@ export default async function OrdersPage({
   let paymentEvidenceLoaded = false
   let queueHasMore = false
   let queueResultCapped = false
+  let queueNextCursor: string | null = null
   let totalPages = 0
-  let orders: any[] = []
+  let orders: AdminReviewQueueOrder[] = []
   let adminSupabase: ReturnType<typeof createAdminClient> | null = null
 
   const getAdminSupabase = () => {
@@ -151,8 +168,6 @@ export default async function OrdersPage({
       return null
     }
   }
-
-  const needsQueueProjection = canManageFinancial && (reviewFilter !== 'all' || analyzerFilter !== 'all')
 
   if (needsQueueProjection) {
     const needsVerificationRows = reviewFilter === 'needs_review'
@@ -169,7 +184,8 @@ export default async function OrdersPage({
     let batchQueryError: any = null
     const boundedResult = !paymentReviewUnavailable
       ? await collectBoundedAdminReviewMatches({
-        targetCount: page * ADMIN_REVIEW_PAGE_SIZE,
+        targetCount: ADMIN_REVIEW_PAGE_SIZE,
+        startCursor: queueStartCursor,
         fetchBatch: async (cursor) => {
           let orderQuery = supabase
             .from('orders')
@@ -182,26 +198,33 @@ export default async function OrdersPage({
             analyzerFilter,
           })
 
-          if (cursor) {
-            const [createdAt, id] = cursor.split('|')
+          const parsedCursor = parseAdminReviewCursor(cursor)
+          if (cursor && !parsedCursor) {
+            batchQueryError = new Error('Invalid admin review cursor')
+            return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
+          }
+
+          if (parsedCursor) {
             orderQuery = orderQuery.or(
-              `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`,
+              `created_at.lt.${parsedCursor.createdAt},and(created_at.eq.${parsedCursor.createdAt},id.lt.${parsedCursor.id})`,
             )
           }
 
-          const { data: batchOrders, error: orderError } = await orderQuery
+          const { data: rawBatchOrders, error: orderError } = await orderQuery
             .order('created_at', { ascending: false })
             .order('id', { ascending: false })
-            .limit(ADMIN_REVIEW_ORDER_BATCH_SIZE)
+            .limit(ADMIN_REVIEW_ORDER_BATCH_SIZE + 1)
 
           if (orderError) {
             batchQueryError = orderError
-            return { matches: [], candidateCount: 0, nextCursor: null, hasMore: false }
+            return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
           }
 
-          const candidateOrders = batchOrders || []
+          const rawCandidateOrders = rawBatchOrders || []
+          const hasMoreCandidates = rawCandidateOrders.length > ADMIN_REVIEW_ORDER_BATCH_SIZE
+          const candidateOrders = rawCandidateOrders.slice(0, ADMIN_REVIEW_ORDER_BATCH_SIZE)
           if (candidateOrders.length === 0) {
-            return { matches: [], candidateCount: 0, nextCursor: null, hasMore: false }
+            return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
           }
 
           const orderIds = candidateOrders.map((order: any) => order.id)
@@ -215,7 +238,7 @@ export default async function OrdersPage({
 
           if (paymentError) {
             batchQueryError = paymentError
-            return { matches: [], candidateCount: 0, nextCursor: null, hasMore: false }
+            return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
           }
 
           const paymentRowsForBatch = paymentRows || []
@@ -224,21 +247,25 @@ export default async function OrdersPage({
             const queueAdminSupabase = getAdminSupabase()
             if (!queueAdminSupabase) {
               batchQueryError = new Error('Admin verification client unavailable')
-              return { matches: [], candidateCount: 0, nextCursor: null, hasMore: false }
+              return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
             }
 
-            const { data: verificationRows, error: verificationError } = await queueAdminSupabase
-              .from('payment_verifications')
-              .select('submission_id, order_id, state, decision, attempt_count, created_at, updated_at')
-              .in('submission_id', paymentRowsForBatch.map((payment: any) => payment.id))
+            for (const verificationIds of chunkAdminReviewVerificationIds(
+              paymentRowsForBatch.map((payment: any) => payment.id),
+            )) {
+              const { data: verificationRows, error: verificationError } = await queueAdminSupabase
+                .from('payment_verifications')
+                .select('submission_id, order_id, state, decision, attempt_count, created_at, updated_at')
+                .in('submission_id', verificationIds)
 
-            if (verificationError) {
-              batchQueryError = verificationError
-              return { matches: [], candidateCount: 0, nextCursor: null, hasMore: false }
-            }
+              if (verificationError) {
+                batchQueryError = verificationError
+                return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
+              }
 
-            for (const verification of verificationRows || []) {
-              verificationBySubmissionId.set(verification.submission_id, verification)
+              for (const verification of verificationRows || []) {
+                verificationBySubmissionId.set(verification.submission_id, verification)
+              }
             }
           }
 
@@ -266,6 +293,20 @@ export default async function OrdersPage({
           }).map((order: any) => order.id))
 
           const decorated = decorateOrders(candidateOrders, paymentRowsForBatch, verificationBySubmissionId)
+          const decoratedById = new Map(decorated.map((order) => [order.id, order]))
+          const matchedOrders: AdminReviewQueueOrder[] = []
+          const matchCursors: string[] = []
+          for (const candidate of candidateOrders) {
+            if (!matchedIds.has(candidate.id)) continue
+            const cursorForMatch = getAdminReviewCursor({
+              id: candidate.id,
+              created_at: candidate.created_at,
+            })
+            const decoratedOrder = decoratedById.get(candidate.id)
+            if (!cursorForMatch || !decoratedOrder) continue
+            matchedOrders.push(decoratedOrder)
+            matchCursors.push(serializeAdminReviewCursor(cursorForMatch))
+          }
           const lastOrder = candidateOrders[candidateOrders.length - 1]
           const lastCursor = getAdminReviewCursor({
             id: lastOrder.id,
@@ -273,10 +314,11 @@ export default async function OrdersPage({
           })
 
           return {
-            matches: decorated.filter((order: any) => matchedIds.has(order.id)),
+            matches: matchedOrders,
+            matchCursors,
             candidateCount: candidateOrders.length,
-            nextCursor: lastCursor ? `${lastCursor.createdAt}|${lastCursor.id}` : null,
-            hasMore: candidateOrders.length === ADMIN_REVIEW_ORDER_BATCH_SIZE,
+            nextCursor: lastCursor ? serializeAdminReviewCursor(lastCursor) : null,
+            hasMore: Boolean(lastCursor && hasMoreCandidates),
           }
         },
       })
@@ -286,13 +328,11 @@ export default async function OrdersPage({
       console.error('[PAYMENT] bounded payment review queue query failed:', batchQueryError.message || batchQueryError)
       paymentReviewUnavailable = true
     } else if (boundedResult) {
-      const rawMatches = boundedResult.matches
-      orders = rawMatches.slice(from, to)
+      orders = boundedResult.matches
       queueHasMore = boundedResult.hasMore
       queueResultCapped = boundedResult.capReached
-      totalPages = queueHasMore
-        ? Math.max(page + 1, Math.ceil(rawMatches.length / ADMIN_REVIEW_PAGE_SIZE))
-        : Math.ceil(rawMatches.length / ADMIN_REVIEW_PAGE_SIZE)
+      queueNextCursor = boundedResult.nextCursor
+      totalPages = page + (queueHasMore ? 1 : 0)
       paymentEvidenceLoaded = true
     }
   } else {
@@ -362,11 +402,11 @@ export default async function OrdersPage({
     totalPages = 0
   }
 
-  const users = canManageFinancial
-    ? (await supabase.from('profiles').select('id, email').order('email')).data || []
+  const users: AdminReviewQueueUser[] = canManageFinancial
+    ? ((await supabase.from('profiles').select('id, email').order('email')).data || []) as AdminReviewQueueUser[]
     : []
-  const packages = canManageFinancial
-    ? (await supabase.from('packages').select('id, name').order('name')).data || []
+  const packages: AdminReviewQueuePackage[] = canManageFinancial
+    ? ((await supabase.from('packages').select('id, name').order('name')).data || []) as AdminReviewQueuePackage[]
     : []
 
   return (
@@ -386,6 +426,8 @@ export default async function OrdersPage({
       paymentReviewUnavailable={paymentReviewUnavailable}
       queueHasMore={queueHasMore}
       queueResultCapped={queueResultCapped}
+      queueNextCursor={queueNextCursor}
+      isBoundedQueue={needsQueueProjection}
     />
   )
 }

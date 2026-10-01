@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth/server-protect'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isUuid } from '@/lib/payment/manual'
-import { canAccessPaymentEvidence } from '@/lib/payment/admin-review'
+import { createSignedPaymentEvidenceUrl } from '@/lib/payment/admin-review'
 import OrderPaymentDetailClient from './OrderPaymentDetailClient'
 
 function relationObject(value: any) {
@@ -85,21 +85,18 @@ export default async function OrderPaymentDetailPage({
   const submissions = await Promise.all((rawSubmissions || []).map(async (submission: any) => {
     let signedUrl: string | null = null
 
-    if (adminSupabase && canAccessPaymentEvidence({
-      role: profile.role,
-      requestedOrderId: id,
-      submissionId: submission.id,
-      submissionOrderId: submission.order_id,
-    })) {
-      const { data, error } = await adminSupabase.storage
-        .from('payment-slips')
-        .createSignedUrl(submission.storage_object_path, 300)
-
-      if (error) {
-        console.error('[PAYMENT] payment slip signed URL failed:', safeErrorCode(error))
-      } else {
-        signedUrl = data?.signedUrl || null
-      }
+    if (adminSupabase) {
+      signedUrl = await createSignedPaymentEvidenceUrl({
+        role: profile.role,
+        requestedOrderId: id,
+        submissionId: submission.id,
+        submissionOrderId: submission.order_id,
+        storageObjectPath: submission.storage_object_path,
+        createSignedUrl: (storageObjectPath, expiresIn) => adminSupabase!
+          .storage
+          .from('payment-slips')
+          .createSignedUrl(storageObjectPath, expiresIn),
+      })
     }
 
     return {
