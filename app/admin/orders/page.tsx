@@ -7,10 +7,11 @@ import {
   ADMIN_REVIEW_ORDER_BATCH_SIZE,
   ADMIN_REVIEW_ORDER_SELECT,
   ADMIN_REVIEW_PAGE_SIZE,
-  chunkAdminReviewVerificationIds,
+  fetchAdminReviewVerificationRows,
   collectBoundedAdminReviewMatches,
   getAdminReviewCapabilities,
   getAdminReviewCursor,
+  getAdminReviewSubmissionAnomaly,
   getAdminReviewState,
   latestByOrder,
   matchesAdminReviewQueue,
@@ -154,6 +155,7 @@ export default async function OrdersPage({
   let queueHasMore = false
   let queueResultCapped = false
   let queueNextCursor: string | null = null
+  let paymentReviewIntegrityAnomaly = false
   let totalPages = 0
   let orders: AdminReviewQueueOrder[] = []
   let adminSupabase: ReturnType<typeof createAdminClient> | null = null
@@ -234,7 +236,7 @@ export default async function OrdersPage({
             .in('order_id', orderIds)
             .order('created_at', { ascending: false })
             .order('id', { ascending: false })
-            .limit(ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH)
+            .limit(ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH + 1)
 
           if (paymentError) {
             batchQueryError = paymentError
@@ -242,6 +244,16 @@ export default async function OrdersPage({
           }
 
           const paymentRowsForBatch = paymentRows || []
+          const submissionAnomaly = getAdminReviewSubmissionAnomaly(
+            paymentRowsForBatch,
+            ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH,
+          )
+          if (submissionAnomaly) {
+            paymentReviewIntegrityAnomaly = true
+            batchQueryError = new Error('submission-integrity-anomaly')
+            return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
+          }
+
           const verificationBySubmissionId = new Map<string, any>()
           if (needsVerificationRows && paymentRowsForBatch.length > 0) {
             const queueAdminSupabase = getAdminSupabase()
@@ -250,22 +262,21 @@ export default async function OrdersPage({
               return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
             }
 
-            for (const verificationIds of chunkAdminReviewVerificationIds(
-              paymentRowsForBatch.map((payment: any) => payment.id),
-            )) {
-              const { data: verificationRows, error: verificationError } = await queueAdminSupabase
+            const verificationResult = await fetchAdminReviewVerificationRows({
+              submissionIds: paymentRowsForBatch.map((payment: any) => payment.id),
+              fetchChunk: async (verificationIds) => queueAdminSupabase
                 .from('payment_verifications')
                 .select('submission_id, order_id, state, decision, attempt_count, created_at, updated_at')
-                .in('submission_id', verificationIds)
+                .in('submission_id', verificationIds),
+            })
 
-              if (verificationError) {
-                batchQueryError = verificationError
-                return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
-              }
+            if (verificationResult.error) {
+              batchQueryError = verificationResult.error
+              return { matches: [], matchCursors: [], candidateCount: 0, nextCursor: null, hasMore: false }
+            }
 
-              for (const verification of verificationRows || []) {
-                verificationBySubmissionId.set(verification.submission_id, verification)
-              }
+            for (const verification of verificationResult.data) {
+              verificationBySubmissionId.set(verification.submission_id, verification)
             }
           }
 
@@ -365,36 +376,53 @@ export default async function OrdersPage({
         .in('order_id', orderIds)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
-        .limit(ADMIN_REVIEW_PAGE_SIZE * PAYMENT_SUBMISSION_MAX_COUNT)
+        .limit(ADMIN_REVIEW_PAGE_SIZE * PAYMENT_SUBMISSION_MAX_COUNT + 1)
       : { data: [] as any[], error: null }
     const { data: paymentRows, error: paymentRowsError } = paymentRowsQuery
+    const paymentRowsForPage = paymentRows || []
+
+    if (paymentRowsError) {
+      paymentReviewUnavailable = true
+    } else if (getAdminReviewSubmissionAnomaly(
+      paymentRowsForPage,
+      ADMIN_REVIEW_PAGE_SIZE * PAYMENT_SUBMISSION_MAX_COUNT,
+    )) {
+      paymentReviewIntegrityAnomaly = true
+      paymentReviewUnavailable = true
+    }
 
     const verificationBySubmissionId = new Map<string, any>()
-    const visibleSubmissionIds = (paymentRows || []).map((payment: any) => payment.id)
-    if (canManageFinancial && visibleSubmissionIds.length > 0) {
+    const visibleSubmissionIds = paymentRowsForPage.map((payment: any) => payment.id)
+    if (!paymentReviewUnavailable && canManageFinancial && visibleSubmissionIds.length > 0) {
       const visibleAdminSupabase = getAdminSupabase()
       if (visibleAdminSupabase) {
-        const { data: verificationRows, error: verificationError } = await visibleAdminSupabase
-          .from('payment_verifications')
-          .select('submission_id, order_id, state, decision, attempt_count, created_at, updated_at')
-          .in('submission_id', visibleSubmissionIds)
+        const verificationResult = await fetchAdminReviewVerificationRows({
+          submissionIds: visibleSubmissionIds,
+          fetchChunk: async (verificationIds) => visibleAdminSupabase
+            .from('payment_verifications')
+            .select('submission_id, order_id, state, decision, attempt_count, created_at, updated_at')
+            .in('submission_id', verificationIds),
+        })
 
-        if (verificationError) {
-          console.error('[PAYMENT VERIFICATION] visible queue query failed:', verificationError.code || 'unknown')
+        if (verificationResult.error) {
+          console.error('[PAYMENT VERIFICATION] visible queue chunk unavailable:', verificationResult.failedChunkIndex)
+          paymentReviewUnavailable = true
         } else {
           analyzerDataLoaded = true
-          for (const verification of verificationRows || []) {
+          for (const verification of verificationResult.data) {
             verificationBySubmissionId.set(verification.submission_id, verification)
           }
         }
+      } else {
+        paymentReviewUnavailable = true
       }
-    } else if (canManageFinancial && !paymentRowsError) {
+    } else if (!paymentReviewUnavailable && canManageFinancial) {
       analyzerDataLoaded = true
     }
 
-    orders = decorateOrders(visibleOrders, paymentRows || [], verificationBySubmissionId)
+    orders = decorateOrders(visibleOrders, paymentRowsForPage, verificationBySubmissionId)
     totalPages = count ? Math.ceil(count / ADMIN_REVIEW_PAGE_SIZE) : 0
-    paymentEvidenceLoaded = canManageFinancial && !paymentRowsError
+    paymentEvidenceLoaded = canManageFinancial && !paymentRowsError && !paymentReviewUnavailable
   }
 
   if (paymentReviewUnavailable) {
@@ -424,6 +452,7 @@ export default async function OrdersPage({
       paymentEvidenceLoaded={paymentEvidenceLoaded}
       analyzerDataLoaded={analyzerDataLoaded}
       paymentReviewUnavailable={paymentReviewUnavailable}
+      paymentReviewIntegrityAnomaly={paymentReviewIntegrityAnomaly}
       queueHasMore={queueHasMore}
       queueResultCapped={queueResultCapped}
       queueNextCursor={queueNextCursor}

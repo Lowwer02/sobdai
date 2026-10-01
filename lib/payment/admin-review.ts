@@ -15,6 +15,8 @@ export const ADMIN_REVIEW_MAX_SUBMISSIONS_PER_BATCH =
   ADMIN_REVIEW_ORDER_BATCH_SIZE * PAYMENT_SUBMISSION_MAX_COUNT
 export const ADMIN_REVIEW_VERIFICATION_ID_CHUNK_SIZE = 50
 export const PAYMENT_EVIDENCE_SIGNED_URL_TTL_SECONDS = 300
+export const ADMIN_REVIEW_SUBMISSION_INTEGRITY_MESSAGE =
+  'ไม่สามารถโหลดคิวตรวจสอบได้ เนื่องจากพบข้อมูลหลักฐานที่ต้องตรวจสอบเพิ่มเติม'
 
 /**
  * Keep the admin list projection explicit. The relation fields are limited to
@@ -278,6 +280,69 @@ export function chunkAdminReviewVerificationIds(ids: string[]): string[][] {
   return chunks
 }
 
+export type AdminReviewVerificationRow = {
+  submission_id: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export async function fetchAdminReviewVerificationRows<
+  T extends AdminReviewVerificationRow,
+>({
+  submissionIds,
+  fetchChunk,
+}: {
+  submissionIds: string[]
+  fetchChunk: (submissionIds: string[]) => Promise<{ data: T[] | null; error: unknown }>
+}): Promise<{
+  data: T[]
+  error: unknown | null
+  failedChunkIndex: number | null
+}> {
+  const rows: T[] = []
+  const chunks = chunkAdminReviewVerificationIds(submissionIds)
+
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const result = await fetchChunk(chunks[chunkIndex])
+    if (result.error) {
+      return { data: [], error: result.error, failedChunkIndex: chunkIndex }
+    }
+    rows.push(...(result.data || []))
+  }
+
+  rows.sort((a, b) => {
+    const submissionOrder = a.submission_id.localeCompare(b.submission_id)
+    if (submissionOrder !== 0) return submissionOrder
+
+    const aCreatedAt = a.created_at || ''
+    const bCreatedAt = b.created_at || ''
+    const createdOrder = aCreatedAt.localeCompare(bCreatedAt)
+    if (createdOrder !== 0) return createdOrder
+
+    return (a.updated_at || '').localeCompare(b.updated_at || '')
+  })
+
+  return { data: rows, error: null, failedChunkIndex: null }
+}
+
+export type AdminReviewSubmissionAnomaly = 'global_overflow' | 'per_order_overflow'
+
+export function getAdminReviewSubmissionAnomaly(
+  rows: Array<{ order_id: string }>,
+  maxRows: number,
+): AdminReviewSubmissionAnomaly | null {
+  if (rows.length > maxRows) return 'global_overflow'
+
+  const rowsByOrder = new Map<string, number>()
+  for (const row of rows) {
+    const count = (rowsByOrder.get(row.order_id) || 0) + 1
+    if (count > PAYMENT_SUBMISSION_MAX_COUNT) return 'per_order_overflow'
+    rowsByOrder.set(row.order_id, count)
+  }
+
+  return null
+}
+
 export async function collectBoundedAdminReviewMatches<T>({
   targetCount,
   startCursor = null,
@@ -302,14 +367,9 @@ export async function collectBoundedAdminReviewMatches<T>({
     if (matches.length >= targetCount) {
       const lastDisplayedMatchCursor = matchCursors[targetCount - 1] || batch.nextCursor
       const hasUnconsumedMatches = matches.length > targetCount
-      const candidateExistsAfterDisplayedMatch = Boolean(
-        lastDisplayedMatchCursor
-        && batch.nextCursor
-        && lastDisplayedMatchCursor !== batch.nextCursor,
-      )
       const hasMore = Boolean(
         lastDisplayedMatchCursor
-        && (hasUnconsumedMatches || candidateExistsAfterDisplayedMatch || canContinue),
+        && (hasUnconsumedMatches || canContinue),
       )
 
       return {

@@ -6,6 +6,7 @@ import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle, Plus, X } from
 import { ORDER_STATUS } from '@/lib/orderUtils'
 import {
   ADMIN_REVIEW_QUEUE_CAP_MESSAGE,
+  ADMIN_REVIEW_SUBMISSION_INTEGRITY_MESSAGE,
   getAnalyzerTriagePresentation,
   type AdminReviewQueueOrder,
   type AdminReviewQueuePackage,
@@ -37,6 +38,7 @@ interface OrdersClientProps {
   paymentEvidenceLoaded: boolean
   analyzerDataLoaded: boolean
   paymentReviewUnavailable: boolean
+  paymentReviewIntegrityAnomaly: boolean
   queueHasMore: boolean
   queueResultCapped: boolean
   queueNextCursor: string | null
@@ -57,6 +59,7 @@ export default function OrdersClient({
   paymentEvidenceLoaded,
   analyzerDataLoaded,
   paymentReviewUnavailable,
+  paymentReviewIntegrityAnomaly,
   queueHasMore,
   queueResultCapped,
   queueNextCursor,
@@ -303,7 +306,9 @@ export default function OrdersClient({
               {paymentReviewUnavailable ? (
                 <tr>
                   <td colSpan={7} className="p-12 text-center text-[#A1866B]">
-                    ไม่สามารถโหลดคิวตรวจสอบการชำระเงินได้ กรุณารีเฟรชแล้วลองใหม่
+                    {paymentReviewIntegrityAnomaly
+                      ? ADMIN_REVIEW_SUBMISSION_INTEGRITY_MESSAGE
+                      : 'ไม่สามารถโหลดคิวตรวจสอบการชำระเงินได้ กรุณารีเฟรชแล้วลองใหม่'}
                   </td>
                 </tr>
               ) : orders.length === 0 ? (

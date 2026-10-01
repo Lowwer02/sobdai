@@ -3,6 +3,7 @@ import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import AdminOrderMutationControls from '../../app/admin/orders/AdminOrderMutationControls'
+import { PAYMENT_SUBMISSION_MAX_COUNT } from './manual'
 import {
   ADMIN_REVIEW_MAX_BATCHES_PER_REQUEST,
   ADMIN_REVIEW_MAX_ORDERS_PER_REQUEST,
@@ -14,10 +15,12 @@ import {
   chunkAdminReviewVerificationIds,
   collectBoundedAdminReviewMatches,
   createSignedPaymentEvidenceUrl,
+  fetchAdminReviewVerificationRows,
   getAdminReviewCapabilities,
   getAdminReviewState,
   getPaymentReviewAuditEvent,
   getReviewActionFailureMessage,
+  getAdminReviewSubmissionAnomaly,
   latestByOrder,
   matchesAdminReviewQueue,
   normalizePaymentRejectionReason,
@@ -360,6 +363,189 @@ test('limit-plus-one semantics distinguish exactly 50 remaining candidates from 
 
   assert.equal((await run(50)).hasMore, false)
   assert.equal((await run(51)).hasMore, true)
+})
+
+test('bounded hasMore edge matrix distinguishes exhaustion from real lookahead', async () => {
+  const run = async (candidateCount: number, matchingCount: number) => collectBoundedAdminReviewMatches({
+    targetCount: 15,
+    fetchBatch: async (cursor) => {
+      const startIndex = cursor ? Number(cursor.split('-')[1]) + 1 : 0
+      const scannedCount = Math.min(candidateCount - startIndex, 50)
+      const candidateIndexes = Array.from({ length: Math.max(0, scannedCount) }, (_, offset) => startIndex + offset)
+      const matchingIndexes = candidateIndexes.slice(0, matchingCount)
+      return {
+        matches: matchingIndexes.map((index) => `candidate-${index}`),
+        matchCursors: matchingIndexes.map((index) => `candidate-${index}`),
+        candidateCount: scannedCount,
+        nextCursor: scannedCount > 0 ? `candidate-${startIndex + scannedCount - 1}` : null,
+        hasMore: startIndex + scannedCount < candidateCount,
+      }
+    },
+  })
+
+  const cases = [
+    { candidateCount: 49, matchingCount: 14, hasMore: false },
+    { candidateCount: 50, matchingCount: 15, hasMore: false },
+    { candidateCount: 51, matchingCount: 15, hasMore: true },
+    { candidateCount: 50, matchingCount: 16, hasMore: true },
+  ]
+
+  for (const testCase of cases) {
+    const result = await run(testCase.candidateCount, testCase.matchingCount)
+    assert.equal(result.hasMore, testCase.hasMore, JSON.stringify(testCase))
+    if (!testCase.hasMore) assert.equal(result.nextCursor, null)
+  }
+
+  const priorCursorResult = await collectBoundedAdminReviewMatches({
+    targetCount: 1,
+    startCursor: 'candidate-49',
+    fetchBatch: async (cursor) => {
+      assert.equal(cursor, 'candidate-49')
+      return {
+        matches: ['candidate-50'],
+        matchCursors: ['candidate-50'],
+        candidateCount: 1,
+        nextCursor: 'candidate-50',
+        hasMore: false,
+      }
+    },
+  })
+  assert.deepEqual(priorCursorResult.matches, ['candidate-50'])
+  assert.equal(priorCursorResult.hasMore, false)
+})
+
+test('tied-timestamp keyset pagination crosses the 400-row cap without skips or duplicates', async () => {
+  const makeId = (rank: number) => `00000000-0000-4000-8000-${rank.toString(16).padStart(12, '0')}`
+  const candidates = Array.from({ length: 520 }, (_, position) => ({
+    position,
+    created_at: '2026-10-01T00:00:00.000Z',
+    id: makeId(520 - position),
+  })).sort((a, b) => b.id.localeCompare(a.id))
+  const expectedPositions = new Set([3, 49, 50, 199, 399, 400, 450, 519])
+  const requestedCursors: Array<string | null> = []
+
+  const fetchBatch = async (cursor: string | null) => {
+    requestedCursors.push(cursor)
+    const startIndex = cursor
+      ? candidates.findIndex((candidate) => serializeAdminReviewCursor({
+        createdAt: candidate.created_at,
+        id: candidate.id,
+      }) === cursor) + 1
+      : 0
+    assert.ok(startIndex >= 0)
+    const batch = candidates.slice(startIndex, startIndex + 50)
+    const last = batch[batch.length - 1]
+    const matches = batch.filter((candidate) => expectedPositions.has(candidate.position))
+    return {
+      matches,
+      matchCursors: matches.map((candidate) => serializeAdminReviewCursor({
+        createdAt: candidate.created_at,
+        id: candidate.id,
+      })),
+      candidateCount: batch.length,
+      nextCursor: last
+        ? serializeAdminReviewCursor({ createdAt: last.created_at, id: last.id })
+        : null,
+      hasMore: startIndex + batch.length < candidates.length,
+    }
+  }
+
+  const firstScan = await collectBoundedAdminReviewMatches({ targetCount: 15, fetchBatch })
+  const continuation = await collectBoundedAdminReviewMatches({
+    targetCount: 15,
+    startCursor: firstScan.nextCursor,
+    fetchBatch,
+  })
+  const returnedPositions = [
+    ...firstScan.matches.map((candidate) => candidate.position),
+    ...continuation.matches.map((candidate) => candidate.position),
+  ]
+  const cursorPositions = requestedCursors
+    .filter((cursor): cursor is string => Boolean(cursor))
+    .map((cursor) => candidates.findIndex((candidate) => serializeAdminReviewCursor({
+      createdAt: candidate.created_at,
+      id: candidate.id,
+    }) === cursor))
+
+  assert.equal(firstScan.capReached, true)
+  assert.equal(firstScan.candidateOrdersProcessed, 400)
+  assert.equal(requestedCursors[8], firstScan.nextCursor)
+  assert.deepEqual(returnedPositions.sort((a, b) => a - b), [...expectedPositions].sort((a, b) => a - b))
+  assert.equal(new Set(returnedPositions).size, expectedPositions.size)
+  assert.ok(cursorPositions.every((position, index) => index === 0 || position > cursorPositions[index - 1]))
+  assert.ok(candidates[49].id.localeCompare(candidates[50].id) > 0)
+  assert.ok(candidates[399].id.localeCompare(candidates[400].id) > 0)
+  assert.equal(continuation.hasMore, false)
+  assert.equal(continuation.nextCursor, null)
+})
+
+test('shared verification fetch helper covers every bounded chunk and propagates failures', async () => {
+  for (const size of [0, 1, 50, 51, 75, 250, 251]) {
+    const ids = Array.from({ length: size }, (_, index) => `submission-${index}`)
+    const requestedChunks: string[][] = []
+    const result = await fetchAdminReviewVerificationRows({
+      submissionIds: [...ids, ...(size > 0 ? [ids[0]] : [])],
+      fetchChunk: async (chunk) => {
+        requestedChunks.push(chunk)
+        return {
+          data: chunk.map((submission_id) => ({ submission_id, created_at: null, updated_at: null })),
+          error: null,
+        }
+      },
+    })
+
+    assert.ok(requestedChunks.every((chunk) => chunk.length <= 50), `${size} has an oversized chunk`)
+    assert.deepEqual(new Set(result.data.map((row) => row.submission_id)), new Set(ids))
+    assert.equal(result.error, null)
+  }
+
+  let calls = 0
+  const failed = await fetchAdminReviewVerificationRows({
+    submissionIds: Array.from({ length: 75 }, (_, index) => `submission-${index}`),
+    fetchChunk: async (chunk) => {
+      calls += 1
+      return calls === 2
+        ? { data: null, error: new Error('verification query failed') }
+        : { data: chunk.map((submission_id) => ({ submission_id })), error: null }
+    },
+  })
+  assert.equal(calls, 2)
+  assert.equal(failed.failedChunkIndex, 1)
+  assert.ok(failed.error instanceof Error)
+  assert.deepEqual(failed.data, [])
+})
+
+test('submission history anomaly detection fails closed before no-evidence projection', () => {
+  const validRows = Array.from({ length: 250 }, (_, index) => ({ order_id: `order-${Math.floor(index / 5)}` }))
+  assert.equal(getAdminReviewSubmissionAnomaly(validRows, 250), null)
+
+  const globalOverflow = [...validRows, { order_id: 'order-overflow' }]
+  assert.equal(getAdminReviewSubmissionAnomaly(globalOverflow, 250), 'global_overflow')
+
+  const perOrderOverflow = [
+    ...Array.from({ length: PAYMENT_SUBMISSION_MAX_COUNT + 1 }, () => ({ order_id: 'order-anomaly' })),
+    ...Array.from({ length: 244 }, (_, index) => ({ order_id: `order-${index}` })),
+  ]
+  assert.equal(perOrderOverflow.length, 250)
+  assert.equal(getAdminReviewSubmissionAnomaly(perOrderOverflow, 250), 'per_order_overflow')
+
+  for (let count = 0; count <= PAYMENT_SUBMISSION_MAX_COUNT; count += 1) {
+    assert.equal(
+      getAdminReviewSubmissionAnomaly(
+        Array.from({ length: count }, () => ({ order_id: 'order-normal' })),
+        250,
+      ),
+      null,
+    )
+  }
+
+  assert.equal(getAdminReviewState({
+    orderStatus: 'pending',
+    paymentProvider: 'promptpay_manual',
+    latestSubmissionStatus: null,
+    submissionCount: 0,
+    analyzerState: null,
+  }), 'no_evidence')
 })
 
 test('cursor serialization preserves tied timestamps and rejects malformed cursors', () => {

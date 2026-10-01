@@ -2,7 +2,10 @@ import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth/server-protect'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isUuid } from '@/lib/payment/manual'
-import { createSignedPaymentEvidenceUrl } from '@/lib/payment/admin-review'
+import {
+  createSignedPaymentEvidenceUrl,
+  fetchAdminReviewVerificationRows,
+} from '@/lib/payment/admin-review'
 import OrderPaymentDetailClient from './OrderPaymentDetailClient'
 
 function relationObject(value: any) {
@@ -54,18 +57,25 @@ export default async function OrderPaymentDetailPage({
 
   const submissionIds = (rawSubmissions || []).map((submission: any) => submission.id)
   let rawVerifications: any[] = []
-  if (submissionIds.length > 0 && adminSupabase) {
-    const { data, error } = await adminSupabase
-      .from('payment_verifications')
-      .select('submission_id, state, decision, analyzer_version, attempt_count, detected_amount, amount_match_state, recipient_match_state, destination_match_state, qr_kind, qr_structure_valid, qr_crc_valid, reference_extracted, qr_format, reference_state, image_duplicate_state, timestamp_state, reason_codes, duration_ms, completed_at')
-      .in('submission_id', submissionIds)
-
-    if (error) {
-      // The page remains compatible with the pre-M1.3 schema during a
-      // DB-first rollout; only the optional QA panel is unavailable.
-      console.error('[PAYMENT VERIFICATION] detail query unavailable:', error.code || 'unknown')
+  let verificationHistoryLoaded = true
+  if (submissionIds.length > 0) {
+    if (!adminSupabase) {
+      verificationHistoryLoaded = false
     } else {
-      rawVerifications = data || []
+      const verificationResult = await fetchAdminReviewVerificationRows({
+        submissionIds,
+        fetchChunk: async (verificationIds) => adminSupabase!
+          .from('payment_verifications')
+          .select('submission_id, state, decision, analyzer_version, attempt_count, detected_amount, amount_match_state, recipient_match_state, destination_match_state, qr_kind, qr_structure_valid, qr_crc_valid, reference_extracted, qr_format, reference_state, image_duplicate_state, timestamp_state, reason_codes, duration_ms, completed_at')
+          .in('submission_id', verificationIds),
+      })
+
+      if (verificationResult.error) {
+        verificationHistoryLoaded = false
+        console.error('[PAYMENT VERIFICATION] detail chunk unavailable:', verificationResult.failedChunkIndex)
+      } else {
+        rawVerifications = verificationResult.data
+      }
     }
   }
 
@@ -160,7 +170,7 @@ export default async function OrderPaymentDetailPage({
         packageSlug: pkg?.slug || null,
       }}
       submissions={submissions}
-      submissionsLoaded={!submissionsError}
+      submissionsLoaded={!submissionsError && verificationHistoryLoaded}
       shadowMetrics={shadowMetrics ? {
         totalAnalyzed: Number(shadowMetrics.total_analyzed || 0),
         strongMatch: Number(shadowMetrics.strong_match || 0),
