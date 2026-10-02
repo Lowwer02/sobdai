@@ -172,12 +172,12 @@ export default async function LearningDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] font-sans pb-24">
+    <div className="min-h-screen bg-background text-foreground font-sans pb-24">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Back Link */}
-        <Link 
-          href="/" 
-          className="inline-flex items-center gap-2 text-[#A1866B] hover:text-[#D4AF37] transition-colors text-sm font-medium mb-8 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg px-2 py-1 -ml-2"
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-brand transition-colors text-sm font-medium mb-8 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-lg px-2 py-1 -ml-2"
         >
           <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
           หน้าแรก
@@ -185,21 +185,13 @@ export default async function LearningDashboardPage() {
 
         {/* Header */}
         <header className="text-center mb-12">
-          <h1
-            className="text-3xl md:text-5xl font-bold font-display tracking-tight mb-3"
-            style={{
-              background: 'linear-gradient(135deg, #f5ede0 30%, #e8c46e 70%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
+          <h1 className="h1-gradient text-3xl md:text-5xl font-bold font-display tracking-tight mb-3">
             แพ็กเกจของฉัน
           </h1>
-          <p className="text-[#A1866B] text-sm md:text-base max-w-lg mx-auto">
+          <p className="text-muted-foreground text-sm md:text-base max-w-lg mx-auto">
             แพ็กเกจทั้งหมดที่คุณสามารถเรียนได้
           </p>
-          <OrderHistoryLink className="inline-flex items-center justify-center mt-4 px-3 py-1.5 rounded-lg border border-[rgba(255,255,255,0.08)] text-xs font-medium text-[#A1866B] hover:text-[#D4AF37] hover:border-[rgba(212,175,55,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]" />
+          <OrderHistoryLink className="inline-flex items-center justify-center mt-4 px-3 py-1.5 rounded-lg border border-border-subtle text-xs font-medium text-muted-foreground hover:text-brand hover:border-brand-solid/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
         </header>
 
         {/* Learning Cards Grid */}
@@ -240,36 +232,36 @@ function LearningCard({ pkg }: LearningCardProps) {
 
   return (
     <article
-      className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl p-6 hover:border-[rgba(212,175,55,0.18)] transition-all flex flex-col justify-between h-full group"
+      className="bg-card border border-border-subtle rounded-2xl p-6 hover:border-brand-solid/20 transition-all flex flex-col justify-between h-full group"
     >
       <div>
         {/* Header / Department Info */}
         <div className="flex gap-4 items-start mb-5">
-          <div className="w-12 h-12 rounded-xl bg-white border border-[rgba(255,255,255,0.05)] flex items-center justify-center p-2 flex-shrink-0 overflow-hidden">
+          <div className="w-12 h-12 rounded-xl bg-white border border-border-subtle flex items-center justify-center p-2 flex-shrink-0 overflow-hidden">
             {logoUrl ? (
               <Image src={logoUrl} alt={orgName} width={48} height={48} className="w-full h-full object-contain" unoptimized />
             ) : (
-              <div className="w-full h-full bg-[#D4AF37] flex items-center justify-center text-[#1A140E] font-bold text-lg">
+              <div className="w-full h-full bg-brand-solid flex items-center justify-center text-brand-foreground font-bold text-lg">
                 {orgName.charAt(0)}
               </div>
             )}
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold text-[#D4AF37] tracking-wider mb-0.5 uppercase">
+            <div className="text-xs font-semibold text-brand tracking-wider mb-0.5 uppercase">
               ปี {pkg.exam_year}
             </div>
-            <h2 className="text-lg font-bold text-[#F5E9D6] leading-snug truncate">
+            <h2 className="text-lg font-bold text-foreground leading-snug truncate">
               {pkg.name}
             </h2>
-            <div className="text-xs text-[#A1866B] mt-0.5 truncate">
+            <div className="text-xs text-muted-foreground mt-0.5 truncate">
               {orgName} • {posName}
             </div>
           </div>
         </div>
 
         {/* Ownership Badge */}
-        <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg w-fit mb-6">
+        <div className="flex items-center gap-1.5 text-success text-xs font-bold bg-success-bg border border-success-border px-3 py-1.5 rounded-lg w-fit mb-6">
           <CheckCircle size={14} />
           คุณเป็นเจ้าของแพ็กเกจนี้
         </div>
@@ -281,8 +273,8 @@ function LearningCard({ pkg }: LearningCardProps) {
           <div
             className="mb-6"
             style={{
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--hover)',
               borderRadius: '12px',
               padding: '10px 14px',
               display: 'flex',
@@ -294,13 +286,13 @@ function LearningCard({ pkg }: LearningCardProps) {
             aria-label="เนื้อหาที่เพิ่มเข้ามาล่าสุดในแพ็กเกจนี้"
           >
             {pkg.content_freshness.newExamSetCount > 0 && (
-              <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: '#E29A78' }}>
+              <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--fresh-exam)' }}>
                 <span aria-hidden="true">✦</span>
                 <span>{formatFreshExamSetLabel(pkg.content_freshness.newExamSetCount)}</span>
               </div>
             )}
             {pkg.content_freshness.newSummaryCount > 0 && (
-              <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: '#E3B04B' }}>
+              <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--fresh-summary)' }}>
                 <span aria-hidden="true">▣</span>
                 <span>{formatFreshSummaryLabel(pkg.content_freshness.newSummaryCount)}</span>
               </div>
@@ -308,28 +300,28 @@ function LearningCard({ pkg }: LearningCardProps) {
           </div>
         )}
 
-        <div className="h-px bg-[rgba(255,255,255,0.06)] w-full mb-5" />
+        <div className="h-px bg-border-subtle w-full mb-5" />
 
         {/* Stats Section */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="space-y-1">
-            <div className="text-xs text-[#A1866B] flex items-center gap-1">
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
               <BookOpen size={12} />
               สรุปเนื้อหา
             </div>
-            <div className="text-sm font-bold text-[#F5E9D6]">
+            <div className="text-sm font-bold text-foreground">
               {pkg.total_summaries} เรื่อง
             </div>
           </div>
 
           <div className="space-y-1">
-            <div className="text-xs text-[#A1866B] flex items-center gap-1">
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
               <Award size={12} />
               ชุดข้อสอบ
             </div>
-            <div className="text-sm font-bold text-[#F5E9D6]">
+            <div className="text-sm font-bold text-foreground">
               {pkg.total_exam_sets} ชุด{' '}
-              <span className="text-xs font-normal text-[#A1866B]">
+              <span className="text-xs font-normal text-muted-foreground">
                 ({pkg.total_questions} ข้อ)
               </span>
             </div>
@@ -349,7 +341,7 @@ function LearningCard({ pkg }: LearningCardProps) {
       <div className="mt-auto">
         <Link
           href={`/package/${pkg.slug}`}
-          className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 px-4 rounded-xl w-full text-center transition-all hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2"
+          className="inline-flex items-center justify-center gap-2 bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-3 px-4 rounded-xl w-full text-center transition-all hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           aria-label={`เรียนต่อแพ็กเกจ ${pkg.name}`}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -365,33 +357,33 @@ function LearningCard({ pkg }: LearningCardProps) {
 /** Guest empty state — not logged in. */
 function GuestEmptyState() {
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex items-center justify-center px-4 py-12">
-      <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-12">
+      <div className="bg-card border border-border-subtle rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
         {/* Emblem */}
-        <div className="w-16 h-16 rounded-full bg-[rgba(212,175,55,0.1)] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+        <div className="w-16 h-16 rounded-full bg-wash flex items-center justify-center mx-auto mb-6 text-brand">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             <circle cx="12" cy="10" r="3" fill="currentColor" />
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">
+        <h1 className="text-2xl font-bold font-display text-foreground mb-3">
           แดชบอร์ดการเรียนของคุณ
         </h1>
-        <p className="text-[#A1866B] text-sm leading-relaxed mb-8">
+        <p className="text-muted-foreground text-sm leading-relaxed mb-8">
           เข้าสู่ระบบเพื่อดูแพ็กเกจที่คุณเข้าเรียนได้ ติดตามผลการเรียน และเข้าทบทวนเนื้อหาหรือทำข้อสอบ
         </p>
 
         <div className="flex flex-col gap-3">
           <Link
             href="/login?redirect=/exams"
-            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+            className="bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             เข้าสู่ระบบ
           </Link>
           <Link
             href="/packages"
-            className="border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            className="border border-border-subtle hover:bg-hover text-foreground font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
           >
             สำรวจแพ็กเกจ
           </Link>
@@ -404,27 +396,27 @@ function GuestEmptyState() {
 /** Primary package-access read failed; do not render any owned content. */
 function PackageAccessErrorState() {
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex items-center justify-center px-4 py-12">
-      <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
-        <div className="w-16 h-16 rounded-full bg-[rgba(212,175,55,0.1)] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-12">
+      <div className="bg-card border border-border-subtle rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
+        <div className="w-16 h-16 rounded-full bg-wash flex items-center justify-center mx-auto mb-6 text-brand">
           <AlertCircle size={32} aria-hidden="true" />
         </div>
 
-        <h1 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">
+        <h1 className="text-2xl font-bold font-display text-foreground mb-3">
           ไม่สามารถโหลดแพ็กเกจของคุณได้
         </h1>
-        <p className="text-[#A1866B] text-sm leading-relaxed mb-8">
+        <p className="text-muted-foreground text-sm leading-relaxed mb-8">
           กรุณาลองใหม่อีกครั้ง
         </p>
 
         <div className="flex flex-col gap-3">
           <Link
             href="/my-packages"
-            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+            className="bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             ลองใหม่
           </Link>
-          <OrderHistoryLink className="border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] text-[#F5E9D6] font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20" />
+          <OrderHistoryLink className="border border-border-subtle hover:bg-hover text-foreground font-bold py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20" />
         </div>
       </div>
     </div>
@@ -434,10 +426,10 @@ function PackageAccessErrorState() {
 /** Logged-in but owns no packages. */
 function NoPackagesEmptyState() {
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex items-center justify-center px-4 py-12">
-      <div className="bg-[#1A140E] border border-[rgba(255,255,255,0.06)] rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-12">
+      <div className="bg-card border border-border-subtle rounded-2xl max-w-md w-full p-8 text-center shadow-lg">
         {/* Illustration */}
-        <div className="w-16 h-16 rounded-full bg-[rgba(212,175,55,0.1)] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+        <div className="w-16 h-16 rounded-full bg-wash flex items-center justify-center mx-auto mb-6 text-brand">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <path d="M12 8v8" />
@@ -445,21 +437,21 @@ function NoPackagesEmptyState() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold font-display text-[#F5E9D6] mb-3">
+        <h1 className="text-2xl font-bold font-display text-foreground mb-3">
           ยังไม่มีแพ็กเกจ
         </h1>
-        <p className="text-[#A1866B] text-sm leading-relaxed mb-8">
+        <p className="text-muted-foreground text-sm leading-relaxed mb-8">
           เลือกแพ็กเกจที่สนใจเพื่อเริ่มต้นการเรียนและการเตรียมสอบกับ Sobdai
         </p>
 
         <div className="flex flex-col gap-3">
           <Link
             href="/packages"
-            className="bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+            className="bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             เลือกแพ็กเกจ
           </Link>
-          <OrderHistoryLink className="border border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] text-[#F5E9D6] font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20" />
+          <OrderHistoryLink className="border border-border-subtle hover:bg-hover text-foreground font-bold py-3 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] text-center inline-flex items-center justify-center gap-2 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20" />
         </div>
       </div>
     </div>

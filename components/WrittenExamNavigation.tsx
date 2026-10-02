@@ -10,7 +10,7 @@ export default function WrittenExamNavigation({
 }) {
   if (materials.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgba(255,255,255,0.1)] px-4 py-8 text-center text-[13px] text-[#A1866B]">
+      <div className="rounded-xl border border-dashed border-border-subtle px-4 py-8 text-center text-[13px] text-muted-foreground">
         ยังไม่มีข้อสอบอัตนัยที่เผยแพร่
       </div>
     )
@@ -21,8 +21,8 @@ export default function WrittenExamNavigation({
       role="group"
       aria-label="ข้อสอบอัตนัย"
       style={{
-        backgroundColor: '#0F0B07',
-        border: '1px solid rgba(212,175,55,0.2)',
+        backgroundColor: 'var(--background)',
+        border: '1px solid color-mix(in srgb, var(--brand-solid) 20%, transparent)',
         borderRadius: '16px',
         overflow: 'hidden',
         transition: 'border-color 0.2s',
@@ -35,7 +35,7 @@ export default function WrittenExamNavigation({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '14px 16px',
-          color: '#D4AF37',
+          color: 'var(--brand)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -44,8 +44,8 @@ export default function WrittenExamNavigation({
             style={{
               fontSize: '10px',
               fontWeight: '700',
-              color: '#A1866B',
-              backgroundColor: 'rgba(255,255,255,0.05)',
+              color: 'var(--muted-foreground)',
+              backgroundColor: 'var(--border-subtle)',
               padding: '2px 8px',
               borderRadius: '6px',
             }}

@@ -102,7 +102,7 @@ export default function SupportModal({
     /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(4px)' }}
+      style={{ backgroundColor: 'var(--overlay)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
       aria-modal="true"
       role="dialog"
@@ -115,8 +115,8 @@ export default function SupportModal({
         tabIndex={-1}
         className="relative w-full max-w-sm rounded-[24px] overflow-hidden shadow-2xl focus:outline-none"
         style={{
-          backgroundColor: '#1A140E',
-          border: '1px solid rgba(212,175,55,0.25)',
+          backgroundColor: 'var(--card)',
+          border: '1px solid color-mix(in srgb, var(--brand-solid) 25%, transparent)',
           animation: 'supportModalIn 0.22s ease-out',
           maxHeight: '92dvh',
           overflowY: 'auto',
@@ -126,7 +126,7 @@ export default function SupportModal({
         {/* Gold top-glow line */}
         <div
           className="absolute top-0 left-0 right-0 h-px z-10"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.6), transparent)' }}
+          style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-solid) 60%, transparent), transparent)' }}
         />
 
         {/* Close button */}
@@ -134,7 +134,7 @@ export default function SupportModal({
           id="support-modal-close"
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-xl flex items-center justify-center text-[#A1866B] hover:text-[#F5E9D6] hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           aria-label="ปิดป๊อปอัป"
         >
           <X size={18} />
@@ -146,14 +146,14 @@ export default function SupportModal({
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center mb-1"
               style={{
-                background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(212,175,55,0.05))',
-                border: '1px solid rgba(212,175,55,0.2)',
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-solid) 15%, transparent), color-mix(in srgb, var(--brand-solid) 5%, transparent))',
+                border: '1px solid color-mix(in srgb, var(--brand-solid) 20%, transparent)',
               }}
             >
-              <Heart size={22} className="text-[#D4AF37]" fill="rgba(212,175,55,0.3)" />
+              <Heart size={22} className="text-brand" fill="rgba(212,175,55,0.3)" />
             </div>
-            <h2 id="support-modal-title" className="text-[18px] font-bold font-display text-[#F5E9D6]">{title}</h2>
-            <p id="support-modal-desc" className="text-[#A1866B] text-[13px] leading-relaxed max-w-xs">{description}</p>
+            <h2 id="support-modal-title" className="text-[18px] font-bold font-display text-foreground">{title}</h2>
+            <p id="support-modal-desc" className="text-muted-foreground text-[13px] leading-relaxed max-w-xs">{description}</p>
           </div>
 
           {/* ── Support Details (Shared) ── */}
@@ -168,7 +168,7 @@ export default function SupportModal({
 
           {/* ── Footer message ── */}
           {footer_message && (
-            <p className="text-center text-[#D4AF37]/60 text-[12px] leading-relaxed">
+            <p className="text-center text-brand/60 text-[12px] leading-relaxed">
               {footer_message}
             </p>
           )}

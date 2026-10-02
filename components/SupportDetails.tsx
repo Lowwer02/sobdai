@@ -48,7 +48,7 @@ export default function SupportDetails({
             className="rounded-2xl p-3 flex items-center justify-center shadow-lg"
             style={{
               background: '#FFFFFF',
-              border: '1px solid rgba(212,175,55,0.15)',
+              border: '1px solid color-mix(in srgb, var(--brand-solid) 15%, transparent)',
               width: qrSize,
               height: qrSize,
             }}
@@ -68,12 +68,12 @@ export default function SupportDetails({
           {promptpay_name && (
             <div className="flex flex-col items-center gap-1 text-center">
               <div className="flex items-center gap-1.5">
-                <QrCode size={13} className="text-[#D4AF37]/70" />
-                <span className="text-[11px] text-[#A1866B] uppercase tracking-wider font-semibold">
+                <QrCode size={13} className="text-brand/70" />
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">
                   PromptPay
                 </span>
               </div>
-              <span className="text-[#F5E9D6] text-[15px] font-bold">{promptpay_name}</span>
+              <span className="text-foreground text-[15px] font-bold">{promptpay_name}</span>
             </div>
           )}
         </div>
@@ -82,15 +82,15 @@ export default function SupportDetails({
         <div
           className="rounded-2xl p-5 flex flex-col items-center gap-3 text-center w-full max-w-xs"
           style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px dashed rgba(212,175,55,0.2)',
+            background: 'var(--hover)',
+            border: '1px dashed color-mix(in srgb, var(--brand-solid) 20%, transparent)',
           }}
         >
-          <Sparkles size={22} className="text-[#D4AF37]/40" />
-          <p className="text-[#A1866B] text-[13px] leading-snug">
+          <Sparkles size={22} className="text-brand/40" />
+          <p className="text-muted-foreground text-[13px] leading-snug">
             ช่องทางการสนับสนุนจะเปิดให้ใช้งานเร็วๆ นี้
           </p>
-          <p className="text-[#A1866B]/50 text-[11px]">
+          <p className="text-muted-foreground/50 text-[11px]">
             PromptPay · บัญชีธนาคาร · ช่องทางอื่นๆ
           </p>
         </div>
@@ -101,17 +101,17 @@ export default function SupportDetails({
         <div
           className="rounded-xl px-4 py-3 flex items-start gap-3 w-full max-w-xs text-left"
           style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'var(--hover)',
+            border: '1px solid var(--border-subtle)',
           }}
         >
-          <Building2 size={15} className="text-[#A1866B] mt-0.5 flex-shrink-0" />
+          <Building2 size={15} className="text-muted-foreground mt-0.5 flex-shrink-0" />
           <div className="space-y-0.5">
             {bank_name && (
-              <p className="text-[#A1866B] text-[12px]">{bank_name}</p>
+              <p className="text-muted-foreground text-[12px]">{bank_name}</p>
             )}
             {account_number && (
-              <p className="text-[#F5E9D6] text-[14px] font-bold tracking-widest">
+              <p className="text-foreground text-[14px] font-bold tracking-widest">
                 {account_number}
               </p>
             )}

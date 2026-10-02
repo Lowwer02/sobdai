@@ -48,20 +48,20 @@ export interface ContentCardProps {
 }
 
 const TONES: Record<'success' | 'gold', { bg: string; color: string }> = {
-  success: { bg: 'rgba(34,197,94,0.1)', color: '#22C55E' },
-  gold: { bg: 'rgba(212,175,55,0.1)', color: '#D4AF37' },
+  success: { bg: 'var(--success-bg)', color: 'var(--success)' },
+  gold: { bg: 'var(--wash)', color: 'var(--brand)' },
 }
 
 // Shared card shell. Unifies the two previous cards onto:
-//   bg rgba(255,255,255,0.02), border rgba(255,255,255,0.05),
+//   bg var(--hover), border var(--border-subtle),
 //   radius 12px, padding 14px 16px — the Summary card's values (the more
 //   refined of the two). Hover lifts border to gold.
 const CARD_CLASS =
-  'hover:border-[rgba(212,175,55,0.3)] hover:bg-[rgba(212,175,55,0.03)] group'
+  'hover:border-brand-solid/30 hover:bg-wash/30 group'
 
 const CARD_STYLE: CSSProperties = {
-  backgroundColor: 'rgba(255,255,255,0.02)',
-  border: '1px solid rgba(255,255,255,0.05)',
+  backgroundColor: 'var(--hover)',
+  border: '1px solid var(--border-subtle)',
   borderRadius: '12px',
   padding: '14px 16px',
   transition: 'border-color 0.2s, background-color 0.2s',
@@ -92,18 +92,18 @@ export default function ContentCard({
     <Link href={href} prefetch={prefetch} className="block">
       <div className={`${CARD_CLASS} relative overflow-hidden`} style={CARD_STYLE}>
         {cornerBadge && (
-          <div className="absolute top-0 right-0 bg-[#D4AF37] text-[#1A140E] text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">
+          <div className="absolute top-0 right-0 bg-brand-solid text-brand-foreground text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">
             {cornerBadge}
           </div>
         )}
 
         {/* Title — unified typography: 14px / 600, room for corner badge */}
         <h4
-          className="group-hover:text-[#D4AF37]"
+          className="group-hover:text-brand"
           style={{
             fontSize: '14px',
             fontWeight: '600',
-            color: '#F5E9D6',
+            color: 'var(--foreground)',
             marginBottom: description ? '4px' : '0',
             lineHeight: 1.45,
             paddingRight: cornerBadge ? '40px' : '0',
@@ -118,7 +118,7 @@ export default function ContentCard({
           <p
             className="line-clamp-2"
             style={{
-              color: '#A1866B',
+              color: 'var(--muted-foreground)',
               fontSize: '12px',
               lineHeight: 1.5,
               margin: 0,
@@ -138,7 +138,7 @@ export default function ContentCard({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              color: '#A1866B',
+              color: 'var(--muted-foreground)',
               fontSize: '11px',
               minWidth: 0,
               flex: '1 1 auto',

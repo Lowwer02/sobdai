@@ -140,7 +140,7 @@ export default function ExamNavigation({
 
   if (examSets.length === 0) {
     return (
-      <div className="h-40 border border-dashed border-[rgba(255,255,255,0.1)] rounded-xl flex items-center justify-center text-[#A1866B] text-[13px]">
+      <div className="h-40 border border-dashed border-border-subtle rounded-xl flex items-center justify-center text-muted-foreground text-[13px]">
         กำลังจัดเตรียมชุดข้อสอบ
       </div>
     )
@@ -157,7 +157,7 @@ export default function ExamNavigation({
             left: '14px',
             top: '50%',
             transform: 'translateY(-50%)',
-            color: '#A1866B',
+            color: 'var(--muted-foreground)',
             pointerEvents: 'none',
           }}
         />
@@ -169,9 +169,9 @@ export default function ExamNavigation({
           aria-label="ค้นหาชุดข้อสอบ"
           style={{
             width: '100%',
-            backgroundColor: '#0F0B07',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#F5E9D6',
+            backgroundColor: 'var(--background)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--foreground)',
             borderRadius: '12px',
             padding: '10px 14px 10px 40px',
             fontSize: '13px',
@@ -204,21 +204,21 @@ export default function ExamNavigation({
               transition: 'all 0.2s',
               ...(activeFilter === option.value
                 ? {
-                    backgroundColor: 'rgba(212,175,55,0.1)',
-                    borderColor: 'rgba(212,175,55,0.3)',
-                    color: '#D4AF37',
+                    backgroundColor: 'color-mix(in srgb, var(--brand-solid) 10%, transparent)',
+                    borderColor: 'color-mix(in srgb, var(--brand-solid) 30%, transparent)',
+                    color: 'var(--brand)',
                   }
                 : {
                     backgroundColor: 'transparent',
-                    borderColor: 'rgba(255,255,255,0.08)',
-                    color: '#A1866B',
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--muted-foreground)',
                   }),
             }}
           >
             {option.label}
           </button>
         ))}
-        <span style={{ fontSize: '11px', color: '#A1866B', marginLeft: 'auto', alignSelf: 'center' }}>
+        <span style={{ fontSize: '11px', color: 'var(--muted-foreground)', marginLeft: 'auto', alignSelf: 'center' }}>
           {writtenExamCount > 0
             ? <>ปรนัย {totalFiltered} · อัตนัย {writtenExamCount}</>
             : `${totalFiltered} ชุดข้อสอบ`}
@@ -238,9 +238,9 @@ export default function ExamNavigation({
               <div
                 key={category}
                 style={{
-                  backgroundColor: '#0F0B07',
+                  backgroundColor: 'var(--background)',
                   border: '1px solid',
-                  borderColor: isExpanded ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.05)',
+                  borderColor: isExpanded ? 'color-mix(in srgb, var(--brand-solid) 20%, transparent)' : 'var(--border-subtle)',
                   borderRadius: '16px',
                   overflow: 'hidden',
                   transition: 'border-color 0.2s',
@@ -262,7 +262,7 @@ export default function ExamNavigation({
                     background: 'none',
                     border: 'none',
                     cursor: isDesktop ? 'default' : 'pointer',
-                    color: isExpanded ? '#D4AF37' : '#F5E9D6',
+                    color: isExpanded ? 'var(--brand)' : 'var(--foreground)',
                     transition: 'color 0.2s',
                   }}
                 >
@@ -274,8 +274,8 @@ export default function ExamNavigation({
                       style={{
                         fontSize: '10px',
                         fontWeight: '700',
-                        color: '#A1866B',
-                        backgroundColor: 'rgba(255,255,255,0.05)',
+                        color: 'var(--muted-foreground)',
+                        backgroundColor: 'var(--border-subtle)',
                         padding: '2px 8px',
                         borderRadius: '6px',
                       }}
@@ -287,7 +287,7 @@ export default function ExamNavigation({
                     <ChevronDown
                       size={16}
                       style={{
-                        color: '#A1866B',
+                        color: 'var(--muted-foreground)',
                         transition: 'transform 0.25s ease',
                         transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                       }}
@@ -338,9 +338,9 @@ export default function ExamNavigation({
                             width: '100%',
                             padding: '10px 12px',
                             borderRadius: '12px',
-                            border: '1px solid rgba(212,175,55,0.2)',
-                            backgroundColor: 'rgba(212,175,55,0.05)',
-                            color: '#D4AF37',
+                            border: '1px solid color-mix(in srgb, var(--brand-solid) 20%, transparent)',
+                            backgroundColor: 'color-mix(in srgb, var(--brand-solid) 5%, transparent)',
+                            color: 'var(--brand)',
                             fontSize: '12px',
                             fontWeight: '600',
                             cursor: 'pointer',
@@ -361,12 +361,12 @@ export default function ExamNavigation({
         <div
           style={{
             height: '100px',
-            border: '1px dashed rgba(255,255,255,0.1)',
+            border: '1px dashed var(--border-subtle)',
             borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#A1866B',
+            color: 'var(--muted-foreground)',
             fontSize: '13px',
           }}
         >

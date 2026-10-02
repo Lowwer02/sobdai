@@ -25,7 +25,7 @@ type CanonicalPositionLink = {
 
 function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) {
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0F0B07] border border-[#D4AF37]/30 text-[#D4AF37] text-[12px] rounded-full">
+    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-background border border-brand-solid/30 text-brand text-[12px] rounded-full">
       {icon}
       {children}
     </div>
@@ -34,17 +34,17 @@ function GoldBadge({ children, icon }: { children: React.ReactNode, icon?: React
 
 function MiniStatCard({ icon, title, value, subtitle }: { icon: React.ReactNode, title: string, value: string | React.ReactNode, subtitle: string }) {
   return (
-    <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.05)] rounded-2xl p-4 flex flex-col h-full hover:border-[#D4AF37]/30 transition-colors group">
+    <div className="bg-background border border-border-subtle rounded-2xl p-4 flex flex-col h-full hover:border-brand-solid/30 transition-colors group">
       <div className="flex items-center gap-2 mb-2">
-        <div className="text-[#D4AF37] opacity-80 group-hover:opacity-100 transition-opacity">
+        <div className="text-brand opacity-80 group-hover:opacity-100 transition-opacity">
           {icon}
         </div>
-        <span className="text-[#A1866B] text-[12px] font-medium">{title}</span>
+        <span className="text-muted-foreground text-[12px] font-medium">{title}</span>
       </div>
-      <div className="text-[#D4AF37] text-xl font-bold font-display mb-1 tracking-tight">
+      <div className="text-brand text-xl font-bold font-display mb-1 tracking-tight">
         {value}
       </div>
-      <div className="text-[#A1866B] text-[11px] mt-auto leading-snug">
+      <div className="text-muted-foreground text-[11px] mt-auto leading-snug">
         {subtitle}
       </div>
     </div>
@@ -54,12 +54,12 @@ function MiniStatCard({ icon, title, value, subtitle }: { icon: React.ReactNode,
 function FeatureItem({ icon, title, subtitle }: { icon: React.ReactNode, title: string, subtitle: string }) {
   return (
     <div className="flex items-center gap-4 flex-1 min-w-[200px]">
-      <div className="w-12 h-12 rounded-2xl bg-[#0F0B07] border border-[rgba(212,175,55,0.2)] flex items-center justify-center text-[#D4AF37] flex-shrink-0">
+      <div className="w-12 h-12 rounded-2xl bg-background border border-brand-solid/20 flex items-center justify-center text-brand flex-shrink-0">
         {icon}
       </div>
       <div>
-        <div className="text-[#F5E9D6] font-bold text-[14px]">{title}</div>
-        <div className="text-[#A1866B] text-[12px]">{subtitle}</div>
+        <div className="text-foreground font-bold text-[14px]">{title}</div>
+        <div className="text-muted-foreground text-[12px]">{subtitle}</div>
       </div>
     </div>
   )
@@ -124,11 +124,11 @@ export default function PackageClient({
   }, [pkg?.id, pkg?.name, pkg?.current_price])
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6]">
+    <div className="min-h-screen bg-background text-foreground">
       <main className="max-w-[1360px] mx-auto px-4 py-6 md:py-8">
-        
+
         <div className="mb-6">
-          <Link href="/#exams" className="text-[#A1866B] hover:text-[#F5E9D6] flex items-center gap-2 text-[14px] font-medium transition-colors w-fit">
+          <Link href="/#exams" className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-[14px] font-medium transition-colors w-fit">
             <ChevronLeft size={16} />
             แพ็กเกจทั้งหมด
           </Link>
@@ -138,9 +138,9 @@ export default function PackageClient({
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
-            <div className="lg:col-span-7 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 md:p-8 flex flex-col gap-8 relative overflow-hidden shadow-2xl">
+            <div className="lg:col-span-7 bg-card border border-brand-solid/15 rounded-[24px] p-6 md:p-8 flex flex-col gap-8 relative overflow-hidden shadow-2xl">
               <div className="flex flex-col sm:flex-row gap-6 relative z-10">
-                <div className="w-36 h-48 bg-white rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-[rgba(212,175,55,0.3)] shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
+                <div className="w-36 h-48 bg-white rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-brand-solid/30 shadow-[0_0_30px_rgba(212,175,55,0.1)] mx-auto sm:mx-0 overflow-hidden">
                   {logoUrl ? (
                     <Image
                       src={logoUrl}
@@ -151,37 +151,37 @@ export default function PackageClient({
                       className="p-4"
                     />
                   ) : (
-                    <div className="text-[#D4AF37] font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
+                    <div className="text-brand font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
                   )}
                 </div>
 
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <span className="text-[#F5E9D6] text-[13px] mr-2">{orgName}</span>
+                    <span className="text-foreground text-[13px] mr-2">{orgName}</span>
                     {(canonicalPosition || pkg.positions?.name) && (
                       canonicalPosition ? (
                         <Link
                           href={`/positions/${encodeURIComponent(canonicalPosition.slug)}`}
-                          className="text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full border border-[#D4AF37]/30 hover:bg-[#D4AF37]/10 transition-colors"
+                          className="text-brand text-[11px] px-2.5 py-0.5 rounded-full border border-brand-solid/30 hover:bg-brand-solid/10 transition-colors"
                         >
                           {canonicalPosition.name}
                         </Link>
                       ) : (
-                        <span className="text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full border border-white/10">
+                        <span className="text-muted-foreground text-[11px] px-2.5 py-0.5 rounded-full border border-border-subtle">
                           {pkg.positions.name}
                         </span>
                       )
                     )}
-                    <span className="bg-[#1A140E] text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-[#D4AF37]/30">{pkg.package_code}</span>
-                    <span className="bg-[#D4AF37]/10 text-[#D4AF37] text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {formatThaiDisplayYear(pkg.exam_year)}</span>
-                    <span className="bg-[#1A140E] border border-[rgba(255,255,255,0.1)] text-[#A1866B] text-[11px] px-2.5 py-0.5 rounded-full">v{pkg.version || '1'}</span>
+                    <span className="bg-card text-brand text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase border border-brand-solid/30">{pkg.package_code}</span>
+                    <span className="bg-wash text-brand text-[11px] px-2.5 py-0.5 rounded-full font-bold">ปี {formatThaiDisplayYear(pkg.exam_year)}</span>
+                    <span className="bg-card border border-border-subtle text-muted-foreground text-[11px] px-2.5 py-0.5 rounded-full">v{pkg.version || '1'}</span>
                   </div>
-                  
-                  <h1 className="text-3xl md:text-[36px] font-bold font-display text-[#F5E9D6] mb-5 leading-[1.25]">
+
+                  <h1 className="text-3xl md:text-[36px] font-bold font-display text-foreground mb-5 leading-[1.25]">
                     {buildPackageH1(pkg)}
                   </h1>
 
-                  <p className="text-[#A1866B] text-[14px] leading-[1.6] mb-6">
+                  <p className="text-muted-foreground text-[14px] leading-[1.6] mb-6">
                     {pkg.description || 'เตรียมความพร้อมสำหรับการสอบครอบคลุมเนื้อหาทั้งหมด พร้อมเฉลยละเอียดทุกข้อ'}
                   </p>
 
@@ -195,22 +195,22 @@ export default function PackageClient({
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-auto">
-                <MiniStatCard 
+                <MiniStatCard
                   icon={<BookOpen size={16} />}
                   title="ชุดข้อสอบทั้งหมด"
-                  value={<>{pkg.total_exam_sets} <span className="text-[15px] font-normal text-[#F5E9D6]">ชุด</span></>}
+                  value={<>{pkg.total_exam_sets} <span className="text-[15px] font-normal text-foreground">ชุด</span></>}
                   subtitle={`หมวดหมู่: ${pkg.total_categories} หมวด`}
                 />
-                <MiniStatCard 
-                  icon={<Clock size={16} />} 
+                <MiniStatCard
+                  icon={<Clock size={16} />}
                   title="จำนวนข้อสอบ"
-                  value={<>{pkg.total_questions.toLocaleString()} <span className="text-[15px] font-normal text-[#F5E9D6]">ข้อ</span></>}
+                  value={<>{pkg.total_questions.toLocaleString()} <span className="text-[15px] font-normal text-foreground">ข้อ</span></>}
                   subtitle="อัปเดตล่าสุด: พ.ศ. 2569"
                 />
-                <MiniStatCard 
+                <MiniStatCard
                   icon={<CalendarDays size={16} />}
                   title="ใช้งานได้"
-                  value={<>12 <span className="text-[15px] font-normal text-[#F5E9D6]">เดือน</span></>}
+                  value={<>12 <span className="text-[15px] font-normal text-foreground">เดือน</span></>}
                   subtitle="นับจากวันที่ซื้อ"
                 />
                 <MiniStatCard 
@@ -222,32 +222,32 @@ export default function PackageClient({
               </div>
             </div>
 
-            <div className="lg:col-span-2 bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group hover:border-[#D4AF37]/30 transition-colors">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37] opacity-[0.03] rounded-bl-full pointer-events-none"></div>
-               <FileText size={48} className="text-[#D4AF37]/80 mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" strokeWidth={1} />
-               <div className="text-[42px] font-bold font-display text-[#D4AF37] leading-none mb-2 tracking-tight">
-                 {pkg.total_questions.toLocaleString()} <span className="text-[18px] text-[#F5E9D6] ml-1">ข้อ</span>
+            <div className="lg:col-span-2 bg-card border border-brand-solid/15 rounded-[24px] p-6 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group hover:border-brand-solid/30 transition-colors">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-brand-solid opacity-[0.03] rounded-bl-full pointer-events-none"></div>
+               <FileText size={48} className="text-brand/80 mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]" strokeWidth={1} />
+               <div className="text-[42px] font-bold font-display text-brand leading-none mb-2 tracking-tight">
+                 {pkg.total_questions.toLocaleString()} <span className="text-[18px] text-foreground ml-1">ข้อ</span>
                </div>
-               <div className="text-[#A1866B] text-[13px] leading-snug max-w-[120px]">
+               <div className="text-muted-foreground text-[13px] leading-snug max-w-[120px]">
                  รวมทุกข้อสอบในแพ็กเกจ
                </div>
             </div>
 
-            <div className="lg:col-span-3 bg-[#1A140E] border border-[#D4AF37]/30 rounded-[24px] p-8 shadow-[0_0_40px_rgba(212,175,55,0.05)] sticky top-6 transition-all duration-300 ease-in-out">
-              <h2 className="text-[#D4AF37] font-bold text-[16px] mb-6 font-display">เลือกแพ็กเกจเพื่อเริ่มเรียน</h2>
-              
-              <div className="text-[#A1866B] text-[14px] mb-2">แพ็กเกจนี้</div>
+            <div className="lg:col-span-3 bg-card border border-brand-solid/30 rounded-[24px] p-8 shadow-[0_0_40px_rgba(212,175,55,0.05)] sticky top-6 transition-all duration-300 ease-in-out">
+              <h2 className="text-brand font-bold text-[16px] mb-6 font-display">เลือกแพ็กเกจเพื่อเริ่มเรียน</h2>
+
+              <div className="text-muted-foreground text-[14px] mb-2">แพ็กเกจนี้</div>
 
               <div className="mb-4 flex items-baseline gap-2">
-                <span className="text-[56px] font-bold text-[#D4AF37] font-display leading-none tracking-tight">{pkg.current_price}</span>
-                <span className="text-[18px] text-[#F5E9D6] font-bold">บาท</span>
+                <span className="text-[56px] font-bold text-brand font-display leading-none tracking-tight">{pkg.current_price}</span>
+                <span className="text-[18px] text-foreground font-bold">บาท</span>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-8 h-6">
                 {hasDiscount && (
                   <>
-                    <span className="text-[#A1866B] text-[13px] line-through">ปกติ {pkg.original_price} บาท</span>
-                    <span className="bg-[#D4AF37]/20 text-[#D4AF37] text-[11px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/30">
+                    <span className="text-muted-foreground text-[13px] line-through">ปกติ {pkg.original_price} บาท</span>
+                    <span className="bg-brand-solid/20 text-brand text-[11px] font-bold px-2.5 py-1 rounded border border-brand-solid/30">
                       ประหยัด {discountAmount} บาท
                     </span>
                   </>
@@ -256,30 +256,30 @@ export default function PackageClient({
 
               <div className="space-y-4 mb-10">
                 <div className="flex items-start gap-3">
-                  <Check size={16} className="text-[#22C55E] flex-shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-[#F5E9D6] text-[14px]">ใช้งานได้ 12 เดือน</span>
+                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-foreground text-[14px]">ใช้งานได้ 12 เดือน</span>
                 </div>
                 <div className="flex items-start gap-3">
-                  <Check size={16} className="text-[#22C55E] flex-shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-[#F5E9D6] text-[14px]">อัปเดตข้อสอบไม่จำกัด</span>
+                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-foreground text-[14px]">อัปเดตข้อสอบไม่จำกัด</span>
                 </div>
                 <div className="flex items-start gap-3">
-                  <Check size={16} className="text-[#22C55E] flex-shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-[#F5E9D6] text-[14px]">เฉลยละเอียดทุกข้อ</span>
+                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-foreground text-[14px]">เฉลยละเอียดทุกข้อ</span>
                 </div>
                 <div className="flex items-start gap-3">
-                  <Check size={16} className="text-[#22C55E] flex-shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-[#F5E9D6] text-[14px]">จำลองสอบจับเวลา</span>
+                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-foreground text-[14px]">จำลองสอบจับเวลา</span>
                 </div>
                 <div className="flex items-start gap-3">
-                  <Check size={16} className="text-[#22C55E] flex-shrink-0 mt-0.5" strokeWidth={3} />
-                  <span className="text-[#F5E9D6] text-[14px]">รองรับทุกอุปกรณ์</span>
+                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" strokeWidth={3} />
+                  <span className="text-foreground text-[14px]">รองรับทุกอุปกรณ์</span>
                 </div>
               </div>
 
               {isPurchased ? (
                 <Link href="#resources" className="block w-full">
-                  <button type="button" className="w-full bg-[#22C55E] hover:bg-[#1EA950] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(34,197,94,0.15)] font-display">
+                  <button type="button" className="w-full bg-success hover:bg-[#1EA950] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(34,197,94,0.15)] font-display">
                     <PlayCircle size={18} />
                     เริ่มเรียน
                   </button>
@@ -289,15 +289,15 @@ export default function PackageClient({
                   <button
                     type="button"
                     onClick={() => beginCheckout(pkg.id, pkg.name, pkg.current_price)}
-                    className="w-full bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display"
+                    className="w-full bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] text-[16px] shadow-[0_10px_20px_rgba(212,175,55,0.15)] font-display"
                   >
                     <Lock size={18} />
                     ซื้อแพ็กเกจนี้
                   </button>
                 </Link>
               )}
-              
-              <div className="text-center mt-4 text-[#D4AF37] text-[12px] flex items-center justify-center gap-1.5 opacity-80">
+
+              <div className="text-center mt-4 text-brand text-[12px] flex items-center justify-center gap-1.5 opacity-80">
                 <Star size={12} fill="currentColor" />
                 ซื้อครั้งเดียว ใช้ได้ 12 เดือนเต็ม
               </div>
@@ -333,22 +333,22 @@ export default function PackageClient({
           )}
 
           <div id="resources" className="grid grid-cols-1 gap-6 items-start lg:grid-cols-2">
-            <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
+            <div className="bg-card border border-brand-solid/15 rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                <div className="w-10 h-10 rounded-xl bg-wash flex items-center justify-center text-brand">
                   <BookOpen size={20} />
                 </div>
-                <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">สรุปเนื้อหา</h3>
+                <h3 className="text-foreground text-[20px] font-bold font-display">สรุปเนื้อหา</h3>
               </div>
               <SummaryNavigation summaries={summaries} packageSlug={pkg.slug} />
             </div>
 
-            <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
+            <div className="bg-card border border-brand-solid/15 rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                <div className="w-10 h-10 rounded-xl bg-wash flex items-center justify-center text-brand">
                   <Check size={20} />
                 </div>
-                <h3 className="text-[#F5E9D6] text-[20px] font-bold font-display">ชุดข้อสอบ</h3>
+                <h3 className="text-foreground text-[20px] font-bold font-display">ชุดข้อสอบ</h3>
               </div>
               
               <div className="flex-1">
@@ -369,13 +369,13 @@ export default function PackageClient({
           {hasRelatedContent && (
             <section
               aria-label="อ่านเพิ่มเติมก่อนสอบ"
-              className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col gap-6"
+              className="bg-card border border-brand-solid/15 rounded-[24px] p-6 lg:p-8 shadow-2xl flex flex-col gap-6"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                <div className="w-10 h-10 rounded-xl bg-wash flex items-center justify-center text-brand">
                   <Sparkles size={20} />
                 </div>
-                <h2 className="text-[#F5E9D6] text-[20px] font-bold font-display">
+                <h2 className="text-foreground text-[20px] font-bold font-display">
                   อ่านเพิ่มเติมก่อนสอบ
                 </h2>
               </div>
@@ -383,7 +383,7 @@ export default function PackageClient({
               <div className={`grid grid-cols-1 ${relatedNews.length > 0 && relatedArticles.length > 0 ? 'lg:grid-cols-2' : ''} gap-6 items-start`}>
                 {relatedNews.length > 0 && (
                   <div className="flex flex-col gap-3">
-                    <h3 className="text-[13px] font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-[13px] font-bold text-brand uppercase tracking-wider flex items-center gap-2">
                       <Newspaper size={15} />
                       <span>ข่าวเปิดสอบที่เกี่ยวข้อง</span>
                     </h3>
@@ -403,7 +403,7 @@ export default function PackageClient({
 
                 {relatedArticles.length > 0 && (
                   <div className="flex flex-col gap-3">
-                    <h3 className="text-[13px] font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-2">
+                    <h3 className="text-[13px] font-bold text-brand uppercase tracking-wider flex items-center gap-2">
                       <BookOpen size={15} />
                       <span>บทความเตรียมสอบ</span>
                     </h3>
@@ -425,31 +425,31 @@ export default function PackageClient({
             </section>
           )}
 
-          <div className="bg-[#1A140E] border border-[rgba(212,175,55,0.15)] rounded-[24px] p-6 lg:p-8 flex flex-wrap xl:flex-nowrap items-center justify-between gap-6 shadow-xl">
+          <div className="bg-card border border-brand-solid/15 rounded-[24px] p-6 lg:p-8 flex flex-wrap xl:flex-nowrap items-center justify-between gap-6 shadow-xl">
              <FeatureItem 
                icon={<Edit3 size={24} />} 
                title="เฉลยละเอียดทุกข้อ" 
                subtitle="อธิบายครบ เข้าใจง่าย" 
              />
-             <div className="hidden xl:block w-px h-12 bg-[rgba(255,255,255,0.05)]"></div>
+             <div className="hidden xl:block w-px h-12 bg-border-subtle"></div>
              <FeatureItem 
                icon={<Clock size={24} />} 
                title="จำลองสอบจับเวลา" 
                subtitle="เสมือนสอบจริง" 
              />
-             <div className="hidden xl:block w-px h-12 bg-[rgba(255,255,255,0.05)]"></div>
+             <div className="hidden xl:block w-px h-12 bg-border-subtle"></div>
              <FeatureItem 
                icon={<MonitorSmartphone size={24} />} 
                title="ใช้งานได้ทุกอุปกรณ์" 
                subtitle="มือถือ แท็บเล็ต คอมพิวเตอร์" 
              />
-             <div className="hidden xl:block w-px h-12 bg-[rgba(255,255,255,0.05)]"></div>
+             <div className="hidden xl:block w-px h-12 bg-border-subtle"></div>
              <FeatureItem 
                icon={<CalendarDays size={24} />} 
                title="อัปเดตข้อสอบไม่จำกัด" 
                subtitle="เนื้อหาล่าสุดตลอดเวลา" 
              />
-             <div className="hidden xl:block w-px h-12 bg-[rgba(255,255,255,0.05)]"></div>
+             <div className="hidden xl:block w-px h-12 bg-border-subtle"></div>
              <FeatureItem 
                icon={<ShieldCheck size={24} />} 
                title="ความปลอดภัยสูง" 

@@ -30,10 +30,10 @@ export default function SupportCard({
     <>
       <div
         id="support-card"
-        className="rounded-[20px] p-5 flex flex-col gap-4 mt-4 transition-colors duration-200 hover:border-[#D4AF37]/20"
+        className="rounded-[20px] p-5 flex flex-col gap-4 mt-4 transition-colors duration-200 hover:border-brand-solid/20"
         style={{
-          backgroundColor: '#1A140E',
-          border: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: 'var(--card)',
+          border: '1px solid var(--border-subtle)',
         }}
       >
         {/* Header row */}
@@ -41,35 +41,35 @@ export default function SupportCard({
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{
-              background: 'rgba(212,175,55,0.08)',
-              border: '1px solid rgba(212,175,55,0.15)',
+              background: 'color-mix(in srgb, var(--brand-solid) 8%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--brand-solid) 15%, transparent)',
             }}
           >
-            <Heart size={15} className="text-[#D4AF37]/70" />
+            <Heart size={15} className="text-brand/70" />
           </div>
-          <span className="text-[#F5E9D6] text-[13px] font-semibold">{title}</span>
+          <span className="text-foreground text-[13px] font-semibold">{title}</span>
         </div>
 
         {/* Description */}
-        <p className="text-[#A1866B] text-[12px] leading-relaxed">{description}</p>
+        <p className="text-muted-foreground text-[12px] leading-relaxed">{description}</p>
 
         {/* Ghost CTA button */}
         <button
           id="support-card-button"
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-[#D4AF37] transition-all duration-200"
+          className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-brand transition-all duration-200"
           style={{
-            background: 'rgba(212,175,55,0.07)',
-            border: '1px solid rgba(212,175,55,0.2)',
+            background: 'color-mix(in srgb, var(--brand-solid) 7%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--brand-solid) 20%, transparent)',
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(212,175,55,0.12)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(212,175,55,0.35)'
+            ;(e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--brand-solid) 12%, transparent)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--brand-solid) 35%, transparent)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(212,175,55,0.07)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(212,175,55,0.2)'
+            ;(e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--brand-solid) 7%, transparent)'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--brand-solid) 20%, transparent)'
           }}
         >
           {button_label}

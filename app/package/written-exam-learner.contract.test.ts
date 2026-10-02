@@ -35,7 +35,7 @@ test('Written Exam presentation reuses the Package content-card language', () =>
   assert.doesNotMatch(packageClient, /<PenTool/)
   assert.match(writtenExamNavigation, /role="group"/)
   assert.match(writtenExamNavigation, /aria-label="ข้อสอบอัตนัย"/)
-  assert.match(writtenExamNavigation, /border: '1px solid rgba\(212,175,55,0\.2\)'/)
+  assert.match(writtenExamNavigation, /border: '1px solid color-mix\(in srgb, var\(--brand-solid\) 20%, transparent\)'/)
   assert.match(writtenExamNavigation, /borderRadius: '16px'/)
   assert.match(writtenExamNavigation, /padding: '14px 16px'/)
   assert.match(writtenExamNavigation, /fontSize: '14px', fontWeight: '600'/)
