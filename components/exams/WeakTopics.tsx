@@ -190,9 +190,9 @@ function WeakTopicRow({ topic }: { topic: WeakTopicGroup }) {
             style={{
               fontSize: '11px',
               fontWeight: 600,
-              color: '#f59e0b',
-              background: 'rgba(245,158,11,0.1)',
-              border: '1px solid rgba(245,158,11,0.3)',
+              color: 'var(--warning)',
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--warning-border)',
               borderRadius: '999px',
               padding: '2px 9px',
             }}
@@ -213,7 +213,7 @@ function WeakTopicRow({ topic }: { topic: WeakTopicGroup }) {
           height: '6px',
           width: '100%',
           borderRadius: '999px',
-          background: 'rgba(255,255,255,0.08)',
+          background: 'var(--hover-strong)',
           overflow: 'hidden',
           marginBottom: '6px',
         }}
@@ -261,7 +261,7 @@ function Count({
 }) {
   const color =
     tone === 'wrong'
-      ? '#ef4444'
+      ? 'var(--destructive)'
       : tone === 'gold'
         ? 'var(--gold-light)'
         : 'var(--text-muted)'

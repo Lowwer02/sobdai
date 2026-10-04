@@ -55,7 +55,7 @@ export default function LearningStats({ statistics }: { statistics: LearningStat
       >
         <Metric label="ทำข้อสอบแล้ว" value={`${attempts}`} unit="ครั้ง" accent="var(--gold-light)" />
         <Metric label="ความแม่นยำรวม" value={`${overallAccuracy}`} unit="%" accent="var(--gold-light)" />
-        <Metric label="อัตราผ่าน" value={`${passRate}`} unit="%" accent="#22c55e" />
+        <Metric label="อัตราผ่าน" value={`${passRate}`} unit="%" accent="var(--success)" />
         <Metric label="จำนวนข้อที่ตอบ" value={`${totalAnswered}`} unit="ข้อ" accent="var(--gold-light)" />
         <Metric
           label="เวลาทำข้อสอบรวม"
@@ -119,9 +119,9 @@ function Metric({
       style={{
         gridColumn: wide ? '1 / -1' : undefined,
         padding: '14px 14px',
-        background: 'rgba(255,255,255,0.02)',
+        background: 'var(--hover)',
         borderRadius: '12px',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid var(--border-subtle)',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',

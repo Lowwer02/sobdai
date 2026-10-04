@@ -36,9 +36,9 @@ export default function ContinueLearningCard({ session }: { session: DashboardAc
           style={{
             fontSize: '11px',
             padding: '3px 10px',
-            background: isPractice ? 'rgba(34,197,94,0.12)' : 'rgba(212,175,55,0.12)',
-            color: isPractice ? '#22c55e' : 'var(--gold-light)',
-            border: `1px solid ${isPractice ? 'rgba(34,197,94,0.35)' : 'rgba(212,175,55,0.35)'}`,
+            background: isPractice ? 'var(--success-bg)' : 'var(--wash)',
+            color: isPractice ? 'var(--success)' : 'var(--gold-light)',
+            border: `1px solid ${isPractice ? 'var(--success-border)' : 'var(--border-hover)'}`,
           }}
         >
           {isPractice ? 'ฝึกทำ' : 'จำลองสอบ'}
@@ -102,7 +102,7 @@ export default function ContinueLearningCard({ session }: { session: DashboardAc
             height: '6px',
             width: '100%',
             borderRadius: '999px',
-            background: 'rgba(255,255,255,0.08)',
+            background: 'var(--hover-strong)',
             overflow: 'hidden',
           }}
         >

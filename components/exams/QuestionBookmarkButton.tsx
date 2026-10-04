@@ -161,7 +161,7 @@ export default function QuestionBookmarkButton({
       {errorMsg && (
         <span
           role="alert"
-          style={{ marginTop: '6px', fontSize: '12px', color: '#ef4444' }}
+          style={{ marginTop: '6px', fontSize: '12px', color: 'var(--destructive)' }}
         >
           {errorMsg}
         </span>

@@ -28,37 +28,37 @@ export default async function MyAnalyticsPage() {
   ])
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-10 px-4">
+    <div className="min-h-screen bg-background text-foreground py-10 px-4">
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Header */}
         <div>
           <Link
             href="/my-packages"
-            className="inline-flex items-center gap-1 text-sm text-[#A1866B] hover:text-[#D4AF37] transition-colors mb-3"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-brand transition-colors mb-3"
           >
             <ChevronLeft size={16} /> กลับ
           </Link>
           <h1 className="text-2xl font-bold font-display">ผลการเรียนของฉัน</h1>
-          <p className="text-sm text-[#A1866B] mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             สรุปจากการทำข้อสอบทั้งหมดของคุณ — อ่านจากประวัติที่บันทึกไว้
           </p>
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+          <div className="rounded-xl border border-destructive-border bg-destructive-bg p-4 text-sm text-destructive">
             ไม่สามารถโหลดข้อมูลได้: {error}
           </div>
         )}
 
         {analytics && analytics.overall.totalAttempts === 0 && (
-          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E] p-8 text-center">
-            <p className="text-[#F5E9D6] font-medium">ยังไม่มีประวัติการทำข้อสอบ</p>
-            <p className="text-sm text-[#A1866B] mt-1">
+          <div className="rounded-2xl border border-brand-solid/15 bg-card p-8 text-center">
+            <p className="text-foreground font-medium">ยังไม่มีประวัติการทำข้อสอบ</p>
+            <p className="text-sm text-muted-foreground mt-1">
               เริ่มทำข้อสอบเพื่อดูสรุปผลและแนวโน้มของคุณที่นี่
             </p>
             <Link
               href="/my-packages"
-              className="inline-block mt-4 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
+              className="inline-block mt-4 bg-brand-solid hover:bg-brand-hover text-brand-foreground font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
             >
               ดูแพ็กเกจของฉัน
             </Link>
@@ -72,8 +72,8 @@ export default async function MyAnalyticsPage() {
                 learner's Analytics. Each card explains WHY. */}
             {recs && !recs.isEmpty && recs.recommendations.length > 0 && (
               <section className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B] flex items-center gap-2">
-                  <Sparkles size={14} className="text-[#D4AF37]" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Sparkles size={14} className="text-brand" />
                   ขั้นตอนถัดไปแนะนำ
                 </h2>
                 <div className="space-y-2">
@@ -84,14 +84,14 @@ export default async function MyAnalyticsPage() {
                         : null
                     const body = (
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-[#F5E9D6]">
+                        <div className="text-sm font-medium text-foreground">
                           {r.title}
                         </div>
-                        <div className="text-xs text-[#A1866B] mt-1 leading-relaxed">
+                        <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
                           {r.reason}
                         </div>
                         {r.target?.label && (
-                          <div className="text-xs text-[#D4AF37] mt-2">
+                          <div className="text-xs text-brand mt-2">
                             → {r.target.label}
                           </div>
                         )}
@@ -101,14 +101,14 @@ export default async function MyAnalyticsPage() {
                       <Link
                         key={i}
                         href={targetHref}
-                        className="block rounded-xl border border-[rgba(212,175,55,0.2)] bg-[#1A140E] px-4 py-3 hover:border-[#D4AF37]/50 transition-colors"
+                        className="block rounded-xl border border-brand-solid/20 bg-card px-4 py-3 hover:border-brand-solid/50 transition-colors"
                       >
                         {body}
                       </Link>
                     ) : (
                       <div
                         key={i}
-                        className="rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] px-4 py-3"
+                        className="rounded-xl border border-border-subtle bg-card px-4 py-3"
                       >
                         {body}
                       </div>
@@ -120,7 +120,7 @@ export default async function MyAnalyticsPage() {
 
             {/* Overall performance */}
             <section className="space-y-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 ภาพรวม
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -148,7 +148,7 @@ export default async function MyAnalyticsPage() {
                   value={formatDuration(analytics.overall.averageTimeSeconds)}
                 />
               </div>
-              <p className="text-xs text-[#A1866B]">
+              <p className="text-xs text-muted-foreground">
                 แบ่งตามประเภท: ฝึกหัด {analytics.overall.practiceAttempts} ครั้ง ·
                 จำลองข้อสอบ {analytics.overall.simulationAttempts} ครั้ง
               </p>
@@ -156,12 +156,12 @@ export default async function MyAnalyticsPage() {
 
             {/* Weak / strong subjects */}
             <section className="space-y-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 รายวิชา
               </h2>
               {analytics.weakSubjects.length === 0 &&
               analytics.strongSubjects.length === 0 ? (
-                <p className="text-sm text-[#A1866B]">
+                <p className="text-sm text-muted-foreground">
                   ยังไม่มีข้อมูลรายวิชาเพียงพอที่จะจัดกลุ่ม
                 </p>
               ) : (
@@ -176,23 +176,23 @@ export default async function MyAnalyticsPage() {
                     return (
                       <div
                         key={s.name}
-                        className="flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] px-4 py-3"
+                        className="flex items-center justify-between rounded-xl border border-border-subtle bg-card px-4 py-3"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-[#F5E9D6] truncate">
+                          <div className="text-sm font-medium text-foreground truncate">
                             {s.name}
                           </div>
-                          <div className="text-xs text-[#A1866B]">
+                          <div className="text-xs text-muted-foreground">
                             ถูก {s.correct}/{s.total}
                           </div>
                         </div>
                         <span
                           className={`text-sm font-bold px-2.5 py-1 rounded-md ${
                             cls === 'weak'
-                              ? 'text-red-300 bg-red-500/10'
+                              ? 'text-destructive bg-destructive-bg'
                               : cls === 'strong'
-                              ? 'text-green-300 bg-green-500/10'
-                              : 'text-[#D4AF37] bg-[#D4AF37]/10'
+                              ? 'text-success bg-success-bg'
+                              : 'text-brand bg-brand-solid/10'
                           }`}
                         >
                           {s.accuracy}%
@@ -207,22 +207,22 @@ export default async function MyAnalyticsPage() {
             {/* Topic performance */}
             {analytics.topicPerformance.length > 0 && (
               <section className="space-y-4">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   หัวข้อย่อย
                 </h2>
                 <div className="space-y-2">
                   {analytics.topicPerformance.slice(0, 12).map((t) => (
                     <div
                       key={t.name}
-                      className="flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] px-4 py-3"
+                      className="flex items-center justify-between rounded-xl border border-border-subtle bg-card px-4 py-3"
                     >
                       <div className="min-w-0">
-                        <div className="text-sm text-[#F5E9D6] truncate">{t.name}</div>
-                        <div className="text-xs text-[#A1866B]">
+                        <div className="text-sm text-foreground truncate">{t.name}</div>
+                        <div className="text-xs text-muted-foreground">
                           ถูก {t.correct}/{t.total}
                         </div>
                       </div>
-                      <span className="text-sm font-bold text-[#F5E9D6]">{t.accuracy}%</span>
+                      <span className="text-sm font-bold text-foreground">{t.accuracy}%</span>
                     </div>
                   ))}
                 </div>
@@ -231,7 +231,7 @@ export default async function MyAnalyticsPage() {
 
             {/* Recent history */}
             <section className="space-y-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-[#A1866B]">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 ประวัติล่าสุด
               </h2>
               <div className="space-y-2">
@@ -242,14 +242,14 @@ export default async function MyAnalyticsPage() {
                   .map((h) => (
                     <div
                       key={h.id}
-                      className="flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] px-4 py-3"
+                      className="flex items-center justify-between rounded-xl border border-border-subtle bg-card px-4 py-3"
                     >
                       <div className="min-w-0">
-                        <div className="text-sm text-[#F5E9D6]">
+                        <div className="text-sm text-foreground">
                           {h.mode === 'simulation' ? 'จำลองข้อสอบ' : 'ฝึกหัด'} ·{' '}
                           {h.score}/{h.total}
                         </div>
-                        <div className="text-xs text-[#A1866B]">
+                        <div className="text-xs text-muted-foreground">
                           {new Date(h.completed_at).toLocaleString('th-TH', {
                             dateStyle: 'short',
                             timeStyle: 'short',
@@ -259,8 +259,8 @@ export default async function MyAnalyticsPage() {
                       <span
                         className={`text-xs font-bold px-2 py-1 rounded-md ${
                           h.passed
-                            ? 'text-green-300 bg-green-500/10'
-                            : 'text-red-300 bg-red-500/10'
+                            ? 'text-success bg-success-bg'
+                            : 'text-destructive bg-destructive-bg'
                         }`}
                       >
                         {h.accuracy}%
@@ -280,9 +280,9 @@ export default async function MyAnalyticsPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.05)] bg-[#1A140E] px-4 py-3">
-      <div className="text-xl font-bold text-[#F5E9D6]">{value}</div>
-      <div className="text-[11px] text-[#A1866B] mt-0.5">{label}</div>
+    <div className="rounded-xl border border-border-subtle bg-card px-4 py-3">
+      <div className="text-xl font-bold text-foreground">{value}</div>
+      <div className="text-[11px] text-muted-foreground mt-0.5">{label}</div>
     </div>
   )
 }

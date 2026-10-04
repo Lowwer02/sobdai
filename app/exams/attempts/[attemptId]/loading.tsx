@@ -3,7 +3,7 @@
  * fetching, no client JS. Mirrors the page's dark/gold design tokens.
  */
 export default function AttemptReviewLoading() {
-  const block = { background: 'rgba(255,255,255,0.04)', borderRadius: '10px' }
+  const block = { background: 'var(--hover)', borderRadius: '10px' }
   return (
     <div
       className="min-h-screen animate-pulse"

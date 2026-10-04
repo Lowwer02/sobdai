@@ -53,7 +53,29 @@ export default function AttemptQuestionReviewCard({
 
   // State label: a short Thai phrase + icon-ish glyph, independent of color.
   const stateLabel = isUnanswered ? 'ไม่ได้ตอบ' : isCorrect ? 'ตอบถูก' : 'ตอบผิด'
-  const stateColor = isUnanswered ? 'var(--gold-light)' : isCorrect ? '#22c55e' : '#ef4444'
+  // Token-based tone (replaces the old `${hex}1a` suffix pattern, which produced
+  // invalid CSS whenever stateColor was a var() — the unanswered state's tinted
+  // badge background/border silently never rendered in dark).
+  const stateTone = isUnanswered
+    ? {
+        color: 'var(--gold-light)',
+        bg: 'color-mix(in srgb, var(--gold-light) 10%, transparent)',
+        border: 'color-mix(in srgb, var(--gold-light) 33%, transparent)',
+        softBg: 'color-mix(in srgb, var(--gold-light) 7%, transparent)',
+      }
+    : isCorrect
+      ? {
+          color: 'var(--success)',
+          bg: 'color-mix(in srgb, var(--success) 10%, transparent)',
+          border: 'color-mix(in srgb, var(--success) 33%, transparent)',
+          softBg: 'color-mix(in srgb, var(--success) 7%, transparent)',
+        }
+      : {
+          color: 'var(--destructive)',
+          bg: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+          border: 'color-mix(in srgb, var(--destructive) 33%, transparent)',
+          softBg: 'color-mix(in srgb, var(--destructive) 7%, transparent)',
+        }
   const available = !!content?.available
 
   const choices: Array<{ letter: string; text: string | null }> = [
@@ -84,9 +106,9 @@ export default function AttemptQuestionReviewCard({
           style={{
             fontSize: '11px',
             padding: '3px 10px',
-            background: 'rgba(255,255,255,0.03)',
+            background: 'var(--hover)',
             color: 'var(--gold-muted)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: '1px solid var(--border-subtle)',
           }}
         >
           ข้อที่ {order}
@@ -97,9 +119,9 @@ export default function AttemptQuestionReviewCard({
             fontWeight: 700,
             padding: '3px 10px',
             borderRadius: '999px',
-            color: stateColor,
-            background: `${stateColor}1a`,
-            border: `1px solid ${stateColor}55`,
+            color: stateTone.color,
+            background: stateTone.bg,
+            border: `1px solid ${stateTone.border}`,
             whiteSpace: 'nowrap',
           }}
           aria-label={`สถานะ: ${stateLabel}`}
@@ -127,8 +149,8 @@ export default function AttemptQuestionReviewCard({
           style={{
             padding: '14px',
             borderRadius: '12px',
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px dashed rgba(255,255,255,0.12)',
+            background: 'var(--hover)',
+            border: '1px dashed var(--border-subtle)',
             marginBottom: '16px',
             fontSize: '13.5px',
             color: 'var(--text-muted)',
@@ -167,18 +189,18 @@ export default function AttemptQuestionReviewCard({
           marginTop: '14px',
           padding: '10px 12px',
           borderRadius: '10px',
-          background: `${stateColor}12`,
-          border: `1px solid ${stateColor}33`,
+          background: stateTone.softBg,
+          border: `1px solid color-mix(in srgb, ${stateTone.color} 20%, transparent)`,
           fontSize: '12.5px',
           color: 'var(--text-primary)',
           lineHeight: 1.5,
         }}
       >
         {isUnanswered ? (
-          <span>คุณ<strong style={{ color: stateColor }}>ไม่ได้ตอบ</strong>ข้อนี้ — เฉลย: <strong>{correct}</strong></span>
+          <span>คุณ<strong style={{ color: stateTone.color }}>ไม่ได้ตอบ</strong>ข้อนี้ — เฉลย: <strong>{correct}</strong></span>
         ) : (
           <span>
-            คุณตอบ <strong style={{ color: isSelectedWrong(isCorrect) ? '#ef4444' : '#22c55e' }}>{selected}</strong>
+            คุณตอบ <strong style={{ color: isSelectedWrong(isCorrect) ? 'var(--destructive)' : 'var(--success)' }}>{selected}</strong>
             {' '}— เฉลย <strong>{correct}</strong>{' '}
             ({isCorrect ? 'ถูก' : 'ผิด'})
           </span>
@@ -192,8 +214,8 @@ export default function AttemptQuestionReviewCard({
             marginTop: '12px',
             padding: '12px 14px',
             borderRadius: '10px',
-            background: 'rgba(212,175,55,0.05)',
-            border: '1px solid rgba(212,175,55,0.18)',
+            background: 'color-mix(in srgb, var(--brand-solid) 5%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--brand-solid) 18%, transparent)',
           }}
         >
           <div
@@ -293,17 +315,17 @@ function ChoiceRow({
   missing: boolean
 }) {
   // Visual tier (color) — paired with text labels so it is never color-only.
-  let background = 'rgba(255,255,255,0.02)'
-  let borderColor = 'rgba(255,255,255,0.06)'
+  let background = 'var(--hover)'
+  let borderColor = 'var(--border-subtle)'
   let textColor = 'var(--text-secondary)'
   if (isCorrectChoice) {
-    background = 'rgba(34,197,94,0.10)'
-    borderColor = 'rgba(34,197,94,0.45)'
-    textColor = '#F5E9D6'
+    background = 'color-mix(in srgb, var(--success) 10%, transparent)'
+    borderColor = 'color-mix(in srgb, var(--success) 45%, transparent)'
+    textColor = 'var(--foreground)'
   } else if (isSelected) {
-    background = 'rgba(239,68,68,0.10)'
-    borderColor = 'rgba(239,68,68,0.45)'
-    textColor = '#F5E9D6'
+    background = 'color-mix(in srgb, var(--destructive) 10%, transparent)'
+    borderColor = 'color-mix(in srgb, var(--destructive) 45%, transparent)'
+    textColor = 'var(--foreground)'
   }
 
   return (
@@ -330,8 +352,12 @@ function ChoiceRow({
           fontWeight: 700,
           fontSize: '12.5px',
           border: `1px solid ${borderColor}`,
-          color: isCorrectChoice ? '#22c55e' : isSelected ? '#ef4444' : 'var(--text-muted)',
-          background: isCorrectChoice ? 'rgba(34,197,94,0.08)' : isSelected ? 'rgba(239,68,68,0.08)' : 'transparent',
+          color: isCorrectChoice ? 'var(--success)' : isSelected ? 'var(--destructive)' : 'var(--text-muted)',
+          background: isCorrectChoice
+            ? 'color-mix(in srgb, var(--success) 8%, transparent)'
+            : isSelected
+              ? 'color-mix(in srgb, var(--destructive) 8%, transparent)'
+              : 'transparent',
         }}
         aria-hidden="true"
       >
@@ -353,13 +379,13 @@ function ChoiceRow({
           }}
         >
           {isCorrectChoice && (
-            <span style={{ color: '#22c55e' }}>✓ คำตอบที่ถูก</span>
+            <span style={{ color: 'var(--success)' }}>✓ คำตอบที่ถูก</span>
           )}
           {isSelected && !isCorrectChoice && (
-            <span style={{ color: '#ef4444' }}>✕ ที่คุณเลือก</span>
+            <span style={{ color: 'var(--destructive)' }}>✕ ที่คุณเลือก</span>
           )}
           {isSelected && isCorrectChoice && (
-            <span style={{ color: '#22c55e' }}>• ที่คุณเลือก</span>
+            <span style={{ color: 'var(--success)' }}>• ที่คุณเลือก</span>
           )}
         </div>
       </div>
@@ -374,9 +400,9 @@ function Label({ text }: { text: string }) {
         fontSize: '11px',
         padding: '2px 8px',
         borderRadius: '999px',
-        background: 'rgba(255,255,255,0.03)',
+        background: 'var(--hover)',
         color: 'var(--text-muted)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: '1px solid var(--border-subtle)',
       }}
     >
       {text}

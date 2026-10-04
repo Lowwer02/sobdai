@@ -17,10 +17,10 @@ export const metadata: Metadata = {
 
 function MessageCard({ title, message }: { title: string; message: string }) {
   return (
-    <div className="min-h-[60vh] bg-[#0F0B07] px-4 py-16 text-[#F5E9D6]">
-      <div className="mx-auto max-w-xl rounded-3xl border border-[rgba(212,175,55,0.2)] bg-[#1A140E] p-8 text-center shadow-xl">
+    <div className="min-h-[60vh] bg-background px-4 py-16 text-foreground">
+      <div className="mx-auto max-w-xl rounded-3xl border border-brand-solid/20 bg-card p-8 text-center shadow-xl">
         <h1 className="mb-3 text-3xl font-bold font-display">{title}</h1>
-        <p className="text-[#A1866B]">{message}</p>
+        <p className="text-muted-foreground">{message}</p>
       </div>
     </div>
   )

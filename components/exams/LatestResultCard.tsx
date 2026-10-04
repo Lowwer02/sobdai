@@ -50,9 +50,9 @@ export default function LatestResultCard({ result }: { result: DashboardLatestRe
             style={{
               fontSize: '11px',
               padding: '3px 10px',
-              background: isPractice ? 'rgba(34,197,94,0.12)' : 'rgba(212,175,55,0.12)',
-              color: isPractice ? '#22c55e' : 'var(--gold-light)',
-              border: `1px solid ${isPractice ? 'rgba(34,197,94,0.35)' : 'rgba(212,175,55,0.35)'}`,
+              background: isPractice ? 'var(--success-bg)' : 'var(--wash)',
+              color: isPractice ? 'var(--success)' : 'var(--gold-light)',
+              border: `1px solid ${isPractice ? 'var(--success-border)' : 'var(--border-hover)'}`,
             }}
           >
             {modeLabel}
@@ -63,9 +63,9 @@ export default function LatestResultCard({ result }: { result: DashboardLatestRe
               fontWeight: 700,
               padding: '3px 10px',
               borderRadius: '999px',
-              color: result.passed ? '#22c55e' : '#ef4444',
-              background: result.passed ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-              border: `1px solid ${result.passed ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              color: result.passed ? 'var(--success)' : 'var(--destructive)',
+              background: result.passed ? 'var(--success-bg)' : 'var(--destructive-bg)',
+              border: `1px solid ${result.passed ? 'var(--success-border)' : 'var(--destructive-border)'}`,
             }}
           >
             {result.passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
@@ -111,7 +111,7 @@ export default function LatestResultCard({ result }: { result: DashboardLatestRe
             fontSize: '40px',
             lineHeight: 1,
             fontWeight: 700,
-            color: result.passed ? '#22c55e' : 'var(--gold-light)',
+            color: result.passed ? 'var(--success)' : 'var(--gold-light)',
           }}
         >
           {accuracy}%
@@ -128,8 +128,8 @@ export default function LatestResultCard({ result }: { result: DashboardLatestRe
           marginBottom: '20px',
         }}
       >
-        <Stat label="ตอบถูก" value={correct} color="#22c55e" />
-        <Stat label="ตอบผิด" value={wrong} color="#ef4444" />
+        <Stat label="ตอบถูก" value={correct} color="var(--success)" />
+        <Stat label="ตอบผิด" value={wrong} color="var(--destructive)" />
         <Stat label="ทำครบ" value={`${answered}/${total}`} color="var(--gold-light)" />
       </div>
 
@@ -226,9 +226,9 @@ function Stat({ label, value, color }: { label: string; value: string | number; 
       style={{
         textAlign: 'center',
         padding: '12px 8px',
-        background: 'rgba(255,255,255,0.02)',
+        background: 'var(--hover)',
         borderRadius: '12px',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid var(--border-subtle)',
       }}
     >
       <div style={{ fontSize: '20px', fontWeight: 700, color, marginBottom: '2px' }}>{value}</div>

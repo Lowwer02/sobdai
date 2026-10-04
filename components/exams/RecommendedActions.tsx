@@ -72,7 +72,7 @@ async function RecommendedActionsAsync() {
           gap: '8px',
         }}
       >
-        <Sparkles size={16} className="text-[#D4AF37]" style={{ flexShrink: 0 }} />
+        <Sparkles size={16} className="text-brand" style={{ flexShrink: 0 }} />
         ขั้นตอนถัดไปแนะนำ
       </h2>
 
@@ -108,7 +108,7 @@ async function RecommendedActionsAsync() {
                 {r.reason}
               </div>
               {r.target?.label && (
-                <div style={{ fontSize: '12px', color: '#D4AF37', marginTop: '6px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--brand)', marginTop: '6px' }}>
                   → {r.target.label}
                 </div>
               )}
@@ -124,8 +124,8 @@ async function RecommendedActionsAsync() {
                 display: 'block',
                 textDecoration: 'none',
                 borderRadius: '12px',
-                border: '1px solid rgba(212,175,55,0.2)',
-                background: 'var(--card-bg, #1A140E)',
+                border: '1px solid color-mix(in srgb, var(--brand-solid) 20%, transparent)',
+                background: 'var(--card)',
                 padding: '12px 16px',
                 transition: 'border-color 0.2s',
               }}
@@ -137,8 +137,8 @@ async function RecommendedActionsAsync() {
               key={r.priority}
               style={{
                 borderRadius: '12px',
-                border: '1px solid rgba(255,255,255,0.05)',
-                background: 'var(--card-bg, #1A140E)',
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--card)',
                 padding: '12px 16px',
               }}
             >

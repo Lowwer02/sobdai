@@ -129,7 +129,7 @@ export default function ActivityTimeline({
                     top: '24px',
                     bottom: '0',
                     width: '2px',
-                    background: 'rgba(212,175,55,0.18)',
+                    background: 'var(--wash-strong)',
                   }}
                 />
               ) : null}
@@ -182,7 +182,7 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
 
   const dotColor = isCompleted
     ? event.passed
-      ? '#22c55e'
+      ? 'var(--success)'
       : 'var(--gold-light)'
     : 'var(--gold)'
 
@@ -245,9 +245,9 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
               fontWeight: 600,
               padding: '1px 8px',
               borderRadius: '999px',
-              color: isPractice ? '#22c55e' : 'var(--gold-light)',
-              background: isPractice ? 'rgba(34,197,94,0.1)' : 'rgba(212,175,55,0.1)',
-              border: `1px solid ${isPractice ? 'rgba(34,197,94,0.3)' : 'rgba(212,175,55,0.3)'}`,
+              color: isPractice ? 'var(--success)' : 'var(--gold-light)',
+              background: isPractice ? 'var(--success-bg)' : 'var(--wash)',
+              border: `1px solid ${isPractice ? 'var(--success-border)' : 'var(--border-hover)'}`,
             }}
           >
             {modeLabel}

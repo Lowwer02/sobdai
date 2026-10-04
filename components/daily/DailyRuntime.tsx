@@ -46,12 +46,12 @@ function accuracyLabel(correct: number, answered: number): string {
 
 function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[rgba(255,235,180,0.08)] bg-[#1A1208] p-4">
-      <div className="mb-2 flex items-center gap-2 text-xs text-[#A1866B]">
+    <div className="rounded-2xl border border-border-subtle bg-card p-4">
+      <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
         {icon}
         <span>{label}</span>
       </div>
-      <div className="text-xl font-bold text-[#F5E9D6]">{value}</div>
+      <div className="text-xl font-bold text-foreground">{value}</div>
     </div>
   )
 }
@@ -67,16 +67,16 @@ function QuestCard({
 }) {
   return (
     <div className={`flex items-center gap-3 rounded-2xl border p-4 ${completed
-      ? 'border-[#3D9D66]/50 bg-[#2D7A4F]/10'
-      : 'border-[rgba(255,235,180,0.08)] bg-[#1A1208]'}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${completed ? 'bg-[#3D9D66] text-[#0F0B07]' : 'bg-[#2A1E12] text-[#A1866B]'}`}>
+      ? 'border-exam-correct/50 bg-exam-correct/10'
+      : 'border-border-subtle bg-card'}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${completed ? 'bg-exam-correct text-background' : 'bg-muted text-muted-foreground'}`}>
         {completed ? <Check size={20} /> : <Target size={18} />}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="font-semibold text-[#F5E9D6]">ทำข้อสอบวันนี้ให้ครบ 5 ข้อ</div>
-        <div className="text-sm text-[#D4AF37]">+{rewardExp} EXP</div>
+        <div className="font-semibold text-foreground">ทำข้อสอบวันนี้ให้ครบ 5 ข้อ</div>
+        <div className="text-sm text-brand">+{rewardExp} EXP</div>
       </div>
-      <span className={`text-xs font-semibold ${completed ? 'text-[#3D9D66]' : 'text-[#7A6550]'}`}>
+      <span className={`text-xs font-semibold ${completed ? 'text-exam-correct' : 'text-muted-foreground'}`}>
         {completed ? 'สำเร็จแล้ว' : guest ? 'รอบันทึก' : 'ยังไม่สำเร็จ'}
       </span>
     </div>
@@ -86,12 +86,12 @@ function QuestCard({
 function AnswerFeedback({ result }: { result: DailyQuestionResult }) {
   return (
     <div className={`mt-5 rounded-2xl border p-4 ${result.isCorrect
-      ? 'border-[#3D9D66]/40 bg-[#2D7A4F]/10'
-      : 'border-[#E05C5C]/40 bg-[#E05C5C]/10'}`}>
-      <div className={`font-semibold ${result.isCorrect ? 'text-[#4CAF7D]' : 'text-[#E05C5C]'}`}>
+      ? 'border-exam-correct/40 bg-exam-correct/10'
+      : 'border-exam-incorrect/40 bg-exam-incorrect/10'}`}>
+      <div className={`font-semibold ${result.isCorrect ? 'text-exam-correct' : 'text-exam-incorrect'}`}>
         {result.isCorrect ? 'ถูกต้อง' : `คำตอบที่ถูก ${result.correctAnswer}`}
       </div>
-      {result.explanation && <p className="mt-2 text-sm leading-6 text-[#A1866B]">{result.explanation}</p>}
+      {result.explanation && <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.explanation}</p>}
     </div>
   )
 }
@@ -111,17 +111,17 @@ function ResultList({
         if (!result) return null
         return (
           <div key={question.id} className={`rounded-2xl border p-4 ${result.isCorrect
-            ? 'border-[#3D9D66]/40 bg-[#2D7A4F]/10'
-            : 'border-[#E05C5C]/40 bg-[#E05C5C]/10'}`}>
+            ? 'border-exam-correct/40 bg-exam-correct/10'
+            : 'border-exam-incorrect/40 bg-exam-incorrect/10'}`}>
             <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-              <span className="font-semibold text-[#F5E9D6]">ข้อที่ {index + 1}</span>
-              <span className={result.isCorrect ? 'text-[#4CAF7D]' : 'text-[#E05C5C]'}>
+              <span className="font-semibold text-foreground">ข้อที่ {index + 1}</span>
+              <span className={result.isCorrect ? 'text-exam-correct' : 'text-exam-incorrect'}>
                 {result.isCorrect ? 'ถูกต้อง' : `คำตอบที่ถูก ${result.correctAnswer}`}
               </span>
             </div>
-            <p className="text-sm leading-6 text-[#C4A882]">{question.content}</p>
+            <p className="text-sm leading-6 text-[color:var(--text-secondary)]">{question.content}</p>
             {result.explanation && (
-              <p className="mt-3 border-t border-white/5 pt-3 text-sm leading-6 text-[#A1866B]">
+              <p className="mt-3 border-t border-border-subtle pt-3 text-sm leading-6 text-muted-foreground">
                 {result.explanation}
               </p>
             )}
@@ -349,21 +349,21 @@ export default function DailyRuntime({
   }
 
   return (
-    <main className="min-h-[70vh] bg-[#0F0B07] px-4 py-10 text-[#F5E9D6] md:py-14">
+    <main className="min-h-[70vh] bg-background px-4 py-10 text-foreground md:py-14">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#D4AF37]">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-brand">
               <Sparkles size={17} /> แบบฝึกประจำวัน
             </div>
             <h1 className="text-4xl font-bold font-display md:text-5xl">ข้อสอบประจำวัน 5 ข้อ</h1>
-            <p className="mt-2 text-[#A1866B]">ฝึกสั้น ๆ วันละ 5 ข้อ · ชุดประจำวันที่ {formatDate(state.localDate)}</p>
+            <p className="mt-2 text-muted-foreground">ฝึกสั้น ๆ วันละ 5 ข้อ · ชุดประจำวันที่ {formatDate(state.localDate)}</p>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#1A140E] px-4 py-3">
-            <Flame className="text-[#D4AF37]" size={22} />
+          <div className="flex items-center gap-3 rounded-2xl border border-brand-solid/20 bg-card px-4 py-3">
+            <Flame className="text-brand" size={22} />
             <div>
-              <div className="text-xs text-[#A1866B]">ต่อเนื่อง</div>
-              <div className="text-xl font-bold text-[#F5E9D6]">
+              <div className="text-xs text-muted-foreground">ต่อเนื่อง</div>
+              <div className="text-xl font-bold text-foreground">
                 {isGuest ? 'สมัครเพื่อเริ่ม' : `${state.lifetime.currentStreak} วัน`}
               </div>
             </div>
@@ -384,19 +384,19 @@ export default function DailyRuntime({
               <div className="quiz-card">
                 <div className="mb-6 flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-sm text-[#A1866B]">ความคืบหน้า</div>
+                    <div className="text-sm text-muted-foreground">ความคืบหน้า</div>
                     <div className="mt-1 text-lg font-bold">ข้อที่ {currentIndex + 1} / 5</div>
                   </div>
-                  <div className="text-right text-sm text-[#A1866B]">ตอบแล้ว {state.progress.questionsAnswered}/5</div>
+                  <div className="text-right text-sm text-muted-foreground">ตอบแล้ว {state.progress.questionsAnswered}/5</div>
                 </div>
-                <div className="mb-8 h-2 overflow-hidden rounded-full bg-[#2A1E12]">
-                  <div className="h-full rounded-full bg-[#D4AF37] transition-all" style={{ width: `${((currentIndex + 1) / 5) * 100}%` }} />
+                <div className="mb-8 h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-brand-solid transition-all" style={{ width: `${((currentIndex + 1) / 5) * 100}%` }} />
                 </div>
 
                 <div className="mb-8">
-                  <div className="mb-3 text-sm font-semibold text-[#D4AF37]">คำถาม {currentIndex + 1}</div>
-                  <h2 className="text-2xl font-bold leading-relaxed text-[#F5E9D6]">{question.content}</h2>
-                  {question.hint && <p className="mt-4 text-sm text-[#7A9FD4]">คำใบ้: {question.hint}</p>}
+                  <div className="mb-3 text-sm font-semibold text-brand">คำถาม {currentIndex + 1}</div>
+                  <h2 className="text-2xl font-bold leading-relaxed text-foreground">{question.content}</h2>
+                  {question.hint && <p className="mt-4 text-sm text-[color:var(--hint)]">คำใบ้: {question.hint}</p>}
                 </div>
 
                 <div className="space-y-3">
@@ -407,7 +407,7 @@ export default function DailyRuntime({
                         key={choice}
                         type="button"
                         className={`choice-btn ${selected
-                          ? 'border-[#D4AF37] bg-[rgba(212,168,67,0.18)] font-semibold'
+                          ? 'border-brand-solid bg-wash-strong font-semibold'
                           : ''}`}
                         data-selected={selected ? 'true' : 'false'}
                         aria-pressed={selected}
@@ -423,9 +423,9 @@ export default function DailyRuntime({
                         <span
                           className="choice-badge"
                           style={selected ? {
-                            backgroundColor: 'var(--gold)',
-                            borderColor: 'var(--gold)',
-                            color: '#1A1208',
+                            backgroundColor: 'var(--brand-solid)',
+                            borderColor: 'var(--brand-solid)',
+                            color: 'var(--brand-foreground)',
                             opacity: 1,
                             boxShadow: '0 0 0 3px rgba(212, 175, 55, 0.18)',
                           } : undefined}
@@ -467,38 +467,38 @@ export default function DailyRuntime({
                   </button>
                 </div>
                 {persistedChoice && currentIndex === 4 && state.progress.questionsAnswered < 5 && (
-                  <div className="mt-5 text-right text-xs text-[#A1866B]">กลับไปตอบข้อที่ยังไม่ส่งให้ครบ 5 ข้อ</div>
+                  <div className="mt-5 text-right text-xs text-muted-foreground">กลับไปตอบข้อที่ยังไม่ส่งให้ครบ 5 ข้อ</div>
                 )}
-                {saveMessage && <div className="mt-5 text-right text-xs text-[#A1866B]">{saveMessage}</div>}
+                {saveMessage && <div className="mt-5 text-right text-xs text-muted-foreground">{saveMessage}</div>}
               </div>
             ) : (
               <div className="quiz-card">
                 <div className="text-center">
-                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#2D7A4F]/20 text-[#4CAF7D]">
+                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-exam-correct/20 text-exam-correct">
                     <Check size={34} />
                   </div>
-                  <div className="text-sm font-semibold text-[#3D9D66]">ทำครบ 5 ข้อแล้ว</div>
+                  <div className="text-sm font-semibold text-exam-correct">ทำครบ 5 ข้อแล้ว</div>
                   <h2 className="mt-2 text-3xl font-bold font-display">ถูก {summary.correct}/{summary.answered} ข้อ</h2>
                   {isGuest ? (
-                    <p className="mt-2 text-[#A1866B]">
+                    <p className="mt-2 text-muted-foreground">
                       ผลวันนี้พร้อมแล้ว สมัครเพื่อเก็บผลและเริ่มสะสมวันต่อเนื่อง
                     </p>
                   ) : (
-                    <p className="mt-2 text-[#A1866B]">วันนี้ได้รับ +{summary.expEarned} EXP</p>
+                    <p className="mt-2 text-muted-foreground">วันนี้ได้รับ +{summary.expEarned} EXP</p>
                   )}
                   {!isGuest && guestClaimStatus === 'failed' && saveMessage && (
-                    <p className="mt-3 text-sm text-[#E05C5C]">{saveMessage}</p>
+                    <p className="mt-3 text-sm text-exam-incorrect">{saveMessage}</p>
                   )}
                 </div>
                 <ResultList questions={state.questions} results={state.results} />
                 {isGuest && (
-                  <div className="mt-8 rounded-2xl border border-[rgba(212,175,55,0.28)] bg-[rgba(212,168,67,0.08)] p-5">
-                    <div className="text-lg font-bold text-[#F5E9D6]">เก็บผลวันนี้ไว้</div>
-                    <p className="mt-2 text-sm leading-6 text-[#A1866B]">
+                  <div className="mt-8 rounded-2xl border border-brand-solid/30 bg-wash p-5">
+                    <div className="text-lg font-bold text-foreground">เก็บผลวันนี้ไว้</div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       สมัครหรือเข้าสู่ระบบเพื่อบันทึกผล เริ่มสะสมวันต่อเนื่อง และรับ +50 EXP
                     </p>
                     {guestClaimStatus === 'failed' && (
-                      <p className="mt-3 text-sm text-[#E05C5C]">
+                      <p className="mt-3 text-sm text-exam-incorrect">
                         ระบบยังยืนยันผลไม่สำเร็จ กรุณาลองทำรายการอีกครั้งก่อนเข้าสู่ระบบ
                       </p>
                     )}
@@ -528,7 +528,7 @@ export default function DailyRuntime({
           <aside className="space-y-6">
             <section>
               <div className="mb-3 flex items-center gap-2">
-                <Target size={18} className="text-[#D4AF37]" />
+                <Target size={18} className="text-brand" />
                 <h2 className="text-xl font-bold font-display">ภารกิจวันนี้</h2>
               </div>
               <div className="space-y-3">
@@ -540,7 +540,7 @@ export default function DailyRuntime({
 
             <section>
               <div className="mb-3 flex items-center gap-2">
-                <Zap size={18} className="text-[#D4AF37]" />
+                <Zap size={18} className="text-brand" />
                 <h2 className="text-xl font-bold font-display">สถิติวันนี้</h2>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -551,8 +551,8 @@ export default function DailyRuntime({
               </div>
             </section>
 
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[rgba(212,168,67,0.06)] p-4 text-sm leading-6 text-[#A1866B]">
-              <div className="mb-2 flex items-center gap-2 font-semibold text-[#D4AF37]"><LockKeyhole size={15} /> กติกาประจำวัน</div>
+            <div className="rounded-2xl border border-brand-solid/15 bg-wash p-4 text-sm leading-6 text-muted-foreground">
+              <div className="mb-2 flex items-center gap-2 font-semibold text-brand"><LockKeyhole size={15} /> กติกาประจำวัน</div>
               {isGuest
                 ? 'ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น ผลและวันต่อเนื่องจะเริ่มบันทึกเมื่อเข้าสู่ระบบ'
                 : 'ต่อเนื่องและ EXP จะเพิ่มเมื่อส่งคำตอบครบทั้ง 5 ข้อเท่านั้น ความแม่นยำใช้เพื่อดูข้อมูลการฝึกเท่านั้น'}

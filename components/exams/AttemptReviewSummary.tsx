@@ -53,9 +53,9 @@ export default function AttemptReviewSummary({
             style={{
               fontSize: '11px',
               padding: '3px 10px',
-              background: isPractice ? 'rgba(34,197,94,0.12)' : 'rgba(212,175,55,0.12)',
-              color: isPractice ? '#22c55e' : 'var(--gold-light)',
-              border: `1px solid ${isPractice ? 'rgba(34,197,94,0.35)' : 'rgba(212,175,55,0.35)'}`,
+              background: isPractice ? 'var(--success-bg)' : 'var(--wash)',
+              color: isPractice ? 'var(--success)' : 'var(--gold-light)',
+              border: `1px solid ${isPractice ? 'var(--success-border)' : 'var(--border-hover)'}`,
             }}
           >
             {modeLabel}
@@ -66,9 +66,9 @@ export default function AttemptReviewSummary({
               fontWeight: 700,
               padding: '3px 10px',
               borderRadius: '999px',
-              color: data.passed ? '#22c55e' : '#ef4444',
-              background: data.passed ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-              border: `1px solid ${data.passed ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              color: data.passed ? 'var(--success)' : 'var(--destructive)',
+              background: data.passed ? 'var(--success-bg)' : 'var(--destructive-bg)',
+              border: `1px solid ${data.passed ? 'var(--success-border)' : 'var(--destructive-border)'}`,
             }}
           >
             {data.passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
@@ -114,7 +114,7 @@ export default function AttemptReviewSummary({
             fontSize: '40px',
             lineHeight: 1,
             fontWeight: 700,
-            color: data.passed ? '#22c55e' : 'var(--gold-light)',
+            color: data.passed ? 'var(--success)' : 'var(--gold-light)',
           }}
         >
           {data.accuracy}%
@@ -132,8 +132,8 @@ export default function AttemptReviewSummary({
           marginBottom: '18px',
         }}
       >
-        <Stat label="ถูก" value={data.score} color="#22c55e" />
-        <Stat label="ผิด" value={wrong} color="#ef4444" />
+        <Stat label="ถูก" value={data.score} color="var(--success)" />
+        <Stat label="ผิด" value={wrong} color="var(--destructive)" />
         <Stat label="ไม่ได้ตอบ" value={unanswered} color="var(--gold-light)" />
       </div>
 
@@ -248,9 +248,9 @@ function Stat({ label, value, color }: { label: string; value: string | number; 
       style={{
         textAlign: 'center',
         padding: '12px 8px',
-        background: 'rgba(255,255,255,0.02)',
+        background: 'var(--hover)',
         borderRadius: '12px',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid var(--border-subtle)',
       }}
     >
       <div style={{ fontSize: '20px', fontWeight: 700, color, marginBottom: '2px' }}>{value}</div>
