@@ -891,15 +891,14 @@ h1, h2, h3, .heading {
   z-index: 40;
   height: calc(var(--exam-mobile-bottom-bar-height, 4.75rem) + env(safe-area-inset-bottom, 0px));
   padding: 0.375rem 0.5rem env(safe-area-inset-bottom, 0px);
-  background: rgba(15, 11, 8, 0.99);
+  /* Single theme-aware declaration — no dark literal + Light override pair.
+     Dark: --surface (#0f0b07) replaces the old rgba(15,11,8,0.99), which
+     composited to the same value over the runtime canvas (visually
+     equivalent); Light resolves to ivory with no cascade dependency. Same
+     token the site-wide .mobile-bottom-nav uses. */
+  background: var(--surface);
   border-top: 1px solid color-mix(in srgb, var(--brand-solid) 18%, transparent);
   box-shadow: var(--shadow-nav);
-}
-
-/* The dark bar literal above is the production baseline; Light re-maps the
-   surface only (gold border/shadow tokens above already follow the theme). */
-[data-theme='light'] .exam-mobile-bottom-bar {
-  background: var(--surface);
 }
 
 .exam-mobile-bottom-bar__grid {
