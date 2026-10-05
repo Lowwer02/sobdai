@@ -130,7 +130,7 @@ export default function DownloadShareButton(props: DownloadShareButtonProps) {
         type="button"
         onClick={handleShare}
         disabled={!!busy}
-        className="flex-1 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+        className="flex-1 bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {sharing ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
         {sharing ? 'กำลังเตรียม...' : 'แชร์ผลลัพธ์'}
@@ -141,7 +141,7 @@ export default function DownloadShareButton(props: DownloadShareButtonProps) {
         type="button"
         onClick={handleDownload}
         disabled={!!busy}
-        className="flex-1 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#F5E9D6] font-bold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        className="flex-1 bg-transparent border border-border-subtle hover:bg-hover text-foreground font-bold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
         {downloading ? 'กำลังเตรียม...' : 'ดาวน์โหลดรูป'}

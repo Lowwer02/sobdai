@@ -99,7 +99,7 @@ export default function SampleExamResultUpsellModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(4px)' }}
+      style={{ backgroundColor: 'var(--overlay)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
       aria-modal="true"
       role="dialog"
@@ -111,8 +111,8 @@ export default function SampleExamResultUpsellModal({
         tabIndex={-1}
         className="relative w-full max-w-md rounded-[24px] overflow-hidden shadow-2xl focus:outline-none animate-in zoom-in-95 duration-200"
         style={{
-          backgroundColor: '#1A140E',
-          border: '1px solid rgba(212,175,55,0.3)',
+          backgroundColor: 'var(--card)',
+          border: '1px solid color-mix(in srgb, var(--brand-solid) 30%, transparent)',
           maxHeight: '92dvh',
           overflowY: 'auto',
         }}
@@ -133,7 +133,7 @@ export default function SampleExamResultUpsellModal({
           id="sample-upsell-modal-close"
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-xl flex items-center justify-center text-[#A1866B] hover:text-[#F5E9D6] hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           aria-label="ปิดป๊อปอัป"
         >
           <X size={18} />
@@ -141,24 +141,24 @@ export default function SampleExamResultUpsellModal({
 
         <div className="p-6 sm:p-8">
           {/* Header pill */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0F0B07] border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-bold rounded-full mb-5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-background border border-brand/30 text-brand text-xs font-bold rounded-full mb-5">
             <Sparkles size={13} fill="currentColor" />
             <span>ทำข้อสอบตัวอย่างเสร็จแล้ว</span>
           </div>
 
           {/* Optional score context */}
           {score !== undefined && total !== undefined && total > 0 && (
-            <div className="bg-[#0F0B07] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[#A1866B] text-xs">
-                <CheckCircle2 size={15} className="text-[#22C55E]" />
+            <div className="bg-background border border-border-subtle rounded-xl p-3 mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <CheckCircle2 size={15} className="text-success" />
                 <span>คะแนนข้อสอบตัวอย่าง</span>
               </div>
               <div className="text-right">
-                <span className="text-[#F5E9D6] font-bold text-sm font-display">
+                <span className="text-foreground font-bold text-sm font-display">
                   {score} / {total} ข้อ
                 </span>
                 {accuracy !== undefined && (
-                  <span className="text-[#D4AF37] text-xs ml-1.5 font-bold">
+                  <span className="text-brand text-xs ml-1.5 font-bold">
                     ({accuracy}%)
                   </span>
                 )}
@@ -169,7 +169,7 @@ export default function SampleExamResultUpsellModal({
           {/* Heading */}
           <h2
             id="sample-upsell-modal-title"
-            className="text-xl sm:text-2xl font-bold font-display text-[#F5E9D6] mb-2 leading-snug"
+            className="text-xl sm:text-2xl font-bold font-display text-foreground mb-2 leading-snug"
           >
             อยากฝึกต่อไหม?
           </h2>
@@ -177,16 +177,16 @@ export default function SampleExamResultUpsellModal({
           {/* Subtitle */}
           <p
             id="sample-upsell-modal-desc"
-            className="text-[#A1866B] text-sm leading-relaxed mb-6"
+            className="text-muted-foreground text-sm leading-relaxed mb-6"
           >
             ปลดล็อกชุดข้อสอบและเนื้อหาทั้งหมดในแพ็กเกจนี้
           </p>
 
           {/* Package highlight pill */}
           {packageName && (
-            <div className="mb-6 px-3.5 py-2.5 bg-[#0F0B07] border border-[rgba(212,175,55,0.15)] rounded-xl flex items-center gap-2.5">
-              <Lock size={14} className="text-[#D4AF37] flex-shrink-0" />
-              <span className="text-xs text-[#F5E9D6] font-medium truncate">
+            <div className="mb-6 px-3.5 py-2.5 bg-background border border-brand/15 rounded-xl flex items-center gap-2.5">
+              <Lock size={14} className="text-brand flex-shrink-0" />
+              <span className="text-xs text-foreground font-medium truncate">
                 {packageName}
               </span>
             </div>
@@ -194,9 +194,9 @@ export default function SampleExamResultUpsellModal({
 
           {/* Pricing context if discounted */}
           {hasDiscount && (
-            <div className="flex items-center gap-2 mb-3 text-xs text-[#A1866B]">
+            <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
               <span className="line-through">ปกติ ฿{numOriginalPrice?.toLocaleString()}</span>
-              <span className="bg-[#D4AF37]/15 text-[#D4AF37] font-bold px-2 py-0.5 rounded text-[11px] border border-[#D4AF37]/30">
+              <span className="bg-brand/15 text-brand font-bold px-2 py-0.5 rounded text-[11px] border border-brand/30">
                 ประหยัด ฿{((numOriginalPrice ?? 0) - (numCurrentPrice ?? 0)).toLocaleString()}
               </span>
             </div>
@@ -208,7 +208,7 @@ export default function SampleExamResultUpsellModal({
               id="upsell-modal-primary-cta"
               href={checkoutUrl}
               onClick={() => trackSampleResultUpsellClick(packageId, examSetId)}
-              className="w-full min-h-[48px] px-6 py-3.5 bg-[#D4AF37] hover:bg-[#F1D17A] text-[#1A140E] font-bold rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 text-base font-display focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="w-full min-h-[48px] px-6 py-3.5 bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold rounded-xl transition-all shadow-[0_4px_15px_rgba(212,175,55,0.3)] hover:shadow-[0_4px_25px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 text-base font-display focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
             >
               <span>{ctaLabel}</span>
               <ArrowRight size={16} />
@@ -218,7 +218,7 @@ export default function SampleExamResultUpsellModal({
               id="upsell-modal-secondary-cta"
               type="button"
               onClick={onClose}
-              className="w-full min-h-[44px] px-4 py-2.5 bg-transparent border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.05)] text-[#A1866B] hover:text-[#F5E9D6] text-sm font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              className="w-full min-h-[44px] px-4 py-2.5 bg-transparent border border-border-subtle hover:bg-hover text-muted-foreground hover:text-foreground text-sm font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               ดูผลสอบก่อน
             </button>
