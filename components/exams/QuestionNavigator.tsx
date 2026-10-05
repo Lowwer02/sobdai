@@ -126,15 +126,15 @@ export default function QuestionNavigator({
 
   return (
     <div
-      className={`flex max-h-[calc(85vh-1.25rem)] flex-col p-4 text-[#F5E9D6] font-sans sm:p-5 lg:max-h-[85vh] ${className}`}
+      className={`flex max-h-[calc(85vh-1.25rem)] flex-col p-4 text-foreground font-sans sm:p-5 lg:max-h-[85vh] ${className}`}
     >
       {/* Header with Two-Row Layout */}
-      <div className="mb-4 pb-3 border-b border-[rgba(255,255,255,0.06)] space-y-3">
+      <div className="mb-4 pb-3 border-b border-border-subtle space-y-3">
         {/* Row 1: Title + Counter Pill (Left), Close Button (Right) */}
         <div className="flex items-center justify-between gap-3">
-          <h3 id="question-navigator-heading" className="text-base font-bold text-[#F5E9D6] font-display flex items-center gap-2">
+          <h3 id="question-navigator-heading" className="text-base font-bold text-foreground font-display flex items-center gap-2">
             <span>{title}</span>
-            <span className="text-xs font-normal text-[#A1866B] bg-[#0F0B07] px-2 py-0.5 rounded-full border border-[rgba(255,255,255,0.05)]">
+            <span className="text-xs font-normal text-muted-foreground bg-background px-2 py-0.5 rounded-full border border-border-subtle">
               {answeredCount}/{total} ข้อ
             </span>
           </h3>
@@ -143,7 +143,7 @@ export default function QuestionNavigator({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.05)] rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-hover rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               aria-label="ปิดตัวนำทางข้อสอบ"
             >
               <X size={18} />
@@ -152,18 +152,18 @@ export default function QuestionNavigator({
         </div>
 
         {/* Row 2: Legend Summary Pills */}
-        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#A1866B]">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#0F0B07] border border-[rgba(255,255,255,0.04)]">
-            <span className="w-2 h-2 rounded-full bg-[#D4AF37]" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border border-border-subtle">
+            <span className="w-2 h-2 rounded-full bg-brand-solid" aria-hidden="true" />
             <span>ตอบแล้ว ({answeredCount})</span>
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#0F0B07] border border-[rgba(255,255,255,0.04)]">
-            <span className="w-2 h-2 rounded-full bg-[rgba(255,255,255,0.15)]" aria-hidden="true" />
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background border border-border-subtle">
+            <span className="w-2 h-2 rounded-full bg-foreground/15" aria-hidden="true" />
             <span>ยังไม่ตอบ ({unansweredCount})</span>
           </div>
           {flaggedCount > 0 && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400">
-              <Flag size={10} className="fill-yellow-400" aria-hidden="true" />
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-warning/10 border border-warning/20 text-warning">
+              <Flag size={10} className="fill-warning" aria-hidden="true" />
               <span>ปักหมุด ({flaggedCount})</span>
             </div>
           )}
@@ -181,20 +181,20 @@ export default function QuestionNavigator({
             const { index, questionNumber, isCurrent, isAnswered, isFlagged } = item
 
             let btnClass =
-              'relative h-10 w-full rounded-xl text-xs font-bold transition-all duration-150 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0B07] cursor-pointer '
+              'relative h-10 w-full rounded-xl text-xs font-bold transition-all duration-150 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer '
 
             if (isCurrent) {
-              btnClass += 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-[#0F0B07] z-10 '
+              btnClass += 'ring-2 ring-brand ring-offset-2 ring-offset-background z-10 '
             }
 
             if (isAnswered) {
               btnClass += isCurrent
-                ? 'bg-[#D4AF37] text-[#1A140E] shadow-[0_0_12px_rgba(212,175,55,0.4)] '
-                : 'bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37]/30 '
+                ? 'bg-brand-solid text-brand-foreground shadow-[0_0_12px_rgba(212,175,55,0.4)] '
+                : 'bg-brand/20 border border-brand/50 text-brand hover:bg-brand/30 '
             } else {
               btnClass += isCurrent
-                ? 'bg-[#2A2016] border border-[#D4AF37] text-[#F5E9D6] '
-                : 'bg-[#0F0B07] border border-[rgba(255,255,255,0.08)] text-[#A1866B] hover:text-[#F5E9D6] hover:bg-[rgba(255,255,255,0.04)] hover:border-[#D4AF37]/40 '
+                ? 'bg-muted border border-brand text-foreground '
+                : 'bg-background border border-border-subtle text-muted-foreground hover:text-foreground hover:bg-hover hover:border-brand/40 '
             }
 
             const a11yStatus = [
@@ -221,17 +221,17 @@ export default function QuestionNavigator({
                 {/* Flagged Badge Indicator */}
                 {isFlagged && (
                   <span
-                    className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-yellow-500 text-[#0F0B07] shadow-sm"
+                    className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-warning text-background shadow-sm"
                     aria-hidden="true"
                   >
-                    <Flag size={8} className="fill-[#0F0B07]" />
+                    <Flag size={8} className="fill-background" />
                   </span>
                 )}
 
                 {/* Answered Indicator Dot */}
                 {isAnswered && !isCurrent && (
                   <span
-                    className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-[#D4AF37]"
+                    className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full bg-brand-solid"
                     aria-hidden="true"
                   />
                 )}
@@ -242,11 +242,11 @@ export default function QuestionNavigator({
       </div>
 
       {canRequestSubmit && onRequestSubmit && (
-        <div className="mt-4 shrink-0 border-t border-[rgba(255,255,255,0.06)] pt-4 sm:hidden">
+        <div className="mt-4 shrink-0 border-t border-border-subtle pt-4 sm:hidden">
           <button
             type="button"
             onClick={onRequestSubmit}
-            className="flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D4AF37] px-4 py-3 text-sm font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="flex min-h-11 w-full items-center justify-center rounded-xl bg-brand-solid px-4 py-3 text-sm font-bold text-brand-foreground transition-colors hover:bg-[#F1D17A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
           >
             ส่งข้อสอบ
           </button>
