@@ -350,6 +350,83 @@
   color: var(--destructive);
 }
 
+/* ===================== Written Exam adaptive markdown (P2C.2) ===================== */
+/* The learner Written Exam reader renders the shared SummaryMarkdown renderer,
+   whose utility classes are fixed dark literals. Global tokenization would
+   regress SummaryMarkdown's other consumers (news/articles/summaries/
+   positions/agencies/admin previews still sit on dark canvases), so the reader
+   wraps its markdown in .we-markdown-adaptive and these Light-only scoped
+   overrides re-map just the ink/surfaces that are unreadable on ivory.
+   Every rule below is prefixed with [data-theme='light'] — Dark receives ZERO
+   rules from this block. Alerts already have theme-aware styling above, so
+   they are excluded here rather than duplicated. Unlayered rules like these
+   win over Tailwind's layered utilities regardless of specificity. */
+[data-theme='light'] .we-markdown-adaptive .summary-content {
+  color: var(--foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content :is(h2, h3, h4, h5) {
+  color: var(--foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content h3 {
+  border-color: var(--border-subtle);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content h6 {
+  color: var(--muted-foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content p {
+  color: var(--muted-foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content :is(ul, ol) {
+  color: var(--muted-foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content a {
+  color: var(--brand);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content a:hover {
+  text-decoration-color: var(--brand);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content strong {
+  color: var(--foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content em {
+  color: var(--foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content blockquote:not(.markdown-alert) {
+  background: var(--hover);
+  color: var(--muted-foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content hr {
+  background: var(--border-subtle);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content .overflow-x-auto {
+  border-color: var(--border-subtle);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content th {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content td {
+  background: var(--card);
+  color: var(--muted-foreground);
+  border-color: var(--border-subtle);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content code:not(pre > code) {
+  background: var(--muted);
+  color: var(--brand);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content pre {
+  background: var(--surface-muted);
+  border-color: var(--border-subtle);
+  color: var(--foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content div.relative > div.absolute {
+  background: var(--card);
+  color: var(--muted-foreground);
+}
+[data-theme='light'] .we-markdown-adaptive .summary-content img {
+  border-color: var(--border-subtle);
+}
+
 /* ===================== Base ===================== */
 * {
   box-sizing: border-box;

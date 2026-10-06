@@ -124,13 +124,13 @@ function WrittenExamState({
   const isError = kind === 'error'
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] px-4 py-16 text-[#F5E9D6]">
+    <div className="min-h-screen bg-background px-4 py-16 text-foreground">
       <div className="mx-auto flex min-h-[55vh] max-w-md items-center justify-center">
-        <div className="w-full rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#1A140E] p-7 text-center shadow-2xl sm:p-8">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#D4AF37]/10 text-[#D4AF37]">
+        <div className="w-full rounded-2xl border border-brand-solid/20 bg-card p-7 text-center shadow-2xl sm:p-8">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-wash text-brand">
             {isLogin ? <LogIn size={30} aria-hidden="true" /> : isLocked ? <Lock size={30} aria-hidden="true" /> : <AlertTriangle size={30} aria-hidden="true" />}
           </div>
-          <h1 className="mt-6 text-2xl font-bold font-display text-[#F5E9D6]">
+          <h1 className="mt-6 text-2xl font-bold font-display text-foreground">
             {isLogin
               ? 'เข้าสู่ระบบเพื่ออ่าน Written Exam'
               : isLocked
@@ -139,7 +139,7 @@ function WrittenExamState({
                   ? 'ยังไม่มีเนื้อหา Written Exam'
                   : 'ไม่สามารถโหลด Written Exam ได้'}
           </h1>
-          <p className="mt-3 text-sm leading-6 text-[#A1866B]">
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
             {isLogin
               ? 'กรุณาเข้าสู่ระบบก่อน เพื่อตรวจสอบสิทธิ์การเข้าถึงเนื้อหานี้'
               : isLocked
@@ -152,7 +152,7 @@ function WrittenExamState({
             {isLogin && (
               <Link
                 href={`/login?redirect=${encodeURIComponent(redirectPath)}`}
-                className="block w-full rounded-xl bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A]"
+                className="block w-full rounded-xl bg-brand-solid py-3 font-bold text-brand-foreground transition-colors hover:bg-[#F1D17A]"
               >
                 เข้าสู่ระบบ
               </Link>
@@ -160,7 +160,7 @@ function WrittenExamState({
             {isLocked && (
               <Link
                 href={`/checkout/${packageId}`}
-                className="block w-full rounded-xl bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A]"
+                className="block w-full rounded-xl bg-brand-solid py-3 font-bold text-brand-foreground transition-colors hover:bg-[#F1D17A]"
               >
                 สั่งซื้อแพ็กเกจ
               </Link>
@@ -168,14 +168,14 @@ function WrittenExamState({
             {isError && (
               <Link
                 href={redirectPath}
-                className="block w-full rounded-xl bg-[#D4AF37] py-3 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A]"
+                className="block w-full rounded-xl bg-brand-solid py-3 font-bold text-brand-foreground transition-colors hover:bg-[#F1D17A]"
               >
                 ลองใหม่อีกครั้ง
               </Link>
             )}
             <Link
               href={`/package/${packageSlug}`}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(255,255,255,0.1)] py-3 font-bold text-[#F5E9D6] transition-colors hover:bg-[rgba(255,255,255,0.05)]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border-subtle py-3 font-bold text-foreground transition-colors hover:bg-hover"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               กลับไปแพ็กเกจ
