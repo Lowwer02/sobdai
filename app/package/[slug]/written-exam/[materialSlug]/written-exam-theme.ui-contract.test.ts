@@ -6,16 +6,20 @@ import test from 'node:test'
 /**
  * written-exam-theme.ui-contract.test.ts
  *
- * Theme P2C.2 — Written Exam Light Mode via Scoped Semantic Contract.
+ * Theme P2C.3 — Written Exam on the globally semantic SummaryMarkdown renderer.
+ * P2C.2's transitional .we-markdown-adaptive Light bridge is deleted: the
+ * renderer is now fully semantic and the Written Exam learner inherits
+ * Light/Dark through the normal theme tokens like every other theme-ready
+ * consumer.
  *
  * Pins:
- *  A. Written Exam learner route files no longer carry the hardcoded dark
- *     theme literals P2C.2 removes (with explicit whitelists for the
- *     intentional survivors).
- *  B. The adaptive scope class wraps the SummaryMarkdown render path.
- *  C. globals.css carries a Light-only Written Exam scoped markdown contract.
- *  D. Every .we-markdown-adaptive rule in globals.css is Light-scoped
- *     (Dark receives zero new rules from the adaptive block).
+ *  A. Written Exam learner route files no longer carry hardcoded theme
+ *     literals (with an explicit whitelist for the intentional survivors).
+ *  B. WrittenExamReader renders plain SummaryMarkdown — no adaptive scope
+ *     class and no theme/variant/adaptive props.
+ *  C. The P2C.2 adaptive bridge is gone from globals.css AND active source.
+ *  D. The global semantic renderer contract exists (prose tokens + dark
+ *     parent island) so the reader's Light/Dark output needs no local bridge.
  *  E. SummaryMarkdown itself stays untouched — no adaptive/theme/variant prop,
  *     shared pipeline byte-identical.
  *  F. Critical Written Exam behavioral contracts remain present.
@@ -44,7 +48,7 @@ function assertNoScopedDarkLiterals(name: string, source: string, whitelist: Reg
   assert.equal(
     leftover,
     null,
-    `${name} must not carry hardcoded theme color literals after P2C.2; found: ${leftover?.join(', ') ?? 'none'}`,
+    `${name} must not carry hardcoded theme color literals after P2C.3; found: ${leftover?.join(', ') ?? 'none'}`,
   )
 }
 
@@ -55,44 +59,42 @@ test('A: written exam route files drop scoped dark literals (whitelist: CTA gold
   assertNoScopedDarkLiterals('loading.tsx', loading)
 })
 
-test('B: the adaptive scope class wraps the SummaryMarkdown render path', () => {
-  // The reader renders SummaryMarkdown only through StudySection, whose
-  // content wrapper carries the scope class — one placement covers all
-  // markdown usages without touching the shared renderer.
-  assert.match(reader, /we-markdown-adaptive p-5 md:p-7/)
+test('B: WrittenExamReader renders plain SummaryMarkdown — no adaptive scope, no theme props', () => {
+  // The reader renders SummaryMarkdown directly through StudySection and the
+  // answer section; Light/Dark come from the global semantic renderer, so the
+  // P2C.2 wrapper class and any renderer theming prop must stay absent.
+  assert.doesNotMatch(reader, /we-markdown-adaptive/)
+  assert.doesNotMatch(reader, /<SummaryMarkdown[^>]*\b(?:adaptive|theme|variant|appearance|dark)=/)
   assert.match(reader, /<SummaryMarkdown content=\{question\.questionMarkdown\} \/>/)
   assert.match(reader, /<SummaryMarkdown content=\{question\.modelAnswerMarkdown\} \/>/)
   assert.doesNotMatch(reader, /<SummaryMarkdown(?![^>]*\/>)/)
   assert.match(summaryMarkdown, /className="summary-content"/)
 })
 
-test('C: globals.css contains the Light-only Written Exam scoped markdown contract', () => {
-  assert.match(globals, /\[data-theme='light'\] \.we-markdown-adaptive \.summary-content/)
+test('C: the P2C.2 adaptive bridge is absent from globals.css and active source', () => {
+  assert.doesNotMatch(globals, /we-markdown-adaptive/)
+  assert.doesNotMatch(reader, /we-markdown-adaptive/)
+  assert.doesNotMatch(summaryMarkdown, /we-markdown-adaptive/)
 })
 
-test('D: every we-markdown-adaptive rule in globals.css is Light-scoped (zero Dark rules)', () => {
-  const lines = globals.split('\n')
-  const scopedLines = lines.filter((line) => line.includes('we-markdown-adaptive'))
-  assert.ok(scopedLines.length > 0, 'expected scoped markdown rules in globals.css')
-  for (const line of scopedLines) {
-    assert.match(
-      line,
-      /\[data-theme='light'\]/,
-      `adaptive markdown rule must be Light-scoped: ${line.trim()}`,
-    )
-  }
-  // The scope must also chain through .summary-content so it can never leak
-  // into other SummaryMarkdown consumers.
-  for (const line of scopedLines) {
-    assert.match(line, /\.summary-content/, `adaptive rule must target .summary-content: ${line.trim()}`)
-  }
+test('D: the global semantic renderer contract exists (prose tokens + dark parent island)', () => {
+  // Prose roles exist in BOTH theme token blocks.
+  assert.match(globals, /--prose-body: #d6cbb8;/)
+  assert.match(globals, /--prose-body: #6f5d47;/)
+  assert.match(globals, /--prose-surface: #1a140e;/)
+  assert.match(globals, /--prose-surface: #f1e9d8;/)
+  // ...and are exposed as Tailwind color aliases.
+  assert.match(globals, /--color-prose-body: var\(--prose-body\);/)
+  assert.match(globals, /--color-prose-surface: var\(--prose-surface\);/)
+  // The intentionally-dark parent island replaces the old reader-scoped bridge.
+  assert.match(globals, /\.summary-markdown-dark-scope \.summary-content \{/)
 })
 
 test('E: SummaryMarkdown stays untouched — no adaptive/theme/variant prop added', () => {
   assert.doesNotMatch(summaryMarkdown, /we-markdown-adaptive/)
   assert.doesNotMatch(summaryMarkdown, /\badaptive\??:/)
-  assert.doesNotMatch(summaryMarkdown, /theme\??:/)
-  assert.doesNotMatch(summaryMarkdown, /variant\??:/)
+  assert.doesNotMatch(summaryMarkdown, /\btheme\??:/)
+  assert.doesNotMatch(summaryMarkdown, /\bvariant\??:/)
   // Shared rendering pipeline intact: ReactMarkdown + gfm + github alerts + raw.
   assert.match(summaryMarkdown, /remarkGfm/)
   assert.match(summaryMarkdown, /remarkGithubAlerts/)

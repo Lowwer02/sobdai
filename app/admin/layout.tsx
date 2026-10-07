@@ -59,7 +59,7 @@ export default async function AdminLayout({
   const filteredManagementNav = managementNav.filter(item => hasPermission(role, item.permission as any))
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex flex-col md:flex-row font-sans summary-markdown-dark-scope">
       
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-[#1A140E] border-r border-[#D4AF37]/20 flex flex-col md:sticky md:top-0 md:h-screen md:overflow-y-auto shrink-0">

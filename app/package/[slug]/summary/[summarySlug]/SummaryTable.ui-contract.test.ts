@@ -35,9 +35,9 @@ test('SummaryMarkdown thead is static — no sticky overlay over the first body 
 
 test('SummaryMarkdown preserves the semantic header cell styling', () => {
   assert.match(markdownSource, /th: \(\{ node, \.\.\.props \}\) => \(/)
-  assert.match(markdownSource, /bg-\[#1A140E\]/)
+  assert.match(markdownSource, /bg-prose-surface/)
   assert.match(markdownSource, /whitespace-nowrap/)
-  assert.match(markdownSource, /border-b border-\[rgba\(212,175,55,0\.15\)\]/)
+  assert.match(markdownSource, /border-b border-brand\/15/)
 })
 
 test('SummaryMarkdown rendering stack is unchanged', () => {

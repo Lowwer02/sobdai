@@ -68,7 +68,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
               return (
                 <h2
                   id={id}
-                  className="scroll-mt-24 font-display text-3xl md:text-4xl font-bold mt-14 mb-6 text-[#F5E9D6] leading-[1.25] tracking-tight"
+                  className="scroll-mt-24 font-display text-3xl md:text-4xl font-bold mt-14 mb-6 text-foreground leading-[1.25] tracking-tight"
                   {...props}
                 />
               )
@@ -76,7 +76,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             return (
               <h2
                 id={id}
-                className="scroll-mt-24 font-display text-3xl md:text-4xl font-bold mt-14 mb-6 text-[#F5E9D6] leading-[1.25] tracking-tight"
+                className="scroll-mt-24 font-display text-3xl md:text-4xl font-bold mt-14 mb-6 text-foreground leading-[1.25] tracking-tight"
                 {...props}
               />
             )
@@ -87,7 +87,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
               return (
                 <h2
                   id={id}
-                  className="scroll-mt-24 font-display text-2xl md:text-3xl font-bold mt-12 mb-5 text-[#F5E9D6] border-b border-[rgba(255,255,255,0.06)] pb-3 leading-[1.3]"
+                  className="scroll-mt-24 font-display text-2xl md:text-3xl font-bold mt-12 mb-5 text-foreground border-b border-border-subtle pb-3 leading-[1.3]"
                   {...props}
                 />
               )
@@ -95,7 +95,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             return (
               <h3
                 id={id}
-                className="scroll-mt-24 font-display text-2xl md:text-3xl font-bold mt-12 mb-5 text-[#F5E9D6] border-b border-[rgba(255,255,255,0.06)] pb-3 leading-[1.3]"
+                className="scroll-mt-24 font-display text-2xl md:text-3xl font-bold mt-12 mb-5 text-foreground border-b border-border-subtle pb-3 leading-[1.3]"
                 {...props}
               />
             )
@@ -105,7 +105,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             return (
               <h4
                 id={id}
-                className="scroll-mt-24 font-display text-xl md:text-2xl font-bold mt-10 mb-4 text-[#F5E9D6] leading-[1.35]"
+                className="scroll-mt-24 font-display text-xl md:text-2xl font-bold mt-10 mb-4 text-foreground leading-[1.35]"
                 {...props}
               />
             )
@@ -115,7 +115,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             return (
               <h5
                 id={id}
-                className="scroll-mt-24 text-lg md:text-xl font-bold mt-8 mb-3 text-[#F5E9D6] border-l-4 border-[#D4AF37] pl-4 py-1 bg-[rgba(212,175,55,0.04)] rounded-r-lg leading-[1.35]"
+                className="scroll-mt-24 text-lg md:text-xl font-bold mt-8 mb-3 text-foreground border-l-4 border-brand pl-4 py-1 bg-brand/4 rounded-r-lg leading-[1.35]"
                 {...props}
               />
             )
@@ -125,7 +125,7 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             return (
               <h6
                 id={id}
-                className="scroll-mt-24 text-base font-bold mt-6 mb-2 text-[#F5E9D6] uppercase tracking-wider"
+                className="scroll-mt-24 text-base font-bold mt-6 mb-2 text-foreground uppercase tracking-wider"
                 {...props}
               />
             )
@@ -135,27 +135,27 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             return (
               <h6
                 id={id}
-                className="scroll-mt-24 text-sm font-bold mt-6 mb-2 text-[#A1866B] uppercase tracking-wider"
+                className="scroll-mt-24 text-sm font-bold mt-6 mb-2 text-muted-foreground uppercase tracking-wider"
                 {...props}
               />
             )
           },
           p: ({ node, ...props }) => (
-            <p className="text-[#D6CBB8] leading-[1.85] mb-5 text-[15px] md:text-base" {...props} />
+            <p className="text-prose-body leading-[1.85] mb-5 text-[15px] md:text-base" {...props} />
           ),
           a: ({ node, ...props }) => (
             <a
-              className="text-[#D4AF37] underline decoration-[#D4AF37]/40 underline-offset-2 hover:decoration-[#D4AF37] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded px-0.5"
+              className="text-brand underline decoration-brand/40 underline-offset-2 hover:decoration-brand transition-colors focus:outline-none focus:ring-2 focus:ring-brand rounded px-0.5"
               target="_blank"
               rel="noopener noreferrer"
               {...props}
             />
           ),
           ul: ({ node, ...props }) => (
-            <ul className="list-disc pl-6 mb-5 mt-2 space-y-2 text-[#D6CBB8] marker:text-[#D4AF37]/60" {...props} />
+            <ul className="list-disc pl-6 mb-5 mt-2 space-y-2 text-prose-body marker:text-brand/60" {...props} />
           ),
           ol: ({ node, ...props }) => (
-            <ol className="list-decimal pl-6 mb-5 mt-2 space-y-2 text-[#D6CBB8] marker:text-[#D4AF37]/60 marker:font-bold" {...props} />
+            <ol className="list-decimal pl-6 mb-5 mt-2 space-y-2 text-prose-body marker:text-brand/60 marker:font-bold" {...props} />
           ),
           li: ({ node, ...props }) => (
             <li className="leading-[1.75] pl-1 [&>ul]:mt-2 [&>ol]:mt-2" {...props} />
@@ -168,14 +168,14 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
               return <blockquote className={className} {...props} />
             }
             return (
-              <blockquote className="border-l-4 border-[#A1866B]/50 bg-[rgba(255,255,255,0.02)] pl-5 pr-4 py-3 my-6 rounded-r-lg text-[#A1866B] italic leading-relaxed" {...props} />
+              <blockquote className="border-l-4 border-muted-foreground/50 bg-hover pl-5 pr-4 py-3 my-6 rounded-r-lg text-muted-foreground italic leading-relaxed" {...props} />
             )
           },
           hr: ({ node, ...props }) => (
-            <hr className="my-8 border-0 h-px bg-[rgba(255,255,255,0.08)]" {...props} />
+            <hr className="my-8 border-0 h-px bg-border-subtle" {...props} />
           ),
           table: ({ node, ...props }) => (
-            <div className="my-6 overflow-x-auto rounded-xl border border-[rgba(255,255,255,0.06)] -mx-1 px-1">
+            <div className="my-6 overflow-x-auto rounded-xl border border-border-subtle -mx-1 px-1">
               <div className="inline-block min-w-full align-middle">
                 {/* min-width lets wide multi-column tables overflow
                     horizontally inside the wrapper instead of being crushed
@@ -189,16 +189,16 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
             <thead {...props} />
           ),
           th: ({ node, ...props }) => (
-            <th className="bg-[#1A140E] p-3 md:p-4 text-[#F5E9D6] font-bold text-left border-b border-[rgba(212,175,55,0.15)] whitespace-nowrap" {...props} />
+            <th className="bg-prose-surface p-3 md:p-4 text-foreground font-bold text-left border-b border-brand/15 whitespace-nowrap" {...props} />
           ),
           td: ({ node, ...props }) => (
-            <td className="p-3 md:p-4 border-b border-[rgba(255,255,255,0.04)] bg-[#0F0B07] text-[#D6CBB8] align-top" {...props} />
+            <td className="p-3 md:p-4 border-b border-border-subtle bg-background text-prose-body align-top" {...props} />
           ),
           code: ({ node, className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className || '')
             const isInline = !match && !String(children).includes('\n')
             return isInline ? (
-              <code className="bg-[#1A140E] text-[#D4AF37] px-1.5 py-0.5 rounded-md text-[0.88em] border border-[rgba(212,175,55,0.18)] font-mono" {...props}>
+              <code className="bg-prose-surface text-brand px-1.5 py-0.5 rounded-md text-[0.88em] border border-brand/18 font-mono" {...props}>
                 {children}
               </code>
             ) : (
@@ -209,10 +209,10 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
           },
           pre: ({ node, ...props }) => (
             <div className="relative group my-6">
-              <div className="absolute -top-2.5 left-4 px-2 bg-[#0F0B07] text-[#A1866B] text-[10px] font-bold uppercase tracking-wider rounded">
+              <div className="absolute -top-2.5 left-4 px-2 bg-background text-muted-foreground text-[10px] font-bold uppercase tracking-wider rounded">
                 โค้ด
               </div>
-              <pre className="bg-[#1A140E] p-4 pt-5 rounded-xl border border-[rgba(255,255,255,0.06)] overflow-x-auto text-[12.5px] md:text-[13px] leading-[1.7] text-[#F5E9D6]" {...props} />
+              <pre className="bg-prose-surface p-4 pt-5 rounded-xl border border-border-subtle overflow-x-auto text-[12.5px] md:text-[13px] leading-[1.7] text-foreground" {...props} />
             </div>
           ),
           img: ({ node, alt, src, ...props }) => (
@@ -227,16 +227,16 @@ function SummaryMarkdownImpl({ content, headingMode = 'default' }: SummaryMarkdo
                 src={typeof src === 'string' ? src : undefined}
                 loading="lazy"
                 decoding="async"
-                className="w-full h-auto rounded-2xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_30px_rgba(0,0,0,0.3)]"
+                className="w-full h-auto rounded-2xl border border-border-subtle shadow-[0_8px_30px_rgba(0,0,0,0.3)]"
                 {...props}
               />
             </span>
           ),
           strong: ({ node, ...props }) => (
-            <strong className="font-bold text-[#F5E9D6]" {...props} />
+            <strong className="font-bold text-foreground" {...props} />
           ),
           em: ({ node, ...props }) => (
-            <em className="italic text-[#E5DCC8]" {...props} />
+            <em className="italic text-prose-body" {...props} />
           ),
         }}
       >

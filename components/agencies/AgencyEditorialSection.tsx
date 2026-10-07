@@ -25,7 +25,7 @@ export default function AgencyEditorialSection({ content }: AgencyEditorialSecti
       </header>
 
       {content ? (
-        <div className={styles.editorialBody}>
+        <div className={`${styles.editorialBody} summary-markdown-dark-scope`}>
           <SummaryMarkdown content={content} />
         </div>
       ) : (

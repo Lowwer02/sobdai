@@ -209,7 +209,7 @@ export default function PositionEditorialSection({
           </aside>
         )}
 
-        <div id="position-editorial-body" className={`${styles.editorialBody} ${styles.editorialMarkdown}`}>
+        <div id="position-editorial-body" className={`${styles.editorialBody} ${styles.editorialMarkdown} summary-markdown-dark-scope`}>
           {sourceContent ? (
             segments.map((segment, index) => (
               segment.infographic ? (

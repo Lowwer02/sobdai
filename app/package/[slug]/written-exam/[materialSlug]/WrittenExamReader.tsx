@@ -144,7 +144,7 @@ export default function WrittenExamReader({
                 </button>
               </div>
               {showAnswer ? (
-                <div className="we-markdown-adaptive p-5 md:p-7">
+                <div className="p-5 md:p-7">
                   <SummaryMarkdown content={question.modelAnswerMarkdown} />
                 </div>
               ) : (
@@ -233,11 +233,7 @@ function StudySection({
         <span className="text-brand">{icon}</span>
         <h2 className="text-lg font-bold font-display text-foreground">{title}</h2>
       </div>
-      {/* P2C.2: every SummaryMarkdown render inside the reader is wrapped by
-          this adaptive scope — the Light-only markdown overrides in
-          globals.css key off .we-markdown-adaptive so the renderer's other
-          consumers are unaffected. Styling scope only; no JSX branching. */}
-      <div className="we-markdown-adaptive p-5 md:p-7">{children}</div>
+      <div className="p-5 md:p-7">{children}</div>
     </section>
   )
 }
