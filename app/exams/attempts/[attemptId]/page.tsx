@@ -5,6 +5,7 @@ import { getAttemptReview, normalizeView, filterSummary } from '@/lib/assessment
 import { fetchBookmarkStateMap } from '@/lib/assessment/saved-questions-data'
 import AttemptReviewSummary from '@/components/exams/AttemptReviewSummary'
 import AttemptQuestionReviewCard from '@/components/exams/AttemptQuestionReviewCard'
+import TrackedLink from '@/components/exams/TrackedLink'
 import { createPageMetadata } from '@/lib/seo'
 import type { Metadata } from 'next'
 
@@ -80,8 +81,10 @@ export default async function AttemptReviewPage({
       style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
     >
       <div style={{ maxWidth: '820px', margin: '0 auto', padding: '32px 20px 80px' }}>
-        {/* Back link */}
-        <div style={{ marginBottom: '20px' }}>
+        {/* Back link + insight CTA (Learning Analytics UX V1 merge). The CTA
+            returns the learner to the single Learning Home and fires the
+            exams_insight_cta_click event via the TrackedLink wrapper. */}
+        <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <Link
             href="/exams"
             style={{
@@ -92,6 +95,14 @@ export default async function AttemptReviewPage({
           >
             ← กลับแดชบอร์ด
           </Link>
+          <TrackedLink
+            href="/exams"
+            eventName="exams_insight_cta_click"
+            className="bg-brand-solid hover:bg-brand-hover text-brand-foreground font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
+            style={{ textDecoration: 'none', display: 'inline-block' }}
+          >
+            ดูสรุปการเรียนของฉัน
+          </TrackedLink>
         </div>
 
         {/* Summary header */}

@@ -88,6 +88,25 @@ export function trackDailyGuestClaimComplete(): void {
 }
 
 /**
+ * Track a Learning-Home (/exams) insight interaction. Fired immediately before
+ * internal navigation by the tiny client <TrackedLink> wrapper; consent-gated
+ * via the shared pushToDataLayer. V1 exposes exactly two events:
+ *  - exams_weak_topic_review_click: the "ทบทวนข้อผิด" CTA in the Weak Topics
+ *    section (navigates to /exams/attempts/{id})
+ *  - exams_insight_cta_click: the "ดูสรุปการเรียนของฉัน" CTA on the attempt
+ *    review page (navigates to /exams)
+ * No impressions/view events and no resume-click event in V1 (the
+ * ContinueLearningCard stays server-rendered with zero client JS).
+ */
+export function trackExamsEvent(
+  name: 'exams_weak_topic_review_click' | 'exams_insight_cta_click',
+): void {
+  pushToDataLayer({
+    event: name,
+  })
+}
+
+/**
  * Track viewing a package detail.
  */
 export function viewPackage(

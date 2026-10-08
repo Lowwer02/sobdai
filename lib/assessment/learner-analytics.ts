@@ -318,18 +318,123 @@ export function deriveWeakTopics(
   return eligible.slice(0, WEAK_TOPIC_MAX_RESULTS)
 }
 
+// ─── Subject performance (pure) ─────────────────────────────────────────────
+
+/**
+ * One subject-level rollup group, ready for the /exams "วิชา" section. This is
+ * the SUBJECT dimension complement to topic-level weak topics: grouping uses
+ * ONLY entry.subject (trimmed) — never the topic>law>subject priority.
+ */
+export interface SubjectPerformanceGroup {
+  /** Display label — the subject string, trimmed. */
+  label: string
+  /** Encountered questions in the window for this subject. */
+  total: number
+  correct: number
+  incorrect: number
+  unanswered: number
+  /** correct / total × 100, rounded. Clamped to [0,100]. */
+  accuracy: number
+}
+
+/** Subject rollup tuning (exported so tests can see the contract). */
+export const SUBJECT_MIN_ENCOUNTERS = 3
+export const SUBJECT_PERFORMANCE_MAX_RESULTS = 4
+
+/**
+ * Derive subject-level performance groups from sanitized attempts.
+ *
+ * Same per-attempt validation semantics as deriveWeakTopics: the persisted
+ * answer_summary is validated via the EXACT persisted-contract validator
+ * (validateAnswerSummary), so duplicate question ids within one attempt can
+ * never double-count and malformed entries are skipped.
+ *
+ * Grouping: ONLY by entry.subject (trimmed). Entries with an empty/whitespace
+ * subject are skipped — there is no fallback label on this rollup.
+ *
+ * Eligibility: ≥ SUBJECT_MIN_ENCOUNTERS encountered questions AND at least one
+ * incorrect-or-unanswered item (a fully-correct subject is not an insight).
+ *
+ * Ranking: lowest accuracy first, then larger sample, then stable Thai label
+ * ordering (localeCompare with numeric+sensitivity) as the final tie-break.
+ *
+ * At most SUBJECT_PERFORMANCE_MAX_RESULTS (4) groups are returned. Pure &
+ * defensive.
+ */
+export function deriveSubjectPerformance(
+  attempts: SanitizedAttempt[],
+): SubjectPerformanceGroup[] {
+  interface Acc {
+    total: number
+    correct: number
+    incorrect: number
+    unanswered: number
+  }
+  const groups = new Map<string, Acc>()
+
+  for (const attempt of attempts) {
+    const entries = validateAnswerSummary(attempt.answerSummary)
+    for (const e of entries) {
+      const subject = e.subject?.trim()
+      if (!subject) continue // no usable subject label → skip
+      const acc = groups.get(subject)
+      if (acc) {
+        acc.total += 1
+        if (e.isCorrect) acc.correct += 1
+        else if (e.selected == null) acc.unanswered += 1
+        else acc.incorrect += 1
+      } else {
+        const fresh: Acc = { total: 1, correct: 0, incorrect: 0, unanswered: 0 }
+        if (e.isCorrect) fresh.correct = 1
+        else if (e.selected == null) fresh.unanswered = 1
+        else fresh.incorrect = 1
+        groups.set(subject, fresh)
+      }
+    }
+  }
+
+  const eligible: SubjectPerformanceGroup[] = []
+  for (const [label, acc] of groups) {
+    // Eligibility: enough encounters AND at least one incorrect/unanswered.
+    if (acc.total < SUBJECT_MIN_ENCOUNTERS) continue
+    if (acc.incorrect === 0 && acc.unanswered === 0) continue
+    const accuracy = acc.total > 0 ? Math.round((acc.correct / acc.total) * 100) : 0
+    eligible.push({
+      label,
+      total: acc.total,
+      correct: acc.correct,
+      incorrect: acc.incorrect,
+      unanswered: acc.unanswered,
+      accuracy: Math.max(0, Math.min(100, accuracy)),
+    })
+  }
+
+  // Ranking: lowest accuracy → larger sample → stable Thai label tie-break.
+  eligible.sort(
+    (a, b) =>
+      a.accuracy - b.accuracy ||
+      b.total - a.total ||
+      a.label.localeCompare(b.label, 'th', { numeric: true, sensitivity: 'base' }),
+  )
+
+  return eligible.slice(0, SUBJECT_PERFORMANCE_MAX_RESULTS)
+}
+
 // ─── Combined analytics payload ──────────────────────────────────────────────
 
 /** The full Phase 1D analytics payload handed to the dashboard. */
 export interface LearnerAnalytics {
   statistics: LearningStatistics
   weakTopics: WeakTopicGroup[]
+  /** Subject-level rollup (Learning Analytics UX V1 merge — same window). */
+  subjectPerformance: SubjectPerformanceGroup[]
 }
 
 /** The safe empty fallback (no attempts / query failure). */
 export const EMPTY_LEARNER_ANALYTICS: LearnerAnalytics = {
   statistics: { ...EMPTY_LEARNING_STATISTICS },
   weakTopics: [],
+  subjectPerformance: [],
 }
 
 /**
@@ -343,6 +448,7 @@ export function computeLearnerAnalytics(
   return {
     statistics: computeLearningStatistics(attempts),
     weakTopics: deriveWeakTopics(attempts),
+    subjectPerformance: deriveSubjectPerformance(attempts),
   }
 }
 

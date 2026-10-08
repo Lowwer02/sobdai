@@ -9,6 +9,7 @@ import LatestResultCard, { LatestResultEmpty } from '@/components/exams/LatestRe
 import LearningStats, { LearningStatsEmpty } from '@/components/exams/LearningStats'
 import { WeakTopicsEmpty } from '@/components/exams/WeakTopics'
 import WeakTopicsClientSection from '@/components/exams/WeakTopicsClientSection'
+import SubjectPerformance from '@/components/exams/SubjectPerformance'
 import ActivityTimeline, { ActivityTimelineEmpty } from '@/components/exams/ActivityTimeline'
 import RecommendedActions from '@/components/exams/RecommendedActions'
 import SavedQuestions, { SavedQuestionsEmpty } from '@/components/exams/SavedQuestions'
@@ -376,6 +377,24 @@ export default async function ExamDashboardPage({
             />
           )}
         </section>
+
+        {/* ---------- Subject Insight (Learning Analytics UX V1 merge) --------
+            Subject-level rollup of the same recent window the statistics and
+            weak-topics sections use (deriveSubjectPerformance inside
+            computeLearnerAnalytics — zero extra queries). Shown only when the
+            learner has completed attempts; when attempts exist but no subject
+            met the ≥3-encounters eligibility, a one-line muted note explains
+            why the list is empty (never a bare blank). */}
+        {hasCompletedAttempts && (
+          <section style={{ marginBottom: '48px' }}>
+            <SectionTitle>วิชา</SectionTitle>
+            {learnerAnalytics.subjectPerformance.length > 0 ? (
+              <SubjectPerformance subjectPerformance={learnerAnalytics.subjectPerformance} />
+            ) : (
+              <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลรายวิชาที่เพียงพอ</p>
+            )}
+          </section>
+        )}
 
         {/* ---------- My Packages (always show all on desktop; 2 on mobile) ----
             Desktop renders every owned package (unchanged behavior). Mobile

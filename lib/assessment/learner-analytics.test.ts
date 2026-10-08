@@ -12,12 +12,15 @@ import assert from 'node:assert/strict'
 import {
   computeLearningStatistics,
   deriveWeakTopics,
+  deriveSubjectPerformance,
   computeLearnerAnalytics,
   sanitizeAttempt,
   resolveWeakTopicsScope,
   ANALYTICS_WINDOW_LIMIT,
   WEAK_TOPIC_MIN_ENCOUNTERS,
   WEAK_TOPIC_MAX_RESULTS,
+  SUBJECT_MIN_ENCOUNTERS,
+  SUBJECT_PERFORMANCE_MAX_RESULTS,
   type SanitizedAttempt,
 } from './learner-analytics'
 
@@ -590,4 +593,166 @@ test('resolveWeakTopicsScope: auto-default package must itself be owned (defensi
   })
   assert.equal(scope.kind, 'package')
   assert.equal(scope.kind === 'package' && scope.packageId, 'pkgA') // rule 2, rule 1 skipped
+})
+
+// ─── Subject performance (Learning Analytics UX V1 merge) ────────────────────
+
+/** Build a raw summary entry (the persisted answer_summary entry shape). */
+function entry(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    questionId: 'q',
+    selected: 'A',
+    correct: 'B',
+    isCorrect: false,
+    flagged: false,
+    subject: null,
+    law: null,
+    topic: null,
+    ...overrides,
+  }
+}
+
+test('deriveSubjectPerformance: empty attempts → []', () => {
+  assert.deepEqual(deriveSubjectPerformance([]), [])
+})
+
+test('deriveSubjectPerformance: single attempt fixture groups by subject', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 1, total: 3, answerSummary: [
+    entry({ questionId: 'q1', isCorrect: true, subject: 'กฎหมายปกครอง' }),
+    entry({ questionId: 'q2', isCorrect: false, subject: 'กฎหมายปกครอง' }),
+    entry({ questionId: 'q3', isCorrect: false, subject: 'กฎหมายปกครอง' }),
+  ] })
+  const out = deriveSubjectPerformance([attempt])
+  assert.equal(out.length, 1)
+  assert.equal(out[0].label, 'กฎหมายปกครอง')
+  assert.equal(out[0].total, 3)
+  assert.equal(out[0].correct, 1)
+  assert.equal(out[0].incorrect, 2)
+  assert.equal(out[0].unanswered, 0)
+  assert.equal(out[0].accuracy, 33)
+})
+
+test(`deriveSubjectPerformance: min-3 gating (SUBJECT_MIN_ENCOUNTERS = ${SUBJECT_MIN_ENCOUNTERS})`, () => {
+  const attempt: SanitizedAttempt = att('a', { score: 0, total: 2, answerSummary: [
+    entry({ questionId: 'q1', isCorrect: false, subject: 'วิชาสองข้อ' }),
+    entry({ questionId: 'q2', isCorrect: false, subject: 'วิชาสองข้อ' }),
+  ] })
+  // Only 2 encounters → below the threshold even though everything is wrong.
+  assert.deepEqual(deriveSubjectPerformance([attempt]), [])
+})
+
+test('deriveSubjectPerformance: fully-correct subject is excluded (needs ≥1 miss)', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 3, total: 3, answerSummary: [
+    entry({ questionId: 'q1', isCorrect: true, subject: 'วิชาเก่ง' }),
+    entry({ questionId: 'q2', isCorrect: true, subject: 'วิชาเก่ง' }),
+    entry({ questionId: 'q3', isCorrect: true, subject: 'วิชาเก่ง' }),
+  ] })
+  assert.deepEqual(deriveSubjectPerformance([attempt]), [])
+})
+
+test('deriveSubjectPerformance: unanswered counts toward misses but not as incorrect', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 1, total: 3, answerSummary: [
+    entry({ questionId: 'q1', isCorrect: true, subject: 'วิชาค้างตอบ' }),
+    entry({ questionId: 'q2', selected: null, isCorrect: false, subject: 'วิชาค้างตอบ' }),
+    entry({ questionId: 'q3', selected: null, isCorrect: false, subject: 'วิชาค้างตอบ' }),
+  ] })
+  const out = deriveSubjectPerformance([attempt])
+  assert.equal(out.length, 1)
+  assert.equal(out[0].incorrect, 0)
+  assert.equal(out[0].unanswered, 2)
+  assert.equal(out[0].accuracy, 33)
+})
+
+test('deriveSubjectPerformance: null/empty/whitespace subjects are skipped', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 0, total: 5, answerSummary: [
+    entry({ questionId: 'q1', subject: null }),
+    entry({ questionId: 'q2', subject: '   ' }),
+    entry({ questionId: 'q3', subject: '' }),
+    entry({ questionId: 'q4', subject: '  วิชามีช่องว่าง  ' }),
+    entry({ questionId: 'q5', subject: 'วิชามีช่องว่าง' }),
+  ] })
+  const out = deriveSubjectPerformance([attempt])
+  // Only the trimmed subject qualifies — and with just 2 encounters it is
+  // below the min-3 gate, so the result is empty. The point: untrimmed
+  // variants never split into extra groups and labelless entries never crash.
+  assert.deepEqual(out, [])
+})
+
+test('deriveSubjectPerformance: subject label is trimmed and groups merge across whitespace variants', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 0, total: 3, answerSummary: [
+    entry({ questionId: 'q1', subject: ' ภาษีอากร ' }),
+    entry({ questionId: 'q2', subject: 'ภาษีอากร' }),
+    entry({ questionId: 'q3', subject: 'ภาษีอากร\t' }),
+  ] })
+  const out = deriveSubjectPerformance([attempt])
+  assert.equal(out.length, 1)
+  assert.equal(out[0].label, 'ภาษีอากร')
+  assert.equal(out[0].total, 3)
+})
+
+test('deriveSubjectPerformance: ranking = lowest accuracy → larger total → Thai label tie-break', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 0, total: 12, answerSummary: [
+    // 'วิชาก': 3 encountered, 1 correct → 33%
+    entry({ questionId: 'a1', isCorrect: true, subject: 'วิชาก' }),
+    entry({ questionId: 'a2', isCorrect: false, subject: 'วิชาก' }),
+    entry({ questionId: 'a3', isCorrect: false, subject: 'วิชาก' }),
+    // 'วิชาข': 3 encountered, 2 correct → 67%
+    entry({ questionId: 'b1', isCorrect: true, subject: 'วิชาข' }),
+    entry({ questionId: 'b2', isCorrect: true, subject: 'วิชาข' }),
+    entry({ questionId: 'b3', isCorrect: false, subject: 'วิชาข' }),
+    // 'วิชาค': 4 encountered, 2 correct → 50%, but larger sample than วิชาข
+    entry({ questionId: 'c1', isCorrect: true, subject: 'วิชาค' }),
+    entry({ questionId: 'c2', isCorrect: true, subject: 'วิชาค' }),
+    entry({ questionId: 'c3', isCorrect: false, subject: 'วิชาค' }),
+    entry({ questionId: 'c4', isCorrect: false, subject: 'วิชาค' }),
+    // 'วิชาง': 3 encountered, 1 correct → 33%, same accuracy as วิชาก but
+    // smaller total is impossible here — equal accuracy + equal total → Thai
+    // label tie-break orders 'วิชาก' before 'วิชาง'.
+    entry({ questionId: 'd1', isCorrect: true, subject: 'วิชาง' }),
+    entry({ questionId: 'd2', isCorrect: false, subject: 'วิชาง' }),
+    entry({ questionId: 'd3', isCorrect: false, subject: 'วิชาง' }),
+  ] })
+  const out = deriveSubjectPerformance([attempt])
+  assert.equal(out.length, 4)
+  // 33% groups first (accuracy tie → both total 3 → label tie-break), then 50%.
+  assert.deepEqual(out.map((g) => g.label), ['วิชาก', 'วิชาง', 'วิชาค', 'วิชาข'])
+})
+
+test(`deriveSubjectPerformance: returns at most ${SUBJECT_PERFORMANCE_MAX_RESULTS} groups`, () => {
+  const summary = [] as Record<string, unknown>[]
+  for (let i = 0; i < SUBJECT_PERFORMANCE_MAX_RESULTS + 2; i++) {
+    const subject = `วิชาทดสอบ-${i}`
+    summary.push(entry({ questionId: `x${i}-1`, isCorrect: false, subject }))
+    summary.push(entry({ questionId: `x${i}-2`, isCorrect: false, subject }))
+    summary.push(entry({ questionId: `x${i}-3`, isCorrect: false, subject }))
+  }
+  const attempt: SanitizedAttempt = att('a', { score: 0, total: summary.length, answerSummary: summary })
+  const out = deriveSubjectPerformance([attempt])
+  assert.equal(out.length, SUBJECT_PERFORMANCE_MAX_RESULTS)
+})
+
+test('deriveSubjectPerformance: duplicate question ids within one attempt never double-count (validator)', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 0, total: 3, answerSummary: [
+    entry({ questionId: 'dup', isCorrect: false, subject: 'วิชาซ้ำ' }),
+    entry({ questionId: 'dup', isCorrect: false, subject: 'วิชาซ้ำ' }),
+    entry({ questionId: 'other', isCorrect: false, subject: 'วิชาซ้ำ' }),
+    entry({ questionId: 'extra', isCorrect: false, subject: 'วิชาซ้ำ' }),
+  ] })
+  const out = deriveSubjectPerformance([attempt])
+  // The validator dedupes 'dup' → 3 unique encountered questions, not 4.
+  assert.equal(out.length, 1)
+  assert.equal(out[0].total, 3)
+})
+
+test('computeLearnerAnalytics: payload exposes subjectPerformance from the same window', () => {
+  const attempt: SanitizedAttempt = att('a', { score: 1, total: 3, answerSummary: [
+    entry({ questionId: 'q1', isCorrect: true, subject: 'วิชาเดียว' }),
+    entry({ questionId: 'q2', isCorrect: false, subject: 'วิชาเดียว' }),
+    entry({ questionId: 'q3', isCorrect: false, subject: 'วิชาเดียว' }),
+  ] })
+  const { subjectPerformance } = computeLearnerAnalytics([attempt])
+  assert.equal(subjectPerformance.length, 1)
+  assert.equal(subjectPerformance[0].label, 'วิชาเดียว')
+  // Zero attempts → empty list, matching the empty fallback.
+  assert.deepEqual(computeLearnerAnalytics([]).subjectPerformance, [])
 })

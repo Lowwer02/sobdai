@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import type { WeakTopicGroup } from '@/lib/assessment/learner-analytics'
+import TrackedLink from '@/components/exams/TrackedLink'
 
 /**
  * Weak Topics section (Phase 1D) — "หัวข้อที่ควรทบทวน".
@@ -132,11 +132,14 @@ export default function WeakTopics({
             ))}
           </div>
 
-          {/* Optional CTA — only when a valid review attempt id is available. */}
+          {/* Optional CTA — only when a valid review attempt id is available.
+              Learning Analytics UX V1: fires exams_weak_topic_review_click via
+              the tiny TrackedLink client wrapper (navigation unchanged). */}
           {reviewAttemptId ? (
             <div style={{ marginTop: '18px' }}>
-              <Link
+              <TrackedLink
                 href={`/exams/attempts/${reviewAttemptId}?view=incorrect`}
+                eventName="exams_weak_topic_review_click"
                 className="btn-outline"
                 style={{
                   display: 'inline-block',
@@ -147,7 +150,7 @@ export default function WeakTopics({
                 }}
               >
                 {reviewCtaLabel}
-              </Link>
+              </TrackedLink>
             </div>
           ) : null}
         </div>
