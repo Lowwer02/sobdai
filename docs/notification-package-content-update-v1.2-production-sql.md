@@ -64,7 +64,7 @@ where p.package_code = 'OPSMOAC-PPA-2026-V10';
 Record `id` (→ `:package_id`) and `slug`. Fail the gate if zero or multiple
 rows return, or if `is_published = false`.
 
-### A1: resolve the new hard exam set (human confirms exactly one)
+### A1: resolve the new hard exam set (human confirms by name)
 
 ```sql
 select es.id, es.name, es.is_sample, es.status, es.created_at
@@ -75,19 +75,37 @@ where p.package_code = 'OPSMOAC-PPA-2026-V10'
 order by es.created_at desc;
 ```
 
-Record the new hard set's `id` (→ `:exam_set_id`). It should be the newest
-row; confirm by name before proceeding.
+Record the new HARD set's `id` (→ `:exam_set_id`) and its exact `name`
+(→ `:exam_set_name`). Do not pick by recency alone: confirm by name that the
+row is the newly added hard-difficulty set (the gate below pins both values,
+so a wrong or ambiguous choice fails closed rather than silently targeting
+another set).
 
 ### A2: recipient preview (aggregates only — no PII in output)
+
+Paste the confirmed `:exam_set_id` and `:exam_set_name` from A1. The preview
+fails closed on an unconfirmed selection: an unreplaced id is a `uuid` parse
+error, and an id/name pair that does not resolve to exactly one published set
+raises the self-describing `A2 gate failed` error instead of returning counts.
+The target, exam-set, event-key, and entitlement derivations are the same
+shapes Gate B uses.
 
 ```sql
 with target as (
   select id, slug from public.packages
   where package_code = 'OPSMOAC-PPA-2026-V10' and is_published = true
 ),
+exam as (
+  select es.id, es.name
+  from public.exam_sets es
+  join target t on t.id = es.package_id
+  where es.id = '<exam_set_id from A1>'::uuid
+    and es.status = 'published'
+    and es.name = '<exam_set_name from A1>'
+),
 event as (
-  select 'package_content_update:' || id::text || ':<exam_set_id from A1>' as k
-  from target
+  select 'package_content_update:' || t.id::text || ':' || e.id::text as k
+  from target t cross join exam e
 ),
 entitled as (
   select distinct o.user_id
@@ -108,21 +126,33 @@ have as (
   join public.notifications n on n.user_id = r.user_id
   where n.type = 'PACKAGE_CONTENT_UPDATE'
     and n.source_event_key = (select k from event)
+),
+gate as (
+  select case
+           when (select count(*) from target) = 1
+            and (select count(*) from exam) = 1
+             then 1
+           else (select 'A2 gate failed: the target package or the confirmed hard exam set did not resolve to exactly one published row'::int)
+         end as ok
 )
-select (select count(*) from recipients)                        as eligible_recipients,
-       (select n from have)                                     as already_notified,
-       (select count(*) from recipients) - (select n from have) as pending_recipients;
+select (select ok from gate)                                     as gate_ok,
+       (select e.name from exam e)                               as confirmed_exam_set_name,
+       (select count(*) from recipients)                         as eligible_recipients,
+       (select n from have)                                      as already_notified,
+       (select count(*) from recipients) - (select n from have)  as pending_recipients;
 ```
 
-Every recipient is entitled by construction: the set is derived from that
-package's completed orders only. Record `eligible_recipients` (→
-`:confirmed_eligible`) for Gate B's drift guard.
+`gate_ok` must be `1` and `confirmed_exam_set_name` must read as the hard set
+before the counts mean anything. Every recipient is entitled by construction:
+the set is derived from that package's completed orders only. Record
+`eligible_recipients` (→ `:confirmed_eligible`) for Gate B's drift guard.
 
 ------------------------------------------------------------------------
 
 ## Gate B — guarded, idempotent, per-recipient insert
 
-Fill in the two human-confirmed values from Gate A. Behavior:
+Fill in the three human-confirmed values from Gate A (exam-set id, exam-set
+name, eligible count). Behavior:
 
 - Fails closed if the target package, the published exam set, or the eligible
   audience size differs from what Gate A confirmed.
@@ -140,9 +170,10 @@ declare
   v_package_id  uuid;
   v_slug        text;
   v_exam_set_id uuid := '<exam_set_id from A1>';
+  v_exam_set_name text := '<exam_set_name from A1>';
   v_confirmed_eligible int := <eligible_recipients confirmed in A2>;
   v_send_date   date := coalesce(
-                     nullif(current_setting('app.notification_v1_2_send_date', true), ''),
+                     to_date(nullif(current_setting('app.notification_v1_2_send_date', true), ''), 'YYYY-MM-DD'),
                      date '2026-10-09'
                    );
   v_today       date := (now() at time zone 'Asia/Bangkok')::date;
@@ -172,8 +203,9 @@ begin
      where id = v_exam_set_id
        and package_id = v_package_id
        and status = 'published'
+       and name = v_exam_set_name
   ) then
-    raise exception 'Gate B: % is not a published exam set of the target package.', v_exam_set_id;
+    raise exception 'Gate B: % is not the confirmed published hard exam set of the target package.', v_exam_set_id;
   end if;
 
   v_event_key := 'package_content_update:' || v_package_id::text || ':' || v_exam_set_id::text;

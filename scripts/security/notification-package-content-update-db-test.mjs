@@ -77,6 +77,21 @@ async function expectError(client, name, sql, messagePattern) {
     check(name, false, 'expected an error but the statement succeeded')
   } catch (error) {
     check(name, messagePattern.test(error.message), `got: ${error.message}`)
+    // A failed batch that opened its own transaction (for example
+    // `begin; migration; commit;`) leaves the session inside an aborted
+    // transaction because PostgreSQL skips the remaining statements,
+    // including the trailing commit. Probe for that state and roll back
+    // only this call's own transaction; a failed plain statement runs in
+    // autocommit and leaves nothing to clean up.
+    try {
+      await client.query('select 1')
+    } catch (abortError) {
+      if (abortError.code === '25P02') {
+        await client.query('rollback')
+      } else {
+        throw abortError
+      }
+    }
   }
 }
 
@@ -158,7 +173,10 @@ language plpgsql as $$ begin return query select null::uuid, null::uuid, 'stub':
 `
 
 // The fanout mirrors docs/notification-package-content-update-v1.2-production-sql.md
-// Gate B. %EXAM_SET_ID% and %CONFIRMED_ELIGIBLE% are substituted per scenario.
+// Gate B. %EXAM_SET_ID% and %CONFIRMED_ELIGIBLE% are substituted per scenario;
+// the exam-set name pin comes from the fixture's confirmed hard set.
+const HARD_EXAM_SET_NAME = 'ชุดยาก (new)'
+
 function fanoutSql(examSetId, confirmedEligible) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(examSetId)) {
     throw new Error('exam set id must be a uuid')
@@ -166,6 +184,7 @@ function fanoutSql(examSetId, confirmedEligible) {
   if (!Number.isInteger(confirmedEligible) || confirmedEligible < 0) {
     throw new Error('confirmed eligible must be a non-negative integer')
   }
+  const examSetName = HARD_EXAM_SET_NAME.replaceAll("'", "''")
   return `
 do $package_content_update_fanout$
 declare
@@ -174,7 +193,7 @@ declare
   v_exam_set_id uuid := '${examSetId}';
   v_confirmed_eligible int := ${confirmedEligible};
   v_send_date   date := coalesce(
-                     nullif(current_setting('app.notification_v1_2_send_date', true), ''),
+                     to_date(nullif(current_setting('app.notification_v1_2_send_date', true), ''), 'YYYY-MM-DD'),
                      date '2026-10-09'
                    );
   v_today       date := (now() at time zone 'Asia/Bangkok')::date;
@@ -197,9 +216,12 @@ begin
 
   if not exists (
     select 1 from public.exam_sets
-     where id = v_exam_set_id and package_id = v_package_id and status = 'published'
+     where id = v_exam_set_id
+       and package_id = v_package_id
+       and status = 'published'
+       and name = '${examSetName}'
   ) then
-    raise exception 'Gate B: % is not a published exam set of the target package.', v_exam_set_id;
+    raise exception 'Gate B: % is not the confirmed published hard exam set of the target package.', v_exam_set_id;
   end if;
 
   v_event_key := 'package_content_update:' || v_package_id::text || ':' || v_exam_set_id::text;
@@ -288,11 +310,17 @@ async function main() {
   client.on('notice', (notice) => notices.push(String(notice.message)))
   await client.query(`set statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
 
-  const { rows: schemaCheck } = await client.query(
-    "select to_regclass('public.profiles') is not null as preexisting",
-  )
+  const { rows: schemaCheck } = await client.query(`
+    select to_regclass('public.profiles') is not null as preexisting,
+           to_regprocedure('auth.uid()') is not null as auth_uid_preexisting
+  `)
   if (schemaCheck[0].preexisting) {
     console.error('Refusing to run: public.profiles already exists. This test needs an EMPTY database.')
+    await client.end()
+    process.exit(2)
+  }
+  if (schemaCheck[0].auth_uid_preexisting) {
+    console.error('Refusing to run: a real auth.uid() already exists (Supabase-style fixture). This harness rewrites auth.uid() and may only run against an empty disposable database.')
     await client.end()
     process.exit(2)
   }
@@ -357,11 +385,17 @@ async function main() {
     select '77777777-7777-4777-8777-777777777777'::uuid, id, 'paid', 'paid'
       from public.packages where package_code = 'OTHER-PKG-1';
 
-    insert into public.exam_sets (package_id, name, status)
-    select id, 'ชุดยาก (new)', 'published' from public.packages where package_code = 'OPSMOAC-PPA-2026-V10';
+    insert into public.exam_sets (package_id, name, status, created_at)
+    select id, 'ชุดยาก (new)', 'published', now() from public.packages where package_code = 'OPSMOAC-PPA-2026-V10';
+
+    insert into public.exam_sets (package_id, name, status, created_at)
+    select id, 'ชุดเดิม (old)', 'published', now() - interval '30 days' from public.packages where package_code = 'OPSMOAC-PPA-2026-V10';
 
     insert into public.exam_sets (package_id, name, status)
     select id, 'draft set', 'draft' from public.packages where package_code = 'OPSMOAC-PPA-2026-V10';
+
+    insert into public.exam_sets (package_id, name, status)
+    select id, 'other package set', 'published' from public.packages where package_code = 'OTHER-PKG-1';
   `)
   void seed
 
@@ -376,6 +410,9 @@ async function main() {
   const otherExamSetId = (await client.query(
     'select id from public.exam_sets where package_id = $1 limit 1',
     [ids.other_package_id],
+  )).rows[0].id
+  const oldPublishedSetId = (await client.query(
+    "select id from public.exam_sets where name = 'ชุดเดิม (old)' limit 1",
   )).rows[0].id
   const eventKey = `package_content_update:${ids.package_id}:${ids.exam_set_id}`
 
@@ -426,9 +463,11 @@ async function main() {
   console.log('scenario: fail-closed target validation')
   await client.query(setGuardDateToday)
   await expectError(client, 'draft exam set rejected',
-    fanoutSql(ids.draft_set_id, 4), /not a published exam set/)
+    fanoutSql(ids.draft_set_id, 4), /not the confirmed published hard exam set/)
   await expectError(client, 'foreign-package exam set rejected',
-    fanoutSql(otherExamSetId, 4), /not a published exam set/)
+    fanoutSql(otherExamSetId, 4), /not the confirmed published hard exam set/)
+  await expectError(client, 'non-hard published set of the target package rejected',
+    fanoutSql(oldPublishedSetId, 4), /not the confirmed published hard exam set/)
   await expectError(client, 'eligible audience drift rejected',
     fanoutSql(ids.exam_set_id, 5), /audience drift/)
   const { rows: afterFailClosed } = await client.query(
@@ -548,9 +587,16 @@ async function main() {
     values ($1, 'rejected', 'test only')
     returning id
   `, [orderA])).rows[0].id
-  await expectError(client, 'rejected producer guards a non-pending order',
-    'select public.try_create_payment_rejected_notification($1)'.replace('$1', `'${submission}'`),
-    /invalid rejected payment submission/)
+  // The canonical producers are best-effort by contract (092/093: errors are
+  // isolated in `exception when others then raise warning`), so invalid input
+  // is a silent no-op, not a raised error.
+  await client.query('select public.try_create_payment_rejected_notification($1)', [submission])
+  const { rows: noRejectedRow } = await client.query(
+    'select count(*)::int as n from public.notifications where source_payment_submission_id = $1',
+    [submission],
+  )
+  check('rejected producer no-ops on a non-pending order (best-effort isolation)',
+    noRejectedRow[0].n === 0, `got ${noRejectedRow[0].n}`)
   const pendingOrder = (await client.query(`
     insert into public.orders (user_id, package_id, status, payment_provider)
     values ('11111111-1111-4111-8111-111111111111', $1, 'pending', 'promptpay_manual')
@@ -586,8 +632,11 @@ async function main() {
   check('authenticated can select own (grant)', privs[0].can_select === true)
   check('authenticated cannot insert', privs[0].can_insert === false)
   check('authenticated cannot delete', privs[0].can_delete === false)
-  check('authenticated update limited to read_at column',
-    privs[0].can_update === true && privs[0].can_update_read_at === true && privs[0].can_update_href === false)
+  check('authenticated update is column-scoped to read_at only',
+    privs[0].can_update === false
+    && privs[0].can_update_read_at === true
+    && privs[0].can_update_href === false,
+    JSON.stringify(privs[0]))
 
   await client.query('begin')
   await client.query("select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true)")
