@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -27,9 +28,10 @@ import {
 import {
   createPromptPayQrFile,
   getPromptPayQrSaveMode,
+  initiatePromptPayQrDownload,
   isPromptPayShareCancelled,
-  PROMPTPAY_QR_FILENAME,
 } from '@/lib/payment/promptpay-qr-export'
+import { shouldPrepareManualPaymentQr } from '@/lib/payment/manual-qr-eligibility'
 
 declare global {
   interface Window { OmiseCard: any }
@@ -88,12 +90,20 @@ export default function CheckoutClient({
   const [qrSavePending, setQrSavePending] = useState(false)
   const [qrSaveStatus, setQrSaveStatus] = useState('')
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false)
+  const [qrPreviewPortalReady, setQrPreviewPortalReady] = useState(false)
   const [manualQrState, setManualQrState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>(
     initialManualOrder && manualPaymentEnabled ? 'loading' : 'idle',
   )
   const [slipFile, setSlipFile] = useState<File | null>(null)
   const [slipSubmitting, setSlipSubmitting] = useState(false)
   const [fileInputKey, setFileInputKey] = useState(0)
+  const qrPreviewDialogRef = useRef<HTMLDialogElement | null>(null)
+  const qrPreviewCloseButtonRef = useRef<HTMLButtonElement | null>(null)
+  const qrPreviewOpenerRef = useRef<HTMLElement | null>(null)
+  const qrPreviewFallbackRef = useRef<HTMLAnchorElement | null>(null)
+  const qrPreviewWasOpenedRef = useRef(false)
+  const qrPreviewIsOpenRef = useRef(false)
+  const qrShareAttemptGenerationRef = useRef(0)
 
   const currentPrice = Number(pkg.current_price)
   const originalPrice = Number(pkg.original_price)
@@ -109,9 +119,35 @@ export default function CheckoutClient({
         evidenceReadAvailable: manualOrder.paymentEvidenceAvailable,
       })
     : null
+  const manualQrNeededForPaidCheckout = shouldPrepareManualPaymentQr({
+    currentPrice,
+    order: manualOrder,
+    paymentEnabled: manualPaymentEnabled,
+    presentationState: presentation?.state ?? null,
+  })
   const currentManualQrDetails = manualOrder && manualQrDetails?.orderId === manualOrder.id
     ? manualQrDetails
     : null
+  const qrPreviewCanOpen = Boolean(
+    manualQrNeededForPaidCheckout
+    && currentManualQrDetails
+    && manualQrExport?.orderId === manualOrder?.id
+    && manualQrState === 'ready',
+  )
+  const qrShareContextRef = useRef({
+    orderId: manualOrder?.id ?? null,
+    price: currentPrice,
+    paymentEnabled: manualPaymentEnabled,
+    eligible: manualQrNeededForPaidCheckout,
+    presentationState: presentation?.state ?? null,
+  })
+  qrShareContextRef.current = {
+    orderId: manualOrder?.id ?? null,
+    price: currentPrice,
+    paymentEnabled: manualPaymentEnabled,
+    eligible: manualQrNeededForPaidCheckout,
+    presentationState: presentation?.state ?? null,
+  }
   const manualQrUrl = manualOrder
     ? `/api/payment/manual/order/${encodeURIComponent(manualOrder.id)}/qr`
     : null
@@ -180,9 +216,20 @@ export default function CheckoutClient({
 
   useEffect(() => {
     const orderId = manualOrder?.id
-    if (!orderId || !manualQrUrl || !manualPaymentEnabled || manualQrDetails?.orderId !== orderId) {
+    if (!orderId || !manualQrUrl || !manualQrNeededForPaidCheckout) {
       setManualQrExport(null)
       setManualQrExportState('idle')
+      setManualQrState('idle')
+      setQrSavePending(false)
+      setQrSaveStatus('')
+      setQrPreviewOpen(false)
+      return
+    }
+
+    if (manualQrDetails?.orderId !== orderId) {
+      setManualQrExport(null)
+      setManualQrExportState('idle')
+      setManualQrState('loading')
       return
     }
 
@@ -225,22 +272,107 @@ export default function CheckoutClient({
       controller.abort()
       if (imageUrl) URL.revokeObjectURL(imageUrl)
     }
-  }, [manualOrder?.id, manualPaymentEnabled, manualQrDetails, manualQrUrl])
+  }, [manualOrder?.id, manualPaymentEnabled, manualQrNeededForPaidCheckout, manualQrDetails?.orderId, manualQrUrl])
 
   useEffect(() => {
-    if (!qrPreviewOpen) return
+    setQrPreviewPortalReady(true)
+  }, [])
 
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const handlePreviewKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setQrPreviewOpen(false)
-    }
-
-    window.addEventListener('keydown', handlePreviewKeyDown)
+  useEffect(() => {
+    qrShareAttemptGenerationRef.current += 1
+    setQrSavePending(false)
+    setQrSaveStatus('')
+    qrPreviewIsOpenRef.current = false
+    setQrPreviewOpen(false)
     return () => {
-      window.removeEventListener('keydown', handlePreviewKeyDown)
-      previousFocus?.focus()
+      qrShareAttemptGenerationRef.current += 1
     }
-  }, [qrPreviewOpen])
+  }, [manualOrder?.id, manualOrder?.status, manualOrder?.paymentSettingsAvailable, currentPrice, manualPaymentEnabled, presentation?.state])
+
+  useEffect(() => {
+    const dialog = qrPreviewDialogRef.current
+    if (qrPreviewOpen && qrPreviewCanOpen && dialog) {
+      if (!dialog.open) dialog.showModal()
+      qrPreviewWasOpenedRef.current = true
+      qrPreviewIsOpenRef.current = true
+      qrPreviewCloseButtonRef.current?.focus()
+      return
+    }
+
+    if (dialog?.open) dialog.close()
+    if (qrPreviewOpen && !qrPreviewCanOpen) setQrPreviewOpen(false)
+
+    if (qrPreviewWasOpenedRef.current) {
+      qrPreviewWasOpenedRef.current = false
+      qrPreviewIsOpenRef.current = false
+      const opener = qrPreviewOpenerRef.current
+      const openerIsUsable = Boolean(
+        opener?.isConnected
+        && !('disabled' in opener && opener.disabled)
+        && opener.getClientRects().length > 0,
+      )
+      const focusTarget = openerIsUsable ? opener : qrPreviewFallbackRef.current
+      focusTarget?.focus()
+    }
+  }, [qrPreviewOpen, qrPreviewCanOpen, qrPreviewPortalReady, manualOrder?.id, manualQrExport?.orderId])
+
+  useEffect(() => {
+    const dialog = qrPreviewDialogRef.current
+    if (!qrPreviewOpen || !qrPreviewCanOpen || !dialog) return
+
+    const handlePreviewTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.getClientRects().length > 0)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const activeElement = document.activeElement
+      if (!dialog.contains(activeElement)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
+      } else if (event.shiftKey && activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handlePreviewTab, true)
+    return () => document.removeEventListener('keydown', handlePreviewTab, true)
+  }, [qrPreviewOpen, qrPreviewCanOpen])
+
+  useEffect(() => {
+    const desktopViewport = window.matchMedia('(min-width: 1024px)')
+    const closeMobilePreview = () => {
+      if (desktopViewport.matches && qrPreviewIsOpenRef.current) {
+        qrPreviewIsOpenRef.current = false
+        setQrPreviewOpen(false)
+      }
+    }
+
+    desktopViewport.addEventListener('change', closeMobilePreview)
+    closeMobilePreview()
+    return () => desktopViewport.removeEventListener('change', closeMobilePreview)
+  }, [])
+
+  const openQrPreview = (opener: HTMLElement) => {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      setQrSaveStatus('')
+      return
+    }
+    if (!qrPreviewIsOpenRef.current) qrPreviewOpenerRef.current = opener
+    qrPreviewIsOpenRef.current = true
+    setQrPreviewOpen(true)
+  }
 
   const handleCardPayment = () => {
     if (!omiseLoaded || !window.OmiseCard) {
@@ -319,51 +451,80 @@ export default function CheckoutClient({
     }
   }
 
-  const handlePromptPayQrSave = () => {
-    if (!manualOrder || !manualQrUrl || manualQrState !== 'ready' || !currentManualQrDetails) return
+  const handlePromptPayQrSave = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    const saveButton = event.currentTarget
+    if (!manualOrder || !manualQrUrl || !manualQrNeededForPaidCheckout || manualQrState !== 'ready' || !currentManualQrDetails) return
 
     const file = manualQrExport?.orderId === manualOrder.id ? manualQrExport.file : null
     if (!file) {
-      setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
-      setQrPreviewOpen(true)
+      setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
       return
+    }
+
+    const orderId = manualOrder.id
+    const presentationState = presentation?.state ?? null
+    const attemptGeneration = ++qrShareAttemptGenerationRef.current
+    const isCurrentShareAttempt = () => {
+      const context = qrShareContextRef.current
+      return qrShareAttemptGenerationRef.current === attemptGeneration
+        && context.orderId === orderId
+        && context.price > 0
+        && context.paymentEnabled
+        && context.eligible
+        && context.presentationState === presentationState
     }
 
     try {
       const downloadLink = document.createElement('a')
       const saveMode = getPromptPayQrSaveMode(navigator, file, 'download' in downloadLink)
 
-      if (saveMode === 'share' && typeof navigator.share === 'function') {
+      if (saveMode === 'share') {
+        const share = navigator.share
+        if (typeof share !== 'function') {
+          setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
+          openQrPreview(saveButton)
+          return
+        }
+
         setQrSavePending(true)
-        setQrSaveStatus('เลือกบันทึกรูปภาพจากเมนูแชร์')
-        void navigator.share({ files: [file], title: 'PromptPay QR Code' })
-          .catch((reason: unknown) => {
-            if (isPromptPayShareCancelled(reason)) return
-            setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
-            setQrPreviewOpen(true)
+        setQrSaveStatus('กำลังเปิดเมนูแชร์...')
+        // Keep this call in the original click stack for iOS user-activation rules.
+        const sharePromise = share.call(navigator, { files: [file], title: 'PromptPay QR Code' })
+        void Promise.resolve(sharePromise)
+          .then(
+            () => {
+              if (isCurrentShareAttempt()) setQrSaveStatus('')
+            },
+            (reason: unknown) => {
+              if (!isCurrentShareAttempt()) return
+              if (isPromptPayShareCancelled(reason)) {
+                setQrSaveStatus('')
+                return
+              }
+              setQrSaveStatus('ไม่สามารถเปิดเมนูแชร์ได้ กรุณาเปิดรูป QR เพื่อบันทึก')
+              openQrPreview(saveButton)
+            },
+          )
+          .finally(() => {
+            if (isCurrentShareAttempt()) setQrSavePending(false)
           })
-          .finally(() => setQrSavePending(false))
         return
       }
 
       if (saveMode === 'download') {
-        const objectUrl = URL.createObjectURL(file)
-        downloadLink.href = objectUrl
-        downloadLink.download = PROMPTPAY_QR_FILENAME
-        downloadLink.hidden = true
-        document.body.appendChild(downloadLink)
-        downloadLink.click()
-        downloadLink.remove()
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
-        setQrSaveStatus('เริ่มดาวน์โหลด QR Code แล้ว')
+        initiatePromptPayQrDownload(file)
+        setQrSaveStatus('เริ่มดาวน์โหลด QR Code แล้ว หากไม่พบไฟล์ สามารถเปิดรูป QR เพื่อบันทึกได้')
         return
       }
 
       setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
-      setQrPreviewOpen(true)
+      openQrPreview(saveButton)
     } catch {
-      setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
-      setQrPreviewOpen(true)
+      if (isCurrentShareAttempt()) {
+        setQrSavePending(false)
+        setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+        openQrPreview(saveButton)
+      }
     }
   }
 
@@ -479,6 +640,7 @@ export default function CheckoutClient({
       <div className="sticky top-0 z-50 border-b border-border-subtle bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-3xl items-center gap-4 px-4">
           <Link
+            ref={qrPreviewFallbackRef}
             href={`/package/${pkg.slug}`}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-hover hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand"
             aria-label="กลับไปหน้าแพ็กเกจ"
@@ -657,7 +819,7 @@ export default function CheckoutClient({
                           )}
                           {manualQrState === 'unavailable' && <div className="py-8 text-sm text-red-700">ขณะนี้การชำระเงินผ่าน PromptPay ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง</div>}
                           {manualQrState === 'ready' && currentManualQrDetails && manualQrExport?.orderId === manualOrder.id && (
-                            <div className="mx-auto mt-3 w-full max-w-sm text-center md:hidden">
+                            <div className="mx-auto mt-3 w-full max-w-sm text-center lg:hidden">
                               <button
                                 type="button"
                                 onClick={handlePromptPayQrSave}
@@ -673,43 +835,19 @@ export default function CheckoutClient({
                                     : 'บันทึก QR Code'}
                               </button>
                               <p className="mt-1 text-xs text-slate-600">บันทึก QR เพื่อเปิดในแอปธนาคาร</p>
+                              <button
+                                type="button"
+                                onClick={(event) => openQrPreview(event.currentTarget)}
+                                className="min-h-[44px] px-3 text-sm font-medium text-[#5A4319] underline decoration-[#8B6B26]/50 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
+                              >
+                                เปิดรูป QR เพื่อบันทึก
+                              </button>
                               <p role="status" aria-live="polite" className="mt-1 min-h-4 text-xs text-slate-600">
                                 {qrSaveStatus}
                               </p>
                             </div>
                           )}
                         </div>
-
-                        {qrPreviewOpen && currentManualQrDetails && manualQrExport?.orderId === manualOrder.id && (
-                          <div
-                            className="fixed inset-0 z-[100] overflow-y-auto bg-black/70 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:hidden"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="promptpay-qr-preview-title"
-                          >
-                            <div className="mx-auto mt-6 w-full max-w-md rounded-2xl bg-white p-4 text-center text-slate-900 shadow-xl">
-                              <div className="flex items-center justify-between gap-4">
-                                <h2 id="promptpay-qr-preview-title" className="text-base font-bold">บันทึก QR Code</h2>
-                                <button
-                                  type="button"
-                                  autoFocus
-                                  onClick={() => setQrPreviewOpen(false)}
-                                  className="min-h-[44px] rounded-lg px-4 text-sm font-semibold text-[#5A4319] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
-                                >
-                                  ปิด
-                                </button>
-                              </div>
-                              <p className="mt-2 text-sm text-slate-700">แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ</p>
-                              <img
-                                src={manualQrExport.imageUrl}
-                                alt={`QR PromptPay สำหรับชำระเงิน ฿${currentManualQrDetails.amount}`}
-                                width={768}
-                                height={768}
-                                className="mx-auto mt-3 h-auto max-h-[65svh] w-auto max-w-full object-contain"
-                              />
-                            </div>
-                          </div>
-                        )}
 
                         {manualQrState === 'ready' && currentManualQrDetails && (
                           <div className="space-y-2 text-center">
@@ -780,6 +918,42 @@ export default function CheckoutClient({
           </>
         )}
       </div>
+      {qrPreviewPortalReady && qrPreviewCanOpen && manualQrExport && currentManualQrDetails && createPortal(
+        <dialog
+          ref={qrPreviewDialogRef}
+          onCancel={() => { qrPreviewIsOpenRef.current = false }}
+          onClose={() => {
+            qrPreviewIsOpenRef.current = false
+            setQrPreviewOpen(false)
+          }}
+          aria-labelledby="promptpay-qr-preview-title"
+          className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border-0 bg-white p-4 text-center text-slate-900 shadow-xl outline-none backdrop:bg-black/70 lg:hidden"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="promptpay-qr-preview-title" className="text-base font-bold">บันทึก QR Code</h2>
+            <button
+              ref={qrPreviewCloseButtonRef}
+              type="button"
+              onClick={() => {
+                qrPreviewIsOpenRef.current = false
+                setQrPreviewOpen(false)
+              }}
+              className="min-h-[44px] rounded-lg px-4 text-sm font-semibold text-[#5A4319] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
+            >
+              ปิด
+            </button>
+          </div>
+          <p className="mt-2 text-sm text-slate-700">แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ</p>
+          <img
+            src={manualQrExport.imageUrl}
+            alt={`QR PromptPay สำหรับชำระเงิน ฿${currentManualQrDetails.amount}`}
+            width={768}
+            height={768}
+            className="mx-auto mt-3 h-auto max-h-[65svh] w-auto max-w-full object-contain"
+          />
+        </dialog>,
+        document.body,
+      )}
     </div>
   )
 }

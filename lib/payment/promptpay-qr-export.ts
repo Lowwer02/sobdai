@@ -1,4 +1,5 @@
 export const PROMPTPAY_QR_FILENAME = 'sobdai-promptpay-qr.png'
+export const PROMPTPAY_QR_DOWNLOAD_URL_LIFETIME_MS = 60_000
 
 export type PromptPayQrShareApi = {
   share?: (data: ShareData) => Promise<void>
@@ -47,4 +48,44 @@ export function isPromptPayShareCancelled(reason: unknown): boolean {
       && 'name' in reason
       && reason.name === 'AbortError',
   )
+}
+
+export interface PromptPayQrDownloadOptions {
+  document?: Pick<Document, 'createElement' | 'body'>
+  urlApi?: Pick<typeof URL, 'createObjectURL' | 'revokeObjectURL'>
+  schedule?: (callback: () => void, delayMs: number) => unknown
+}
+
+/** Start a browser download without treating a returned click as proof of save. */
+export function initiatePromptPayQrDownload(
+  file: File,
+  options: PromptPayQrDownloadOptions = {},
+): void {
+  if (file.type !== 'image/png' || file.size === 0) {
+    throw new Error('PromptPay QR export must be a non-empty PNG.')
+  }
+
+  const documentRef = options.document ?? document
+  const urlApi = options.urlApi ?? URL
+  const schedule = options.schedule ?? ((callback, delayMs) => window.setTimeout(callback, delayMs))
+  const link = documentRef.createElement('a')
+  let objectUrl: string | null = null
+
+  try {
+    objectUrl = urlApi.createObjectURL(file)
+    link.href = objectUrl
+    link.download = PROMPTPAY_QR_FILENAME
+    link.hidden = true
+    documentRef.body.appendChild(link)
+    link.click()
+  } finally {
+    try {
+      link.remove()
+    } finally {
+      if (objectUrl) {
+        const urlToRevoke = objectUrl
+        schedule(() => urlApi.revokeObjectURL(urlToRevoke), PROMPTPAY_QR_DOWNLOAD_URL_LIFETIME_MS)
+      }
+    }
+  }
 }

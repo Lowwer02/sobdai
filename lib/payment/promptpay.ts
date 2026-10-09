@@ -1,5 +1,6 @@
 import { ThaiQRPaymentBuilder, parsePayload } from '@thai-qr-payment/payload'
 import QRCode from 'qrcode'
+import sharp from 'sharp'
 
 export const PROMPTPAY_CURRENCY = '764'
 export const PROMPTPAY_COUNTRY = 'TH'
@@ -99,12 +100,28 @@ export function buildPromptPayPayload(recipient: unknown, amount: unknown): Prom
 
 export async function renderPromptPayQr(recipient: unknown, amount: unknown): Promise<PromptPayPayload & { dataUrl: string }> {
   const payload = buildPromptPayPayload(recipient, amount)
-  const dataUrl = await QRCode.toDataURL(payload.wire, {
-    type: 'image/png',
+  const qr = QRCode.create(payload.wire, { errorCorrectionLevel: 'M' })
+  const totalModuleCount = qr.modules.size + 8
+  const modulePitch = Math.floor(768 / totalModuleCount)
+  const renderedSize = modulePitch * totalModuleCount
+  const paddingBefore = Math.floor((768 - renderedSize) / 2)
+  const paddingAfter = 768 - renderedSize - paddingBefore
+  const qrPng = await QRCode.toBuffer(payload.wire, {
     errorCorrectionLevel: 'M',
     margin: 4,
-    width: 768,
+    width: renderedSize,
   })
+  const paddedPng = await sharp(qrPng)
+    .extend({
+      top: paddingBefore,
+      bottom: paddingAfter,
+      left: paddingBefore,
+      right: paddingAfter,
+      background: '#ffffff',
+    })
+    .png()
+    .toBuffer()
+  const dataUrl = `data:image/png;base64,${paddedPng.toString('base64')}`
 
   return { ...payload, dataUrl }
 }
