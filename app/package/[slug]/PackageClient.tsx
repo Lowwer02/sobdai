@@ -141,6 +141,13 @@ export default function PackageClient({
 }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
+  const positionName = canonicalPosition?.name?.trim() || pkg.positions?.name?.trim() || ''
+  const thaiDisplayYear = formatThaiDisplayYear(pkg.exam_year)
+  const technicalMetadata = [
+    typeof pkg.package_code === 'string' && pkg.package_code.trim() ? pkg.package_code.trim() : null,
+    pkg.version !== null && pkg.version !== undefined && String(pkg.version).trim() ? `v${pkg.version}` : null,
+    typeof pkg.difficulty === 'string' && pkg.difficulty.trim() ? pkg.difficulty.trim() : null,
+  ].filter((value): value is string => Boolean(value))
   const currentPrice = typeof pkg.current_price === 'number' && Number.isFinite(pkg.current_price)
     ? pkg.current_price
     : 0
@@ -216,8 +223,8 @@ export default function PackageClient({
 
     window.addEventListener('scroll', updateStickyPurchase, { passive: true })
     window.addEventListener('resize', updateStickyPurchase)
-    window.addEventListener('focusin', updateStickyPurchase)
-    window.addEventListener('focusout', updateStickyPurchase)
+    document.addEventListener('focusin', updateStickyPurchase)
+    document.addEventListener('focusout', updateStickyPurchase)
     window.visualViewport?.addEventListener('resize', updateStickyPurchase)
     window.visualViewport?.addEventListener('scroll', updateStickyPurchase)
 
@@ -233,8 +240,8 @@ export default function PackageClient({
     return () => {
       window.removeEventListener('scroll', updateStickyPurchase)
       window.removeEventListener('resize', updateStickyPurchase)
-      window.removeEventListener('focusin', updateStickyPurchase)
-      window.removeEventListener('focusout', updateStickyPurchase)
+      document.removeEventListener('focusin', updateStickyPurchase)
+      document.removeEventListener('focusout', updateStickyPurchase)
       window.visualViewport?.removeEventListener('resize', updateStickyPurchase)
       window.visualViewport?.removeEventListener('scroll', updateStickyPurchase)
       overlayObserver.disconnect()
@@ -257,24 +264,27 @@ export default function PackageClient({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-6 items-stretch">
             
             <div className="order-1 lg:order-1 lg:col-span-7 bg-card border border-brand-solid/15 rounded-2xl lg:rounded-[24px] p-4 lg:p-8 flex flex-col gap-4 lg:gap-8 relative overflow-hidden shadow-2xl">
-              <div className="flex flex-col gap-3 relative z-10 lg:flex-row lg:gap-6">
-                <div className="w-12 h-12 lg:w-36 lg:h-48 bg-white rounded-xl lg:rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-brand-solid/30 shadow-[0_0_30px_rgba(212,175,55,0.1)] overflow-hidden">
-                  {logoUrl ? (
-                    <Image
-                      src={logoUrl}
-                      alt={`${orgName} Logo`}
-                      width={144}
-                      height={192}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      className="p-1 lg:p-4"
-                    />
-                  ) : (
-                    <div className="text-brand font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
-                  )}
+              <div className="flex flex-col gap-2 relative z-10 lg:flex-row lg:gap-6">
+                <div className="flex min-w-0 items-center gap-3 lg:flex-none lg:items-start lg:gap-0">
+                  <div className="w-12 h-12 lg:w-36 lg:h-48 bg-white rounded-xl lg:rounded-3xl flex-shrink-0 flex flex-col items-center justify-center relative border-[1px] border-brand-solid/30 shadow-[0_0_30px_rgba(212,175,55,0.1)] overflow-hidden">
+                    {logoUrl ? (
+                      <Image
+                        src={logoUrl}
+                        alt={`${orgName} Logo`}
+                        width={144}
+                        height={192}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        className="p-1 lg:p-4"
+                      />
+                    ) : (
+                      <div className="text-brand font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
+                    )}
+                  </div>
+                  <span className="min-w-0 break-words text-foreground text-[12px] leading-snug lg:hidden">{orgName}</span>
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="flex flex-wrap items-center gap-1.5 mb-2 lg:mb-3">
+                  <div className="hidden lg:flex flex-wrap items-center gap-1.5 mb-3">
                     <span className="text-foreground text-[12px] lg:text-[13px] mr-1 lg:mr-2">{orgName}</span>
                     {(canonicalPosition || pkg.positions?.name) && (
                       canonicalPosition ? (
@@ -296,9 +306,34 @@ export default function PackageClient({
                     <span className="bg-card border border-border-subtle text-muted-foreground text-[10px] lg:text-[11px] px-2 py-0.5 rounded-full min-h-7 inline-flex items-center">{pkg.difficulty || 'ไม่ระบุระดับ'}</span>
                   </div>
 
-                  <h1 className="text-[22px] sm:text-[26px] lg:text-[36px] font-bold font-display text-foreground mb-2 lg:mb-5 leading-[1.3] lg:leading-[1.25] break-words">
+                  <h1 className="text-[22px] sm:text-[26px] lg:text-[36px] font-bold font-display text-foreground mb-1 lg:mb-5 leading-[1.3] lg:leading-[1.25] break-words">
                     {buildPackageH1(pkg)}
                   </h1>
+
+                  {(positionName || thaiDisplayYear) && (
+                    <div className="mb-1.5 flex flex-wrap items-center gap-x-1 text-muted-foreground text-[11px] leading-relaxed break-words lg:hidden">
+                      {positionName && (
+                        canonicalPosition ? (
+                          <Link
+                            href={`/positions/${encodeURIComponent(canonicalPosition.slug)}`}
+                            className="hover:text-brand transition-colors"
+                          >
+                            {positionName}
+                          </Link>
+                        ) : (
+                          <span>{positionName}</span>
+                        )
+                      )}
+                      {positionName && thaiDisplayYear && <span aria-hidden="true">·</span>}
+                      {thaiDisplayYear && <span>ปี {thaiDisplayYear}</span>}
+                    </div>
+                  )}
+
+                  {technicalMetadata.length > 0 && (
+                    <div className="mb-3 text-muted-foreground text-[10px] leading-relaxed break-words [overflow-wrap:anywhere] lg:hidden">
+                      {technicalMetadata.join(' · ')}
+                    </div>
+                  )}
 
                   <p className="text-muted-foreground text-[12px] lg:text-[14px] leading-[1.55] lg:leading-[1.6] mb-3 lg:mb-6 line-clamp-3 lg:line-clamp-none">
                     {pkg.description || 'เตรียมความพร้อมสำหรับการสอบด้วยชุดข้อสอบฝึกทำ พร้อมคำอธิบายประกอบในข้อสอบที่รองรับ'}
