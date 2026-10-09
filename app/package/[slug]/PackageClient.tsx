@@ -266,7 +266,7 @@ export default function PackageClient({
                       width={144}
                       height={192}
                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      className="p-4"
+                      className="p-1 lg:p-4"
                     />
                   ) : (
                     <div className="text-brand font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
