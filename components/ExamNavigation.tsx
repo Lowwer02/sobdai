@@ -56,32 +56,34 @@ export default function ExamNavigation({
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
-  // Responsive behavior: identical to SummaryNavigation — mobile (<768px)
-  // accordion (one category at a time), desktop (>=768px) all expanded.
+  // Responsive behavior: the compact mobile layout continues through tablet
+  // widths. Desktop behavior begins at the preserved 1024px breakpoint.
   const [isDesktop, setIsDesktop] = useState(false)
 
   useEffect(() => {
-    const mql = window.matchMedia('(min-width: 768px)')
+    const mql = window.matchMedia('(min-width: 1024px)')
     const update = () => setIsDesktop(mql.matches)
     update()
     mql.addEventListener('change', update)
     return () => mql.removeEventListener('change', update)
   }, [])
 
-  // Progressive loading (mobile only) — mirrors SummaryNavigation exactly.
-  // Each expanded category initially shows MOBILE_INITIAL cards; "ดูเพิ่มอีก 8
-  // รายการ" appends MOBILE_STEP more per click until all are visible. Desktop
-  // shows everything. Purely client-side slicing of the already-fetched list.
-  const MOBILE_INITIAL = 8
-  const MOBILE_STEP = 8
+  // Progressive loading (mobile and tablet) — all matching records are
+  // filtered before this display limit is applied.
+  const MOBILE_INITIAL = 4
+  const MOBILE_STEP = 4
   const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({})
+  const [hasUserCollapsedCategory, setHasUserCollapsedCategory] = useState(false)
 
   const loadMore = (category: string) => {
     setCategoryLimits(prev => ({ ...prev, [category]: (prev[category] ?? MOBILE_INITIAL) + MOBILE_STEP }))
   }
-  // Reset limits when search/filter changes so a new query starts fresh.
+  // Reset display and accordion state when search/filter changes so the first
+  // matching group is available immediately.
   useEffect(() => {
     setCategoryLimits({})
+    setExpandedCategory(null)
+    setHasUserCollapsedCategory(false)
   }, [searchQuery, activeFilter])
 
   // Filter + search + grouping, recomputed via useMemo (no extra queries).
@@ -132,10 +134,22 @@ export default function ExamNavigation({
   const toggleCategory = (category: string) => {
     // On desktop, all categories are always expanded — toggle is a no-op.
     if (isDesktop) return
-    setExpandedCategory(prev => prev === category ? null : category)
+    const firstCategory = filteredCategories.keys().next().value ?? null
+    const currentlyExpanded = expandedCategory ?? (!hasUserCollapsedCategory ? firstCategory : null)
+    if (currentlyExpanded === category) {
+      setExpandedCategory(null)
+      setHasUserCollapsedCategory(true)
+    } else {
+      setExpandedCategory(category)
+      setHasUserCollapsedCategory(false)
+    }
   }
 
-  const effectiveExpanded = expandedCategory ?? (filteredCategories.size > 0 ? filteredCategories.keys().next().value ?? null : null)
+  const effectiveExpanded = expandedCategory ?? (
+    !hasUserCollapsedCategory && filteredCategories.size > 0
+      ? filteredCategories.keys().next().value ?? null
+      : null
+  )
   const isCategoryExpanded = (category: string) => isDesktop || effectiveExpanded === category
 
   if (examSets.length === 0) {
@@ -234,14 +248,20 @@ export default function ExamNavigation({
             const limit = isDesktop ? items.length : (categoryLimits[category] ?? MOBILE_INITIAL)
             const visibleItems = items.slice(0, limit)
             const hasMore = items.length > limit
+            const itemsToLoad = Math.min(MOBILE_STEP, items.length - limit)
+            const categoryBorder = isExpanded
+              ? 'color-mix(in srgb, var(--brand-solid) 20%, transparent)'
+              : 'var(--border-subtle)'
             return (
               <div
                 key={category}
                 style={{
-                  backgroundColor: 'var(--background)',
-                  border: '1px solid',
-                  borderColor: isExpanded ? 'color-mix(in srgb, var(--brand-solid) 20%, transparent)' : 'var(--border-subtle)',
-                  borderRadius: '16px',
+                  backgroundColor: isDesktop ? 'var(--background)' : 'transparent',
+                  borderTop: `1px solid ${categoryBorder}`,
+                  borderRight: isDesktop ? `1px solid ${categoryBorder}` : '0',
+                  borderBottom: isDesktop ? `1px solid ${categoryBorder}` : '0',
+                  borderLeft: isDesktop ? `1px solid ${categoryBorder}` : '0',
+                  borderRadius: isDesktop ? '16px' : '0',
                   overflow: 'hidden',
                   transition: 'border-color 0.2s',
                 }}
@@ -302,6 +322,8 @@ export default function ExamNavigation({
                   id={`exam-cat-${category}`}
                   role="region"
                   aria-labelledby={`exam-cat-${category}`}
+                  aria-hidden={!isExpanded}
+                  inert={!isExpanded}
                   style={isDesktop
                     ? { padding: '0 12px 12px' }
                     : {
@@ -347,7 +369,7 @@ export default function ExamNavigation({
                             transition: 'background-color 0.2s',
                           }}
                         >
-                          ดูเพิ่มอีก {MOBILE_STEP} รายการ
+                          ดูเพิ่มอีก {itemsToLoad} รายการ
                         </button>
                       )}
                     </div>

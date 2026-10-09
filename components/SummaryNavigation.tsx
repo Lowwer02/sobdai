@@ -31,35 +31,35 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
-  // Responsive behavior: mobile (<768px) uses accordion (one category at a
-  // time), tablet/desktop (>=768px) shows all categories expanded with no
-  // accordion. Tracked via matchMedia to avoid layout shift and to keep the
-  // toggle button keyboard-accessible only on mobile.
+  // Keep the mobile accordion through tablet widths; preserve the desktop
+  // presentation from 1024px upward.
   const [isDesktop, setIsDesktop] = useState(false)
 
   useEffect(() => {
-    const mql = window.matchMedia('(min-width: 768px)')
+    const mql = window.matchMedia('(min-width: 1024px)')
     const update = () => setIsDesktop(mql.matches)
     update()
     mql.addEventListener('change', update)
     return () => mql.removeEventListener('change', update)
   }, [])
 
-  // Progressive loading (mobile only): each expanded category initially shows
-  // MOBILE_INITIAL items; "ดูเพิ่มอีก 8 รายการ" appends MOBILE_STEP more per
-  // click until all are visible. Desktop shows everything. No API calls —
-  // purely client-side slicing of the already-fetched list.
-  const MOBILE_INITIAL = 8
-  const MOBILE_STEP = 8
+  // Progressive loading (mobile and tablet); filtering always runs over the
+  // complete fetched list before the visible slice is applied.
+  const MOBILE_INITIAL = 4
+  const MOBILE_STEP = 4
   // limit per category, keyed by category label; absent key = initial limit.
   const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({})
+  const [hasUserCollapsedCategory, setHasUserCollapsedCategory] = useState(false)
 
   const loadMore = (category: string) => {
     setCategoryLimits(prev => ({ ...prev, [category]: (prev[category] ?? MOBILE_INITIAL) + MOBILE_STEP }))
   }
-  // Reset limits when search/filter changes so a new query starts fresh.
+  // Reset display and accordion state when search/filter changes so matching
+  // groups are available immediately.
   useEffect(() => {
     setCategoryLimits({})
+    setExpandedCategory(null)
+    setHasUserCollapsedCategory(false)
   }, [searchQuery, activeFilter])
 
   // Group summaries by subject. Use the curated label as the category key so
@@ -120,12 +120,24 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
   const toggleCategory = (category: string) => {
     // On desktop, all categories are always expanded — toggle is a no-op.
     if (isDesktop) return
-    setExpandedCategory(prev => prev === category ? null : category)
+    const firstCategory = filteredCategories.keys().next().value ?? null
+    const currentlyExpanded = expandedCategory ?? (!hasUserCollapsedCategory ? firstCategory : null)
+    if (currentlyExpanded === category) {
+      setExpandedCategory(null)
+      setHasUserCollapsedCategory(true)
+    } else {
+      setExpandedCategory(category)
+      setHasUserCollapsedCategory(false)
+    }
   }
 
-  // Auto-expand first category if none is expanded and we have results.
-  // On desktop this is irrelevant — every category is expanded regardless.
-  const effectiveExpanded = expandedCategory ?? (filteredCategories.size > 0 ? filteredCategories.keys().next().value ?? null : null)
+  // Auto-expand the first matching category until the user explicitly closes
+  // it. Search/filter changes restore this default for their matching results.
+  const effectiveExpanded = expandedCategory ?? (
+    !hasUserCollapsedCategory && filteredCategories.size > 0
+      ? filteredCategories.keys().next().value ?? null
+      : null
+  )
 
   const isCategoryExpanded = (category: string) => isDesktop || effectiveExpanded === category
 
@@ -223,14 +235,20 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
             const limit = isDesktop ? items.length : (categoryLimits[category] ?? MOBILE_INITIAL)
             const visibleItems = items.slice(0, limit)
             const hasMore = items.length > limit
+            const itemsToLoad = Math.min(MOBILE_STEP, items.length - limit)
+            const categoryBorder = isExpanded
+              ? 'color-mix(in srgb, var(--brand-solid) 20%, transparent)'
+              : 'var(--border-subtle)'
             return (
               <div
                 key={category}
                 style={{
-                  backgroundColor: 'var(--background)',
-                  border: '1px solid',
-                  borderColor: isExpanded ? 'color-mix(in srgb, var(--brand-solid) 20%, transparent)' : 'var(--border-subtle)',
-                  borderRadius: '16px',
+                  backgroundColor: isDesktop ? 'var(--background)' : 'transparent',
+                  borderTop: `1px solid ${categoryBorder}`,
+                  borderRight: isDesktop ? `1px solid ${categoryBorder}` : '0',
+                  borderBottom: isDesktop ? `1px solid ${categoryBorder}` : '0',
+                  borderLeft: isDesktop ? `1px solid ${categoryBorder}` : '0',
+                  borderRadius: isDesktop ? '16px' : '0',
                   overflow: 'hidden',
                   transition: 'border-color 0.2s',
                 }}
@@ -294,6 +312,8 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                   id={`summary-cat-${category}`}
                   role="region"
                   aria-labelledby={`summary-cat-${category}`}
+                  aria-hidden={!isExpanded}
+                  inert={!isExpanded}
                   style={isDesktop
                     ? { padding: '0 12px 12px' }
                     : {
@@ -338,7 +358,7 @@ export default function SummaryNavigation({ summaries, packageSlug }: SummaryNav
                             transition: 'background-color 0.2s',
                           }}
                         >
-                          ดูเพิ่มอีก {MOBILE_STEP} รายการ
+                          ดูเพิ่มอีก {itemsToLoad} รายการ
                         </button>
                       )}
                     </div>
