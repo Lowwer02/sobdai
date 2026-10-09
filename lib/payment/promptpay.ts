@@ -102,8 +102,8 @@ export async function renderPromptPayQr(recipient: unknown, amount: unknown): Pr
   const dataUrl = await QRCode.toDataURL(payload.wire, {
     type: 'image/png',
     errorCorrectionLevel: 'M',
-    margin: 2,
-    width: 512,
+    margin: 4,
+    width: 768,
   })
 
   return { ...payload, dataUrl }

@@ -24,6 +24,12 @@ import {
   isCustomerPaymentStaleStateError,
   type CustomerVerificationStatus,
 } from '@/lib/payment/customer'
+import {
+  createPromptPayQrFile,
+  getPromptPayQrSaveMode,
+  isPromptPayShareCancelled,
+  PROMPTPAY_QR_FILENAME,
+} from '@/lib/payment/promptpay-qr-export'
 
 declare global {
   interface Window { OmiseCard: any }
@@ -41,6 +47,7 @@ export interface ManualPaymentOrder {
 }
 
 interface ManualPaymentQrDetails {
+  orderId: string
   amount: string
   displayName: string
   instructionText: string
@@ -76,6 +83,11 @@ export default function CheckoutClient({
   const [claimedSuccess, setClaimedSuccess] = useState(false)
   const [manualOrder, setManualOrder] = useState<ManualPaymentOrder | null>(initialManualOrder)
   const [manualQrDetails, setManualQrDetails] = useState<ManualPaymentQrDetails | null>(null)
+  const [manualQrExport, setManualQrExport] = useState<{ orderId: string; file: File; imageUrl: string } | null>(null)
+  const [manualQrExportState, setManualQrExportState] = useState<'idle' | 'preparing' | 'ready' | 'failed'>('idle')
+  const [qrSavePending, setQrSavePending] = useState(false)
+  const [qrSaveStatus, setQrSaveStatus] = useState('')
+  const [qrPreviewOpen, setQrPreviewOpen] = useState(false)
   const [manualQrState, setManualQrState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>(
     initialManualOrder && manualPaymentEnabled ? 'loading' : 'idle',
   )
@@ -96,6 +108,12 @@ export default function CheckoutClient({
         paymentSettingsAvailable: manualOrder.paymentSettingsAvailable,
         evidenceReadAvailable: manualOrder.paymentEvidenceAvailable,
       })
+    : null
+  const currentManualQrDetails = manualOrder && manualQrDetails?.orderId === manualOrder.id
+    ? manualQrDetails
+    : null
+  const manualQrUrl = manualOrder
+    ? `/api/payment/manual/order/${encodeURIComponent(manualOrder.id)}/qr`
     : null
 
   const showError = (value: unknown, fallback: string) => {
@@ -120,12 +138,22 @@ export default function CheckoutClient({
     if (!manualOrder || !manualPaymentEnabled) {
       setManualQrState('idle')
       setManualQrDetails(null)
+      setManualQrExport(null)
+      setManualQrExportState('idle')
+      setQrSavePending(false)
+      setQrSaveStatus('')
+      setQrPreviewOpen(false)
       return
     }
 
     let cancelled = false
     setManualQrState('loading')
     setManualQrDetails(null)
+    setManualQrExport(null)
+    setManualQrExportState('idle')
+    setQrSavePending(false)
+    setQrSaveStatus('')
+    setQrPreviewOpen(false)
 
     fetch(`/api/payment/manual/order/${manualOrder.id}/details`, { cache: 'no-store' })
       .then(async (response) => {
@@ -133,6 +161,7 @@ export default function CheckoutClient({
         if (!response.ok || !data?.success) throw data || new Error('payment details unavailable')
         if (!cancelled) {
           setManualQrDetails({
+            orderId: manualOrder.id,
             amount: String(data.amount),
             displayName: String(data.displayName || ''),
             instructionText: String(data.instructionText || ''),
@@ -148,6 +177,70 @@ export default function CheckoutClient({
 
     return () => { cancelled = true }
   }, [manualOrder?.id, manualPaymentEnabled])
+
+  useEffect(() => {
+    const orderId = manualOrder?.id
+    if (!orderId || !manualQrUrl || !manualPaymentEnabled || manualQrDetails?.orderId !== orderId) {
+      setManualQrExport(null)
+      setManualQrExportState('idle')
+      return
+    }
+
+    let cancelled = false
+    const controller = new AbortController()
+    let imageUrl: string | null = null
+    setManualQrExport(null)
+    setManualQrExportState('preparing')
+    setManualQrState('loading')
+    setQrSaveStatus('')
+
+    fetch(manualQrUrl, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase()
+        if (!response.ok || contentType !== 'image/png') {
+          throw new Error('PromptPay QR image unavailable.')
+        }
+        return response.blob()
+      })
+      .then((blob) => {
+        const file = createPromptPayQrFile(blob)
+        imageUrl = URL.createObjectURL(file)
+        if (cancelled) {
+          URL.revokeObjectURL(imageUrl)
+          return
+        }
+        setManualQrExport({ orderId, file, imageUrl })
+        setManualQrExportState('ready')
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setManualQrExportState('failed')
+          setManualQrState('unavailable')
+          setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+        }
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
+    }
+  }, [manualOrder?.id, manualPaymentEnabled, manualQrDetails, manualQrUrl])
+
+  useEffect(() => {
+    if (!qrPreviewOpen) return
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const handlePreviewKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setQrPreviewOpen(false)
+    }
+
+    window.addEventListener('keydown', handlePreviewKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handlePreviewKeyDown)
+      previousFocus?.focus()
+    }
+  }, [qrPreviewOpen])
 
   const handleCardPayment = () => {
     if (!omiseLoaded || !window.OmiseCard) {
@@ -223,6 +316,54 @@ export default function CheckoutClient({
       showError(reason, 'สร้างคำสั่งซื้อไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePromptPayQrSave = () => {
+    if (!manualOrder || !manualQrUrl || manualQrState !== 'ready' || !currentManualQrDetails) return
+
+    const file = manualQrExport?.orderId === manualOrder.id ? manualQrExport.file : null
+    if (!file) {
+      setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
+      setQrPreviewOpen(true)
+      return
+    }
+
+    try {
+      const downloadLink = document.createElement('a')
+      const saveMode = getPromptPayQrSaveMode(navigator, file, 'download' in downloadLink)
+
+      if (saveMode === 'share' && typeof navigator.share === 'function') {
+        setQrSavePending(true)
+        setQrSaveStatus('เลือกบันทึกรูปภาพจากเมนูแชร์')
+        void navigator.share({ files: [file], title: 'PromptPay QR Code' })
+          .catch((reason: unknown) => {
+            if (isPromptPayShareCancelled(reason)) return
+            setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+            setQrPreviewOpen(true)
+          })
+          .finally(() => setQrSavePending(false))
+        return
+      }
+
+      if (saveMode === 'download') {
+        const objectUrl = URL.createObjectURL(file)
+        downloadLink.href = objectUrl
+        downloadLink.download = PROMPTPAY_QR_FILENAME
+        downloadLink.hidden = true
+        document.body.appendChild(downloadLink)
+        downloadLink.click()
+        downloadLink.remove()
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+        setQrSaveStatus('เริ่มดาวน์โหลด QR Code แล้ว')
+        return
+      }
+
+      setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
+      setQrPreviewOpen(true)
+    } catch {
+      setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+      setQrPreviewOpen(true)
     }
   }
 
@@ -494,33 +635,90 @@ export default function CheckoutClient({
                         <div className="rounded-xl border border-border-subtle bg-surface p-4 text-center">
                           <h3 className="text-lg font-bold text-foreground">โอนเงินผ่าน PromptPay</h3>
                           <p className="mt-1 text-sm text-muted-foreground">กรุณาโอนยอดให้ตรงกับคำสั่งซื้อ</p>
-                          <p className="mt-2 text-3xl font-bold text-brand">฿{formatAmount(manualQrDetails?.amount ?? manualOrder.amount)}</p>
+                          <p className="mt-2 text-3xl font-bold text-brand">฿{formatAmount(currentManualQrDetails?.amount ?? manualOrder.amount)}</p>
                         </div>
 
                         <div className="rounded-lg border border-border-subtle bg-white p-4 text-center">
                           {manualQrState === 'loading' && <div className="py-12 text-sm text-slate-600">กำลังเตรียม QR สำหรับคำสั่งซื้อนี้...</div>}
-                          {manualQrState !== 'unavailable' && (
+                          {manualQrExport?.orderId === manualOrder.id && manualQrState !== 'unavailable' && (
                             <img
-                              src={`/api/payment/manual/order/${manualOrder.id}/qr`}
-                              alt={`QR PromptPay สำหรับชำระเงิน ฿${manualQrDetails?.amount ?? formatAmount(manualOrder.amount)}`}
+                              src={manualQrExport.imageUrl}
+                              alt={`QR PromptPay สำหรับชำระเงิน ฿${currentManualQrDetails?.amount ?? formatAmount(manualOrder.amount)}`}
                               width={280}
                               height={280}
                               className={`mx-auto h-auto w-[280px] max-w-full ${manualQrState === 'loading' ? 'hidden' : ''}`}
                               onLoad={() => setManualQrState('ready')}
-                              onError={() => setManualQrState('unavailable')}
+                              onError={() => {
+                                setManualQrState('unavailable')
+                                setManualQrExportState('failed')
+                                setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+                              }}
                             />
                           )}
                           {manualQrState === 'unavailable' && <div className="py-8 text-sm text-red-700">ขณะนี้การชำระเงินผ่าน PromptPay ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง</div>}
+                          {manualQrState === 'ready' && currentManualQrDetails && manualQrExport?.orderId === manualOrder.id && (
+                            <div className="mx-auto mt-3 w-full max-w-sm text-center md:hidden">
+                              <button
+                                type="button"
+                                onClick={handlePromptPayQrSave}
+                                disabled={manualQrExportState === 'idle' || manualQrExportState === 'preparing' || qrSavePending}
+                                aria-label="บันทึก QR Code สำหรับชำระเงิน"
+                                aria-busy={manualQrExportState === 'preparing' || qrSavePending}
+                                className="min-h-[44px] w-full rounded-xl border border-[#8B6B26]/50 bg-white px-4 py-3 text-sm font-semibold text-[#5A4319] transition-colors hover:bg-[#F8F5EC] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
+                              >
+                                {qrSavePending
+                                  ? 'กำลังเปิดเมนูแชร์...'
+                                  : manualQrExportState === 'idle' || manualQrExportState === 'preparing'
+                                    ? 'กำลังเตรียม QR Code'
+                                    : 'บันทึก QR Code'}
+                              </button>
+                              <p className="mt-1 text-xs text-slate-600">บันทึก QR เพื่อเปิดในแอปธนาคาร</p>
+                              <p role="status" aria-live="polite" className="mt-1 min-h-4 text-xs text-slate-600">
+                                {qrSaveStatus}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
-                        {manualQrState === 'ready' && manualQrDetails && (
-                          <div className="space-y-2 text-center">
-                            {manualQrDetails.displayName && <p className="font-bold text-foreground">{manualQrDetails.displayName}</p>}
-                            {manualQrDetails.instructionText && <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{manualQrDetails.instructionText}</p>}
+                        {qrPreviewOpen && currentManualQrDetails && manualQrExport?.orderId === manualOrder.id && (
+                          <div
+                            className="fixed inset-0 z-[100] overflow-y-auto bg-black/70 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:hidden"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="promptpay-qr-preview-title"
+                          >
+                            <div className="mx-auto mt-6 w-full max-w-md rounded-2xl bg-white p-4 text-center text-slate-900 shadow-xl">
+                              <div className="flex items-center justify-between gap-4">
+                                <h2 id="promptpay-qr-preview-title" className="text-base font-bold">บันทึก QR Code</h2>
+                                <button
+                                  type="button"
+                                  autoFocus
+                                  onClick={() => setQrPreviewOpen(false)}
+                                  className="min-h-[44px] rounded-lg px-4 text-sm font-semibold text-[#5A4319] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
+                                >
+                                  ปิด
+                                </button>
+                              </div>
+                              <p className="mt-2 text-sm text-slate-700">แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ</p>
+                              <img
+                                src={manualQrExport.imageUrl}
+                                alt={`QR PromptPay สำหรับชำระเงิน ฿${currentManualQrDetails.amount}`}
+                                width={768}
+                                height={768}
+                                className="mx-auto mt-3 h-auto max-h-[65svh] w-auto max-w-full object-contain"
+                              />
+                            </div>
                           </div>
                         )}
 
-                        {manualQrState !== 'ready' || !manualQrDetails ? (
+                        {manualQrState === 'ready' && currentManualQrDetails && (
+                          <div className="space-y-2 text-center">
+                            {currentManualQrDetails.displayName && <p className="font-bold text-foreground">{currentManualQrDetails.displayName}</p>}
+                            {currentManualQrDetails.instructionText && <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{currentManualQrDetails.instructionText}</p>}
+                          </div>
+                        )}
+
+                        {manualQrState !== 'ready' || !currentManualQrDetails ? (
                           <div className="rounded-lg border border-border-subtle bg-surface p-4 text-center text-sm text-muted-foreground">
                             {manualQrState === 'unavailable' ? 'ยังไม่สามารถดำเนินการส่งหลักฐานได้ กรุณาลองใหม่ภายหลัง' : 'กำลังตรวจสอบข้อมูลการชำระเงิน...'}
                           </div>

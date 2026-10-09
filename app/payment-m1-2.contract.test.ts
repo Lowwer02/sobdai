@@ -16,7 +16,9 @@ const adminActions = read('app/admin/payment/actions.ts')
 test('paid checkout is independent from Donate/Support QR config', () => {
   const paidBlock = checkout.slice(checkout.indexOf('Paid Checkout Panel'))
   assert.doesNotMatch(paidBlock, /supportConfig\?\.qr_image_url|<SupportDetails/)
-  assert.match(paidBlock, /\/api\/payment\/manual\/order\/\$\{manualOrder\.id\}\/qr/)
+  assert.match(checkout, /const manualQrUrl = manualOrder[\s\S]*?\/api\/payment\/manual\/order\/\$\{encodeURIComponent\(manualOrder\.id\)\}\/qr/)
+  assert.match(checkout, /fetch\(manualQrUrl,[\s\S]*?response\.blob\(\)/)
+  assert.match(paidBlock, /src=\{manualQrExport\.imageUrl\}/)
   assert.match(paidBlock, /displayName/)
 })
 
