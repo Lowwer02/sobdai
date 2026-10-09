@@ -5,6 +5,7 @@ import { ArrowRight, Bell, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
   isLocalNotificationHref,
+  PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE,
   PAYMENT_REJECTED_NOTIFICATION_TYPE,
   type NotificationRecord,
 } from '@/lib/notifications'
@@ -229,7 +230,11 @@ export default function NotificationBell({
                       {notification.body}
                     </span>
                     <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#D4AF37]">
-                      {notification.type === PAYMENT_REJECTED_NOTIFICATION_TYPE ? 'ส่งหลักฐานใหม่' : 'เปิดแพ็กเกจ'}
+                      {notification.type === PAYMENT_REJECTED_NOTIFICATION_TYPE
+                        ? 'ส่งหลักฐานใหม่'
+                        : notification.type === PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE
+                          ? 'ทำข้อสอบชุดใหม่'
+                          : 'เปิดแพ็กเกจ'}
                       <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
                       <span className="ml-1 font-normal text-[#6D5943]">{formatNotificationDate(notification.createdAt)}</span>
                     </span>

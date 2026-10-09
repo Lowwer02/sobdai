@@ -18,6 +18,7 @@ const myPackagesPage = read('app/my-packages/page.tsx')
 const checkoutPage = read('app/checkout/[id]/page.tsx')
 const checkoutClient = read('app/checkout/[id]/CheckoutClient.tsx')
 const rejectedMigration = read('supabase/migrations/093_payment_rejected_notification.sql')
+const contentUpdateMigration = read('supabase/migrations/104_package_content_update_notification.sql')
 
 test('unread badge uses a small authenticated count query and latest list is capped', () => {
   assert.match(readRoute, /await supabase\.auth\.getUser\(\)/)
@@ -104,4 +105,42 @@ test('rejection producer is trusted, best-effort, per-submission idempotent, and
   assert.match(reject, /set status = 'rejected'[\s\S]*?perform public\.try_create_payment_rejected_notification/i)
   assert.match(reject, /set search_path = pg_catalog, public, auth, pg_temp/i)
   assert.match(rejectedMigration, /grant execute on function public\.reject_payment_submission\(uuid, text\)[\s\S]*?to authenticated/i)
+})
+
+test('PACKAGE_CONTENT_UPDATE is a supported read-model type with a dedicated exam CTA label', () => {
+  assert.match(read('lib/notifications.ts'), /PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE = 'PACKAGE_CONTENT_UPDATE'/)
+  assert.match(readRoute, /PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE/)
+  assert.match(readRoute, /type: row\.type as NotificationType/)
+  // The bell renders the new type through its generic title/body/href path and
+  // the local-href guard, with a dedicated CTA label; the payment label and
+  // fallback are unchanged.
+  assert.match(bell, /notification\.type === PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE[\s\S]*?'ทำข้อสอบชุดใหม่'/)
+  assert.match(bell, /'ส่งหลักฐานใหม่'/)
+  assert.match(bell, /'เปิดแพ็กเกจ'/)
+  assert.match(bell, /router\.push\(isLocalNotificationHref\(notification\.href\) \? notification\.href : '\/my-packages'\)/)
+})
+
+test('content update migration extends the type check with per-recipient event dedupe and inserts nothing', () => {
+  assert.match(contentUpdateMigration, /Notification 104 refuses a drifted notification type constraint/i)
+  assert.match(contentUpdateMigration, /add column source_event_key text/i)
+  assert.match(contentUpdateMigration, /alter column source_order_id drop not null/i)
+  assert.match(contentUpdateMigration, /type in \('PACKAGE_APPROVED', 'PAYMENT_REJECTED', 'PACKAGE_CONTENT_UPDATE'\)/i)
+  assert.match(contentUpdateMigration, /notifications_event_key_scope_check[\s\S]*?source_event_key is null[\s\S]*?source_order_id is null[\s\S]*?source_payment_submission_id is null/i)
+  // Dedupe is per recipient per event; a global (type, source_event_key) key
+  // would let one event produce a single platform-wide row.
+  assert.match(contentUpdateMigration, /create unique index notifications_user_type_event_key_idx[\s\S]*?\(user_id, type, source_event_key\)[\s\S]*?where source_event_key is not null/i)
+})
+
+test('content update migration pins type-specific source integrity and the client boundary', () => {
+  assert.match(contentUpdateMigration, /notifications_package_approved_source_check[\s\S]*?type <> 'PACKAGE_APPROVED'[\s\S]*?source_order_id is not null/i)
+  assert.match(contentUpdateMigration, /notifications_payment_rejected_source_check[\s\S]*?type <> 'PAYMENT_REJECTED'[\s\S]*?source_payment_submission_id is not null/i)
+  assert.match(contentUpdateMigration, /notifications_package_content_update_source_check[\s\S]*?type <> 'PACKAGE_CONTENT_UPDATE'[\s\S]*?source_event_key is not null/i)
+  // The migration must not backfill notifications, widen the client boundary,
+  // or alter the existing dedupe identities; the fanout is the human-run
+  // runbook.
+  assert.doesNotMatch(contentUpdateMigration, /insert into public\.notifications/i)
+  assert.doesNotMatch(contentUpdateMigration, /grant (insert|update|delete)/i)
+  assert.doesNotMatch(contentUpdateMigration, /drop (constraint notifications_type_source_payment_submission_key|index notifications_type_source_order_key)/i)
+  assert.doesNotMatch(contentUpdateMigration, /policy "Users can view own notifications\."/i)
+  assert.match(contentUpdateMigration, /has_table_privilege\('authenticated', 'public\.notifications', 'INSERT'\)/)
 })

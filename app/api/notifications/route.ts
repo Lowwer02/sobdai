@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import {
   NOTIFICATION_LIST_LIMIT,
   PACKAGE_APPROVED_NOTIFICATION_TYPE,
+  PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE,
   PAYMENT_REJECTED_NOTIFICATION_TYPE,
   type NotificationRecord,
   type NotificationType,
@@ -26,6 +27,7 @@ function toNotificationRecord(row: {
   if (
     row.type !== PACKAGE_APPROVED_NOTIFICATION_TYPE
     && row.type !== PAYMENT_REJECTED_NOTIFICATION_TYPE
+    && row.type !== PACKAGE_CONTENT_UPDATE_NOTIFICATION_TYPE
   ) return null
 
   return {
