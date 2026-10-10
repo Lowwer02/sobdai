@@ -56,9 +56,11 @@ test('the desktop rail receives the SAME related-package data as the bottom sect
   assert.match(page, /<NewsRailPackages packages=\{related\.packages\} \/>/)
   assert.match(page, /<PackageCard key=\{pkg\.id\} pkg=\{pkg\} index=\{i\} \/>/)
   // No second relation query on the page — the bottom section and the rail
-  // consume the SAME resolved `related.packages` result.
+  // consume the SAME resolved `related.packages` result. Entity Discovery V1
+  // passes the authoritative organization to the same single invocation, so
+  // the contract counts CALLS (not argument lists).
   assert.equal(
-    page.split('getRelatedContent(article.id)').length - 1,
+    page.split('getRelatedContent(').length - 1,
     1,
     'the relation query is invoked exactly once on the page',
   )
@@ -168,11 +170,13 @@ test('empty states: package-only, affiliate-only, neither, and multiple packages
   // Packages-without-affiliate: the solo variant cancels the mobile inline gap.
   const style = styleBlock(page)
   assert.match(style, /\.news-detail-aside\.news-detail-aside-solo \{ margin-top: 0; \}/)
-  // Packages-only news: the whole bottom section hides on Desktop (no empty
-  // heading shell) — the hide class is applied exactly when summaries are absent.
+  // Entity Discovery V1: the bottom section hides on Desktop only when NOTHING
+  // would remain under the heading. A chips-only related section (canonical
+  // entity links without summaries/packages) must stay visible, so the hide
+  // class requires summaries AND agencies AND positions to be empty.
   assert.match(
     page,
-    /related\.summaries\.length === 0 \? 'news-related-desktop-hidden' : undefined/,
+    /related\.summaries\.length === 0 && related\.agencies\.length === 0 && related\.positions\.length === 0\s*\n\s*\? 'news-related-desktop-hidden'\s*\n\s*: undefined/,
   )
   assert.match(style, /\.news-related-desktop-hidden \{ display: none; \}/)
   // Multiple packages: the rail stacks compact cards in one column inside the
