@@ -31,6 +31,7 @@ const desktopNavSource = read('components/DesktopNav.tsx')
 const mobileNavSource = read('components/MobileNav.tsx')
 const nextConfigSource = read('next.config.ts')
 const sitemapSource = read('app/sitemap.ts')
+const articlesPublicSource = read('lib/articles-public.ts')
 
 /**
  * Strip block + line comments so prose ABOUT /downloads (the temporary
@@ -124,5 +125,18 @@ test('sitemap news section filters cross-canonical aliases via the self-canonica
     sitemapSource,
     /\.filter\(\(row\)\s*=>\s*isSelfCanonicalNewsArticle\(row\.slug, row\.canonical_url\)\)/,
     'news sitemap rows must pass the self-canonical filter'
+  )
+})
+
+test('sitemap articles section filters cross-canonical aliases via the self-canonical rule', () => {
+  assert.match(
+    articlesPublicSource,
+    /select\('slug, canonical_url, updated_at, published_at'\)/,
+    'articles sitemap query must load canonical_url'
+  )
+  assert.match(
+    sitemapSource,
+    /isSelfCanonicalArticle\(row\.slug, row\.canonical_url\)/,
+    'articles sitemap rows must pass the self-canonical filter'
   )
 })

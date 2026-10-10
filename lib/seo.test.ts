@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { NEWS_HUB_DESCRIPTION, NEWS_HUB_H1, NEWS_HUB_SUBTITLE, NEWS_HUB_TITLE, SITE_NAME, resolveNewsCanonicalUrl, isSelfCanonicalNewsArticle } from './seo.ts'
+import { NEWS_HUB_DESCRIPTION, NEWS_HUB_H1, NEWS_HUB_SUBTITLE, NEWS_HUB_TITLE, SITE_NAME, resolveNewsCanonicalUrl, isSelfCanonicalNewsArticle, resolveArticleCanonicalUrl, isSelfCanonicalArticle } from './seo.ts'
+
 
 /**
  * SEO-P2C — /news keyword-ownership contract.
@@ -89,4 +90,36 @@ test('a news row canonicalizing elsewhere is NOT self-canonical (sitemap alias c
   assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026-1', '/news/led-recruitment-2026'), false)
   assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026-1', 'https://sobdai.com/news/led-recruitment-2026'), false)
   assert.equal(isSelfCanonicalNewsArticle('a', 'https://external.example.com/source-article'), false)
+})
+
+// ─── Article canonical resolution & sitemap hygiene ─────────────────────────
+
+test('article canonical resolver falls back to the row own /articles/<slug> URL when canonical_url is blank', () => {
+  assert.equal(resolveArticleCanonicalUrl('exam-guide', null), 'https://sobdai.com/articles/exam-guide')
+  assert.equal(resolveArticleCanonicalUrl('exam-guide', ''), 'https://sobdai.com/articles/exam-guide')
+  assert.equal(resolveArticleCanonicalUrl('exam-guide', '   '), 'https://sobdai.com/articles/exam-guide')
+  assert.equal(resolveArticleCanonicalUrl('exam-guide', undefined), 'https://sobdai.com/articles/exam-guide')
+})
+
+test('article canonical resolver passes an editor-set canonical through trimmed (path or absolute)', () => {
+  assert.equal(resolveArticleCanonicalUrl('a', ' /articles/b '), 'https://sobdai.com/articles/b')
+  assert.equal(resolveArticleCanonicalUrl('a', 'https://external.example.com/story'), 'https://external.example.com/story')
+})
+
+test('an article row with blank canonical_url is self-canonical', () => {
+  assert.equal(isSelfCanonicalArticle('exam-guide', null), true)
+  assert.equal(isSelfCanonicalArticle('exam-guide', ''), true)
+  assert.equal(isSelfCanonicalArticle('exam-guide', undefined), true)
+})
+
+test('an article row canonicalizing back to its own URL is self-canonical', () => {
+  assert.equal(isSelfCanonicalArticle('exam-guide', '/articles/exam-guide'), true)
+  assert.equal(isSelfCanonicalArticle('exam-guide', '  /articles/exam-guide  '), true)
+  assert.equal(isSelfCanonicalArticle('exam-guide', 'https://sobdai.com/articles/exam-guide'), true)
+})
+
+test('an article row canonicalizing elsewhere is NOT self-canonical (sitemap alias case)', () => {
+  assert.equal(isSelfCanonicalArticle('budget-bureau-guide', '/news/budget-bureau-guide'), false)
+  assert.equal(isSelfCanonicalArticle('budget-bureau-guide', 'https://sobdai.com/news/budget-bureau-guide'), false)
+  assert.equal(isSelfCanonicalArticle('a', 'https://external.example.com/source-article'), false)
 })
