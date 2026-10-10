@@ -34,7 +34,7 @@ test('CheckoutClient handles free package claim state locally without immediate 
   // Local state for claim success
   assert.match(checkoutClientSource, /const \[claimedSuccess, setClaimedSuccess\] = useState\(false\)/)
   // Free checkout sets local claimedSuccess and tracks freePackageClaimed
-  assert.match(checkoutClientSource, /if \(data\.success\) \{\s*setClaimedSuccess\(true\)\s*freePackageClaimed\(pkg\.id, pkg\.name\)/)
+  assert.match(checkoutClientSource, /if \(data\.success\) \{\s*if \(checkoutContextTokenRef\.current !== contextToken\) return\s*setClaimedSuccess\(true\)\s*freePackageClaimed\(pkg\.id, pkg\.name\)/)
   // Does not do router.push for free checkout
   assert.doesNotMatch(checkoutClientSource, /handleFreeCheckout[\s\S]*router\.push/)
 })

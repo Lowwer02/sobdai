@@ -32,6 +32,7 @@ import {
   isPromptPayShareCancelled,
 } from '@/lib/payment/promptpay-qr-export'
 import { shouldPrepareManualPaymentQr } from '@/lib/payment/manual-qr-eligibility'
+import { createCheckoutContextIdentity } from '@/lib/payment/checkout-context-identity'
 
 declare global {
   interface Window { OmiseCard: any }
@@ -49,10 +50,58 @@ export interface ManualPaymentOrder {
 }
 
 interface ManualPaymentQrDetails {
+  contextToken: QrContextToken
   orderId: string
   amount: string
   displayName: string
   instructionText: string
+}
+
+interface CheckoutContextToken {
+  identity: string
+  generation: number
+}
+
+interface QrContextToken {
+  identity: string
+  generation: number
+}
+
+interface ManualPaymentQrExport {
+  contextToken: QrContextToken
+  orderId: string
+  file: File
+  imageUrl: string
+}
+
+type ManualQrState = 'idle' | 'loading' | 'ready' | 'unavailable'
+type ManualQrExportState = 'idle' | 'preparing' | 'ready' | 'failed'
+
+interface PromptPayQrUiState {
+  contextToken: QrContextToken
+  details: ManualPaymentQrDetails | null
+  export: ManualPaymentQrExport | null
+  state: ManualQrState
+  exportState: ManualQrExportState
+  savePending: boolean
+  saveStatus: string
+  previewOpen: boolean
+}
+
+function createInitialPromptPayQrUiState(
+  contextToken: QrContextToken,
+  state: ManualQrState,
+): PromptPayQrUiState {
+  return {
+    contextToken,
+    details: null,
+    export: null,
+    state,
+    exportState: 'idle',
+    savePending: false,
+    saveStatus: '',
+    previewOpen: false,
+  }
 }
 
 interface CheckoutClientProps {
@@ -77,36 +126,67 @@ export default function CheckoutClient({
   initialManualOrder = null,
   manualPaymentEnabled,
 }: CheckoutClientProps) {
+  const currentPrice = Number(pkg.current_price)
+  const originalPrice = Number(pkg.original_price)
+  const checkoutContextIdentity = createCheckoutContextIdentity({
+    packageId: pkg.id,
+    isFreeCheckout: currentPrice === 0,
+    paymentEnabled: manualPaymentEnabled,
+    initialManualOrder,
+  })
+  const checkoutContextTokenRef = useRef<CheckoutContextToken>({
+    identity: checkoutContextIdentity,
+    generation: 0,
+  })
+  if (checkoutContextTokenRef.current.identity !== checkoutContextIdentity) {
+    checkoutContextTokenRef.current = {
+      identity: checkoutContextIdentity,
+      generation: checkoutContextTokenRef.current.generation + 1,
+    }
+  }
+  const checkoutContextToken = checkoutContextTokenRef.current
+
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [omiseLoaded, setOmiseLoaded] = useState(false)
   const [payMethod, setPayMethod] = useState<'card' | 'promptpay'>('promptpay')
   const [claimedSuccess, setClaimedSuccess] = useState(false)
-  const [manualOrder, setManualOrder] = useState<ManualPaymentOrder | null>(initialManualOrder)
-  const [manualQrDetails, setManualQrDetails] = useState<ManualPaymentQrDetails | null>(null)
-  const [manualQrExport, setManualQrExport] = useState<{ orderId: string; file: File; imageUrl: string } | null>(null)
-  const [manualQrExportState, setManualQrExportState] = useState<'idle' | 'preparing' | 'ready' | 'failed'>('idle')
-  const [qrSavePending, setQrSavePending] = useState(false)
-  const [qrSaveStatus, setQrSaveStatus] = useState('')
-  const [qrPreviewOpen, setQrPreviewOpen] = useState(false)
+  const [manualOrderState, setManualOrderState] = useState<{
+    contextToken: CheckoutContextToken
+    order: ManualPaymentOrder | null
+  }>(() => ({ contextToken: checkoutContextToken, order: initialManualOrder }))
+  const [synchronizedCheckoutContextToken, setSynchronizedCheckoutContextToken] = useState(checkoutContextToken)
+  const [qrUiState, setQrUiState] = useState<PromptPayQrUiState | null>(null)
   const [qrPreviewPortalReady, setQrPreviewPortalReady] = useState(false)
-  const [manualQrState, setManualQrState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>(
-    initialManualOrder && manualPaymentEnabled ? 'loading' : 'idle',
-  )
   const [slipFile, setSlipFile] = useState<File | null>(null)
   const [slipSubmitting, setSlipSubmitting] = useState(false)
   const [fileInputKey, setFileInputKey] = useState(0)
   const qrPreviewDialogRef = useRef<HTMLDialogElement | null>(null)
   const qrPreviewCloseButtonRef = useRef<HTMLButtonElement | null>(null)
-  const qrPreviewOpenerRef = useRef<HTMLElement | null>(null)
+  const qrPreviewOpenerRef = useRef<{ element: HTMLElement; contextToken: QrContextToken } | null>(null)
   const qrPreviewFallbackRef = useRef<HTMLAnchorElement | null>(null)
   const qrPreviewWasOpenedRef = useRef(false)
   const qrPreviewIsOpenRef = useRef(false)
   const qrShareAttemptGenerationRef = useRef(0)
+  const qrContextTokenRef = useRef<QrContextToken | null>(null)
+  const qrInitialStateRef = useRef<ManualQrState>('idle')
 
-  const currentPrice = Number(pkg.current_price)
-  const originalPrice = Number(pkg.original_price)
+  if (synchronizedCheckoutContextToken !== checkoutContextToken) {
+    setSynchronizedCheckoutContextToken(checkoutContextToken)
+    setManualOrderState({ contextToken: checkoutContextToken, order: initialManualOrder })
+    setLoading(false)
+    setError('')
+    setPayMethod('promptpay')
+    setClaimedSuccess(false)
+    setSlipFile(null)
+    setSlipSubmitting(false)
+    setFileInputKey((key) => key + 1)
+  }
+
+  const manualOrder = manualOrderState.contextToken === checkoutContextToken
+    ? manualOrderState.order
+    : initialManualOrder
   const displayedAmount = manualOrder?.amount ?? currentPrice
   const presentation = manualOrder
     ? getCustomerPaymentPresentation({
@@ -125,34 +205,97 @@ export default function CheckoutClient({
     paymentEnabled: manualPaymentEnabled,
     presentationState: presentation?.state ?? null,
   })
-  const currentManualQrDetails = manualOrder && manualQrDetails?.orderId === manualOrder.id
-    ? manualQrDetails
+  const qrContextIdentity = JSON.stringify([
+    checkoutContextIdentity,
+    manualOrder?.id ?? null,
+    manualQrNeededForPaidCheckout,
+    presentation?.state ?? null,
+  ])
+  if (qrContextTokenRef.current?.identity !== qrContextIdentity) {
+    qrContextTokenRef.current = {
+      identity: qrContextIdentity,
+      generation: (qrContextTokenRef.current?.generation ?? -1) + 1,
+    }
+    qrShareAttemptGenerationRef.current += 1
+    qrPreviewIsOpenRef.current = false
+  }
+  const qrContextToken = qrContextTokenRef.current!
+  const qrUiMatchesContext = qrUiState?.contextToken === qrContextToken
+  const initialQrState: ManualQrState = manualQrNeededForPaidCheckout ? 'loading' : 'idle'
+  qrInitialStateRef.current = initialQrState
+  const qrUi = qrUiMatchesContext && qrUiState
+    ? qrUiState
+    : createInitialPromptPayQrUiState(qrContextToken, initialQrState)
+
+  if (!qrUiMatchesContext) setQrUiState(qrUi)
+
+  const isCurrentQrContext = (token: QrContextToken) => qrContextTokenRef.current === token
+  const updateQrUi = (
+    token: QrContextToken,
+    update: (current: PromptPayQrUiState) => PromptPayQrUiState,
+  ) => {
+    if (!isCurrentQrContext(token)) return
+    setQrUiState((current) => {
+      if (!isCurrentQrContext(token)) return current
+      const base = current?.contextToken === token
+        ? current
+        : createInitialPromptPayQrUiState(token, qrInitialStateRef.current)
+      return update(base)
+    })
+  }
+  const setManualOrderForContext = (
+    token: CheckoutContextToken,
+    update: ManualPaymentOrder | null | ((current: ManualPaymentOrder | null) => ManualPaymentOrder | null),
+  ) => {
+    if (checkoutContextTokenRef.current !== token) return
+    setManualOrderState((current) => {
+      if (checkoutContextTokenRef.current !== token) return current
+      const currentOrder = current.contextToken === token ? current.order : initialManualOrder
+      return {
+        contextToken: token,
+        order: typeof update === 'function' ? update(currentOrder) : update,
+      }
+    })
+  }
+
+  const currentManualQrDetails = manualOrder
+    && qrUi.details?.contextToken === qrContextToken
+    && qrUi.details.orderId === manualOrder.id
+    ? qrUi.details
     : null
+  const currentManualQrExport = manualOrder
+    && qrUi.export?.contextToken === qrContextToken
+    && qrUi.export.orderId === manualOrder.id
+    ? qrUi.export
+    : null
+  const manualOrderContextRef = useRef<{ checkoutToken: CheckoutContextToken; orderId: string | null }>({
+    checkoutToken: checkoutContextToken,
+    orderId: manualOrder?.id ?? null,
+  })
+  manualOrderContextRef.current = { checkoutToken: checkoutContextToken, orderId: manualOrder?.id ?? null }
+  const manualQrState = qrUi.state
+  const manualQrExportState = qrUi.exportState
+  const qrSavePending = qrUi.savePending
+  const qrSaveStatus = qrUi.saveStatus
+  const qrPreviewOpen = qrUi.previewOpen
   const qrPreviewCanOpen = Boolean(
     manualQrNeededForPaidCheckout
     && currentManualQrDetails
-    && manualQrExport?.orderId === manualOrder?.id
+    && currentManualQrExport
     && manualQrState === 'ready',
   )
-  const qrShareContextRef = useRef({
-    orderId: manualOrder?.id ?? null,
-    price: currentPrice,
-    paymentEnabled: manualPaymentEnabled,
-    eligible: manualQrNeededForPaidCheckout,
-    presentationState: presentation?.state ?? null,
-  })
-  qrShareContextRef.current = {
-    orderId: manualOrder?.id ?? null,
-    price: currentPrice,
-    paymentEnabled: manualPaymentEnabled,
-    eligible: manualQrNeededForPaidCheckout,
-    presentationState: presentation?.state ?? null,
-  }
   const manualQrUrl = manualOrder
     ? `/api/payment/manual/order/${encodeURIComponent(manualOrder.id)}/qr`
     : null
 
-  const showError = (value: unknown, fallback: string) => {
+  const showError = (
+    value: unknown,
+    fallback: string,
+    expectedCheckoutContext = checkoutContextToken,
+    expectedQrContext?: QrContextToken,
+  ) => {
+    if (checkoutContextTokenRef.current !== expectedCheckoutContext) return
+    if (expectedQrContext && !isCurrentQrContext(expectedQrContext)) return
     const message = customerPaymentErrorMessage(value, fallback)
     setError(message)
     toastEvent(message, 'error')
@@ -171,75 +314,99 @@ export default function CheckoutClient({
   }, [])
 
   useEffect(() => {
-    if (!manualOrder || !manualPaymentEnabled) {
-      setManualQrState('idle')
-      setManualQrDetails(null)
-      setManualQrExport(null)
-      setManualQrExportState('idle')
-      setQrSavePending(false)
-      setQrSaveStatus('')
-      setQrPreviewOpen(false)
+    const orderId = manualOrder?.id
+    const contextToken = qrContextToken
+    if (!orderId || !manualPaymentEnabled || !manualQrNeededForPaidCheckout) {
+      updateQrUi(contextToken, (current) => ({
+        ...current,
+        details: null,
+        export: null,
+        state: 'idle',
+        exportState: 'idle',
+        savePending: false,
+        saveStatus: '',
+        previewOpen: false,
+      }))
       return
     }
 
     let cancelled = false
-    setManualQrState('loading')
-    setManualQrDetails(null)
-    setManualQrExport(null)
-    setManualQrExportState('idle')
-    setQrSavePending(false)
-    setQrSaveStatus('')
-    setQrPreviewOpen(false)
+    const controller = new AbortController()
+    const isCurrent = () => !cancelled
+      && checkoutContextTokenRef.current === checkoutContextToken
+      && isCurrentQrContext(contextToken)
 
-    fetch(`/api/payment/manual/order/${manualOrder.id}/details`, { cache: 'no-store' })
+    updateQrUi(contextToken, (current) => ({
+      ...current,
+      state: manualQrNeededForPaidCheckout ? 'loading' : 'idle',
+    }))
+
+    fetch(`/api/payment/manual/order/${orderId}/details`, { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         const data = await response.json().catch(() => null)
         if (!response.ok || !data?.success) throw data || new Error('payment details unavailable')
-        if (!cancelled) {
-          setManualQrDetails({
-            orderId: manualOrder.id,
-            amount: String(data.amount),
-            displayName: String(data.displayName || ''),
-            instructionText: String(data.instructionText || ''),
-          })
+        if (!isCurrent()) return
+        const details: ManualPaymentQrDetails = {
+          contextToken,
+          orderId,
+          amount: String(data.amount),
+          displayName: String(data.displayName || ''),
+          instructionText: String(data.instructionText || ''),
         }
+        updateQrUi(contextToken, (current) => ({ ...current, details }))
       })
       .catch((reason) => {
-        if (!cancelled) {
-          setManualQrState('unavailable')
-          showError(reason, 'ขณะนี้ยังไม่สามารถรับชำระเงินได้ กรุณาลองใหม่ภายหลัง')
-        }
+        if (!isCurrent()) return
+        updateQrUi(contextToken, (current) => ({ ...current, state: 'unavailable' }))
+        showError(reason, 'ขณะนี้ยังไม่สามารถรับชำระเงินได้ กรุณาลองใหม่ภายหลัง', checkoutContextToken, contextToken)
       })
 
-    return () => { cancelled = true }
-  }, [manualOrder?.id, manualPaymentEnabled])
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [checkoutContextToken, qrContextToken, manualOrder?.id, manualPaymentEnabled, manualQrNeededForPaidCheckout])
 
   useEffect(() => {
     const orderId = manualOrder?.id
+    const contextToken = qrContextToken
+    const details = currentManualQrDetails
     if (!orderId || !manualQrUrl || !manualQrNeededForPaidCheckout) {
-      setManualQrExport(null)
-      setManualQrExportState('idle')
-      setManualQrState('idle')
-      setQrSavePending(false)
-      setQrSaveStatus('')
-      setQrPreviewOpen(false)
+      updateQrUi(contextToken, (current) => ({
+        ...current,
+        export: null,
+        exportState: 'idle',
+        state: 'idle',
+        savePending: false,
+        saveStatus: '',
+        previewOpen: false,
+      }))
       return
     }
 
-    if (manualQrDetails?.orderId !== orderId) {
-      setManualQrExport(null)
-      setManualQrExportState('idle')
-      setManualQrState('loading')
+    if (details?.contextToken !== contextToken || details.orderId !== orderId) {
+      updateQrUi(contextToken, (current) => ({
+        ...current,
+        export: null,
+        exportState: 'idle',
+        state: 'loading',
+      }))
       return
     }
 
     let cancelled = false
     const controller = new AbortController()
     let imageUrl: string | null = null
-    setManualQrExport(null)
-    setManualQrExportState('preparing')
-    setManualQrState('loading')
-    setQrSaveStatus('')
+    const isCurrent = () => !cancelled
+      && checkoutContextTokenRef.current === checkoutContextToken
+      && isCurrentQrContext(contextToken)
+    updateQrUi(contextToken, (current) => ({
+      ...current,
+      export: null,
+      exportState: 'preparing',
+      state: 'loading',
+      saveStatus: '',
+    }))
 
     fetch(manualQrUrl, { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
@@ -247,24 +414,31 @@ export default function CheckoutClient({
         if (!response.ok || contentType !== 'image/png') {
           throw new Error('PromptPay QR image unavailable.')
         }
-        return response.blob()
+        if (!isCurrent()) return null
+        const blob = await response.blob()
+        return isCurrent() ? blob : null
       })
       .then((blob) => {
+        if (!blob || !isCurrent()) return
         const file = createPromptPayQrFile(blob)
+        if (!isCurrent()) return
         imageUrl = URL.createObjectURL(file)
-        if (cancelled) {
+        if (!isCurrent()) {
           URL.revokeObjectURL(imageUrl)
+          imageUrl = null
           return
         }
-        setManualQrExport({ orderId, file, imageUrl })
-        setManualQrExportState('ready')
+        const qrExport: ManualPaymentQrExport = { contextToken, orderId, file, imageUrl }
+        updateQrUi(contextToken, (current) => ({ ...current, export: qrExport, exportState: 'ready' }))
       })
-      .catch(() => {
-        if (!cancelled) {
-          setManualQrExportState('failed')
-          setManualQrState('unavailable')
-          setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
-        }
+      .catch((reason) => {
+        if (!isCurrent()) return
+        updateQrUi(contextToken, (current) => ({
+          ...current,
+          exportState: 'failed',
+          state: 'unavailable',
+          saveStatus: 'ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง',
+        }))
       })
 
     return () => {
@@ -272,22 +446,11 @@ export default function CheckoutClient({
       controller.abort()
       if (imageUrl) URL.revokeObjectURL(imageUrl)
     }
-  }, [manualOrder?.id, manualPaymentEnabled, manualQrNeededForPaidCheckout, manualQrDetails?.orderId, manualQrUrl])
+  }, [checkoutContextToken, qrContextToken, manualQrUrl, manualQrNeededForPaidCheckout, currentManualQrDetails?.orderId])
 
   useEffect(() => {
     setQrPreviewPortalReady(true)
   }, [])
-
-  useEffect(() => {
-    qrShareAttemptGenerationRef.current += 1
-    setQrSavePending(false)
-    setQrSaveStatus('')
-    qrPreviewIsOpenRef.current = false
-    setQrPreviewOpen(false)
-    return () => {
-      qrShareAttemptGenerationRef.current += 1
-    }
-  }, [manualOrder?.id, manualOrder?.status, manualOrder?.paymentSettingsAvailable, currentPrice, manualPaymentEnabled, presentation?.state])
 
   useEffect(() => {
     const dialog = qrPreviewDialogRef.current
@@ -300,21 +463,24 @@ export default function CheckoutClient({
     }
 
     if (dialog?.open) dialog.close()
-    if (qrPreviewOpen && !qrPreviewCanOpen) setQrPreviewOpen(false)
+    if (qrPreviewOpen && !qrPreviewCanOpen) {
+      updateQrUi(qrContextToken, (current) => ({ ...current, previewOpen: false }))
+    }
 
     if (qrPreviewWasOpenedRef.current) {
       qrPreviewWasOpenedRef.current = false
       qrPreviewIsOpenRef.current = false
       const opener = qrPreviewOpenerRef.current
       const openerIsUsable = Boolean(
-        opener?.isConnected
-        && !('disabled' in opener && opener.disabled)
-        && opener.getClientRects().length > 0,
+        opener?.contextToken === qrContextToken
+        && opener.element.isConnected
+        && !('disabled' in opener.element && opener.element.disabled)
+        && opener.element.getClientRects().length > 0,
       )
-      const focusTarget = openerIsUsable ? opener : qrPreviewFallbackRef.current
+      const focusTarget = openerIsUsable ? opener?.element : qrPreviewFallbackRef.current
       focusTarget?.focus()
     }
-  }, [qrPreviewOpen, qrPreviewCanOpen, qrPreviewPortalReady, manualOrder?.id, manualQrExport?.orderId])
+  }, [qrContextToken, qrPreviewOpen, qrPreviewCanOpen, qrPreviewPortalReady, manualOrder?.id, currentManualQrExport?.orderId])
 
   useEffect(() => {
     const dialog = qrPreviewDialogRef.current
@@ -355,7 +521,10 @@ export default function CheckoutClient({
     const closeMobilePreview = () => {
       if (desktopViewport.matches && qrPreviewIsOpenRef.current) {
         qrPreviewIsOpenRef.current = false
-        setQrPreviewOpen(false)
+        const currentContextToken = qrContextTokenRef.current
+        if (currentContextToken) {
+          updateQrUi(currentContextToken, (current) => ({ ...current, previewOpen: false }))
+        }
       }
     }
 
@@ -364,19 +533,21 @@ export default function CheckoutClient({
     return () => desktopViewport.removeEventListener('change', closeMobilePreview)
   }, [])
 
-  const openQrPreview = (opener: HTMLElement) => {
+  const openQrPreview = (opener: HTMLElement, contextToken: QrContextToken) => {
+    if (!isCurrentQrContext(contextToken)) return
     if (window.matchMedia('(min-width: 1024px)').matches) {
-      setQrSaveStatus('')
+      updateQrUi(contextToken, (current) => ({ ...current, saveStatus: '' }))
       return
     }
-    if (!qrPreviewIsOpenRef.current) qrPreviewOpenerRef.current = opener
+    if (!qrPreviewIsOpenRef.current) qrPreviewOpenerRef.current = { element: opener, contextToken }
     qrPreviewIsOpenRef.current = true
-    setQrPreviewOpen(true)
+    updateQrUi(contextToken, (current) => ({ ...current, previewOpen: true }))
   }
 
   const handleCardPayment = () => {
+    const contextToken = checkoutContextToken
     if (!omiseLoaded || !window.OmiseCard) {
-      showError(null, 'กำลังโหลดระบบชำระเงิน กรุณารอสักครู่')
+      showError(null, 'กำลังโหลดระบบชำระเงิน กรุณารอสักครู่', contextToken)
       return
     }
 
@@ -392,6 +563,7 @@ export default function CheckoutClient({
       defaultPaymentMethod: 'credit_card',
       submitLabel: `ชำระ ฿${currentPrice.toLocaleString()}`,
       onCreateTokenSuccess: async (token: string) => {
+        if (checkoutContextTokenRef.current !== contextToken) return
         setLoading(true)
         try {
           const response = await fetch('/api/payment/create', {
@@ -401,23 +573,27 @@ export default function CheckoutClient({
           })
           const data = await response.json().catch(() => ({}))
           if (response.ok && data.success) {
+            if (checkoutContextTokenRef.current !== contextToken) return
             router.push(`/package/${pkg.slug}?success=1`)
           } else {
-            showError(data, 'การชำระเงินไม่สำเร็จ กรุณาลองใหม่')
+            showError(data, 'การชำระเงินไม่สำเร็จ กรุณาลองใหม่', contextToken)
           }
         } catch (reason) {
-          showError(reason, 'การชำระเงินไม่สำเร็จ กรุณาลองใหม่')
+          showError(reason, 'การชำระเงินไม่สำเร็จ กรุณาลองใหม่', contextToken)
         } finally {
-          setLoading(false)
+          if (checkoutContextTokenRef.current === contextToken) setLoading(false)
         }
       },
-      onFormClosed: () => setLoading(false),
+      onFormClosed: () => {
+        if (checkoutContextTokenRef.current === contextToken) setLoading(false)
+      },
     })
   }
 
   const handlePromptPay = async () => {
     if (loading || manualOrder || !manualPaymentEnabled) return
 
+    const contextToken = checkoutContextToken
     setLoading(true)
     setError('')
 
@@ -430,11 +606,12 @@ export default function CheckoutClient({
       const data = await response.json().catch(() => null)
 
       if (!response.ok || !data?.success) {
-        showError(data, 'ไม่สามารถสร้างคำสั่งซื้อ PromptPay ได้')
+        showError(data, 'ไม่สามารถสร้างคำสั่งซื้อ PromptPay ได้', contextToken)
         return
       }
 
-      setManualOrder({
+      if (checkoutContextTokenRef.current !== contextToken) return
+      setManualOrderForContext(contextToken, {
         id: data.orderId,
         amount: Number(data.amount),
         status: 'pending',
@@ -445,33 +622,39 @@ export default function CheckoutClient({
         paymentSettingsAvailable: true,
       })
     } catch (reason) {
-      showError(reason, 'สร้างคำสั่งซื้อไม่สำเร็จ กรุณาลองใหม่')
+      showError(reason, 'สร้างคำสั่งซื้อไม่สำเร็จ กรุณาลองใหม่', contextToken)
     } finally {
-      setLoading(false)
+      if (checkoutContextTokenRef.current === contextToken) setLoading(false)
     }
   }
 
   const handlePromptPayQrSave = (event: ReactMouseEvent<HTMLButtonElement>) => {
     const saveButton = event.currentTarget
-    if (!manualOrder || !manualQrUrl || !manualQrNeededForPaidCheckout || manualQrState !== 'ready' || !currentManualQrDetails) return
+    const contextToken = qrContextToken
+    if (!isCurrentQrContext(contextToken)
+      || !manualOrder
+      || !manualQrUrl
+      || !manualQrNeededForPaidCheckout
+      || manualQrState !== 'ready'
+      || !currentManualQrDetails) return
 
-    const file = manualQrExport?.orderId === manualOrder.id ? manualQrExport.file : null
+    const file = currentManualQrExport?.contextToken === contextToken
+      && currentManualQrExport.orderId === manualOrder.id
+      ? currentManualQrExport.file
+      : null
     if (!file) {
-      setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+      updateQrUi(contextToken, (current) => ({
+        ...current,
+        saveStatus: 'ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง',
+      }))
       return
     }
 
-    const orderId = manualOrder.id
-    const presentationState = presentation?.state ?? null
     const attemptGeneration = ++qrShareAttemptGenerationRef.current
     const isCurrentShareAttempt = () => {
-      const context = qrShareContextRef.current
-      return qrShareAttemptGenerationRef.current === attemptGeneration
-        && context.orderId === orderId
-        && context.price > 0
-        && context.paymentEnabled
-        && context.eligible
-        && context.presentationState === presentationState
+      return isCurrentQrContext(contextToken)
+        && checkoutContextTokenRef.current === checkoutContextToken
+        && qrShareAttemptGenerationRef.current === attemptGeneration
     }
 
     try {
@@ -481,49 +664,65 @@ export default function CheckoutClient({
       if (saveMode === 'share') {
         const share = navigator.share
         if (typeof share !== 'function') {
-          setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
-          openQrPreview(saveButton)
+          updateQrUi(contextToken, (current) => ({ ...current, saveStatus: 'แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ' }))
+          openQrPreview(saveButton, contextToken)
           return
         }
 
-        setQrSavePending(true)
-        setQrSaveStatus('กำลังเปิดเมนูแชร์...')
+        updateQrUi(contextToken, (current) => ({
+          ...current,
+          savePending: true,
+          saveStatus: 'กำลังเปิดเมนูแชร์...',
+        }))
         // Keep this call in the original click stack for iOS user-activation rules.
         const sharePromise = share.call(navigator, { files: [file], title: 'PromptPay QR Code' })
         void Promise.resolve(sharePromise)
           .then(
             () => {
-              if (isCurrentShareAttempt()) setQrSaveStatus('')
+              if (isCurrentShareAttempt()) {
+                updateQrUi(contextToken, (current) => ({ ...current, saveStatus: '' }))
+              }
             },
             (reason: unknown) => {
               if (!isCurrentShareAttempt()) return
               if (isPromptPayShareCancelled(reason)) {
-                setQrSaveStatus('')
+                updateQrUi(contextToken, (current) => ({ ...current, saveStatus: '' }))
                 return
               }
-              setQrSaveStatus('ไม่สามารถเปิดเมนูแชร์ได้ กรุณาเปิดรูป QR เพื่อบันทึก')
-              openQrPreview(saveButton)
+              updateQrUi(contextToken, (current) => ({
+                ...current,
+                saveStatus: 'ไม่สามารถเปิดเมนูแชร์ได้ กรุณาเปิดรูป QR เพื่อบันทึก',
+              }))
+              openQrPreview(saveButton, contextToken)
             },
           )
           .finally(() => {
-            if (isCurrentShareAttempt()) setQrSavePending(false)
+            if (isCurrentShareAttempt()) {
+              updateQrUi(contextToken, (current) => ({ ...current, savePending: false }))
+            }
           })
         return
       }
 
       if (saveMode === 'download') {
         initiatePromptPayQrDownload(file)
-        setQrSaveStatus('เริ่มดาวน์โหลด QR Code แล้ว หากไม่พบไฟล์ สามารถเปิดรูป QR เพื่อบันทึกได้')
+        updateQrUi(contextToken, (current) => ({
+          ...current,
+          saveStatus: 'เริ่มดาวน์โหลด QR Code แล้ว หากไม่พบไฟล์ สามารถเปิดรูป QR เพื่อบันทึกได้',
+        }))
         return
       }
 
-      setQrSaveStatus('แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ')
-      openQrPreview(saveButton)
+      updateQrUi(contextToken, (current) => ({ ...current, saveStatus: 'แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ' }))
+      openQrPreview(saveButton, contextToken)
     } catch {
       if (isCurrentShareAttempt()) {
-        setQrSavePending(false)
-        setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
-        openQrPreview(saveButton)
+        updateQrUi(contextToken, (current) => ({
+          ...current,
+          savePending: false,
+          saveStatus: 'ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง',
+        }))
+        openQrPreview(saveButton, contextToken)
       }
     }
   }
@@ -532,6 +731,12 @@ export default function CheckoutClient({
     event.preventDefault()
 
     if (!manualOrder || slipSubmitting || manualOrder.submissionStatus === 'submitted') return
+
+    const contextToken = checkoutContextToken
+    const orderId = manualOrder.id
+    const isCurrentSlipContext = () => checkoutContextTokenRef.current === contextToken
+      && manualOrderContextRef.current.checkoutToken === contextToken
+      && manualOrderContextRef.current.orderId === orderId
 
     if (!manualPaymentEnabled) {
       showError(null, 'ขณะนี้ยังไม่สามารถรับชำระเงินได้ กรุณาลองใหม่ภายหลัง')
@@ -574,11 +779,12 @@ export default function CheckoutClient({
       const data = await response.json().catch(() => null)
 
       if (!response.ok || !data?.success) {
-        showError(data, 'ส่งหลักฐานไม่สำเร็จ กรุณาลองอีกครั้ง')
+        showError(data, 'ส่งหลักฐานไม่สำเร็จ กรุณาลองอีกครั้ง', contextToken)
         return
       }
 
-      setManualOrder((current) => current
+      if (!isCurrentSlipContext()) return
+      setManualOrderForContext(contextToken, (current) => current
         ? {
             ...current,
             submissionStatus: 'submitted',
@@ -591,14 +797,15 @@ export default function CheckoutClient({
       setFileInputKey((key) => key + 1)
       toastEvent('ส่งหลักฐานเรียบร้อยแล้ว กำลังตรวจสอบหลักฐานการชำระเงิน', 'success')
     } catch (reason) {
-      showError(reason, 'ส่งหลักฐานไม่สำเร็จ กรุณาลองอีกครั้ง')
+      showError(reason, 'ส่งหลักฐานไม่สำเร็จ กรุณาลองอีกครั้ง', contextToken)
     } finally {
-      setSlipSubmitting(false)
+      if (isCurrentSlipContext()) setSlipSubmitting(false)
     }
   }
 
   const handleFreeCheckout = async () => {
     if (loading || claimedSuccess) return
+    const contextToken = checkoutContextToken
     setLoading(true)
     setError('')
 
@@ -611,22 +818,23 @@ export default function CheckoutClient({
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        showError(data, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่')
+        showError(data, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่', contextToken)
         return
       }
 
       if (data.success) {
+        if (checkoutContextTokenRef.current !== contextToken) return
         setClaimedSuccess(true)
         freePackageClaimed(pkg.id, pkg.name)
         toastEvent('เปิดใช้งานแพ็กเกจเรียบร้อยแล้ว', 'success')
         return
       }
 
-      showError(data, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่')
+      showError(data, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่', contextToken)
     } catch (reason) {
-      showError(reason, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่')
+      showError(reason, 'เปิดใช้งานแพ็กเกจไม่สำเร็จ กรุณาลองใหม่', contextToken)
     } finally {
-      setLoading(false)
+      if (checkoutContextTokenRef.current === contextToken) setLoading(false)
     }
   }
 
@@ -802,23 +1010,26 @@ export default function CheckoutClient({
 
                         <div className="rounded-lg border border-border-subtle bg-white p-4 text-center">
                           {manualQrState === 'loading' && <div className="py-12 text-sm text-slate-600">กำลังเตรียม QR สำหรับคำสั่งซื้อนี้...</div>}
-                          {manualQrExport?.orderId === manualOrder.id && manualQrState !== 'unavailable' && (
+                          {currentManualQrExport && manualQrState !== 'unavailable' && (
                             <img
-                              src={manualQrExport.imageUrl}
+                              src={currentManualQrExport.imageUrl}
                               alt={`QR PromptPay สำหรับชำระเงิน ฿${currentManualQrDetails?.amount ?? formatAmount(manualOrder.amount)}`}
                               width={280}
                               height={280}
                               className={`mx-auto h-auto w-[280px] max-w-full ${manualQrState === 'loading' ? 'hidden' : ''}`}
-                              onLoad={() => setManualQrState('ready')}
+                              onLoad={() => updateQrUi(qrContextToken, (current) => ({ ...current, state: 'ready' }))}
                               onError={() => {
-                                setManualQrState('unavailable')
-                                setManualQrExportState('failed')
-                                setQrSaveStatus('ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง')
+                                updateQrUi(qrContextToken, (current) => ({
+                                  ...current,
+                                  state: 'unavailable',
+                                  exportState: 'failed',
+                                  saveStatus: 'ไม่สามารถเตรียม QR Code ได้ กรุณาลองอีกครั้ง',
+                                }))
                               }}
                             />
                           )}
                           {manualQrState === 'unavailable' && <div className="py-8 text-sm text-red-700">ขณะนี้การชำระเงินผ่าน PromptPay ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง</div>}
-                          {manualQrState === 'ready' && currentManualQrDetails && manualQrExport?.orderId === manualOrder.id && (
+                          {manualQrState === 'ready' && currentManualQrDetails && currentManualQrExport && (
                             <div className="mx-auto mt-3 w-full max-w-sm text-center lg:hidden">
                               <button
                                 type="button"
@@ -837,7 +1048,7 @@ export default function CheckoutClient({
                               <p className="mt-1 text-xs text-slate-600">บันทึก QR เพื่อเปิดในแอปธนาคาร</p>
                               <button
                                 type="button"
-                                onClick={(event) => openQrPreview(event.currentTarget)}
+                                onClick={(event) => openQrPreview(event.currentTarget, qrContextToken)}
                                 className="min-h-[44px] px-3 text-sm font-medium text-[#5A4319] underline decoration-[#8B6B26]/50 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
                               >
                                 เปิดรูป QR เพื่อบันทึก
@@ -918,13 +1129,18 @@ export default function CheckoutClient({
           </>
         )}
       </div>
-      {qrPreviewPortalReady && qrPreviewCanOpen && manualQrExport && currentManualQrDetails && createPortal(
+      {qrPreviewPortalReady && qrPreviewCanOpen && currentManualQrExport && currentManualQrDetails && createPortal(
         <dialog
           ref={qrPreviewDialogRef}
-          onCancel={() => { qrPreviewIsOpenRef.current = false }}
-          onClose={() => {
+          onCancel={() => {
+            if (!isCurrentQrContext(qrContextToken)) return
             qrPreviewIsOpenRef.current = false
-            setQrPreviewOpen(false)
+            updateQrUi(qrContextToken, (current) => ({ ...current, previewOpen: false }))
+          }}
+          onClose={() => {
+            if (!isCurrentQrContext(qrContextToken)) return
+            qrPreviewIsOpenRef.current = false
+            updateQrUi(qrContextToken, (current) => ({ ...current, previewOpen: false }))
           }}
           aria-labelledby="promptpay-qr-preview-title"
           className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border-0 bg-white p-4 text-center text-slate-900 shadow-xl outline-none backdrop:bg-black/70 lg:hidden"
@@ -935,8 +1151,9 @@ export default function CheckoutClient({
               ref={qrPreviewCloseButtonRef}
               type="button"
               onClick={() => {
+                if (!isCurrentQrContext(qrContextToken)) return
                 qrPreviewIsOpenRef.current = false
-                setQrPreviewOpen(false)
+                updateQrUi(qrContextToken, (current) => ({ ...current, previewOpen: false }))
               }}
               className="min-h-[44px] rounded-lg px-4 text-sm font-semibold text-[#5A4319] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B6B26]/70"
             >
@@ -945,7 +1162,7 @@ export default function CheckoutClient({
           </div>
           <p className="mt-2 text-sm text-slate-700">แตะค้างที่รูป QR แล้วเลือกบันทึกรูปภาพ</p>
           <img
-            src={manualQrExport.imageUrl}
+            src={currentManualQrExport.imageUrl}
             alt={`QR PromptPay สำหรับชำระเงิน ฿${currentManualQrDetails.amount}`}
             width={768}
             height={768}

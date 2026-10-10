@@ -18,7 +18,7 @@ test('paid checkout is independent from Donate/Support QR config', () => {
   assert.doesNotMatch(paidBlock, /supportConfig\?\.qr_image_url|<SupportDetails/)
   assert.match(checkout, /const manualQrUrl = manualOrder[\s\S]*?\/api\/payment\/manual\/order\/\$\{encodeURIComponent\(manualOrder\.id\)\}\/qr/)
   assert.match(checkout, /fetch\(manualQrUrl,[\s\S]*?response\.blob\(\)/)
-  assert.match(paidBlock, /src=\{manualQrExport\.imageUrl\}/)
+  assert.match(paidBlock, /src=\{currentManualQrExport\.imageUrl\}/)
   assert.match(paidBlock, /displayName/)
 })
 
