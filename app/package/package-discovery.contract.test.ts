@@ -59,12 +59,14 @@ test('Position discovery stays intact: canonical link or plain-text fallback, ne
     client,
     /<span className="text-muted-foreground text-\[10px\] lg:text-\[11px\] px-2 py-0\.5 rounded-full border border-border-subtle min-h-7 inline-flex items-center">\s*\{pkg\.positions\.name\}\s*<\/span>/,
   )
-  // The fallback branch must not build any /positions URL.
-  const fallbackStart = client.indexOf('rounded-full border border-border-subtle min-h-7')
-  const fallbackEnd = client.indexOf('แพ็กเกจ', fallbackStart)
-  const fallbackBlock = client.slice(fallbackStart, fallbackEnd)
-  assert.ok(fallbackStart !== -1 && fallbackEnd !== -1)
-  assert.doesNotMatch(fallbackBlock, /\/positions/)
+  // The fallback branch itself must not build any /positions URL. Scoped to
+  // the exact fallback span element (robust to the redesigned hero around it):
+  // the canonicalPosition LINK branch above is the only /positions producer.
+  const fallbackSpan = client.match(
+    /<span className="text-muted-foreground text-\[10px\] lg:text-\[11px\] px-2 py-0\.5 rounded-full border border-border-subtle min-h-7 inline-flex items-center">\s*\{pkg\.positions\.name\}\s*<\/span>/,
+  )
+  assert.ok(fallbackSpan, 'plain-text position fallback span exists')
+  assert.doesNotMatch(fallbackSpan[0], /\/positions/)
 })
 
 test('the canonical Agency resolver itself enforces published + stable slug only', () => {
