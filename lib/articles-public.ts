@@ -68,6 +68,8 @@ export interface PublicRelatedPackage {
   name: string
   slug: string
   position_id: string | null
+  /** Owning organization — feeds canonical Agency discovery (Entity Discovery V1). */
+  organization_id: string | null
   current_price: number | null
   original_price: number | null
   description: string | null
@@ -438,7 +440,7 @@ export const getPublishedArticleRelatedPackages = cache(
       const { data, error } = await supabase
         .from('article_packages')
         .select(
-          'sort_order, articles!inner(status), packages!inner(id, name, slug, position_id, current_price, original_price, description, cover_image_url, logo_url, is_published)'
+          'sort_order, articles!inner(status), packages!inner(id, name, slug, position_id, organization_id, current_price, original_price, description, cover_image_url, logo_url, is_published)'
         )
         .eq('article_id', articleId)
         .eq('articles.status', 'published')
@@ -459,6 +461,7 @@ export const getPublishedArticleRelatedPackages = cache(
             name: pkg.name,
             slug: pkg.slug,
             position_id: pkg.position_id ?? null,
+            organization_id: pkg.organization_id ?? null,
             current_price: pkg.current_price,
             original_price: pkg.original_price,
             description: pkg.description,

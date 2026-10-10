@@ -24,6 +24,9 @@ import AffiliateRail from '@/components/affiliate/AffiliateRail'
 import { getAffiliateRailProducts } from '@/lib/affiliate-public'
 import type { AffiliateRailProduct } from '@/lib/affiliate'
 import { getCanonicalPositionLinks, type CanonicalPositionLink } from '@/lib/positions-public'
+import { getCanonicalAgencyLinks } from '@/lib/agencies-public'
+import { collectFirstOccurrenceIds } from '@/lib/agency-profile'
+import { MAX_DISCOVERY_ENTITY_LINKS } from '@/components/entities/EntityChipRow'
 
 export const revalidate = 300
 
@@ -206,9 +209,20 @@ export default async function ArticleDetailPage({
   // section (ArticleRelatedPackages, hidden >= 1300px). Exactly one is visible
   // per breakpoint; there is never a second fetch.
   const railPackages = packagesRes.success ? packagesRes.data : []
-  const canonicalPositions = await getCanonicalPositionLinks(
-    railPackages.map((pkg) => pkg.position_id),
+  const [canonicalPositions, canonicalAgencies] = await Promise.all([
+    getCanonicalPositionLinks(railPackages.map((pkg) => pkg.position_id)),
+    // Entity Discovery V1: agencies derive from the SAME package relations as
+    // the positions above (packages.organization_id) — no direct
+    // Article→Agency relation. First-occurrence order follows the junction's
+    // deterministic sort_order; capped with the shared discovery limit.
+    getCanonicalAgencyLinks(railPackages.map((pkg) => pkg.organization_id)),
+  ])
+  const relatedAgencies = collectFirstOccurrenceIds(
+    railPackages.map((pkg) => pkg.organization_id),
   )
+    .map((organizationId) => canonicalAgencies.get(organizationId))
+    .filter((agency): agency is NonNullable<typeof agency> => Boolean(agency))
+    .slice(0, MAX_DISCOVERY_ENTITY_LINKS)
   const relatedPositions = Array.from(
     new Map(
       railPackages
@@ -216,7 +230,7 @@ export default async function ArticleDetailPage({
         .filter((position): position is CanonicalPositionLink => Boolean(position))
         .map((position) => [position.id, position]),
     ).values(),
-  )
+  ).slice(0, MAX_DISCOVERY_ENTITY_LINKS)
   const hasRailContent = railPackages.length > 0 || affiliateProducts.length > 0
 
   const articleJsonLd = buildArticleJsonLd(article)
@@ -239,7 +253,7 @@ export default async function ArticleDetailPage({
           rail has content, so an article with neither block keeps a clean,
           centered reading column (no blank sidebar shell). */}
       <div className={hasRailContent ? 'article-affiliate-layout' : undefined}>
-        <ArticleDetail article={article} relatedPositions={relatedPositions} />
+        <ArticleDetail article={article} relatedAgencies={relatedAgencies} relatedPositions={relatedPositions} />
         {hasRailContent && (
           <aside className="article-affiliate-aside">
             {/* ONE sticky wrapper carries BOTH rail blocks (first-party

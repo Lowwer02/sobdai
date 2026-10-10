@@ -283,6 +283,116 @@ export function isAgencyNewsItem(
   return item.relatedOrganizationIds.includes(organizationId)
 }
 
+/**
+ * Public link eligibility for a canonical Agency. Deliberately narrower than
+ * the index-readiness gate: a published profile with a stable slug MAY be
+ * contextually linked from detail pages even while the hub/sitemap still
+ * keeps it out of the index (published-but-noindex pages may receive
+ * internal links). Draft/archived profiles and unstable slugs never link.
+ */
+export interface CanonicalAgencyLink {
+  /** Canonical organizations.id — the stable join key callers resolved by. */
+  organizationId: string
+  agencyProfileId: string
+  slug: string
+  name: string
+  shortName: string | null
+  logoUrl: string | null
+}
+
+/**
+ * Raw organizations row with its embedded agency_profiles relation, as the
+ * public link resolvers read it. The embedded value may be an object (FK
+ * side) or an array (reverse side) — both are normalized here.
+ */
+export interface CanonicalAgencyLinkRow {
+  id: string
+  name: string
+  short_name?: string | null
+  logo_url?: string | null
+  agency_profiles?: unknown
+}
+
+/** Map one organizations+agency_profiles row to a canonical link, or null. */
+export function mapCanonicalAgencyLink(row: CanonicalAgencyLinkRow): CanonicalAgencyLink | null {
+  const organizationId = typeof row.id === 'string' ? row.id : ''
+  const name = normalizeAgencyText(row.name)
+  if (!organizationId || !name) return null
+
+  const profile = firstEmbeddedObject(row.agency_profiles)
+  const agencyProfileId = typeof profile?.id === 'string' ? profile.id : ''
+  const slug = typeof profile?.slug === 'string' ? profile.slug.trim() : ''
+  const status = typeof profile?.status === 'string' ? profile.status : ''
+  if (!agencyProfileId || status !== 'published' || !isStableAgencySlug(slug)) return null
+
+  return {
+    organizationId,
+    agencyProfileId,
+    slug,
+    name,
+    shortName: normalizeAgencyText(row.short_name) || null,
+    logoUrl: typeof row.logo_url === 'string' && row.logo_url.trim() ? row.logo_url.trim() : null,
+  }
+}
+
+/**
+ * Batch map rows to a organizationId-keyed canonical-link map, deduplicated
+ * by canonical organization id and preserving first-occurrence order.
+ */
+export function collectCanonicalAgencyLinks(
+  rows: readonly CanonicalAgencyLinkRow[],
+): Map<string, CanonicalAgencyLink> {
+  const links = new Map<string, CanonicalAgencyLink>()
+  for (const row of rows) {
+    const link = mapCanonicalAgencyLink(row)
+    if (!link || links.has(link.organizationId)) continue
+    links.set(link.organizationId, link)
+  }
+  return links
+}
+
+function firstEmbeddedObject(value: unknown): Record<string, unknown> | null {
+  if (Array.isArray(value)) {
+    const first = value[0]
+    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null
+  }
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+/**
+ * Deterministic News → Agency organization resolution for the news detail
+ * page, mirroring the hub's isAgencyNewsItem priority:
+ *   A. A non-null news.organization_id is AUTHORITATIVE and exclusive —
+ *      package-derived organizations can neither override it nor add to it.
+ *   B. A null explicit value falls back to the distinct organizations of the
+ *      news row's related packages, in first-occurrence (junction sort) order.
+ *   C. Neither signal → no Agency chip.
+ * No title/tag/name matching of any kind.
+ */
+export function resolveNewsAgencyOrganizationIds(
+  newsOrganizationId: string | null | undefined,
+  relatedOrganizationIds: readonly (string | null | undefined)[],
+): string[] {
+  if (typeof newsOrganizationId === 'string' && newsOrganizationId) {
+    return [newsOrganizationId]
+  }
+  return collectFirstOccurrenceIds(relatedOrganizationIds)
+}
+
+/** Deduplicate ids preserving first-occurrence order; blanks are dropped. */
+export function collectFirstOccurrenceIds(
+  ids: readonly (string | null | undefined)[],
+): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const id of ids) {
+    if (typeof id !== 'string' || !id || seen.has(id)) continue
+    seen.add(id)
+    result.push(id)
+  }
+  return result
+}
+
 export function selectAgencyPageBySlug<T extends { profile: { slug: string } }>(
   pages: readonly T[],
   slug: unknown,

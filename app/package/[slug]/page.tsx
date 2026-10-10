@@ -19,6 +19,7 @@ import {
 } from '@/lib/seo'
 import StructuredData from '@/components/StructuredData'
 import { getCanonicalPositionLink } from '@/lib/positions-public'
+import { getCanonicalAgencyLink, type CanonicalAgencyLink } from '@/lib/agencies-public'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -91,7 +92,7 @@ export default async function PackagePage({ params }: PageProps) {
 
   // Now that we have the package id + user, run the dependent queries in parallel.
   const user = userResult.data.user
-  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent, writtenExams, canonicalPosition] = await Promise.all([
+  const [countsMap, draftProfile, summaries, examSets, order, homepageSettings, relatedContent, writtenExams, canonicalPosition, canonicalAgency] = await Promise.all([
     getPackagePublicCounts([pkg.id]),
     // Only need a profile lookup if the package is an unpublished draft
     pkg.is_published
@@ -138,6 +139,9 @@ export default async function PackagePage({ params }: PageProps) {
       return []
     }),
     getCanonicalPositionLink(pkg.position_id),
+    // Entity Discovery V1: canonical Agency link for the owning organization
+    // (published profile + stable slug only). Null keeps the plain-text name.
+    getCanonicalAgencyLink(pkg.organization_id),
   ])
 
   // Apply counts
@@ -184,6 +188,7 @@ export default async function PackagePage({ params }: PageProps) {
           relatedArticles={relatedContent.articles}
           isAuthenticated={Boolean(user)}
           canonicalPosition={canonicalPosition}
+          canonicalAgency={canonicalAgency}
         />
       </Suspense>
     </>

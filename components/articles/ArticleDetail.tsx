@@ -6,11 +6,17 @@ import { calculateReadingTime } from '@/lib/articles'
 import SummaryMarkdown from '@/components/summary/SummaryMarkdown'
 import ArticleReferences from '@/components/articles/ArticleReferences'
 import ArticleAuthorCard from '@/components/articles/ArticleAuthorCard'
+import EntityChipRow from '@/components/entities/EntityChipRow'
 import AdSenseUnit from '@/components/adsense/AdSenseUnit'
 import { getAdsenseDetailConfig, type AdsenseDetailConfig } from '@/lib/adsense'
 
 interface ArticleDetailProps {
   article: PublicArticleDetail
+  relatedAgencies?: Array<{
+    organizationId: string
+    slug: string
+    name: string
+  }>
   relatedPositions?: Array<{ id: string; slug: string; name: string }>
 }
 
@@ -37,7 +43,7 @@ function isDifferentDate(pub?: string | null, upd?: string | null): boolean {
   return Math.abs(d2 - d1) > 60_000
 }
 
-export default function ArticleDetail({ article, relatedPositions = [] }: ArticleDetailProps) {
+export default function ArticleDetail({ article, relatedAgencies = [], relatedPositions = [] }: ArticleDetailProps) {
   const publishedDateStr = formatDate(article.published_at)
   const updatedDateStr = formatDate(article.updated_at)
   const showUpdated = isDifferentDate(article.published_at, article.updated_at) && Boolean(updatedDateStr)
@@ -132,18 +138,31 @@ export default function ArticleDetail({ article, relatedPositions = [] }: Articl
         </div>
       </header>
 
-      {relatedPositions.length > 0 && (
-        <section aria-label="ตำแหน่งที่เกี่ยวข้อง" className="flex flex-wrap items-center gap-2 border-b border-brand/15 pb-6">
-          <span className="text-xs font-semibold text-muted-foreground">ตำแหน่งที่เกี่ยวข้อง:</span>
-          {relatedPositions.map((position) => (
-            <Link
-              key={position.id}
-              href={`/positions/${encodeURIComponent(position.slug)}`}
-              className="rounded-full border border-brand/30 bg-brand-solid/5 px-3 py-1.5 text-xs text-brand transition-colors hover:bg-wash focus:outline-none focus:ring-2 focus:ring-brand"
-            >
-              {position.name}
-            </Link>
-          ))}
+      {(relatedAgencies.length > 0 || relatedPositions.length > 0) && (
+        <section
+          aria-label="หน่วยงานและตำแหน่งที่เกี่ยวข้อง"
+          className="flex flex-col gap-2 border-b border-brand/15 pb-6"
+        >
+          {relatedAgencies.length > 0 && (
+            <EntityChipRow
+              label="หน่วยงานที่เกี่ยวข้อง:"
+              items={relatedAgencies.map((agency) => ({
+                id: agency.organizationId,
+                href: `/agencies/${encodeURIComponent(agency.slug)}`,
+                label: agency.name,
+              }))}
+            />
+          )}
+          {relatedPositions.length > 0 && (
+            <EntityChipRow
+              label="ตำแหน่งที่เกี่ยวข้อง:"
+              items={relatedPositions.map((position) => ({
+                id: position.id,
+                href: `/positions/${encodeURIComponent(position.slug)}`,
+                label: position.name,
+              }))}
+            />
+          )}
         </section>
       )}
 

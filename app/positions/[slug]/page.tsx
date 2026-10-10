@@ -22,6 +22,7 @@ import {
   buildPositionSeoContract,
 } from '@/lib/position-entity'
 import { getPublishedPositionPageBySlug } from '@/lib/positions-public'
+import { getCanonicalAgencyLinks } from '@/lib/agencies-public'
 import styles from './positions.module.css'
 
 export const revalidate = 300
@@ -109,6 +110,17 @@ export default async function PositionDetailPage({ params }: PageProps) {
   const positionJsonLd = buildPositionJsonLd(page, canonicalPath, seo.title, seo.description)
   const updatedLabel = formatDate(page.entity.updated_at)
 
+  // Entity Discovery V1: organizations with a published Agency Profile and a
+  // stable slug link to their canonical /agencies/[slug] page; the rest keep
+  // their plain-text cards. One batched read, keyed by organization id.
+  const canonicalAgencies = await getCanonicalAgencyLinks(
+    page.organizations.map((organization) => organization.id),
+  )
+  const agencyLinksByOrganization: Record<string, { slug: string; name: string }> = {}
+  for (const [organizationId, link] of canonicalAgencies) {
+    agencyLinksByOrganization[organizationId] = { slug: link.slug, name: link.name }
+  }
+
   return (
     <main className={styles.page}>
       <StructuredData data={positionJsonLd} />
@@ -138,6 +150,7 @@ export default async function PositionDetailPage({ params }: PageProps) {
         <PositionAgenciesSection
           organizations={page.organizations}
           packages={page.packages}
+          agencyLinksByOrganization={agencyLinksByOrganization}
         />
 
         <div className={styles.legacyContent}>

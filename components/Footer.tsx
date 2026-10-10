@@ -54,7 +54,10 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
   return (
     <footer data-site-footer="true" className="mobile-bottom-nav-footer bg-background border-t border-brand/10 pt-12 pb-24 lg:pb-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 gap-8 md:gap-10 lg:grid-cols-4">
+        {/* Entity Discovery V1: 5 link groups — the grid gains one desktop
+            column; mobile keeps its full-width rows (brand, explore, connect)
+            and paired half-width rows (help + legal). */}
+        <div className="grid grid-cols-2 gap-8 md:gap-10 lg:grid-cols-5">
 
           {/* 1. BRAND */}
           <div className="col-span-2 lg:col-span-1 flex flex-col items-start">
@@ -83,7 +86,22 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
             )}
           </div>
 
-          {/* 2. HELP / PRODUCT */}
+          {/* 2. EXPLORE (Entity Discovery V1) */}
+          <div className="col-span-2 lg:col-span-1 flex flex-col">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+              สำรวจ
+            </h3>
+            <nav aria-label="สำรวจหน้างานราชการ" className="flex flex-col space-y-2.5 text-sm text-[#A1866B]">
+              <Link href="/positions" className="hover:text-[#F5E9D6] transition-colors">
+                ตำแหน่งงานราชการ
+              </Link>
+              <Link href="/agencies" className="hover:text-[#F5E9D6] transition-colors">
+                หน่วยงานราชการ
+              </Link>
+            </nav>
+          </div>
+
+          {/* 3. HELP / PRODUCT */}
           <div className="col-span-1 flex flex-col">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               ช่วยเหลือ
@@ -104,7 +122,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
             </nav>
           </div>
 
-          {/* 3. LEGAL / SETTINGS */}
+          {/* 4. LEGAL / SETTINGS */}
           <div className="col-span-1 flex flex-col">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               ข้อกำหนดและนโยบาย
@@ -125,7 +143,7 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
             </nav>
           </div>
 
-          {/* 4. CONNECT */}
+          {/* 5. CONNECT */}
           <div className="col-span-2 lg:col-span-1 flex flex-col pt-2 lg:pt-0">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               ติดตามเรา

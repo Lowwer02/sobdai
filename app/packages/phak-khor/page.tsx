@@ -1,7 +1,9 @@
 import { getPublicPackageCatalog } from '@/lib/publicData'
 import PackageCatalogClient from '../PackageCatalogClient'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { Suspense } from 'react'
+import { ArrowRight } from 'lucide-react'
 import {
   createPageMetadata,
   PHAK_KHOR_TITLE,
@@ -42,6 +44,27 @@ export default async function PhakKhorPage({
         activePhase="phak-khor"
         showPhaseTabs={true}
         showAllPhaseTab={false}
+        headerChildren={
+          // Entity Discovery V1: subtle contextual discovery links under the
+          // catalog header (the purpose-built headerChildren slot — no banner,
+          // no catalog refactor, no extra query).
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            <Link
+              href="/positions"
+              className="inline-flex items-center gap-1.5 text-[13px] text-[#A1866B] transition-colors hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37] rounded-sm"
+            >
+              ดูตำแหน่งงานราชการ
+              <ArrowRight size={13} aria-hidden="true" />
+            </Link>
+            <Link
+              href="/agencies"
+              className="inline-flex items-center gap-1.5 text-[13px] text-[#A1866B] transition-colors hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37] rounded-sm"
+            >
+              ดูหน่วยงานราชการ
+              <ArrowRight size={13} aria-hidden="true" />
+            </Link>
+          </div>
+        }
       />
     </Suspense>
   )

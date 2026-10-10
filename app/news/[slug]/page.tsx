@@ -41,6 +41,9 @@ import { getAdsenseDetailConfig, type AdsenseDetailConfig } from '@/lib/adsense'
 import { getHomepageSettings } from '@/lib/homepageConfig'
 import { resolveSocialFollowChannels } from '@/lib/socialFollowConfig'
 import { getCanonicalPositionLinks, type CanonicalPositionLink } from '@/lib/positions-public'
+import { getCanonicalAgencyLinks, type CanonicalAgencyLink } from '@/lib/agencies-public'
+import { resolveNewsAgencyOrganizationIds } from '@/lib/agency-profile'
+import EntityChipRow, { MAX_DISCOVERY_ENTITY_LINKS } from '@/components/entities/EntityChipRow'
 
 /**
  * Viewport width where the two-column layout activates: the editorial column
@@ -131,6 +134,10 @@ interface NewsDetailRow {
   // AdSense Conservative (M3) per-content opt-in (migration 087). Default
   // false on legacy rows; the platform env config gates it a second time.
   adsense_enabled: boolean
+  // Authoritative editorial Agency attribution (migration 102). NULL on all
+  // current production rows — the deterministic operator backfill is a
+  // separate data-ops step; until then Agency chips derive from packages.
+  organization_id: string | null
 }
 
 interface NewsNeighbor {
@@ -176,7 +183,7 @@ const getNewsForRoute = cache(async (slug: string): Promise<NewsDetailRow | null
   const { data } = await supabase
     .from('news')
     .select(
-      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline, affiliate_enabled, affiliate_collection_id, adsense_enabled'
+      'id, slug, title, excerpt, body_markdown, cover_image_url, cover_image_alt, category, tags, status, published_at, updated_at, source_name, source_url, source_date, seo_title, seo_description, canonical_url, og_image_url, created_at, cta_config, gp_exam_requirement, application_deadline, affiliate_enabled, affiliate_collection_id, adsense_enabled, organization_id'
     )
     .eq('slug', slug)
     .eq('status', 'published')
@@ -240,6 +247,7 @@ interface RelatedPackageRow {
   id: string
   slug: string
   position_id: string | null
+  organization_id: string | null
   exam_year: string
   current_price: number
   original_price: number
@@ -255,6 +263,7 @@ interface RelatedContent {
   packages: PackageCardData[]
   summaries: PublicSummaryTarget[]
   positions: CanonicalPositionLink[]
+  agencies: CanonicalAgencyLink[]
 }
 
 /**
@@ -279,7 +288,7 @@ interface RelatedContent {
  * Cached so generateMetadata / the body don't double-fetch (the body is the
  * only caller today, but cache() keeps it idempotent if that changes).
  */
-const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> => {
+const getRelatedContent = cache(async (newsId: string, newsOrganizationId: string | null): Promise<RelatedContent> => {
   const supabase = createAnonServerClient()
 
   const [pkgResult, sumResult] = await Promise.all([
@@ -288,7 +297,7 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
       .select(
         `sort_order, package_id, packages!inner (
           id, slug, exam_year, current_price, original_price, difficulty,
-          description, logo_url, position_id, organizations ( name, logo_url ), positions ( name )
+          description, logo_url, position_id, organization_id, organizations ( name, logo_url ), positions ( name )
         )`
       )
       .eq('news_id', newsId)
@@ -313,9 +322,19 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
   const countsPromise: Promise<Awaited<ReturnType<typeof getPackagePublicCounts>>> = cleanPkgRows.length
     ? getPackagePublicCounts(cleanPkgRows.map(p => p.id))
     : Promise.resolve({})
-  const [counts, canonicalPositions] = await Promise.all([
+  const [counts, canonicalPositions, canonicalAgencies] = await Promise.all([
     countsPromise,
     getCanonicalPositionLinks(cleanPkgRows.map((pkg) => pkg.position_id)),
+    // Entity Discovery V1: the authoritative news.organization_id decides the
+    // Agency attribution; the package-derived fallback applies ONLY while the
+    // explicit value is NULL (resolveNewsAgencyOrganizationIds). No
+    // title/tag/name matching of any kind.
+    getCanonicalAgencyLinks(
+      resolveNewsAgencyOrganizationIds(
+        newsOrganizationId,
+        cleanPkgRows.map((pkg) => pkg.organization_id),
+      ),
+    ),
   ])
   const packages: PackageCardData[] = cleanPkgRows.map(p => ({
     id: p.id,
@@ -351,9 +370,17 @@ const getRelatedContent = cache(async (newsId: string): Promise<RelatedContent> 
         .filter((position): position is CanonicalPositionLink => Boolean(position))
         .map((position) => [position.id, position]),
     ).values(),
-  )
+  ).slice(0, MAX_DISCOVERY_ENTITY_LINKS)
 
-  return { packages, summaries, positions }
+  const agencies = resolveNewsAgencyOrganizationIds(
+    newsOrganizationId,
+    cleanPkgRows.map((pkg) => pkg.organization_id),
+  )
+    .map((organizationId) => canonicalAgencies.get(organizationId))
+    .filter((agency): agency is CanonicalAgencyLink => Boolean(agency))
+    .slice(0, MAX_DISCOVERY_ENTITY_LINKS)
+
+  return { packages, summaries, positions, agencies }
 })
 
 // ─── Metadata ───────────────────────────────────────────────────────────────
@@ -437,7 +464,7 @@ export default async function NewsDetailPage({
   // no published products, so the rail simply doesn't render.
   const [homepageSettings, related, affiliateProducts] = await Promise.all([
     getHomepageSettings(),
-    getRelatedContent(article.id),
+    getRelatedContent(article.id, article.organization_id),
     article.affiliate_enabled
       ? getAffiliateRailProducts(article.affiliate_collection_id)
       : Promise.resolve([] as AffiliateRailProduct[]),
@@ -450,10 +477,13 @@ export default async function NewsDetailPage({
   // fetch, and the rail shows exactly the relation/order the bottom section
   // would have shown.
   const hasRailContent = related.packages.length > 0 || affiliateProducts.length > 0
-  const packageOnlyDesktopHideClassName =
-    related.summaries.length === 0 ? 'news-related-desktop-hidden' : undefined
+  // Desktop hides the bottom section's PACKAGE presentation (the rail takes
+  // over). The section itself must stay visible whenever anything else would
+  // remain under the heading: summaries, entity chips, or both.
   const relatedSectionClassName =
-    related.positions.length > 0 ? undefined : packageOnlyDesktopHideClassName
+    related.summaries.length === 0 && related.agencies.length === 0 && related.positions.length === 0
+      ? 'news-related-desktop-hidden'
+      : undefined
 
   const socialFollowPlacement = homepageSettings.social_follow.placements.news_detail_end
   const resolvedSocialChannels = resolveSocialFollowChannels(
@@ -821,7 +851,7 @@ export default async function NewsDetailPage({
             exactly where they are, and a news item with packages but no
             summaries hides the whole section on Desktop (nothing would remain
             under the heading). */}
-        {(related.packages.length > 0 || related.summaries.length > 0 || related.positions.length > 0) && (
+        {(related.packages.length > 0 || related.summaries.length > 0 || related.positions.length > 0 || related.agencies.length > 0) && (
           <section
             aria-label="เนื้อหาที่เกี่ยวข้อง"
             className={relatedSectionClassName}
@@ -838,6 +868,35 @@ export default async function NewsDetailPage({
             >
               เนื้อหาที่เกี่ยวข้อง
             </h2>
+
+            {/* Related Agencies — Entity Discovery V1. Attribution priority:
+                the authoritative news.organization_id wins exclusively; only a
+                NULL explicit value falls back to the related packages'
+                organizations; neither signal renders nothing. Agency group
+                intentionally precedes the Position group. */}
+            {related.agencies.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <h3
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--gold-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    marginBottom: 12,
+                  }}
+                >
+                  หน่วยงานที่เกี่ยวข้อง
+                </h3>
+                <EntityChipRow
+                  items={related.agencies.map((agency) => ({
+                    id: agency.organizationId,
+                    href: `/agencies/${encodeURIComponent(agency.slug)}`,
+                    label: agency.name,
+                  }))}
+                />
+              </div>
+            )}
 
             {/* Related Packages — the MOBILE presentation; hidden >= 1180px
                 where the desktop rail block (NewsRailPackages) takes over with
@@ -856,17 +915,13 @@ export default async function NewsDetailPage({
                 >
                   ตำแหน่งที่เกี่ยวข้อง
                 </h3>
-                <div className="flex flex-wrap gap-2">
-                  {related.positions.map((position) => (
-                    <Link
-                      key={position.id}
-                      href={`/positions/${encodeURIComponent(position.slug)}`}
-                      className="inline-flex items-center rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/5 px-3 py-1.5 text-sm text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/10 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                    >
-                      {position.name}
-                    </Link>
-                  ))}
-                </div>
+                <EntityChipRow
+                  items={related.positions.map((position) => ({
+                    id: position.id,
+                    href: `/positions/${encodeURIComponent(position.slug)}`,
+                    label: position.name,
+                  }))}
+                />
               </div>
             )}
 

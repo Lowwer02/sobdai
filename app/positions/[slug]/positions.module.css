@@ -371,6 +371,29 @@
   overflow-wrap: anywhere;
 }
 
+/* Entity Discovery V1: the organization name links to its canonical Agency
+   page when one exists. Inherits the heading's typography; only the
+   interaction affordances (underline + focus ring) are added. */
+.agencyNameLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(212, 166, 58, 0.45);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.agencyNameLink:hover {
+  color: #D4A63A;
+  text-decoration-color: #D4A63A;
+}
+
+.agencyNameLink:focus-visible {
+  outline: 2px solid #D4A63A;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .agencyShortName {
   margin: 0.3rem 0 0;
   color: #C8BBA4;

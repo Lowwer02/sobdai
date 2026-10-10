@@ -4,6 +4,7 @@ import { cache } from 'react'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import { isOperationalPositionPlaceholder } from '@/lib/position-entity'
 import {
+  collectCanonicalAgencyLinks,
   dedupeById,
   isAgencyNewsItem,
   isAgencyProfileIndexReady,
@@ -16,9 +17,15 @@ import {
   sortAgencyContent,
   type AgencyEditorialIdentity,
   type AgencySource,
+  type CanonicalAgencyLink,
+  type CanonicalAgencyLinkRow,
 } from '@/lib/agency-profile'
 
+// Detail surfaces import the canonical link shape from this public layer.
+export type { CanonicalAgencyLink, CanonicalAgencyLinkRow } from '@/lib/agency-profile'
+
 const MAX_PROFILES = 200
+const MAX_ORGANIZATION_LINKS = 200
 const MAX_ORG_POSITIONS = 2000
 const MAX_PACKAGES = 1000
 const MAX_RELATION_ROWS = 5000
@@ -649,6 +656,55 @@ export function getAgencySitemapSlugs(pages: readonly PublicAgencyPageData[]): s
     .map((page) => page.profile.slug)
     .filter((slug) => isStableAgencySlug(slug))
 }
+
+/**
+ * Resolve a published canonical Agency link for an existing organization.
+ * Link eligibility is published profile + stable slug ONLY (never the
+ * index-readiness gate), so a published-but-noindex agency may still receive
+ * contextual internal links. Fails closed to null.
+ */
+export const getCanonicalAgencyLink = cache(
+  async (organizationId: string | null | undefined): Promise<CanonicalAgencyLink | null> => {
+    if (!organizationId || typeof organizationId !== 'string') return null
+    const links = await getCanonicalAgencyLinks([organizationId])
+    return links.get(organizationId) ?? null
+  },
+)
+
+/**
+ * Batch equivalent used by detail surfaces (Package/Article/News/Position)
+ * without per-organization re-queries. One bounded read keyed by the callers'
+ * organization ids; deduplicated by canonical organization id with
+ * first-occurrence order preserved by the returned Map.
+ */
+export const getCanonicalAgencyLinks = cache(
+  async (
+    organizationIds: readonly (string | null | undefined)[],
+  ): Promise<Map<string, CanonicalAgencyLink>> => {
+    const ids = [...new Set(
+      organizationIds.filter((id): id is string => typeof id === 'string' && Boolean(id)),
+    )]
+    if (ids.length === 0) return new Map()
+
+    try {
+      const supabase = createAnonServerClient()
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name, short_name, logo_url, agency_profiles!inner(id, slug, status)')
+        .in('id', ids)
+        .eq('agency_profiles.status', 'published')
+        .limit(MAX_ORGANIZATION_LINKS)
+      if (error) {
+        console.error('Canonical Agency link batch read failed:', error.message)
+        return new Map()
+      }
+      return collectCanonicalAgencyLinks((data ?? []) as unknown as CanonicalAgencyLinkRow[])
+    } catch (error) {
+      console.error('Canonical Agency link batch read failed:', error)
+      return new Map()
+    }
+  },
+)
 
 /** Display label: short name (สตง.) wins, else the full organization name. */
 export function publicAgencyOrganizationLabel(organization: PublicAgencyOrganization): string {

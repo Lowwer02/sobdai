@@ -195,7 +195,7 @@ test('Position Detail V2 related links, source semantics, and content boundaries
   assert.doesNotMatch(positionUiSource, /^['"]use client['"]/m)
 })
 
-test('Position Detail V2 remains keyboard- and screen-reader-friendly without nav/footer scope creep', () => {
+test('Position Detail V2 stays accessible while discovery links follow the approved surface policy', () => {
   assert.match(positionUiSource, /aria-hidden="true"/)
   assert.match(positionUiSource, /:focus-visible/)
   assert.doesNotMatch(positionUiSource, /<(?:a|Link)[^>]*>\s*<\/(?:a|Link)>/)
@@ -203,8 +203,49 @@ test('Position Detail V2 remains keyboard- and screen-reader-friendly without na
   const ids = [...positionUiSource.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1])
   assert.equal(new Set(ids).size, ids.length, 'Position Detail source IDs must be unique')
 
-  assert.doesNotMatch(navbar, /\/positions/)
-  assert.doesNotMatch(desktopNav, /href:\s*['"]\/positions['"]|href="\/positions"/)
-  assert.doesNotMatch(mobileNav, /href:\s*['"]\/positions['"]|href="\/positions"/)
-  assert.doesNotMatch(footer, /href="\/positions"|href:\s*['"]\/positions['"]|ตำแหน่งงานราชการ/)
+  // Discovery surface policy (Entity Discovery V1): the MOBILE discovery
+  // surface and the FOOTER สำรวจ group may link /positions (and the footer
+  // also /agencies). Both are shipped and intentional — asserted as present.
+  assert.match(
+    mobileNav,
+    /href:\s*['"]\/positions['"]/,
+    'MobileNav keeps its discovery link to /positions',
+  )
+  assert.match(footer, /สำรวจ/, 'Footer keeps the สำรวจ discovery group')
+  assert.match(
+    footer,
+    /href="\/positions"/,
+    'Footer explore group links ตำแหน่งงานราชการ to /positions',
+  )
+  assert.match(
+    footer,
+    /href="\/agencies"/,
+    'Footer explore group links หน่วยงานราชการ to /agencies',
+  )
+  assert.match(footer, /lg:grid-cols-5/, 'Footer grid widens to five desktop columns')
+
+  // Still NOT approved: Position/Agency promotion in the MAIN desktop navbar.
+  assert.doesNotMatch(navbar, /\/positions|\/agencies/)
+  assert.doesNotMatch(desktopNav, /href:\s*['"]\/(?:positions|agencies)['"]|href="\/(?:positions|agencies)"/)
+})
+
+test('Position Detail links recruiting organizations to their canonical Agency pages only when eligible', () => {
+  // The route resolves canonical Agency links for the shown organizations in
+  // ONE batched call and passes a plain record down.
+  assert.match(detailRoute, /getCanonicalAgencyLinks\(\s*page\.organizations\.map\(\(organization\) => organization\.id\),?\s*\)/)
+  assert.match(detailRoute, /agencyLinksByOrganization=\{agencyLinksByOrganization\}/)
+
+  // The card links ONLY the organizations that resolved a canonical Agency;
+  // the rest keep their plain-text heading — nothing is hidden or fabricated.
+  assert.match(positionAgencies, /agencyLinksByOrganization\[organization\.id\]/)
+  assert.match(positionAgencies, /href=\{`\/agencies\/\$\{encodeURIComponent\(agencyLink\.slug\)\}`\}/)
+  assert.match(positionAgencies, /className=\{styles\.agencyNameLink\}/)
+  assert.match(positionStyles, /\.agencyNameLink\s*\{[\s\S]*?color: inherit;/)
+  assert.match(positionStyles, /\.agencyNameLink:focus-visible\s*\{[\s\S]*?outline: 2px solid #D4A63A;/)
+
+  // Every organization still renders exactly one card heading: the map over
+  // organizations is unchanged, so the count cannot change.
+  assert.match(positionAgencies, /organizations\.map\(\(organization\) => \{/)
+  assert.doesNotMatch(positionAgencies, /organizations\.filter\(/)
+  assert.doesNotMatch(positionAgencies, /\.slice\(0,/)
 })

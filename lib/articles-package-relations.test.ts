@@ -39,6 +39,8 @@ function mapPublicRelatedPackages(rows: any[]) {
         id: pkg.id,
         name: pkg.name,
         slug: pkg.slug,
+        position_id: pkg.position_id ?? null,
+        organization_id: pkg.organization_id ?? null,
         current_price: pkg.current_price,
         original_price: pkg.original_price,
         description: pkg.description,
@@ -110,9 +112,11 @@ test('7. Public Related Packages: filters out unpublished packages', () => {
         id: '11111111-1111-1111-1111-111111111111',
         name: 'แพ็กเกจ ก.พ. ภาค ก',
         slug: 'ocsc-part-a',
+        position_id: '33333333-3333-3333-3333-333333333333',
+        organization_id: '44444444-4444-4444-4444-444444444444',
         current_price: 390,
         original_price: 590,
-        description: 'เตรียมสอบภาค ก ครบทุกวิชา',
+        description: 'เตรียมสอบภาค ก ครอบคลุมทุกวิชา',
         cover_image_url: 'https://example.com/cover.jpg',
         logo_url: null,
         is_published: true,
@@ -138,6 +142,10 @@ test('7. Public Related Packages: filters out unpublished packages', () => {
   assert.equal(mapped.length, 1)
   assert.equal(mapped[0].name, 'แพ็กเกจ ก.พ. ภาค ก')
   assert.equal(mapped[0].is_published, true)
+  // Entity Discovery V1: the mapper carries the relation keys the article
+  // page resolves canonical Position/Agency links from.
+  assert.equal(mapped[0].position_id, '33333333-3333-3333-3333-333333333333')
+  assert.equal(mapped[0].organization_id, '44444444-4444-4444-4444-444444444444')
 })
 
 test('8. Article validation: draft with author and sources passes validation independently of package relations', () => {

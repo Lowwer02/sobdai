@@ -24,6 +24,13 @@ type CanonicalPositionLink = {
   name: string
 }
 
+// Local mirror of CanonicalAgencyLink (lib/agency-profile.ts) — the client
+// boundary keeps its own serializable prop shape.
+type CanonicalAgencyLink = {
+  slug: string
+  name: string
+}
+
 function GoldBadge({ children, icon, className = '' }: { children: React.ReactNode, icon?: React.ReactNode, className?: string }) {
   return (
     <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-background border border-brand-solid/30 text-brand text-[12px] rounded-full ${className}`}>
@@ -125,6 +132,7 @@ export default function PackageClient({
   isAuthenticated,
   canonicalPosition = null,
   visualPreview = false,
+  canonicalAgency = null,
 }: {
   pkg: any
   examSets: any[]
@@ -138,6 +146,7 @@ export default function PackageClient({
   canonicalPosition?: CanonicalPositionLink | null
   /** Disables analytics and checkout handling for the ignored local preview. */
   visualPreview?: boolean
+  canonicalAgency?: CanonicalAgencyLink | null
 }) {
   const orgName = pkg.organizations?.name || 'ไม่ระบุหน่วยงาน'
   const logoUrl = pkg.logo_url || pkg.organizations?.logo_url || null
@@ -280,12 +289,37 @@ export default function PackageClient({
                       <div className="text-brand font-bold text-6xl opacity-30">{orgName.charAt(0)}</div>
                     )}
                   </div>
-                  <span className="min-w-0 break-words text-foreground text-[12px] leading-snug lg:hidden">{orgName}</span>
+                  {/* Entity Discovery V1 (mobile hero): same canonical Agency
+                      link as the desktop row, keeping the redesigned mobile
+                      layout and theme tokens intact. */}
+                  {canonicalAgency ? (
+                    <Link
+                      href={`/agencies/${encodeURIComponent(canonicalAgency.slug)}`}
+                      className="min-w-0 break-words text-foreground text-[12px] leading-snug lg:hidden w-fit underline decoration-brand/40 decoration-1 underline-offset-4 hover:text-brand hover:decoration-brand transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-sm"
+                    >
+                      {orgName}
+                    </Link>
+                  ) : (
+                    <span className="min-w-0 break-words text-foreground text-[12px] leading-snug lg:hidden">{orgName}</span>
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="hidden lg:flex flex-wrap items-center gap-1.5 mb-3">
-                    <span className="text-foreground text-[12px] lg:text-[13px] mr-1 lg:mr-2">{orgName}</span>
+                    {/* Entity Discovery V1: the organization name links to its
+                        canonical Agency page when a published profile with a
+                        stable slug exists; otherwise it stays plain text.
+                        Classes follow the latest-main theme tokens. */}
+                    {canonicalAgency ? (
+                      <Link
+                        href={`/agencies/${encodeURIComponent(canonicalAgency.slug)}`}
+                        className="text-foreground text-[12px] lg:text-[13px] mr-1 lg:mr-2 underline decoration-brand/40 decoration-1 underline-offset-4 hover:text-brand hover:decoration-brand transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-sm"
+                      >
+                        {orgName}
+                      </Link>
+                    ) : (
+                      <span className="text-foreground text-[12px] lg:text-[13px] mr-1 lg:mr-2">{orgName}</span>
+                    )}
                     {(canonicalPosition || pkg.positions?.name) && (
                       canonicalPosition ? (
                         <Link

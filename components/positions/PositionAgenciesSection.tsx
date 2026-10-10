@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import type {
   PublicPositionOrganization,
   PublicPositionPackage,
@@ -8,6 +9,12 @@ import styles from '@/app/positions/[slug]/positions.module.css'
 interface PositionAgenciesSectionProps {
   organizations: PublicPositionOrganization[]
   packages: PublicPositionPackage[]
+  /**
+   * Entity Discovery V1: canonical Agency link per organization id, present
+   * only for organizations with a published Agency Profile + stable slug.
+   * Absent keys keep the plain-text card — never hidden, never fabricated.
+   */
+  agencyLinksByOrganization?: Record<string, { slug: string; name: string }>
 }
 
 // This route-local mapping is intentionally explicit for the one agency whose
@@ -49,6 +56,7 @@ function organizationLogoUrl(
 export default function PositionAgenciesSection({
   organizations,
   packages,
+  agencyLinksByOrganization = {},
 }: PositionAgenciesSectionProps) {
   if (organizations.length === 0) return null
 
@@ -74,6 +82,7 @@ export default function PositionAgenciesSection({
         {organizations.map((organization) => {
           const packageAvailable = hasPublishedPackage(organization, packages)
           const logoUrl = organizationLogoUrl(organization, packages)
+          const agencyLink = agencyLinksByOrganization[organization.id]
 
           return (
             <li key={organization.id} className={styles.agencyCard}>
@@ -96,7 +105,18 @@ export default function PositionAgenciesSection({
                   <span className={styles.packageBadge}>มีแพ็กเกจเตรียมสอบ</span>
                 )}
               </div>
-              <h3 className={styles.agencyName}>{organization.name}</h3>
+              <h3 className={styles.agencyName}>
+                {agencyLink ? (
+                  <Link
+                    href={`/agencies/${encodeURIComponent(agencyLink.slug)}`}
+                    className={styles.agencyNameLink}
+                  >
+                    {organization.name}
+                  </Link>
+                ) : (
+                  organization.name
+                )}
+              </h3>
               {organization.short_name && (
                 <p className={styles.agencyShortName}>{organization.short_name}</p>
               )}
