@@ -211,6 +211,18 @@ test('Position Detail V2 stays accessible while discovery links follow the appro
     /href:\s*['"]\/positions['"]/,
     'MobileNav keeps its discovery link to /positions',
   )
+  // UX polish: the mobile More สำรวจ grid also promotes the Agencies hub —
+  // same discovery policy as the footer, still NOT in the desktop navbar.
+  assert.match(
+    mobileNav,
+    /href:\s*'\/agencies',\s*label:\s*'หน่วยงานราชการ'/,
+    'MobileNav discovery grid links หน่วยงานราชการ to /agencies',
+  )
+  assert.match(
+    mobileNav,
+    /'\/agencies',/,
+    'MobileNav MORE_SECTION_PREFIXES tracks /agencies for More-button active state',
+  )
   assert.match(footer, /สำรวจ/, 'Footer keeps the สำรวจ discovery group')
   assert.match(
     footer,
@@ -236,12 +248,20 @@ test('Position Detail links recruiting organizations to their canonical Agency p
   assert.match(detailRoute, /agencyLinksByOrganization=\{agencyLinksByOrganization\}/)
 
   // The card links ONLY the organizations that resolved a canonical Agency;
-  // the rest keep their plain-text heading — nothing is hidden or fabricated.
+  // the rest keep their informational card — nothing is hidden or fabricated.
   assert.match(positionAgencies, /agencyLinksByOrganization\[organization\.id\]/)
   assert.match(positionAgencies, /href=\{`\/agencies\/\$\{encodeURIComponent\(agencyLink\.slug\)\}`\}/)
-  assert.match(positionAgencies, /className=\{styles\.agencyNameLink\}/)
-  assert.match(positionStyles, /\.agencyNameLink\s*\{[\s\S]*?color: inherit;/)
-  assert.match(positionStyles, /\.agencyNameLink:focus-visible\s*\{[\s\S]*?outline: 2px solid #D4A63A;/)
+  // UX polish: the WHOLE card is the semantic link (the card contains no other
+  // links, so there are no nested anchors) — and ineligible organizations keep
+  // a real informational card with no href and no pointer/hover affordance.
+  assert.match(positionAgencies, /className=\{styles\.agencyCardLink\}/)
+  assert.match(positionAgencies, /<li key=\{organization\.id\} className=\{styles\.agencyCardItem\}>/)
+  assert.match(positionAgencies, /<div className=\{styles\.agencyCard\}>\{cardBody\}<\/div>/)
+  assert.doesNotMatch(positionAgencies, /styles\.agencyNameLink/, 'no nested name-level anchor inside the card link')
+  assert.match(positionStyles, /\.agencyCardLink\s*\{[\s\S]*?color: inherit;/)
+  assert.match(positionStyles, /\.agencyCardLink:focus-visible\s*\{[\s\S]*?outline: 2px solid #D4A63A;/)
+  // The subtle hover must exist ONLY on the linked card, never on informational cards.
+  assert.doesNotMatch(positionStyles, /\.agencyCard:hover/)
 
   // Every organization still renders exactly one card heading: the map over
   // organizations is unchanged, so the count cannot change.

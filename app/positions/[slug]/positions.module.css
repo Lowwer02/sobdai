@@ -294,9 +294,18 @@
   list-style: none;
 }
 
-.agencyCard {
+/* Entity Discovery V1 UX polish: the grid cell wrapper so the card fills it
+   whether it renders as a link or an informational card. */
+.agencyCardItem {
   display: flex;
   min-width: 0;
+}
+
+.agencyCard,
+.agencyCardLink {
+  display: flex;
+  min-width: 0;
+  flex: 1;
   min-height: 8.5rem;
   flex-direction: column;
   padding: 1.05rem;
@@ -306,9 +315,22 @@
   transition: border-color 160ms ease, background-color 160ms ease;
 }
 
-.agencyCard:hover {
+/* The subtle hover affordance belongs ONLY to cards whose whole body is a
+   real link to a published Agency Profile — informational cards keep no
+   misleading pointer/hover. */
+.agencyCardLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.agencyCardLink:hover {
   border-color: rgba(212, 166, 58, 0.26);
   background: rgba(33, 23, 14, 0.72);
+}
+
+.agencyCardLink:focus-visible {
+  outline: 2px solid #D4A63A;
+  outline-offset: 2px;
 }
 
 .agencyCardTop {
@@ -369,29 +391,6 @@
   font-weight: 700;
   line-height: 1.55;
   overflow-wrap: anywhere;
-}
-
-/* Entity Discovery V1: the organization name links to its canonical Agency
-   page when one exists. Inherits the heading's typography; only the
-   interaction affordances (underline + focus ring) are added. */
-.agencyNameLink {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: rgba(212, 166, 58, 0.45);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
-  transition: color 160ms ease, text-decoration-color 160ms ease;
-}
-
-.agencyNameLink:hover {
-  color: #D4A63A;
-  text-decoration-color: #D4A63A;
-}
-
-.agencyNameLink:focus-visible {
-  outline: 2px solid #D4A63A;
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 .agencyShortName {

@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation'
 import {
   BookOpenText,
   BriefcaseBusiness,
+  Building2,
   CalendarCheck2,
   ChevronRight,
   CircleHelp,
@@ -45,6 +46,7 @@ const DISCOVERY_LINKS = [
   { href: '/news', label: 'ข่าวสาร', icon: Newspaper },
   { href: '/articles', label: 'บทความ', icon: BookOpenText },
   { href: '/positions', label: 'ตำแหน่งงานราชการ', icon: BriefcaseBusiness },
+  { href: '/agencies', label: 'หน่วยงานราชการ', icon: Building2 },
 ] as const
 
 const HELP_LINKS = [
@@ -73,6 +75,7 @@ const MORE_SECTION_PREFIXES = [
   '/news',
   '/articles',
   '/positions',
+  '/agencies',
   '/help',
   '/faq',
   '/contact',

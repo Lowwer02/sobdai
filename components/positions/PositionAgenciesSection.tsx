@@ -84,8 +84,8 @@ export default function PositionAgenciesSection({
           const logoUrl = organizationLogoUrl(organization, packages)
           const agencyLink = agencyLinksByOrganization[organization.id]
 
-          return (
-            <li key={organization.id} className={styles.agencyCard}>
+          const cardBody = (
+            <>
               <div className={styles.agencyCardTop}>
                 <span className={styles.agencyIconWrap}>
                   {logoUrl ? (
@@ -105,20 +105,29 @@ export default function PositionAgenciesSection({
                   <span className={styles.packageBadge}>มีแพ็กเกจเตรียมสอบ</span>
                 )}
               </div>
-              <h3 className={styles.agencyName}>
-                {agencyLink ? (
-                  <Link
-                    href={`/agencies/${encodeURIComponent(agencyLink.slug)}`}
-                    className={styles.agencyNameLink}
-                  >
-                    {organization.name}
-                  </Link>
-                ) : (
-                  organization.name
-                )}
-              </h3>
+              <h3 className={styles.agencyName}>{organization.name}</h3>
               {organization.short_name && (
                 <p className={styles.agencyShortName}>{organization.short_name}</p>
+              )}
+            </>
+          )
+
+          // Entity Discovery V1 UX polish: when a published Agency Profile with
+          // a stable slug exists, the WHOLE card is the semantic link (the card
+          // contains no other links, so no nested anchors are possible).
+          // Organizations without a profile stay informational cards — no fake
+          // href, no pointer/hover affordance, count unchanged.
+          return (
+            <li key={organization.id} className={styles.agencyCardItem}>
+              {agencyLink ? (
+                <Link
+                  href={`/agencies/${encodeURIComponent(agencyLink.slug)}`}
+                  className={styles.agencyCardLink}
+                >
+                  {cardBody}
+                </Link>
+              ) : (
+                <div className={styles.agencyCard}>{cardBody}</div>
               )}
             </li>
           )
