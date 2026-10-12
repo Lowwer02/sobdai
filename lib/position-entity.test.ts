@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { buildPositionSeoContract, derivePublishedPositionContentIds, derivePublishedPositionPackageIds, hasUniquePositionIntent, hasUniquePositionOverview, isPositionEntityIndexReady, isOperationalPositionPlaceholder, isPositionPlaceholderName, isStablePositionSlug, positionIndexability, selectIndexablePositionPages, selectPositionPageBySlug, selectPublishedPackages, selectPublishedPositionContent, validatePositionMappingSelection } from './position-entity.ts'
+import { buildPositionSeoContract, computeMappingDiff, derivePublishedPositionContentIds, derivePublishedPositionPackageIds, excludePlaceholderPositions, hasUniquePositionIntent, hasUniquePositionOverview, isPositionEntityIndexReady, isOperationalPositionPlaceholder, isPositionPlaceholderName, isStablePositionSlug, positionIndexability, POSITION_MAPPING_SEARCH_PAGE_SIZE, selectIndexablePositionPages, selectPositionPageBySlug, selectPublishedPackages, selectPublishedPositionContent, validatePositionMappingSelection } from './position-entity.ts'
 
 const overview = 'ข้อมูลภาพรวมของตำแหน่งนี้อธิบายขอบเขตงานและบริบทการทำงานจากแหล่งข้อมูลที่ตรวจสอบได้อย่างเป็นระบบ'
 const baseEntity = {
@@ -136,4 +136,48 @@ test('unknown Position slugs resolve to null for the route to 404 safely', () =>
   assert.equal(selectPositionPageBySlug(pages, 'unknown-position'), null)
   assert.equal(selectPositionPageBySlug(pages, ''), null)
   assert.deepEqual(selectIndexablePositionPages([...pages, { indexReady: false, entity: { slug: 'thin' } }]).map((page) => page.entity.slug), ['policy-and-plan-analyst'])
+})
+
+test('mapping diff separates additions from removals and detects unchanged sets', () => {
+  // Identical sets (any order) are unchanged — saving is a no-op, not a rewrite.
+  assert.deepEqual(computeMappingDiff(['b', 'a'], ['a', 'b']), { addedIds: [], removedIds: [], unchanged: true })
+  assert.deepEqual(computeMappingDiff([], []), { addedIds: [], removedIds: [], unchanged: true })
+
+  // Hidden/offscreen selected rows participate: diff runs over full sets, never visible pages.
+  assert.deepEqual(computeMappingDiff(['a', 'b'], ['b', 'c', 'd']), {
+    addedIds: ['c', 'd'],
+    removedIds: ['a'],
+    unchanged: false,
+  })
+  assert.deepEqual(computeMappingDiff(['a', 'b'], []), { addedIds: [], removedIds: ['a', 'b'], unchanged: false })
+  assert.deepEqual(computeMappingDiff([], ['a']), { addedIds: ['a'], removedIds: [], unchanged: false })
+
+  // Duplicate intended ids collapse via set semantics without phantom removals.
+  assert.deepEqual(computeMappingDiff(['a'], ['a', 'a']), { addedIds: [], removedIds: [], unchanged: true })
+})
+
+test('placeholder exclusion mirrors the RPC predicate and preserves chainability', () => {
+  assert.equal(POSITION_MAPPING_SEARCH_PAGE_SIZE, 20)
+
+  const conditions: Array<[string, string, string]> = []
+  const fakeQuery = {
+    not(column: string, operator: string, value: string) {
+      conditions.push([column, operator, value])
+      return this
+    },
+  }
+  excludePlaceholderPositions(fakeQuery)
+
+  // Every RPC exclusion family appears, AND-complemented (chained .not calls).
+  assert.ok(conditions.length >= 14)
+  for (const [column, operator] of conditions) {
+    assert.ok(column === 'code' || column === 'name')
+    assert.ok(operator === 'imatch' || operator === 'ilike')
+  }
+  assert.ok(conditions.some(([, op, value]) => op === 'imatch' && value === '^gen([[:space:]_-]|$)'))
+  assert.ok(conditions.some(([, op, value]) => op === 'ilike' && value === '%general position%'))
+  assert.ok(conditions.some(([, op, value]) => op === 'ilike' && value === 'ไม่ระบุตำแหน่ง'))
+
+  // The canonical TS predicate still rejects rows the SQL could miss (trim family).
+  assert.equal(isOperationalPositionPlaceholder({ code: ' GEN ', name: 'นักวิเคราะห์' }), true)
 })

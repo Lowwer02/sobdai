@@ -99,6 +99,73 @@ export function isOperationalPositionPlaceholder(
   )
 }
 
+/**
+ * Mirror the mapping RPC's placeholder predicate as AND-complemented PostgREST
+ * filters. `imatch` is the case-insensitive form of the RPC's `^gen...` regex;
+ * the exact-name and "general position" families use `ilike`. Leading/trailing
+ * whitespace is not trimmed here (unlike the RPC's btrim), so the mapping
+ * write path must still re-validate every selected row with
+ * isOperationalPositionPlaceholder before the RPC runs.
+ */
+export function excludePlaceholderPositions<
+  Q extends { not(column: string, operator: string, value: string): Q },
+>(query: Q): Q {
+  return query
+    .not('code', 'imatch', '^gen([[:space:]_-]|$)')
+    .not('name', 'imatch', '^gen([[:space:]_-]|$)')
+    .not('code', 'ilike', '%general position%')
+    .not('name', 'ilike', '%general position%')
+    .not('code', 'ilike', 'gen')
+    .not('name', 'ilike', 'gen')
+    .not('code', 'ilike', 'general')
+    .not('name', 'ilike', 'general')
+    .not('code', 'ilike', 'general position')
+    .not('name', 'ilike', 'general position')
+    .not('code', 'ilike', 'ไม่ระบุ')
+    .not('name', 'ilike', 'ไม่ระบุ')
+    .not('code', 'ilike', 'ไม่ระบุตำแหน่ง')
+    .not('name', 'ilike', 'ไม่ระบุตำแหน่ง')
+}
+
+/** One search-results page of the admin mapping picker (server-enforced cap). */
+export const POSITION_MAPPING_SEARCH_PAGE_SIZE = 20
+
+export interface PositionMappingDiff {
+  addedIds: string[]
+  removedIds: string[]
+  unchanged: boolean
+}
+
+/**
+ * Compare the loaded (database) mapping set against the editor's intended set.
+ * The RPC is a full replacement, so the saved outcome is exactly the intended
+ * set — hidden/offscreen selected rows included — and anything loaded but no
+ * longer intended is removed. Diffing before save makes that replacement
+ * explicit instead of accidental.
+ */
+export function computeMappingDiff(
+  loadedIds: readonly string[],
+  intendedIds: readonly string[],
+): PositionMappingDiff {
+  const loaded = new Set(loadedIds)
+  const intended = new Set(intendedIds)
+  const addedIds: string[] = []
+  const removedIds: string[] = []
+
+  for (const id of intended) {
+    if (!loaded.has(id)) addedIds.push(id)
+  }
+  for (const id of loaded) {
+    if (!intended.has(id)) removedIds.push(id)
+  }
+
+  return {
+    addedIds,
+    removedIds,
+    unchanged: addedIds.length === 0 && removedIds.length === 0,
+  }
+}
+
 export type PositionMappingValidation =
   | { valid: true; positionIds: string[] }
   | {

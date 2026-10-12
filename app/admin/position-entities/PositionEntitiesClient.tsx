@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Edit, Plus, Search } from 'lucide-react'
+import { Edit, ListFilter, Plus, Search } from 'lucide-react'
 
 export interface PositionEntityListRow {
   id: string
@@ -49,12 +49,21 @@ export default function PositionEntitiesClient({
           <h1 className="font-display text-3xl font-bold tracking-tight text-[#F5E9D6]">Position Entities</h1>
           <p className="mt-1 text-[#A1866B]">Manage canonical SEO role pages and their organization-scoped mappings.</p>
         </div>
-        {canManage && (
-          <Link href="/admin/position-entities/create" className="flex w-fit items-center gap-2 rounded-xl bg-[#D4AF37] px-4 py-2.5 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A]">
-            <Plus size={18} aria-hidden="true" />
-            Create Position Entity
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/position-entities/unmapped"
+            className="flex w-fit items-center gap-2 rounded-xl border border-[#D4AF37]/30 px-4 py-2.5 font-semibold text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/10"
+          >
+            <ListFilter size={18} aria-hidden="true" />
+            รายงานตำแหน่งที่ยังไม่ map
           </Link>
-        )}
+          {canManage && (
+            <Link href="/admin/position-entities/create" className="flex w-fit items-center gap-2 rounded-xl bg-[#D4AF37] px-4 py-2.5 font-bold text-[#1A140E] transition-colors hover:bg-[#F1D17A]">
+              <Plus size={18} aria-hidden="true" />
+              Create Position Entity
+            </Link>
+          )}
+        </div>
       </div>
 
       {migrationError && (
