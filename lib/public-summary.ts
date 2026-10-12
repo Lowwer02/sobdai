@@ -607,16 +607,16 @@ async function readLegacyPackageSummaries(
 async function readKpPackageSummaryCards(
   client: PublicSummaryReadClient,
   packageId: string,
-): Promise<readonly RawRow[]> {
+): Promise<{ rows: readonly RawRow[]; failed: boolean }> {
   try {
     const result = await client.rpc(KP_PACKAGE_SUMMARY_CARD_RPC, {
       p_package_id: packageId,
     })
 
-    if (result?.error || !Array.isArray(result?.data)) return []
-    return result.data as RawRow[]
+    if (result?.error || !Array.isArray(result?.data)) return { rows: [], failed: true }
+    return { rows: result.data as RawRow[], failed: false }
   } catch {
-    return []
+    return { rows: [], failed: true }
   }
 }
 
@@ -657,20 +657,56 @@ export async function listPublicPackageSummaries(
   // return the independently safe KP branch, while the route resolver below
   // still fails closed when it cannot establish Legacy collision state.
   const legacyRows = legacy.failed ? [] : legacy.rows
-  return mergePublicSummaryListRows(legacyRows, kpRows, packageId, [])
+  return mergePublicSummaryListRows(legacyRows, kpRows.failed ? [] : kpRows.rows, packageId, [])
 }
 
-async function readLegacyRouteCandidates(
+/**
+ * Resolve only the safe route identity and display metadata. The KP candidate
+ * comes from the entitlement-independent, metadata-only card RPC; the Legacy
+ * candidate is restricted to its published, package-local metadata columns.
+ * Neither branch can return protected content or revision details.
+ */
+export function resolvePublicSummaryRouteMetadataRows(
+  legacyRows: readonly RawRow[],
+  kpCardRows: readonly RawRow[],
+  request: PublicSummaryRouteRequest,
+): PublicSummaryListItem | null {
+  const legacyMatches = legacyRows
+    .map((row) => normalizeLegacyListRow(row, request.packageId))
+    .filter((row): row is PublicSummaryListItem => row !== null && row.slug === request.summarySlug)
+
+  const matchingKpCards = kpCardRows.filter((row) => (
+    text(row.package_id) === request.packageId &&
+    text(row.package_slug) === request.packageSlug &&
+    text(row.summary_slug) === request.summarySlug
+  ))
+  const normalizedKpMatches = matchingKpCards.map((row) => (
+    normalizeKpListRow(row, request.packageId, new Map())
+  ))
+
+  // A malformed card with the requested route identity is ambiguous state,
+  // not evidence that the route is missing or safe to resolve elsewhere.
+  if (normalizedKpMatches.some((row) => row === null)) return null
+
+  const candidates = [
+    ...legacyMatches,
+    ...normalizedKpMatches.filter((row): row is PublicSummaryListItem => row !== null),
+  ]
+  return candidates.length === 1 ? candidates[0] ?? null : null
+}
+
+async function readLegacyRouteDiscoveryCandidates(
   client: PublicSummaryReadClient,
   request: PublicSummaryRouteRequest,
 ): Promise<{ rows: readonly RawRow[]; failed: boolean }> {
   try {
     const result = await client
       .from('summaries')
-      .select(LEGACY_SUMMARY_ROUTE_COLUMNS)
+      .select(LEGACY_SUMMARY_LIST_COLUMNS)
       .eq('package_id', request.packageId)
       .eq('slug', request.summarySlug)
       .is('summary_code', null)
+      .eq('is_published', true)
       .limit(2)
 
     return {
@@ -679,6 +715,30 @@ async function readLegacyRouteCandidates(
     }
   } catch {
     return { rows: [], failed: true }
+  }
+}
+
+async function readLegacyRouteContent(
+  client: PublicSummaryReadClient,
+  request: PublicSummaryRouteRequest,
+  expectedSummaryId: string,
+): Promise<PublicSummaryDetail | null> {
+  try {
+    const result = await client
+      .from('summaries')
+      .select(LEGACY_SUMMARY_ROUTE_COLUMNS)
+      .eq('id', expectedSummaryId)
+      .eq('package_id', request.packageId)
+      .eq('slug', request.summarySlug)
+      .is('summary_code', null)
+      .eq('is_published', true)
+      .limit(2)
+
+    if (result?.error || !Array.isArray(result?.data)) return null
+    const detail = resolvePublicSummaryRouteRows(result.data as RawRow[], [], request, [])
+    return detail?.id === expectedSummaryId && detail.kind === 'legacy' ? detail : null
+  } catch {
+    return null
   }
 }
 
@@ -699,19 +759,39 @@ async function readKpRouteCandidates(
   }
 }
 
-export async function getPublicSummaryRoute(
+export async function getPublicSummaryRouteMetadata(
   client: PublicSummaryReadClient,
   request: PublicSummaryRouteRequest,
-): Promise<PublicSummaryDetail | null> {
-  const [legacy, kpRows] = await Promise.all([
-    readLegacyRouteCandidates(client, request),
-    readKpRouteCandidates(client, request),
+): Promise<PublicSummaryListItem | null> {
+  const [legacy, kpCards] = await Promise.all([
+    readLegacyRouteDiscoveryCandidates(client, request),
+    readKpPackageSummaryCards(client, request.packageId),
   ])
 
-  // If Legacy lookup failed, we cannot prove that the Package-local slug is
-  // not an ambiguous Legacy/KP collision. Do not return the KP candidate.
-  if (legacy.failed) return null
+  // Both branches participate in the Package-local slug namespace. If either
+  // metadata read fails, uniqueness and publication cannot be established.
+  if (legacy.failed || kpCards.failed) return null
+  return resolvePublicSummaryRouteMetadataRows(legacy.rows, kpCards.rows, request)
+}
 
+/**
+ * Load protected content only after the caller has established access. The
+ * KP RPC still enforces database entitlement and current-published-revision
+ * rules; the returned detail must also match the previously discovered ID.
+ */
+export async function getPublicSummaryDetail(
+  client: PublicSummaryReadClient,
+  request: PublicSummaryRouteRequest,
+  discoveredSummary: PublicSummaryListItem,
+): Promise<PublicSummaryDetail | null> {
+  if (discoveredSummary.slug !== request.summarySlug) return null
+
+  if (discoveredSummary.kind === 'legacy') {
+    return readLegacyRouteContent(client, request, discoveredSummary.id)
+  }
+
+  const kpRows = await readKpRouteCandidates(client, request)
   const kpRootRows = await readKpRootPublicationStates(client, kpRows)
-  return resolvePublicSummaryRouteRows(legacy.rows, kpRows, request, kpRootRows)
+  const detail = resolvePublicSummaryRouteRows([], kpRows, request, kpRootRows)
+  return detail?.id === discoveredSummary.id && detail.kind === 'kp_native' ? detail : null
 }

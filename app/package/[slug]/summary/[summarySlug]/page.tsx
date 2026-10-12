@@ -1,10 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Lock, LogIn } from 'lucide-react'
+import Image from 'next/image'
+import { LogIn } from 'lucide-react'
 import { ORDER_COMPLETED_STATUSES } from '@/lib/orderUtils'
 import { hasInternalPackageAccess } from '@/lib/auth/rbac'
-import { getPublicSummaryRoute, listPublicPackageSummaries } from '@/lib/public-summary'
+import {
+  getPublicSummaryDetail,
+  getPublicSummaryRouteMetadata,
+  listPublicPackageSummaries,
+} from '@/lib/public-summary'
 import SummaryClient from './SummaryClient'
 import { createPageMetadata } from '@/lib/seo'
 
@@ -26,10 +31,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     })
   }
 
-  // Metadata and page content use the same Hybrid route resolver. In
-  // particular, KP metadata comes from the selected published revision, not
-  // from the mutable Legacy-compatible root fields.
-  const summary = await getPublicSummaryRoute(supabase, {
+  // Metadata uses the content-free route discovery boundary so entitlement-
+  // filtered detail reads cannot change whether a published route exists.
+  const summary = await getPublicSummaryRouteMetadata(supabase, {
     packageId: pkg.id,
     packageSlug: pkg.slug,
     packageName: pkg.name,
@@ -66,17 +70,17 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
 
   if (!pkg) return notFound()
 
-  // Resolve Legacy and KP routes through one discriminator-aware public read
-  // boundary. KP detail content comes only from the selected published
-  // revision returned by the frozen route projection.
-  const summary = await getPublicSummaryRoute(supabase, {
+  // Discover the published Legacy/KP route from metadata only. KP card
+  // discovery checks active Package membership and the current published
+  // revision without requiring the user's entitlement.
+  const discoveredSummary = await getPublicSummaryRouteMetadata(supabase, {
     packageId: pkg.id,
     packageSlug: pkg.slug,
     packageName: pkg.name,
     summarySlug,
   })
 
-  if (!summary) return notFound()
+  if (!discoveredSummary) return notFound()
 
   // Purchase Access Control
   const { data: { user } } = await supabase.auth.getUser()
@@ -118,24 +122,43 @@ export default async function SummaryPage({ params }: { params: Promise<{ slug: 
   if (!hasAccess) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="bg-card border border-brand/20 p-8 rounded-2xl max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-6">
-            <Lock size={32} />
+        <div className="bg-card border border-brand-solid/20 p-6 sm:p-8 rounded-2xl max-w-md w-full text-center">
+          <div className="mx-auto mb-4 h-44 w-44 sm:mb-5 sm:h-60 sm:w-60">
+            <Image
+              src="/images/mascot/summary-locked.png"
+              alt="มาสคอต Sobdai ถือหนังสือที่มีกุญแจ"
+              width={1254}
+              height={1254}
+              sizes="(max-width: 639px) 176px, 240px"
+              className="h-full w-full object-contain"
+            />
           </div>
           <h2 className="text-2xl font-bold font-display text-foreground mb-3">เนื้อหาสงวนสิทธิ์เฉพาะผู้ซื้อ</h2>
           <p className="text-muted-foreground mb-8 text-sm">แพ็กเกจ {pkg.name}</p>
           <div className="space-y-3">
             <Link href={`/checkout/${pkg.id}`} className="block w-full bg-brand-solid hover:bg-[#F1D17A] text-brand-foreground font-bold py-3 rounded-xl transition-colors">
-              สั่งซื้อแพ็กเกจ
+              ซื้อแพ็กเกจนี้
             </Link>
             <Link href={`/package/${slug}`} className="block w-full bg-transparent border border-border-subtle hover:bg-hover text-foreground font-bold py-3 rounded-xl transition-colors">
-              กลับไปดูรายละเอียด
+              กลับไปรายละเอียด
             </Link>
           </div>
         </div>
       </div>
     )
   }
+
+  // Protected content is fetched only after the customer order check or the
+  // explicit Owner/Admin internal bypass succeeds. KP database entitlement
+  // and revision checks remain authoritative in the route RPC.
+  const summary = await getPublicSummaryDetail(supabase, {
+    packageId: pkg.id,
+    packageSlug: pkg.slug,
+    packageName: pkg.name,
+    summarySlug,
+  }, discoveredSummary)
+
+  if (!summary) return notFound()
 
   // Fetch previous and next summaries through the same hybrid Package list so
   // secondary KP memberships use their own Package-local route slug.

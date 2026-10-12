@@ -44,3 +44,28 @@ test('the broader STAFF_ROLES admin boundary remains unchanged', () => {
   assert.match(serverProtect, /STAFF_ROLES[^\n]*=\s*\['owner',\s*'admin',\s*'editor',\s*'support'\]/)
   assert.match(sessionTypes, /STAFF_ROLES\s*=\s*\['admin',\s*'owner',\s*'editor',\s*'support'\]/)
 })
+
+test('Summary route discovers metadata before auth and fetches protected content only after access', () => {
+  const pageBody = summaryPage.slice(summaryPage.indexOf('export default async function SummaryPage'))
+  const discoveryIndex = pageBody.indexOf('getPublicSummaryRouteMetadata(supabase')
+  const loginIndex = pageBody.indexOf('if (!user)')
+  const entitlementIndex = pageBody.indexOf('if (!hasAccess)')
+  const detailIndex = pageBody.indexOf('getPublicSummaryDetail(supabase')
+
+  assert.ok(discoveryIndex >= 0)
+  assert.ok(discoveryIndex < loginIndex)
+  assert.ok(loginIndex < entitlementIndex)
+  assert.ok(entitlementIndex < detailIndex)
+  assert.match(pageBody, /if\s*\(!discoveredSummary\)\s*return\s+notFound\(\)/)
+  assert.doesNotMatch(pageBody, /content_md|summary_version_id|revision_number/)
+})
+
+test('Summary locked and anonymous CTAs preserve their routes and required copy', () => {
+  assert.match(summaryPage, /src="\/images\/mascot\/summary-locked\.png"/)
+  assert.match(summaryPage, /sizes="\(max-width: 639px\) 176px, 240px"/)
+  assert.match(summaryPage, /href=\{`\/login\?redirect=\/package\/\$\{slug\}\/summary\/\$\{summarySlug\}`\}/)
+  assert.match(summaryPage, /href=\{`\/checkout\/\$\{pkg\.id\}`\}[\s\S]*?ซื้อแพ็กเกจนี้/)
+  assert.match(summaryPage, /href=\{`\/package\/\$\{slug\}`\}[\s\S]*?กลับไปรายละเอียด/)
+  assert.match(summaryPage, /เนื้อหาสงวนสิทธิ์เฉพาะผู้ซื้อ/)
+  assert.match(summaryPage, /แพ็กเกจ \{pkg\.name\}/)
+})

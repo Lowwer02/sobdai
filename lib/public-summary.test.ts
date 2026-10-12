@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { getPublicSummaryRoute, listPublicPackageSummaries, mergePublicSummaryListRows, resolvePublicSummaryRouteRows } from './public-summary.ts'
+import { getPublicSummaryDetail, getPublicSummaryRouteMetadata, listPublicPackageSummaries, mergePublicSummaryListRows, resolvePublicSummaryRouteMetadataRows, resolvePublicSummaryRouteRows } from './public-summary.ts'
 
 const PACKAGE_A = '00000000-0000-4000-8000-0000000000a1'
 const PACKAGE_B = '00000000-0000-4000-8000-0000000000b1'
@@ -351,6 +351,57 @@ test('075 protected route rows can normalize a secondary canonical fallback slug
   assert.equal(result.slug, 'canonical-summary')
 })
 
+test('route discovery resolves published Legacy and KP identities from metadata only', () => {
+  const legacy = resolvePublicSummaryRouteMetadataRows(
+    [legacyRow()],
+    [],
+    request(PACKAGE_A, 'package-a', 'legacy-summary'),
+  )
+  const kp = resolvePublicSummaryRouteMetadataRows(
+    [],
+    [kpCardRow(PACKAGE_A, { package_slug: 'package-a', summary_slug: 'local-a' })],
+    request(PACKAGE_A, 'package-a', 'local-a'),
+  )
+
+  assert.equal(legacy?.kind, 'legacy')
+  assert.equal(legacy?.id, LEGACY_ID)
+  assert.equal(kp?.kind, 'kp_native')
+  assert.equal(kp?.id, KP_ID)
+  assert.equal('content_md' in (legacy ?? {}), false)
+  assert.equal('content_md' in (kp ?? {}), false)
+})
+
+test('route discovery rejects missing, unpublished, wrong-Package, and ambiguous identities', () => {
+  assert.equal(
+    resolvePublicSummaryRouteMetadataRows([], [], request(PACKAGE_A, 'package-a', 'missing')),
+    null,
+  )
+  assert.equal(
+    resolvePublicSummaryRouteMetadataRows(
+      [legacyRow({ is_published: false })],
+      [],
+      request(PACKAGE_A, 'package-a', 'legacy-summary'),
+    ),
+    null,
+  )
+  assert.equal(
+    resolvePublicSummaryRouteMetadataRows(
+      [],
+      [kpCardRow(PACKAGE_A, { package_slug: 'another-package', summary_slug: 'local-a' })],
+      request(PACKAGE_A, 'package-a', 'local-a'),
+    ),
+    null,
+  )
+  assert.equal(
+    resolvePublicSummaryRouteMetadataRows(
+      [legacyRow({ slug: 'same-slug' })],
+      [kpCardRow(PACKAGE_A, { package_slug: 'package-a', summary_slug: 'same-slug' })],
+      request(PACKAGE_A, 'package-a', 'same-slug'),
+    ),
+    null,
+  )
+})
+
 test('hidden, archived, and non-published KP projection rows fail closed', () => {
   const base = kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a' })
   const invalidRows = [
@@ -459,7 +510,49 @@ test('repository uses metadata-only discovery RPC for listing without protected 
   assert.equal(calls.filter((call) => call === 'from:summaries').length, 1)
 })
 
-test('repository uses discovery for listing and keeps protected route RPC plus root validation for detail', async () => {
+test('route metadata discovery does not call the protected content RPC', async () => {
+  const calls: string[] = []
+  const selectedColumns: string[] = []
+  const fakeClient = {
+    from(relation: string) {
+      calls.push(`from:${relation}`)
+      const builder = {
+        select(columns: string) {
+          selectedColumns.push(columns)
+          return builder
+        },
+        eq() { return builder },
+        is() { return builder },
+        limit() { return builder },
+        then(resolve: (value: unknown) => unknown) {
+          const data = relation === 'summaries' ? [legacyRow()] : []
+          return Promise.resolve({ data, error: null }).then(resolve)
+        },
+      }
+      return builder
+    },
+    rpc(functionName: string, args: Record<string, unknown>) {
+      calls.push(`rpc:${functionName}`)
+      assert.deepEqual(args, { p_package_id: PACKAGE_A })
+      return Promise.resolve({
+        data: functionName === 'kp_read_package_summary_cards'
+          ? [kpCardRow(PACKAGE_A, { package_slug: 'package-a', summary_slug: 'local-a1' })]
+          : [],
+        error: null,
+      })
+    },
+  }
+
+  const metadata = await getPublicSummaryRouteMetadata(fakeClient, request(PACKAGE_A, 'package-a', 'local-a1'))
+
+  assert.equal(metadata?.kind, 'kp_native')
+  assert.equal(metadata?.id, KP_ID)
+  assert.ok(calls.includes('rpc:kp_read_package_summary_cards'))
+  assert.equal(calls.includes('rpc:kp_read_summary_route'), false)
+  assert.ok(selectedColumns.every((columns) => !columns.includes('content_md')))
+})
+
+test('protected detail fetch verifies the discovered KP identity against the current published revision', async () => {
   const calls: string[] = []
   const fakeClient = {
     from(relation: string) {
@@ -473,11 +566,10 @@ test('repository uses discovery for listing and keeps protected route RPC plus r
         eq() { return builder },
         is() { return builder },
         in() { return builder },
-        order() { return builder },
         limit() { return builder },
         then(resolve: (value: unknown) => unknown) {
-          const data = relation === 'summaries'
-            ? selectedColumns.includes('current_published_version_id') ? [kpRootRow()] : [legacyRow()]
+          const data = relation === 'summaries' && selectedColumns.includes('current_published_version_id')
+            ? [kpRootRow()]
             : []
           return Promise.resolve({ data, error: null }).then(resolve)
         },
@@ -487,22 +579,71 @@ test('repository uses discovery for listing and keeps protected route RPC plus r
     rpc(functionName: string) {
       calls.push(`rpc:${functionName}`)
       return Promise.resolve({
-        data: functionName === 'kp_read_package_summary_cards'
-          ? [kpCardRow(PACKAGE_A)]
-          : [kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a1' })],
+        data: functionName === 'kp_read_summary_route'
+          ? [kpDetailRow(PACKAGE_A, { package_slug: 'package-a', legacy_slug: 'local-a1' })]
+          : [],
         error: null,
       })
     },
   }
+  const metadata = resolvePublicSummaryRouteMetadataRows(
+    [],
+    [kpCardRow(PACKAGE_A, { package_slug: 'package-a', summary_slug: 'local-a1' })],
+    request(PACKAGE_A, 'package-a', 'local-a1'),
+  )
+  assert.ok(metadata)
 
-  const list = await listPublicPackageSummaries(fakeClient, PACKAGE_A)
-  const detail = await getPublicSummaryRoute(fakeClient, request(PACKAGE_A, 'package-a', 'local-a1'))
+  const detail = await getPublicSummaryDetail(
+    fakeClient,
+    request(PACKAGE_A, 'package-a', 'local-a1'),
+    metadata,
+  )
 
-  assert.equal(list.length, 2)
-  assert.ok(list.some((row) => row.id === KP_ID))
   assert.equal(detail?.kind, 'kp_native')
-  assert.ok(calls.includes('rpc:kp_read_package_summary_cards'))
-  assert.equal(calls.includes('from:kp_read_package_summaries'), false)
+  assert.equal(detail?.id, KP_ID)
   assert.ok(calls.includes('rpc:kp_read_summary_route'))
-  assert.equal(calls.filter((call) => call === 'from:summaries').length, 3)
+  assert.equal(calls.filter((call) => call === 'from:summaries').length, 1)
+})
+
+test('protected detail cannot swap a Package-local route to a different discovered Summary', async () => {
+  const fakeClient = {
+    from() {
+      const builder = {
+        select() { return builder },
+        eq() { return builder },
+        is() { return builder },
+        in() { return builder },
+        limit() { return builder },
+        then(resolve: (value: unknown) => unknown) {
+          return Promise.resolve({ data: [kpRootRow({ id: KP_ID_2 })], error: null }).then(resolve)
+        },
+      }
+      return builder
+    },
+    rpc() {
+      return Promise.resolve({
+        data: [kpDetailRow(PACKAGE_A, {
+          package_slug: 'package-a',
+          legacy_slug: 'local-a1',
+          summary_id: KP_ID_2,
+          summary_code: 'SUM-000202',
+        })],
+        error: null,
+      })
+    },
+  }
+  const metadata = resolvePublicSummaryRouteMetadataRows(
+    [],
+    [kpCardRow(PACKAGE_A, { package_slug: 'package-a', summary_slug: 'local-a1' })],
+    request(PACKAGE_A, 'package-a', 'local-a1'),
+  )
+  assert.ok(metadata)
+
+  const detail = await getPublicSummaryDetail(
+    fakeClient,
+    request(PACKAGE_A, 'package-a', 'local-a1'),
+    metadata,
+  )
+
+  assert.equal(detail, null)
 })
