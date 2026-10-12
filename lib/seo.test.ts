@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { NEWS_HUB_DESCRIPTION, NEWS_HUB_H1, NEWS_HUB_SUBTITLE, NEWS_HUB_TITLE, SITE_NAME, resolveNewsCanonicalUrl, isSelfCanonicalNewsArticle } from './seo.ts'
+import { NEWS_HUB_DESCRIPTION, NEWS_HUB_H1, NEWS_HUB_SUBTITLE, NEWS_HUB_TITLE, SITE_NAME, resolveNewsCanonicalUrl, isSelfCanonicalNewsArticle, resolveArticleCanonicalUrl, isSelfCanonicalArticle } from './seo.ts'
 
 /**
  * SEO-P2C — /news keyword-ownership contract.
@@ -89,4 +89,44 @@ test('a news row canonicalizing elsewhere is NOT self-canonical (sitemap alias c
   assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026-1', '/news/led-recruitment-2026'), false)
   assert.equal(isSelfCanonicalNewsArticle('led-recruitment-2026-1', 'https://sobdai.com/news/led-recruitment-2026'), false)
   assert.equal(isSelfCanonicalNewsArticle('a', 'https://external.example.com/source-article'), false)
+})
+
+// AdSense V3 P2 — article canonical hygiene. Articles use the same blank →
+// self fallback and normalization as news, so the sitemap never submits a
+// cross-canonical article alias.
+
+test('article canonical resolves blank/whitespace/null to its own /articles/<slug> URL', () => {
+  assert.equal(resolveArticleCanonicalUrl('budget-guide', null), 'https://sobdai.com/articles/budget-guide')
+  assert.equal(resolveArticleCanonicalUrl('budget-guide', undefined), 'https://sobdai.com/articles/budget-guide')
+  assert.equal(resolveArticleCanonicalUrl('budget-guide', ''), 'https://sobdai.com/articles/budget-guide')
+  assert.equal(resolveArticleCanonicalUrl('budget-guide', '   '), 'https://sobdai.com/articles/budget-guide')
+})
+
+test('article canonical normalizes relative and absolute values like news', () => {
+  assert.equal(resolveArticleCanonicalUrl('a', '/articles/b'), 'https://sobdai.com/articles/b')
+  assert.equal(resolveArticleCanonicalUrl('a', '  /articles/b  '), 'https://sobdai.com/articles/b')
+  assert.equal(resolveArticleCanonicalUrl('a', 'https://sobdai.com/articles/b'), 'https://sobdai.com/articles/b')
+  assert.equal(resolveArticleCanonicalUrl('a', 'https://external.example.com/x'), 'https://external.example.com/x')
+})
+
+test('article with blank or self-pointing canonical is self-canonical', () => {
+  assert.equal(isSelfCanonicalArticle('budget-guide', null), true)
+  assert.equal(isSelfCanonicalArticle('budget-guide', undefined), true)
+  assert.equal(isSelfCanonicalArticle('budget-guide', '/articles/budget-guide'), true)
+  assert.equal(isSelfCanonicalArticle('budget-guide', '  /articles/budget-guide  '), true)
+  assert.equal(isSelfCanonicalArticle('budget-guide', 'https://sobdai.com/articles/budget-guide'), true)
+})
+
+test('article canonicalizing elsewhere is NOT self-canonical (alias)', () => {
+  assert.equal(isSelfCanonicalArticle('budget-guide-1', '/articles/budget-guide'), false)
+  assert.equal(isSelfCanonicalArticle('budget-guide-1', 'https://sobdai.com/articles/budget-guide'), false)
+  assert.equal(isSelfCanonicalArticle('a', 'https://external.example.com/source'), false)
+  // A news URL is not an article self-canonical.
+  assert.equal(isSelfCanonicalArticle('a', '/news/a'), false)
+})
+
+test('article canonical helpers do not change news canonical behavior', () => {
+  assert.equal(resolveNewsCanonicalUrl('n', null), 'https://sobdai.com/news/n')
+  assert.equal(isSelfCanonicalNewsArticle('n', '/news/n'), true)
+  assert.equal(isSelfCanonicalNewsArticle('n', '/articles/n'), false)
 })

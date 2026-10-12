@@ -1,5 +1,10 @@
 import type { MetadataRoute } from 'next'
-import { PUBLIC_STATIC_ROUTES, absoluteUrl, isSelfCanonicalNewsArticle } from '@/lib/seo'
+import {
+  PUBLIC_STATIC_ROUTES,
+  absoluteUrl,
+  isSelfCanonicalArticle,
+  isSelfCanonicalNewsArticle,
+} from '@/lib/seo'
 import { createAnonServerClient } from '@/lib/supabase/anon-server'
 import {
   getPublishedArticleSitemapRows,
@@ -187,6 +192,10 @@ async function getNewsRoutes(): Promise<SitemapEntry[]> {
  * Published articles → /articles/[slug]. Uses getPublishedArticleSitemapRows()
  * from lib/articles-public.ts to strictly load published article detail rows.
  * lastModified falls back through updated_at → published_at.
+ *
+ * Rows whose editor-set canonical_url points at another URL are aliases of
+ * that target, not independent pages — they are filtered out so the sitemap
+ * only ever emits self-canonical URLs (same rule as news).
  */
 async function getArticleRoutes(): Promise<SitemapEntry[]> {
   try {
@@ -199,6 +208,7 @@ async function getArticleRoutes(): Promise<SitemapEntry[]> {
     for (const row of res.data) {
       if (!row.slug || !row.slug.trim()) continue
       const cleanSlug = row.slug.trim()
+      if (!isSelfCanonicalArticle(cleanSlug, row.canonical_url)) continue
       const url = absoluteUrl(`/articles/${cleanSlug}`)
       if (seenUrls.has(url)) continue
       seenUrls.add(url)

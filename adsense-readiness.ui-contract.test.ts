@@ -126,3 +126,27 @@ test('sitemap news section filters cross-canonical aliases via the self-canonica
     'news sitemap rows must pass the self-canonical filter'
   )
 })
+
+test('sitemap article section filters cross-canonical aliases via the self-canonical rule', () => {
+  const articlesPublicSource = read('lib/articles-public.ts')
+  // The sitemap row query must load canonical_url so the filter has data.
+  assert.match(
+    articlesPublicSource,
+    /\.select\('slug, canonical_url, updated_at, published_at'\)/,
+    'article sitemap query must load canonical_url'
+  )
+  assert.match(
+    articlesPublicSource,
+    /canonical_url: r\.canonical_url \?\? null/,
+    'article sitemap rows must carry canonical_url'
+  )
+  // Cross-canonical aliases are skipped; self-canonical rows still fall through to the entry.
+  assert.match(
+    sitemapSource,
+    /if \(!isSelfCanonicalArticle\(cleanSlug, row\.canonical_url\)\) continue/,
+    'article sitemap rows must pass the self-canonical filter'
+  )
+  assert.match(sitemapSource, /entries\.push\(\{\s*url,/, 'self-canonical articles must still be emitted')
+  // No hardcoded per-slug exception.
+  assert.doesNotMatch(sitemapSource, /articles\/bud/, 'no hardcoded article slugs in the sitemap')
+})

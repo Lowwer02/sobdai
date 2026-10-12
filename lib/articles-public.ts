@@ -80,6 +80,7 @@ export interface PublicRelatedPackage {
 
 export interface PublicArticleSitemapRow {
   slug: string
+  canonical_url: string | null
   updated_at: string
   published_at: string
 }
@@ -491,7 +492,7 @@ export const getPublishedArticleSitemapRows = cache(
 
       const { data, error } = await supabase
         .from('articles')
-        .select('slug, updated_at, published_at')
+        .select('slug, canonical_url, updated_at, published_at')
         .eq('status', 'published')
         .order('published_at', { ascending: false })
 
@@ -502,6 +503,7 @@ export const getPublishedArticleSitemapRows = cache(
 
       const rows: PublicArticleSitemapRow[] = (data || []).map((r: any) => ({
         slug: r.slug,
+        canonical_url: r.canonical_url ?? null,
         updated_at: r.updated_at || '',
         published_at: r.published_at || '',
       }))

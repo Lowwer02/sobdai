@@ -70,6 +70,35 @@ export function isSelfCanonicalNewsArticle(
 }
 
 /**
+ * Resolve an article's canonical URL from its editor-set canonical_url, using
+ * the same platform-wide fallback rule as news: blank → the row's own
+ * /articles/<slug> URL. Normalization (trim, absolute passthrough) matches
+ * resolveNewsCanonicalUrl so both content types behave identically.
+ */
+export function resolveArticleCanonicalUrl(
+  slug: string,
+  canonical_url?: string | null
+): string {
+  // canonical_url may already be absolute; absoluteUrl() passes http(s) through.
+  return canonical_url?.trim()
+    ? absoluteUrl(canonical_url.trim())
+    : absoluteUrl(`/articles/${slug}`)
+}
+
+/**
+ * Whether an article's own /articles/<slug> URL is also its canonical URL —
+ * i.e. the editor left canonical_url blank (self default) or pointed it back
+ * at this exact slug. A row canonicalizing elsewhere is an alias of that
+ * target and must stay out of sitemap.xml.
+ */
+export function isSelfCanonicalArticle(
+  slug: string,
+  canonical_url?: string | null
+): boolean {
+  return resolveArticleCanonicalUrl(slug, canonical_url) === absoluteUrl(`/articles/${slug}`)
+}
+
+/**
  * Canonical schema.org Organization object for Sobdai — the single source of
  * truth for the site's publisher identity. Built from the existing SITE_*
  * constants + the brand logo (/public/logo.png, the asset the nav already
