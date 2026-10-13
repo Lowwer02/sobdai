@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 // @ts-expect-error Node's strip-types test runner requires the explicit .ts extension.
-import { buildPositionSeoContract, computeMappingDiff, derivePublishedPositionContentIds, derivePublishedPositionPackageIds, excludePlaceholderPositions, hasUniquePositionIntent, hasUniquePositionOverview, isPositionEntityIndexReady, isOperationalPositionPlaceholder, isPositionPlaceholderName, isStablePositionSlug, positionIndexability, POSITION_MAPPING_SEARCH_PAGE_SIZE, selectIndexablePositionPages, selectPositionPageBySlug, selectPublishedPackages, selectPublishedPositionContent, validatePositionMappingSelection } from './position-entity.ts'
+import { buildPositionSeoContract, chunkPositionIds, computeMappingDiff, derivePublishedPositionContentIds, derivePublishedPositionPackageIds, excludePlaceholderPositions, hasUniquePositionIntent, hasUniquePositionOverview, isPositionEntityIndexReady, isOperationalPositionPlaceholder, isPositionPlaceholderName, isStablePositionSlug, positionIndexability, POSITION_MAPPING_SEARCH_PAGE_SIZE, POSITION_MAPPING_VALIDATION_BATCH_SIZE, selectIndexablePositionPages, selectPositionPageBySlug, selectPublishedPackages, selectPublishedPositionContent, validatePositionMappingSelection } from './position-entity.ts'
 
 const overview = 'ข้อมูลภาพรวมของตำแหน่งนี้อธิบายขอบเขตงานและบริบทการทำงานจากแหล่งข้อมูลที่ตรวจสอบได้อย่างเป็นระบบ'
 const baseEntity = {
@@ -180,4 +180,34 @@ test('placeholder exclusion mirrors the RPC predicate and preserves chainability
 
   // The canonical TS predicate still rejects rows the SQL could miss (trim family).
   assert.equal(isOperationalPositionPlaceholder({ code: ' GEN ', name: 'นักวิเคราะห์' }), true)
+})
+
+test('validation batching covers the 0/1/100/101/200/2000/2001 ID boundaries exactly once', () => {
+  assert.equal(POSITION_MAPPING_VALIDATION_BATCH_SIZE, 100)
+
+  const makeIds = (count: number) => Array.from({ length: count }, (_, index) => `id-${index}`)
+  const boundaries: Array<[number, number, number | null]> = [
+    [0, 0, null], // empty selection -> no batches, no fetch
+    [1, 1, 1], // single ID -> one small batch
+    [100, 1, 100], // exact batch size -> one full batch
+    [101, 2, 1], // one over -> second batch carries the remainder
+    [200, 2, 100], // exactly two full batches
+    [2000, 20, 100], // RPC cap -> 20 full batches, still allowed
+    [2001, 21, 1], // over the cap -> chunking itself is fine; the cap check rejects it earlier
+  ]
+
+  for (const [count, expectedBatchCount, expectedLastSize] of boundaries) {
+    const ids = makeIds(count)
+    const batches = chunkPositionIds(ids, POSITION_MAPPING_VALIDATION_BATCH_SIZE)
+    assert.equal(batches.length, expectedBatchCount, `batch count for ${count} ids`)
+    // Flattened batches reproduce the requested set exactly once, in order —
+    // no silent drops, no duplicates across batch seams.
+    assert.deepEqual(batches.flat(), ids, `coverage for ${count} ids`)
+    if (expectedLastSize !== null) {
+      assert.equal(batches[batches.length - 1].length, expectedLastSize, `last batch size for ${count} ids`)
+    }
+    for (const batch of batches) {
+      assert.ok(batch.length > 0 && batch.length <= POSITION_MAPPING_VALIDATION_BATCH_SIZE)
+    }
+  }
 })

@@ -130,6 +130,26 @@ export function excludePlaceholderPositions<
 /** One search-results page of the admin mapping picker (server-enforced cap). */
 export const POSITION_MAPPING_SEARCH_PAGE_SIZE = 20
 
+/**
+ * Pre-RPC validation fetches selected positions in ID batches so no single
+ * PostgREST GET URL grows past gateway limits, even at the 2,000-position cap.
+ */
+export const POSITION_MAPPING_VALIDATION_BATCH_SIZE = 100
+
+/**
+ * Split IDs into ordered batches of at most `size` entries. Order and
+ * multiplicity are preserved; flattening the batches reproduces the input
+ * exactly once, so callers can diff coverage against the requested set.
+ */
+export function chunkPositionIds(ids: readonly string[], size: number): string[][] {
+  const batchSize = Number.isInteger(size) && size > 0 ? size : 1
+  const batches: string[][] = []
+  for (let index = 0; index < ids.length; index += batchSize) {
+    batches.push(ids.slice(index, index + batchSize))
+  }
+  return batches
+}
+
 export interface PositionMappingDiff {
   addedIds: string[]
   removedIds: string[]

@@ -181,8 +181,10 @@ export default async function UnmappedPositionsPage({
             {totalPages > 1 && <> · หน้า {page} / {totalPages}</>}
           </p>
 
-          <div className="overflow-hidden rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E]">
-            <table className="w-full text-left text-sm">
+          {/* overflow-x-auto keeps wide tables horizontally scrollable on
+              narrow viewports instead of clipping or squashing columns. */}
+          <div className="overflow-x-auto rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#1A140E]">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-[#A1866B]">
                   <th scope="col" className="px-4 py-3">ตำแหน่ง</th>

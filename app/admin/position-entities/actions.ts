@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { requirePermission } from '@/lib/auth/server-protect'
 import {
   POSITION_MAPPING_SEARCH_PAGE_SIZE,
+  POSITION_MAPPING_VALIDATION_BATCH_SIZE,
+  chunkPositionIds,
   excludePlaceholderPositions,
   isPositionEntityStatus,
   isPositionPlaceholderName,
@@ -61,6 +63,46 @@ function isMissingRowError(error: unknown): boolean {
 
 function uniqueIds(ids: readonly (string | null | undefined)[]): string[] {
   return Array.from(new Set(ids.filter((id): id is string => typeof id === 'string' && id.length > 0)))
+}
+
+/**
+ * Fetch every requested position in bounded batches so no single PostgREST
+ * GET URL exceeds gateway limits at the 2,000-position cap. Batches run
+ * sequentially and the first failure aborts the rest: the caller treats any
+ * non-null error as "validation incomplete" and never reaches the mapping
+ * RPC, so no unvalidated ID can be silently dropped. Returns null when any
+ * batch fails.
+ */
+async function fetchSelectedPositionsForValidation(
+  supabase: Awaited<ReturnType<typeof requirePermission>>['supabase'],
+  trimmedIds: readonly string[],
+): Promise<SelectedPositionRow[] | null> {
+  if (trimmedIds.length === 0) return []
+
+  const batches = chunkPositionIds(trimmedIds, POSITION_MAPPING_VALIDATION_BATCH_SIZE)
+  const selected: SelectedPositionRow[] = []
+  for (const [batchIndex, batch] of batches.entries()) {
+    const { data, error } = await supabase
+      .from('positions')
+      .select('id, code, name, organization_id, position_entity_id')
+      .in('id', batch)
+    if (error) {
+      console.error(
+        `Position mapping validation batch ${batchIndex + 1}/${batches.length} failed:`,
+        error,
+      )
+      return null
+    }
+    selected.push(...((data ?? []) as SelectedPositionRow[]))
+  }
+
+  // Every requested ID must be represented exactly once across all batches
+  // before validation is considered complete.
+  const selectedById = new Map(selected.map((row) => [row.id, row]))
+  if (selected.length !== trimmedIds.length || selectedById.size !== trimmedIds.length) {
+    return null
+  }
+  return selected
 }
 
 /**
@@ -223,12 +265,14 @@ export async function savePositionEntityAction(
  * Owner-gated replacement of one entity's full mapping set through the
  * existing atomic SECURITY DEFINER RPC. The RPC independently re-verifies the
  * active Owner role, placeholder exclusion, conflicting ownership, and the
- * 2,000-position cap inside its transaction; this action adds an
- * application-level staleness comparison so an editor basing their save on an
- * outdated mapping set is rejected with fresh state instead of silently
- * overwriting a concurrent change. The compare is best-effort (a race can
- * still slip between the check and the RPC); the RPC's row locking and
- * conflict rejection remain the authoritative guarantee.
+ * 2,000-position cap inside its transaction; this action re-validates every
+ * requested position in bounded batches (fail-closed: an incomplete or failed
+ * batch aborts before the RPC), and adds an application-level staleness
+ * comparison so an editor basing their save on an outdated mapping set is
+ * rejected with fresh state instead of silently overwriting a concurrent
+ * change. The compare is best-effort (a race can still slip between the check
+ * and the RPC); the RPC's row locking and conflict rejection remain the
+ * authoritative guarantee.
  */
 export async function replacePositionEntityMappingsAction(
   entityId: string,
@@ -255,25 +299,26 @@ export async function replacePositionEntityMappingsAction(
       if (!UUID_PATTERN.test(value)) return { ok: false, error: 'รหัสตำแหน่งไม่ถูกต้อง' }
     }
 
-    const [{ data: entity, error: entityError }, { data: selectedPositions, error: selectedError }] =
-      await Promise.all([
-        supabase
-          .from('position_entities')
-          .select('id, slug, status')
-          .eq('id', entityId)
-          .maybeSingle(),
-        trimmedIds.length > 0
-          ? supabase
-              .from('positions')
-              .select('id, code, name, organization_id, position_entity_id')
-              .in('id', trimmedIds)
-          : Promise.resolve({ data: [] as SelectedPositionRow[] | null, error: null }),
-      ])
+    const [{ data: entity, error: entityError }, selectedPositions] = await Promise.all([
+      supabase
+        .from('position_entities')
+        .select('id, slug, status')
+        .eq('id', entityId)
+        .maybeSingle(),
+      fetchSelectedPositionsForValidation(supabase, trimmedIds),
+    ])
     if (entityError) throw entityError
     if (!entity) return { ok: false, error: 'ไม่พบ Position Entity ที่ต้องการแก้ไข' }
-    if (selectedError) throw selectedError
 
-    const selected = (selectedPositions ?? []) as SelectedPositionRow[]
+    const selected = selectedPositions
+    if (selected === null) {
+      // Fail closed: batch validation did not complete, so no ID may reach the RPC.
+      return {
+        ok: false,
+        error:
+          'ตรวจสอบรายการตำแหน่งที่เลือกไม่ครบทุกชุด ระบบจึงยกเลิกการบันทึก mapping ทั้งหมด กรุณาลองอีกครั้ง',
+      }
+    }
     if (selected.length !== trimmedIds.length) {
       return { ok: false, error: 'พบตำแหน่งที่เลือกไม่ครบ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง' }
     }
@@ -290,7 +335,9 @@ export async function replacePositionEntityMappingsAction(
         const { data: owners } = await supabase
           .from('position_entities')
           .select('id, name, slug')
-          .in('id', uniqueIds(conflicts.map((row) => row.position_entity_id)))
+          // Error-path enrichment only; bounded so a large conflict set can't
+          // hit the same URL-length limit the batch validation exists for.
+          .in('id', uniqueIds(conflicts.map((row) => row.position_entity_id)).slice(0, POSITION_MAPPING_VALIDATION_BATCH_SIZE))
         const ownerNames = new Map(
           ((owners ?? []) as Array<{ id: string; name?: string | null; slug?: string | null }>).map(
             (owner) => [owner.id, owner.name || owner.slug || owner.id],

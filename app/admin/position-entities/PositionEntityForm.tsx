@@ -92,6 +92,12 @@ export default function PositionEntityForm({
   const [mappingError, setMappingError] = useState('')
   const [serverReloadNotice, setServerReloadNotice] = useState('')
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingMappingConfirmation | null>(null)
+  // Create-flow recovery: once the editorial save has persisted a new entity,
+  // the form targets that ID for every later save (mapping retries included),
+  // so a retry can never create a second entity. The selection lives in
+  // component state and survives the failure.
+  const [persistedEntityId, setPersistedEntityId] = useState<string | null>(null)
+  const [editorialSavedNotice, setEditorialSavedNotice] = useState('')
 
   const [searchQuery, setSearchQuery] = useState('')
   const [organizationFilter, setOrganizationFilter] = useState('')
@@ -124,6 +130,9 @@ export default function PositionEntityForm({
 
   const selectedIds = useMemo(() => Array.from(selectedPositions.keys()), [selectedPositions])
   const mappingDiff = useMemo(() => computeMappingDiff(loadedIds, selectedIds), [loadedIds, selectedIds])
+
+  const activeEntityId = values.id ?? persistedEntityId
+  const isCreate = activeEntityId === null
 
   // Debounced server search (300ms) with stale-response protection, mirroring
   // the ArticlePackagePicker pattern.
@@ -205,6 +214,9 @@ export default function PositionEntityForm({
         return
       }
 
+      // Failure keeps the editor in place: the selection and the persisted
+      // entity ID stay intact so the user can fix the cause and retry the
+      // mapping save without re-entering anything or creating a new entity.
       setMappingError(result.error)
       toastEvent(result.error, 'error')
       setPendingConfirmation(null)
@@ -214,19 +226,9 @@ export default function PositionEntityForm({
           'ชุด mapping บนเซิร์ฟเวอร์เปลี่ยนแปลงระหว่างที่แก้ไข ระบบจะโหลดชุดปัจจุบันให้ใหม่',
         )
         router.refresh()
-        return
-      }
-
-      // On create the entity itself was already persisted (editorial and
-      // mapping saves are separate requests, never presented as atomic).
-      // Land the editor on the new entity's edit page so the mapping can be
-      // retried without losing the created record.
-      if (!values.id) {
-        toastEvent('บันทึกข้อมูล Entity สำเร็จแล้ว แต่ mapping ยังไม่ถูกบันทึก กรุณาบันทึก mapping อีกครั้ง', 'warning')
-        router.push(`/admin/position-entities/${entityId}/edit`)
       }
     },
-    [router, values.id],
+    [router],
   )
 
   const requestMappingSave = useCallback(
@@ -253,7 +255,9 @@ export default function PositionEntityForm({
       setEditorialError('')
       setMappingError('')
       startTransition(async () => {
-        const result = await savePositionEntityAction(values.id, formData)
+        // After a create has persisted, later submits update that entity —
+        // never a second insert.
+        const result = await savePositionEntityAction(activeEntityId, formData)
 
         if (!result.ok) {
           setEditorialError(result.error)
@@ -261,10 +265,23 @@ export default function PositionEntityForm({
           return
         }
 
+        if (!values.id && result.entityId) {
+          setPersistedEntityId(result.entityId)
+        }
+
         if (mappingDiff.unchanged) {
           toastEvent('บันทึก Position Entity เรียบร้อยแล้ว', 'success')
           router.push('/admin/position-entities')
           return
+        }
+
+        // Editorial success is reported on its own; overall success waits for
+        // the mapping save. A mapping failure below leaves this notice and the
+        // selection on screen with an explicit retry action.
+        if (!values.id) {
+          setEditorialSavedNotice(
+            'บันทึกข้อมูล Position Entity สำเร็จแล้ว — กำลังบันทึก mapping ต่อ (หรือกด Retry Mapping หากล้มเหลว)',
+          )
         }
 
         if (mappingDiff.removedIds.length > 0) {
@@ -280,12 +297,11 @@ export default function PositionEntityForm({
         await performMappingSave(result.entityId, selectedIds, loadedIds)
       })
     },
-    [loadedIds, mappingDiff, performMappingSave, router, selectedIds, selectedPositions, values.id],
+    [activeEntityId, loadedIds, mappingDiff, performMappingSave, router, selectedIds, selectedPositions, values.id],
   )
 
   const emptiesAllMappings = pendingConfirmation !== null && pendingConfirmation.nextIds.length === 0
   const totalSelected = selectedPositions.size
-  const isCreate = values.id === null
 
   return (
     <form
@@ -299,6 +315,22 @@ export default function PositionEntityForm({
       {(editorialError || mappingError) && (
         <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm leading-6 text-red-200">
           {editorialError || mappingError}
+          {mappingError && !editorialError && activeEntityId !== null && (
+            <button
+              type="button"
+              onClick={() => requestMappingSave(activeEntityId)}
+              disabled={isPending}
+              className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-bold text-red-100 transition-colors hover:bg-red-500/30 disabled:cursor-wait disabled:opacity-60"
+            >
+              {isPending ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Save size={13} aria-hidden="true" />}
+              Retry Mapping
+            </button>
+          )}
+        </div>
+      )}
+      {editorialSavedNotice && (
+        <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm leading-6 text-emerald-200">
+          {editorialSavedNotice}
         </div>
       )}
       {serverReloadNotice && (
@@ -407,13 +439,18 @@ export default function PositionEntityForm({
             {!isCreate && !mappingDiff.unchanged && (
               <button
                 type="button"
-                onClick={() => requestMappingSave(values.id as string)}
+                onClick={() => requestMappingSave(activeEntityId as string)}
                 disabled={isPending}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#D4AF37]/20 px-4 py-2.5 text-sm font-bold text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/30 disabled:cursor-wait disabled:opacity-60"
               >
                 {isPending ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
                 บันทึก mapping เท่านั้น (เพิ่ม {mappingDiff.addedIds.length} · ถอด {mappingDiff.removedIds.length})
               </button>
+            )}
+            {!isCreate && mappingDiff.unchanged && (
+              <p className="rounded-lg border border-white/5 p-3 text-center text-xs text-[#A1866B]">
+                ชุด mapping ตรงกับข้อมูลล่าสุดบนเซิร์ฟเวอร์ — ไม่มีการเปลี่ยนแปลงที่ต้องบันทึก
+              </p>
             )}
           </div>
 
@@ -473,8 +510,8 @@ export default function PositionEntityForm({
               <ul role="list" className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
                 {searchResults.map((row) => {
                   const isSelected = selectedPositions.has(row.id)
-                  const ownedByOther = Boolean(row.owningEntity && row.owningEntity.id !== values.id)
-                  const ownedByThis = Boolean(row.owningEntity && row.owningEntity.id === values.id)
+                  const ownedByOther = Boolean(row.owningEntity && row.owningEntity.id !== activeEntityId)
+                  const ownedByThis = Boolean(row.owningEntity && row.owningEntity.id === activeEntityId)
                   return (
                     <li
                       key={row.id}

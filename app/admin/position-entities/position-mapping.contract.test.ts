@@ -110,6 +110,55 @@ test('unmapped report is read-only, paginated, and placeholder-free', () => {
   assert.doesNotMatch(unmappedPage, /\.rpc\(|\.update\(|\.insert\(|\.upsert\(|\.delete\(/)
 })
 
+test('pre-RPC validation runs in bounded batches and fails closed before the RPC', () => {
+  assert.match(action, /POSITION_MAPPING_VALIDATION_BATCH_SIZE/)
+  assert.match(action, /chunkPositionIds\(/)
+  assert.match(action, /fetchSelectedPositionsForValidation/)
+  // The batch helper caps every request at 100 IDs (URL-length safety).
+  const lib = read('lib/position-entity.ts')
+  assert.match(lib, /POSITION_MAPPING_VALIDATION_BATCH_SIZE = 100/)
+  // Fail-closed: batch validation happens before the RPC call site, and an
+  // incomplete/failed batch aborts with an error instead of proceeding.
+  const batchHelperIndex = action.indexOf('async function fetchSelectedPositionsForValidation')
+  const batchLoopIndex = action.indexOf('for (const [batchIndex, batch] of batches.entries())')
+  const coverageIndex = action.indexOf('selectedById.size !== trimmedIds.length')
+  const rpcIndex = action.indexOf("supabase.rpc(\n      'replace_position_entity_mappings'")
+  assert.ok(batchHelperIndex >= 0 && batchLoopIndex > batchHelperIndex)
+  assert.ok(coverageIndex > batchHelperIndex)
+  assert.ok(rpcIndex > batchLoopIndex && rpcIndex > coverageIndex, 'RPC must run only after batch validation')
+  assert.match(action, /ตรวจสอบรายการตำแหน่งที่เลือกไม่ครบทุกชุด/)
+  // Exactly-once coverage check: no unvalidated or duplicated IDs slip through.
+  assert.match(action, /selected\.length !== trimmedIds\.length \|\| selectedById\.size !== trimmedIds\.length/)
+  // Still no direct positions mutation and still exactly one RPC write path.
+  assert.doesNotMatch(action, /\.from\('positions'\)\s*\.update/)
+  assert.equal(rpcCallCount, 1)
+})
+
+test('create-flow recovery keeps the persisted entity and the selection on failure', () => {
+  // The form targets the persisted entity for later saves (retry can never
+  // create a second entity) and keeps the selection in component state.
+  assert.match(form, /persistedEntityId/)
+  assert.match(form, /const activeEntityId = values\.id \?\? persistedEntityId/)
+  assert.match(form, /savePositionEntityAction\(activeEntityId, formData\)/)
+  assert.match(form, /requestMappingSave\(activeEntityId/)
+  // Explicit retry action inside the mapping-failure banner.
+  assert.match(form, /Retry Mapping/)
+  // Editorial success is displayed separately from mapping failure; overall
+  // success is never shown before the mapping save completes.
+  assert.match(form, /editorialSavedNotice/)
+  assert.match(form, /บันทึกข้อมูล Position Entity สำเร็จแล้ว/)
+  // The old redirect-away-on-create-failure is gone (selection must survive).
+  assert.doesNotMatch(form, /router\.push\(`\/admin\/position-entities\/\$\{entityId\}\/edit`\)/)
+})
+
+test('unmapped report table scrolls horizontally on narrow viewports', () => {
+  assert.match(unmappedPage, /overflow-x-auto rounded-2xl/)
+  assert.match(unmappedPage, /min-w-\[640px\]/)
+  // Read-only behavior and navigation-only deep links preserved.
+  assert.doesNotMatch(unmappedPage, /\.rpc\(|\.update\(|\.insert\(|\.upsert\(|\.delete\(/)
+  assert.match(unmappedPage, /\/admin\/position-entities\//)
+})
+
 test('"use server" module exports only async functions', () => {
   assert.match(action, /^['"]use server['"]/m)
   const runtimeExports = action
