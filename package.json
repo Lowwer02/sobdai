@@ -25,7 +25,7 @@
     "html-to-image": "^1.11.13",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.21.0",
-    "next": "16.3.5",
+    "next": "16.3.8",
     "omise": "^1.1.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
@@ -36,7 +36,7 @@
     "remark-gfm": "^4.0.1",
     "remark-github-alerts": "^0.1.1",
     "remark-parse": "^11.0.0",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "tesseract.js": "^7.0.0",
     "tesseract.js-core": "^7.0.0",
     "unified": "^11.0.0"
