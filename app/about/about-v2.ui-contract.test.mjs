@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const page = read('./page.tsx')
 const about = read('../../components/about/AboutPageV2.tsx')
+const visibleAbout = about.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
 const person = read('../../components/about/AboutPerson.tsx')
 const principles = read('../../components/about/AboutPrinciples.tsx')
 const trust = read('../../components/about/AboutTrust.tsx')
@@ -74,27 +75,30 @@ test('education and professional experience remain grouped without implying curr
   }
 })
 
-test('policy appointment remains attributed and unverified, with committee duties separated', () => {
+test('policy experience separates owner confirmation from the document evidence', () => {
   for (const text of [
-    'ข้อมูลการแต่งตั้งและบทบาทนี้ได้รับแจ้งจาก กิตติพงษ์ จงคล้ายกลาง',
-    'ยังไม่ได้ตรวจสอบกับเอกสารต้นฉบับ',
-    'UNVERIFIED:',
+    'ผู้พัฒนา Sobdai ยืนยันว่าเคยปฏิบัติหน้าที่ในบทบาทนี้',
     'คำสั่งคณะกรรมการบูรณาการและเร่งรัดการขับเคลื่อนนโยบายการศึกษาของกระทรวงศึกษาธิการ ที่ 2/2569',
-    'รายการ 1.11',
+    'คณะอนุกรรมการลดความเหลื่อมล้ำและพัฒนาการบริหารจัดการ',
+    'หน้า 2 รายการ 1.10 และ 1.11',
     'เจ้าหน้าที่สำนักนโยบายและแผนการศึกษา',
+    'ไม่ได้ระบุชื่อผู้พัฒนาเป็นรายบุคคล',
     'อนุกรรมการและผู้ช่วยเลขานุการ',
     'ขอบเขตภารกิจของคณะอนุกรรมการ',
     'ลดความเหลื่อมล้ำทางการศึกษา',
-    'เพิ่มโอกาสเข้าถึงการศึกษาที่มีคุณภาพ',
-    'พัฒนาแนวทางจัดสรรงบประมาณและทรัพยากรการศึกษา',
+    'ขยายโอกาสเข้าถึงการศึกษาที่มีคุณภาพ',
+    'จัดสรรงบประมาณและทรัพยากรทางการศึกษาอย่างเป็นธรรม',
     'พัฒนาการบริหารจัดการสถานศึกษา',
-    'ส่งเสริมการใช้เทคโนโลยีดิจิทัลในการบริหารจัดการศึกษา',
+    'นำเทคโนโลยีดิจิทัลมาสนับสนุนการบริหารจัดการศึกษา',
     'ไม่ใช่ผลงานส่วนบุคคล',
+    'ไม่แสดงถึงการรับรองหรือการสนับสนุน Sobdai จากกระทรวงศึกษาธิการ',
   ]) {
-    assert.ok(about.includes(text), `missing appointment qualification: ${text}`)
+    assert.ok(visibleAbout.includes(text), `missing approved public copy: ${text}`)
   }
-  assert.doesNotMatch(about, /ก่อนเผยแพร่ต่อสาธารณะ|ตรวจสอบแล้ว|ได้รับการรับรองจากกระทรวง/)
-  assert.doesNotMatch(about, /https?:\/\/[^\s"']*(?:2\/2569|education|moe)/i)
+  assert.match(about, /INTERNAL EVIDENCE:[\s\S]*Official-source authentication remains unverified/)
+  assert.doesNotMatch(visibleAbout, /ยังไม่ได้ตรวจสอบ|ยังรอผู้พัฒนายืนยัน|ก่อนเผยแพร่ต่อสาธารณะ|Source verification UNVERIFIED|UNVERIFIED/i)
+  assert.doesNotMatch(visibleAbout, /คำสั่ง(?:นี้)?(?:แต่งตั้ง|ระบุชื่อ)(?:กิตติพงษ์|ผู้พัฒนา)|ได้รับการรับรองหรือสนับสนุนจากกระทรวง/)
+  assert.doesNotMatch(visibleAbout, /https?:\/\/[^\s"']*(?:2\/2569|education|moe)/i)
 })
 
 test('About keeps the local portrait, date, legal document version, and platform disclaimer', () => {

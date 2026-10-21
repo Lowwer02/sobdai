@@ -223,7 +223,7 @@ export default function AboutPageV2({ version }: { version: string }) {
         </div>
       </section>
 
-      {/* UNVERIFIED: Founder-provided appointment wording; original order/source not inspected. */}
+      {/* INTERNAL EVIDENCE: Owner confirms personal participation. The supplied scan identifies the staff role and office, not the owner's name. Official-source authentication remains unverified. */}
       <section aria-labelledby="education-policy-heading" className="scroll-mt-24">
         <div className={styles.hairline} aria-hidden="true" />
         <div className={styles.sectionInner}>
@@ -231,37 +231,48 @@ export default function AboutPageV2({ version }: { version: string }) {
             id="education-policy-heading"
             eyebrow="การมีส่วนร่วมเชิงนโยบาย"
             title="การมีส่วนร่วมในการขับเคลื่อนนโยบายการศึกษา"
-            description="ข้อมูลการแต่งตั้งและบทบาทนี้ได้รับแจ้งจาก กิตติพงษ์ จงคล้ายกลาง และยังไม่ได้ตรวจสอบกับเอกสารต้นฉบับ"
+            description="ผู้พัฒนา Sobdai ยืนยันว่าเคยปฏิบัติหน้าที่ในบทบาทนี้ ขณะเป็นเจ้าหน้าที่สำนักนโยบายและแผนการศึกษา สำนักงานเลขาธิการสภาการศึกษา"
           />
           <article className="rounded-2xl border border-brand/30 bg-card p-5 shadow-md sm:p-7">
             <p className="mb-5 text-sm leading-6 text-muted-foreground">
               คำสั่งคณะกรรมการบูรณาการและเร่งรัดการขับเคลื่อนนโยบายการศึกษาของกระทรวงศึกษาธิการ ที่ 2/2569
               เรื่อง แต่งตั้งคณะอนุกรรมการลดความเหลื่อมล้ำและพัฒนาการบริหารจัดการ
             </p>
-            <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+            <h3 className="text-lg font-bold text-foreground">
+              คณะอนุกรรมการลดความเหลื่อมล้ำและพัฒนาการบริหารจัดการ
+            </h3>
+            <div className="mt-4 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">รายการ 1.11</p>
-                <h3 className="mt-1 text-lg font-bold text-foreground">
+                <p className="text-sm text-muted-foreground">
                   เจ้าหน้าที่สำนักนโยบายและแผนการศึกษา
-                </h3>
-                <p className="mt-1 text-muted-foreground">สำนักงานเลขาธิการสภาการศึกษา</p>
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  สำนักงานเลขาธิการสภาการศึกษา
+                </p>
               </div>
               <p className="inline-flex w-fit rounded-full border border-brand/30 bg-wash px-3 py-1.5 text-sm font-semibold text-brand">
                 อนุกรรมการและผู้ช่วยเลขานุการ
               </p>
             </div>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              ตำแหน่งดังกล่าวปรากฏในองค์ประกอบคณะอนุกรรมการตามคำสั่งนี้ หน้า 2 รายการ 1.10 และ 1.11
+              โดยเอกสารระบุตำแหน่งและหน่วยงาน แต่ไม่ได้ระบุชื่อผู้พัฒนาเป็นรายบุคคล
+            </p>
             <div className="pt-5">
               <h3 className="font-semibold text-foreground">ขอบเขตภารกิจของคณะอนุกรรมการ</h3>
               <ul className="mt-3 grid gap-3 text-sm leading-6 text-muted-foreground sm:grid-cols-2">
                 <li>ลดความเหลื่อมล้ำทางการศึกษา</li>
-                <li>เพิ่มโอกาสเข้าถึงการศึกษาที่มีคุณภาพ</li>
-                <li>พัฒนาแนวทางจัดสรรงบประมาณและทรัพยากรการศึกษา</li>
+                <li>ขยายโอกาสเข้าถึงการศึกษาที่มีคุณภาพ</li>
+                <li>จัดสรรงบประมาณและทรัพยากรทางการศึกษาอย่างเป็นธรรม</li>
                 <li>พัฒนาการบริหารจัดการสถานศึกษา</li>
-                <li className="sm:col-span-2">ส่งเสริมการใช้เทคโนโลยีดิจิทัลในการบริหารจัดการศึกษา</li>
+                <li className="sm:col-span-2">นำเทคโนโลยีดิจิทัลมาสนับสนุนการบริหารจัดการศึกษา</li>
               </ul>
             </div>
             <p className="mt-5 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
               รายการภารกิจอธิบายหน้าที่ของคณะอนุกรรมการ ไม่ใช่ผลงานส่วนบุคคล
+            </p>
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">
+              ประสบการณ์ดังกล่าวเป็นบทบาทส่วนบุคคลของผู้พัฒนา และไม่แสดงถึงการรับรองหรือการสนับสนุน Sobdai จากกระทรวงศึกษาธิการ
             </p>
           </article>
         </div>
