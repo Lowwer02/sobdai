@@ -9,21 +9,21 @@ interface MarkdownRendererProps {
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="prose prose-invert prose-gold max-w-none">
+    <div className="max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
-          h1: ({ node, ...props }) => <h1 className="text-3xl font-display font-bold text-[#D4AF37] mb-6" {...props} />,
-          h2: ({ node, ...props }) => <h2 className="text-xl font-bold text-[#F5E9D6] mt-8 mb-4" {...props} />,
-          h3: ({ node, ...props }) => <h3 className="text-lg font-bold text-[#F5E9D6] mt-6 mb-3" {...props} />,
-          p: ({ node, ...props }) => <p className="text-[#A1866B] leading-relaxed mb-4" {...props} />,
-          a: ({ node, ...props }) => <a className="text-[#D4AF37] hover:underline" {...props} />,
-          ul: ({ node, ...props }) => <ul className="list-disc list-inside text-[#A1866B] mb-4 space-y-2" {...props} />,
-          ol: ({ node, ...props }) => <ol className="list-decimal list-inside text-[#A1866B] mb-4 space-y-2" {...props} />,
-          li: ({ node, ...props }) => <li className="text-[#A1866B]" {...props} />,
-          strong: ({ node, ...props }) => <strong className="text-[#F5E9D6] font-semibold" {...props} />,
-          blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-[#D4AF37] pl-4 italic text-[#A1866B]/80 my-4" {...props} />,
+          h1: ({ node, ...props }) => <h1 className="mb-6 text-3xl font-display font-bold text-brand" {...props} />,
+          h2: ({ node, ...props }) => <h2 className="mb-4 mt-8 text-xl font-bold text-foreground" {...props} />,
+          h3: ({ node, ...props }) => <h3 className="mb-3 mt-6 text-lg font-bold text-foreground" {...props} />,
+          p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-muted-foreground" {...props} />,
+          a: ({ node, ...props }) => <a className="text-brand hover:underline focus-visible:underline" {...props} />,
+          ul: ({ node, ...props }) => <ul className="mb-4 list-inside list-disc space-y-2 text-muted-foreground" {...props} />,
+          ol: ({ node, ...props }) => <ol className="mb-4 list-inside list-decimal space-y-2 text-muted-foreground" {...props} />,
+          li: ({ node, ...props }) => <li className="text-muted-foreground" {...props} />,
+          strong: ({ node, ...props }) => <strong className="font-semibold text-foreground" {...props} />,
+          blockquote: ({ node, ...props }) => <blockquote className="my-4 border-l-4 border-brand pl-4 italic text-muted-foreground" {...props} />,
         }}
       >
         {content}

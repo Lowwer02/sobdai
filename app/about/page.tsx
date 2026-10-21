@@ -3,7 +3,9 @@ import { createPageMetadata, SITE_URL } from '@/lib/seo'
 import StructuredData from '@/components/StructuredData'
 import AboutPerson from '@/components/about/AboutPerson'
 import AboutPrinciples from '@/components/about/AboutPrinciples'
+import AboutPageV2 from '@/components/about/AboutPageV2'
 import AboutTrust from '@/components/about/AboutTrust'
+import { LEGAL } from '@/lib/legal'
 import styles from './about.module.css'
 
 /**
@@ -127,8 +129,11 @@ export default function AboutPage() {
           ══════════════════════════════════════════════════════════════ */}
       <AboutPrinciples />
 
+      {/* Personal experience and credibility follow the platform story. */}
+      <AboutPageV2 version={LEGAL.aboutVersion} />
+
       {/* ══════════════════════════════════════════════════════════════
-          SECTIONS 05 + 06 + 07 — TRUST + IMPROVEMENT + CTA
+          TRUST + IMPROVEMENT + CTA
           ══════════════════════════════════════════════════════════════ */}
       <AboutTrust />
 
