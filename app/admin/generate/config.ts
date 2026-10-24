@@ -35,6 +35,15 @@ export const ADMIN_ASSESSMENT_BLUEPRINTS = [
     sourcePath: 'Blueprint/opsmoac_policy_plan_analyst_blueprint.md',
     packageCode: 'OPSMOAC-PPA-2026-V10',
   },
+  {
+    key: 'revenue-academic-officer@3.0.0',
+    id: 'revenue-academic-officer',
+    version: '3.0.0',
+    title: 'นักวิชาการสรรพากร — กรมสรรพากร',
+    description: 'Assessment Blueprint V1 · 5 sets · 100 questions per set · document-allocation only',
+    sourcePath: 'Blueprint/revenue_academic_officer_blueprint.md',
+    packageCode: 'TAX-TRO-2026-V10',
+  },
 ] as const
 
 export type AdminAssessmentBlueprintKey =
