@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Sparkles, Clock, FileText, PlayCircle, LogIn } from 'lucide-react'
+import { FREE_EXAM_ANCHOR, buildFreeExamHeading } from '@/lib/seo'
 
 /**
  * PackageSampleExamSection
@@ -47,12 +48,20 @@ export interface PackageSampleExamSectionProps {
   packageSlug: string
   /** Required — resolved from supabase.auth.getUser() in page.tsx (server-side). */
   isAuthenticated: boolean
+  /**
+   * Package position display name (canonical Position Entity name preferred,
+   * package positions.name fallback) resolved in PackageClient from server
+   * data. Drives the dynamic heading "ทดลองทำข้อสอบฟรี — {positionName}";
+   * when missing the heading falls back to "ทดลองทำข้อสอบฟรี".
+   */
+  positionName?: string | null
 }
 
 export default function PackageSampleExamSection({
   sampleExam,
   packageSlug,
   isAuthenticated,
+  positionName = null,
 }: PackageSampleExamSectionProps) {
   const examHref = `/package/${packageSlug}/exam/${sampleExam.id}`
   const loginHref = `/login?redirect=${encodeURIComponent(examHref)}`
@@ -63,8 +72,9 @@ export default function PackageSampleExamSection({
 
   return (
     <section
+      id={FREE_EXAM_ANCHOR}
       aria-label="ข้อสอบตัวอย่าง"
-      className="relative bg-[#1A140E] border border-[#D4AF37]/30 rounded-[24px] shadow-[0_0_40px_rgba(212,175,55,0.06)] overflow-hidden"
+      className="relative bg-[#1A140E] border border-[#D4AF37]/30 rounded-[24px] shadow-[0_0_40px_rgba(212,175,55,0.06)] overflow-hidden scroll-mt-[88px]"
     >
       {/* Subtle gold glow accent — decorative, pointer-events-none */}
       <div
@@ -85,9 +95,9 @@ export default function PackageSampleExamSection({
             <span>ข้อสอบตัวอย่างฟรี</span>
           </div>
 
-          {/* Title */}
+          {/* Title — dynamic position name, free-exam fallback without it */}
           <h2 className="text-[#F5E9D6] text-[20px] md:text-[22px] font-bold font-display leading-snug mb-2">
-            ลองทำข้อสอบตัวอย่างก่อนตัดสินใจ
+            {buildFreeExamHeading(positionName)}
           </h2>
 
           {/* Supporting copy */}

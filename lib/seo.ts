@@ -131,6 +131,7 @@ export function createPageMetadata({
   type = 'website',
   publishedTime,
   modifiedTime,
+  ogUrl,
 }: {
   title: string
   description?: string
@@ -149,8 +150,18 @@ export function createPageMetadata({
   publishedTime?: string
   /** ISO 8601 timestamp; rendered as article:modified_time. Ignored unless type='article'. */
   modifiedTime?: string
+  /**
+   * Optional OpenGraph URL override, absolute or site-relative. Defaults to
+   * the canonical `path`. Only share/deep-link variants need to diverge: the
+   * canonical <link> stays on the plain URL (no extra indexable page), while
+   * og:url carries the exact shared URL so social platforms cache the
+   * variant's own preview card instead of collapsing it into the base page's
+   * cached preview.
+   */
+  ogUrl?: string
 }): Metadata {
   const url = absoluteUrl(path)
+  const ogUrlAbsolute = ogUrl ? absoluteUrl(ogUrl) : url
   const imageUrl = absoluteUrl(image)
   const isFollow = follow !== undefined ? follow : !noindex
   const isIndex = !noindex
@@ -175,7 +186,7 @@ export function createPageMetadata({
     openGraph: {
       title,
       description,
-      url,
+      url: ogUrlAbsolute,
       siteName: SITE_NAME,
       images: [
         {
@@ -341,6 +352,92 @@ export function buildPackageSeoDescription(pkg: PackageSeoData): string {
 export function buildPackageH1(pkg: PackageSeoData): string {
   const core = buildPackageTopicCore(pkg)
   return core || pkg.name?.trim() || 'แพ็กเกจข้อสอบ'
+}
+
+// ─── Package free-exam deep link + social share variant ─────────────────────
+//
+// `/package/[slug]?share=free-exam#free-exam` is a marketing share URL for the
+// existing free sample-exam section. Single source of truth for its copy,
+// anchor, query, and OG image so the section heading, the server metadata and
+// the tests can never disagree. Position names always come from real package
+// position data (positions.name / canonical Position Entity) — never derived
+// from slugs.
+
+/** Anchor id of the package free sample-exam section (#free-exam). */
+export const FREE_EXAM_ANCHOR = 'free-exam'
+
+/** Query that selects the free-exam share variant on the package route. */
+export const FREE_EXAM_SHARE_PARAM = 'share'
+export const FREE_EXAM_SHARE_VALUE = 'free-exam'
+
+/**
+ * Dedicated Sobdai-branded OG image for the free-exam share variant
+ * (1200×630). Static by design: Thai tone-mark shaping makes runtime OG image
+ * generation unreliable, so the image carries brand copy only while the
+ * position name lives in og:title/og:description.
+ */
+export const FREE_EXAM_OG_IMAGE = '/og-free-exam.jpg'
+
+/**
+ * Visible heading of the free sample-exam section:
+ * "ทดลองทำข้อสอบฟรี — {positionName}". When the package has no position
+ * metadata the position segment is dropped cleanly (never an empty dash).
+ */
+export function buildFreeExamHeading(positionName?: string | null): string {
+  const name = positionName?.trim()
+  return name ? `ทดลองทำข้อสอบฟรี — ${name}` : 'ทดลองทำข้อสอบฟรี'
+}
+
+/** og:title / twitter:title for the free-exam share variant. */
+export function buildFreeExamShareTitle(positionName?: string | null): string {
+  const name = positionName?.trim()
+  return name
+    ? `ทดลองทำข้อสอบฟรี — ${name} | ${SITE_NAME}`
+    : `ทดลองทำข้อสอบฟรี | ${SITE_NAME}`
+}
+
+/** og:description / twitter:description for the free-exam share variant. */
+export function buildFreeExamShareDescription(
+  positionName?: string | null
+): string {
+  const name = positionName?.trim()
+  return name
+    ? `ลองทำข้อสอบตัวอย่างฟรีสำหรับตำแหน่ง ${name} ก่อนตัดสินใจเลือกแพ็กเกจ`
+    : 'ลองทำข้อสอบตัวอย่างฟรี ก่อนตัดสินใจเลือกแพ็กเกจ'
+}
+
+/**
+ * The share URL path — same package route (no new route), ?share=free-exam.
+ * Callers append the #free-exam fragment client-side only; the fragment never
+ * reaches the server and must not decide anything server-side.
+ */
+export function buildFreeExamSharePath(slug: string): string {
+  return `/package/${slug}?${FREE_EXAM_SHARE_PARAM}=${FREE_EXAM_SHARE_VALUE}`
+}
+
+/**
+ * Metadata for the free-exam share variant. The canonical intentionally stays
+ * the plain package URL (the variant must not become a second indexable
+ * package page), while og:url carries the share query so Facebook/LINE cache
+ * the variant's own preview card. Only valid for published packages that have
+ * a published sample exam set — the caller (generateMetadata) verifies that.
+ */
+export function buildFreeExamShareMetadata({
+  slug,
+  positionName,
+}: {
+  slug: string
+  positionName?: string | null
+}): Metadata {
+  const title = buildFreeExamShareTitle(positionName)
+  const description = buildFreeExamShareDescription(positionName)
+  return createPageMetadata({
+    title,
+    description,
+    path: `/package/${slug}`,
+    ogUrl: buildFreeExamSharePath(slug),
+    image: FREE_EXAM_OG_IMAGE,
+  })
 }
 
 // ─── /news hub — keyword ownership (SEO-P2C) ────────────────────────────────

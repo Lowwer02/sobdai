@@ -15,6 +15,9 @@ import {
   buildBreadcrumbJsonLd,
   buildPackageSeoTitle,
   buildPackageSeoDescription,
+  buildFreeExamShareMetadata,
+  FREE_EXAM_SHARE_PARAM,
+  FREE_EXAM_SHARE_VALUE,
   type PackageSeoData,
 } from '@/lib/seo'
 import StructuredData from '@/components/StructuredData'
@@ -23,15 +26,16 @@ import { getCanonicalAgencyLink, type CanonicalAgencyLink } from '@/lib/agencies
 
 interface PageProps {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const supabase = await createClient()
 
   const { data: pkg } = await supabase
     .from('packages')
-    .select('name, slug, description, logo_url, cover_image_url, is_published, seo_title, seo_description, exam_year, organizations(name, short_name), positions(name)')
+    .select('id, name, slug, description, logo_url, cover_image_url, is_published, seo_title, seo_description, exam_year, position_id, organizations(name, short_name), positions(name)')
     .eq('slug', slug)
     .single()
 
@@ -52,6 +56,37 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = buildPackageSeoTitle(pkg as PackageSeoData)
   const description = buildPackageSeoDescription(pkg as PackageSeoData)
   const image = pkg.cover_image_url || pkg.logo_url || undefined
+
+  // FREE EXAM SHARE VARIANT — decided ONLY by the ?share=free-exam query.
+  // The #free-exam fragment never reaches the server and must never decide
+  // server-side metadata. Draft packages keep their noindex metadata.
+  const share = (await searchParams)[FREE_EXAM_SHARE_PARAM]
+  const shareValue = Array.isArray(share) ? share[0] : share
+  if (pkg.is_published && shareValue === FREE_EXAM_SHARE_VALUE) {
+    // Advertise the free exam only when a published sample exam set exists —
+    // the same rule PackageClient uses to render the #free-exam section, so
+    // social previews never promise an unavailable free exam.
+    const { data: sampleExam } = await supabase
+      .from('exam_sets')
+      .select('id')
+      .eq('package_id', pkg.id)
+      .eq('status', 'published')
+      .eq('is_sample', true)
+      .limit(1)
+      .maybeSingle()
+
+    if (sampleExam) {
+      // cache()-deduped with the identical page-render call — no extra
+      // round-trip when metadata and page render in the same request.
+      const canonicalPosition = await getCanonicalPositionLink(pkg.position_id)
+      return buildFreeExamShareMetadata({
+        slug: pkg.slug,
+        positionName:
+          canonicalPosition?.name ??
+          (pkg as PackageSeoData).positions?.name,
+      })
+    }
+  }
 
   return createPageMetadata({
     title,

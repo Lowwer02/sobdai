@@ -240,7 +240,9 @@ test('K: SupportCard is still conditionally rendered', () => {
 
 // ── L. Copy contract: safe approved copy, no hardcoded quality claims ──────────
 test('L: approved headline copy is present in PackageSampleExamSection', () => {
-  assert.match(sampleSection, /ลองทำข้อสอบตัวอย่างก่อนตัดสินใจ/)
+  // FREE EXAM DEEP LINK V1: the heading is dynamic — the position display name
+  // comes from server data via buildFreeExamHeading (fallback "ทดลองทำข้อสอบฟรี").
+  assert.match(sampleSection, /\{buildFreeExamHeading\(positionName\)\}/)
   assert.match(sampleSection, /ทดลองทำข้อสอบจากแพ็กเกจนี้ฟรีก่อนตัดสินใจ/)
 })
 

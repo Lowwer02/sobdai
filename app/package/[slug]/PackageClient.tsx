@@ -12,7 +12,7 @@ import ExamNavigation from '@/components/ExamNavigation'
 import SupportCard from '@/components/SupportCard'
 import type { SupportConfig } from '@/lib/homepageConfig'
 import type { RelatedNewsItem, RelatedArticleItem } from '@/lib/package-related-content'
-import { buildPackageH1, formatThaiDisplayYear } from '@/lib/seo'
+import { buildPackageH1, formatThaiDisplayYear, FREE_EXAM_ANCHOR, FREE_EXAM_SHARE_PARAM, FREE_EXAM_SHARE_VALUE } from '@/lib/seo'
 import ContentCard from '@/components/ContentCard'
 import WrittenExamNavigation from '@/components/WrittenExamNavigation'
 import type { WrittenExamDiscovery } from '@/lib/writtenExamLearner'
@@ -169,6 +169,8 @@ export default function PackageClient({
   const mobileInlinePurchaseRef = React.useRef<HTMLAnchorElement>(null)
   const desktopInlinePurchaseRef = React.useRef<HTMLAnchorElement>(null)
   const [showStickyPurchase, setShowStickyPurchase] = React.useState(false)
+  // Free-exam deep link runs at most once per page mount (see effect below).
+  const didScrollToFreeExam = React.useRef(false)
 
   // Promoted sample exam: the first published is_sample exam set.
   // Resolved from the already-fetched examSets prop — no extra query.
@@ -199,6 +201,101 @@ export default function PackageClient({
       if (!visualPreview) viewPackage(pkg.id, pkg.name, pkg.current_price)
     }
   }, [pkg?.id, pkg?.name, pkg?.current_price, visualPreview])
+
+  // FREE EXAM DEEP LINK — the share URL must reach the sample section even
+  // when a social app strips the URL fragment, so both `#free-exam` and
+  // `?share=free-exam` trigger one scroll to the section. Fragment-only links
+  // already scroll natively; this effect is the safety net for late layout
+  // AND for the router's post-navigation scroll reset (which can zero the
+  // position right after the first scroll lands). Each attempt re-checks the
+  // section's settled position and re-applies (instantly after the first
+  // smooth attempt) until it stays put, within a bounded window. Any user
+  // wheel / touch / key input cancels pending attempts, and the once-ref
+  // prevents navigation loops or repeated scrolling after normal interaction.
+  React.useEffect(() => {
+    if (didScrollToFreeExam.current) return
+
+    const shareActive =
+      searchParams.get(FREE_EXAM_SHARE_PARAM) === FREE_EXAM_SHARE_VALUE
+    const hashActive = window.location.hash === `#${FREE_EXAM_ANCHOR}`
+    if (!shareActive && !hashActive) return
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const MAX_ATTEMPTS = 16
+    const ATTEMPT_INTERVAL_MS = 200
+
+    let cancelled = false
+    let attempts = 0
+    let hasAppliedScroll = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const cancel = () => {
+      cancelled = true
+    }
+    // User interaction wins over any pending programmatic scroll.
+    const userEvents: Array<[Window, string]> = [
+      [window, 'wheel'],
+      [window, 'touchstart'],
+      [window, 'keydown'],
+    ]
+    userEvents.forEach(([target, event]) =>
+      target.addEventListener(event, cancel, { once: true, passive: true })
+    )
+
+    const tryScroll = () => {
+      if (cancelled || didScrollToFreeExam.current) return
+      attempts += 1
+
+      const section = document.getElementById(FREE_EXAM_ANCHOR)
+      if (!section) {
+        if (attempts < MAX_ATTEMPTS) timer = setTimeout(tryScroll, ATTEMPT_INTERVAL_MS)
+        return
+      }
+
+      const rectTop = section.getBoundingClientRect().top
+      const scrollOffset = parseFloat(
+        window.getComputedStyle(section).scrollMarginTop || '0'
+      )
+      const atTarget = Math.abs(rectTop - scrollOffset) <= 4
+      // A section near the page end can never reach the top — max scroll is
+      // as close as the viewport allows, which counts as settled.
+      const atMaxScroll =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 2
+
+      if (atTarget || atMaxScroll) {
+        didScrollToFreeExam.current = true
+        if (shareActive && !window.location.hash) {
+          const url = `${window.location.pathname}${window.location.search}#${FREE_EXAM_ANCHOR}`
+          window.history.replaceState(window.history.state, '', url)
+        }
+        return
+      }
+
+      section.scrollIntoView({
+        // First application may animate; re-applications are instant so the
+        // section wins any late scroll reset without animation stutter.
+        behavior:
+          !hasAppliedScroll && !reducedMotion.matches ? 'smooth' : 'auto',
+        block: 'start',
+      })
+      hasAppliedScroll = true
+      if (attempts < MAX_ATTEMPTS) timer = setTimeout(tryScroll, ATTEMPT_INTERVAL_MS)
+    }
+    // setTimeout, not requestAnimationFrame: rAF is suspended entirely in
+    // hidden tabs (link previews, background loads), which would skip the
+    // deep-link scroll; timers still fire there.
+    const firstTimer = setTimeout(tryScroll, 0)
+
+    return () => {
+      cancelled = true
+      clearTimeout(firstTimer)
+      if (timer) clearTimeout(timer)
+      userEvents.forEach(([target, event]) =>
+        target.removeEventListener(event, cancel)
+      )
+    }
+  }, [searchParams])
 
   React.useEffect(() => {
     const updateStickyPurchase = () => {
@@ -529,6 +626,7 @@ export default function PackageClient({
               sampleExam={sampleExam}
               packageSlug={pkg.slug}
               isAuthenticated={isAuthenticated}
+              positionName={positionName}
             />
           )}
 
