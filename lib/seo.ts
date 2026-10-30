@@ -416,6 +416,18 @@ export function buildFreeExamSharePath(slug: string): string {
 }
 
 /**
+ * Absolute shareable URL for the package free-exam section, used by the
+ * section's "แชร์ข้อสอบฟรีให้เพื่อน" button (native share / clipboard):
+ * https://sobdai.com/package/[slug]?share=free-exam#free-exam
+ * The query keeps the dynamic social metadata path; the anchor lands the
+ * recipient on the free-exam section. Always the production origin — never
+ * localhost or a preview hostname, never any user/session token.
+ */
+export function buildFreeExamShareUrl(slug: string): string {
+  return `${SITE_URL}${buildFreeExamSharePath(slug)}#${FREE_EXAM_ANCHOR}`
+}
+
+/**
  * Metadata for the free-exam share variant. The canonical intentionally stays
  * the plain package URL (the variant must not become a second indexable
  * package page), while og:url carries the share query so Facebook/LINE cache

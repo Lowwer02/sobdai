@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Sparkles, Clock, FileText, PlayCircle, LogIn } from 'lucide-react'
-import { FREE_EXAM_ANCHOR, buildFreeExamHeading } from '@/lib/seo'
+import { useEffect, useRef, useState } from 'react'
+import { Sparkles, Clock, FileText, PlayCircle, LogIn, Share2, Check } from 'lucide-react'
+import { FREE_EXAM_ANCHOR, buildFreeExamHeading, buildFreeExamShareUrl } from '@/lib/seo'
 
 /**
  * PackageSampleExamSection
@@ -69,6 +70,51 @@ export default function PackageSampleExamSection({
 
   const hasDuration = sampleExam.duration_minutes > 0
   const hasQuestionCount = (sampleExam.qCount ?? 0) > 0
+
+  // ── Share Free Exam (V1.1) ──────────────────────────────────────────────
+  // Native share sheet when available; clipboard copy otherwise. AbortError
+  // is a normal sheet cancellation. Feedback is shown ONLY for clipboard
+  // results — never claim success unless copying actually succeeded.
+  type ShareFeedback = 'idle' | 'copied' | 'failed'
+  const [shareFeedback, setShareFeedback] = useState<ShareFeedback>('idle')
+  const shareFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (shareFeedbackTimer.current) clearTimeout(shareFeedbackTimer.current)
+    },
+    []
+  )
+  const showShareFeedback = (feedback: ShareFeedback) => {
+    setShareFeedback(feedback)
+    if (shareFeedbackTimer.current) clearTimeout(shareFeedbackTimer.current)
+    shareFeedbackTimer.current = setTimeout(() => setShareFeedback('idle'), 2500)
+  }
+
+  const shareUrl = buildFreeExamShareUrl(packageSlug)
+  const shareTitle = buildFreeExamHeading(positionName)
+  const shareText = 'ลองทำข้อสอบตัวอย่างฟรีก่อนตัดสินใจเลือกแพ็กเกจกัน'
+
+  const handleShare = async () => {
+    // A. Native system share sheet when supported.
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ url: shareUrl, title: shareTitle, text: shareText })
+        return
+      } catch (error) {
+        // D. User cancelled the sheet — normal, not an error.
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        // E. Genuine share failure — fall through to the clipboard.
+      }
+    }
+    // B. Clipboard fallback (also reached when the native share failed).
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      showShareFeedback('copied')
+    } catch {
+      // C. Never display success unless copying actually succeeded.
+      showShareFeedback('failed')
+    }
+  }
 
   return (
     <section
@@ -157,6 +203,27 @@ export default function PackageSampleExamSection({
               ? 'เริ่มทำได้ทันที • ไม่มีค่าใช้จ่าย'
               : 'เข้าสู่ระบบเพื่อเริ่มทำ • ไม่ต้องซื้อแพ็กเกจก่อน'}
           </p>
+
+          {/* Share Free Exam — ghost/text beneath the primary CTA, centered
+              on desktop (lg:self-center overrides the column's items-end so
+              the button sits centered under the gold CTA) and full-width on
+              mobile. Deliberately quiet: no fill, gold text only, so the
+              primary gold CTA stays visually dominant. 44px touch target. */}
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-live="polite"
+            className="inline-flex items-center justify-center gap-1.5 w-full lg:w-auto lg:self-center px-4 min-h-[44px] rounded-lg bg-transparent text-[#D4AF37] hover:text-[#F1D17A] hover:bg-[#D4AF37]/10 text-[13px] font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1A140E]"
+          >
+            {shareFeedback === 'copied' ? <Check size={15} /> : <Share2 size={15} />}
+            <span>
+              {shareFeedback === 'copied'
+                ? 'คัดลอกลิงก์แล้ว'
+                : shareFeedback === 'failed'
+                  ? 'คัดลอกไม่สำเร็จ'
+                  : 'แชร์ข้อสอบฟรีให้เพื่อน'}
+            </span>
+          </button>
         </div>
       </div>
     </section>
