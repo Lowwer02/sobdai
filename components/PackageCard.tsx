@@ -93,13 +93,13 @@ function HighlightedText({ text, query }: { text: string; query?: string }) {
 const FRESHNESS_CHIPS = {
   exam: {
     glyph: '✦',
-    color: '#E29A78',
+    color: 'var(--fresh-exam)',
     background: 'rgba(226, 138, 100, 0.08)',
     borderColor: 'rgba(226, 138, 100, 0.25)',
   },
   summary: {
     glyph: '▣',
-    color: '#E3B04B',
+    color: 'var(--fresh-summary)',
     background: 'rgba(212, 168, 67, 0.08)',
     borderColor: 'rgba(212, 168, 67, 0.22)',
   },

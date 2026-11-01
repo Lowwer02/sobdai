@@ -88,14 +88,14 @@ export default function Footer({ supportConfig, footerConfig }: FooterProps) {
 
           {/* 2. EXPLORE (Entity Discovery V1) */}
           <div className="col-span-2 lg:col-span-1 flex flex-col">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#D4AF37] mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-brand mb-3">
               สำรวจ
             </h3>
-            <nav aria-label="สำรวจหน้างานราชการ" className="flex flex-col space-y-2.5 text-sm text-[#A1866B]">
-              <Link href="/positions" className="hover:text-[#F5E9D6] transition-colors">
+            <nav aria-label="สำรวจหน้างานราชการ" className="flex flex-col space-y-2.5 text-sm text-muted-foreground">
+              <Link href="/positions" className="hover:text-foreground transition-colors">
                 ตำแหน่งงานราชการ
               </Link>
-              <Link href="/agencies" className="hover:text-[#F5E9D6] transition-colors">
+              <Link href="/agencies" className="hover:text-foreground transition-colors">
                 หน่วยงานราชการ
               </Link>
             </nav>
