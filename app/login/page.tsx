@@ -33,9 +33,9 @@ function LoginPageInner() {
   if (!mounted) return null
 
   return (
-    <div className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] flex flex-col items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 font-sans">
       <div className="max-w-md w-full text-center mb-8">
-        <Link href="/" className="inline-flex items-center gap-3 text-[#D4AF37] font-display font-bold text-2xl mb-8 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] rounded-lg p-1 transition-all hover:scale-105">
+        <Link href="/" className="inline-flex items-center gap-3 text-brand font-display font-bold text-2xl mb-8 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-lg p-1 transition-all hover:scale-105">
           <Image
             src="/logo.png"
             alt="Sobdai Logo"
@@ -56,8 +56,8 @@ function LoginPageInner() {
           </div>
         ) : (
           <>
-            <h1 className="text-2xl font-bold text-[#F5E9D6] mb-2">กรุณาเข้าสู่ระบบ</h1>
-            <p className="text-[#A1866B]">เพื่อเข้าใช้งานฟีเจอร์ต่างๆ ของระบบ</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">กรุณาเข้าสู่ระบบ</h1>
+            <p className="text-muted-foreground">เพื่อเข้าใช้งานฟีเจอร์ต่างๆ ของระบบ</p>
           </>
         )}
       </div>
