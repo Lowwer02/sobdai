@@ -85,7 +85,7 @@ export default async function AuthorProfilePage({ params }: AuthorPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#0F0B07] text-[#F5E9D6] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-background text-foreground py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <StructuredData data={profileJsonLd} />
 
       <div className="max-w-6xl mx-auto space-y-8">
@@ -93,7 +93,7 @@ export default async function AuthorProfilePage({ params }: AuthorPageProps) {
         <div>
           <Link
             href="/articles"
-            className="inline-flex items-center gap-2 text-xs sm:text-sm text-[#A1866B] hover:text-[#D4AF37] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37] rounded-md p-1 -ml-1"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground hover:text-brand transition-colors focus:outline-none focus:ring-2 focus:ring-brand rounded-md p-1 -ml-1"
           >
             <ArrowLeft size={16} />
             <span>กลับสู่บทความทั้งหมด</span>
@@ -101,10 +101,10 @@ export default async function AuthorProfilePage({ params }: AuthorPageProps) {
         </div>
 
         {/* Author Bio Header Card */}
-        <header className="bg-[#1A140E] border border-[#D4AF37]/20 rounded-2xl p-6 sm:p-8 shadow-xl">
+        <header className="bg-card border border-brand/20 rounded-2xl p-6 sm:p-8 shadow-xl">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
             {/* Avatar */}
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#D4AF37]/10 border-2 border-[#D4AF37]/40 flex items-center justify-center shrink-0 text-[#D4AF37] font-extrabold text-3xl overflow-hidden shadow-lg">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-wash border-2 border-brand/40 flex items-center justify-center shrink-0 text-brand font-extrabold text-3xl overflow-hidden shadow-lg">
               {author.avatar_url ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
@@ -120,29 +120,29 @@ export default async function AuthorProfilePage({ params }: AuthorPageProps) {
             {/* Details */}
             <div className="space-y-3 min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#F5E9D6] tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
                   {author.display_name}
                 </h1>
                 {author.role_title && (
-                  <span className="inline-block px-3 py-0.5 text-xs font-semibold bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[#D4AF37] rounded-full">
+                  <span className="inline-block px-3 py-0.5 text-xs font-semibold bg-wash border border-brand/30 text-brand rounded-full">
                     {author.role_title}
                   </span>
                 )}
               </div>
 
               {author.short_bio ? (
-                <p className="text-sm sm:text-base text-[#A1866B] leading-relaxed max-w-3xl">
+                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl">
                   {author.short_bio}
                 </p>
               ) : (
-                <p className="text-sm text-[#A1866B] italic">
+                <p className="text-sm text-muted-foreground italic">
                   ผู้เขียนและผู้จัดทำเนื้อหาการเรียนรู้สำหรับเตรียมสอบราชการบน Sobdai
                 </p>
               )}
 
-              <div className="flex items-center justify-center sm:justify-start gap-4 text-xs text-[#A1866B] pt-1">
+              <div className="flex items-center justify-center sm:justify-start gap-4 text-xs text-muted-foreground pt-1">
                 <span className="flex items-center gap-1.5">
-                  <BookOpen size={14} className="text-[#D4AF37]" />
+                  <BookOpen size={14} className="text-brand" />
                   <span>ผลงานบทความ: <strong>{count}</strong> บทความ</span>
                 </span>
               </div>
@@ -152,20 +152,20 @@ export default async function AuthorProfilePage({ params }: AuthorPageProps) {
 
         {/* Authored Articles Section */}
         <section className="space-y-6">
-          <div className="flex items-center justify-between border-b border-[#D4AF37]/15 pb-4">
-            <h2 className="text-lg sm:text-xl font-bold text-[#F5E9D6] flex items-center gap-2">
-              <FileText className="text-[#D4AF37]" size={20} />
+          <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
+              <FileText className="text-brand" size={20} />
               บทความโดย {author.display_name}
             </h2>
-            <span className="text-xs text-[#A1866B]">
+            <span className="text-xs text-muted-foreground">
               ทั้งหมด {count} บทความ
             </span>
           </div>
 
           {articles.length === 0 ? (
-            <div className="bg-[#1A140E]/50 border border-[#D4AF37]/10 rounded-xl p-12 text-center text-[#A1866B] space-y-2">
-              <FileText size={36} className="mx-auto text-[#D4AF37]/40 mb-2" />
-              <p className="text-base font-semibold text-[#F5E9D6]">ยังไม่มีบทความที่เผยแพร่</p>
+            <div className="bg-card/50 border border-border-subtle rounded-xl p-12 text-center text-muted-foreground space-y-2">
+              <FileText size={36} className="mx-auto text-brand/40 mb-2" />
+              <p className="text-base font-semibold text-foreground">ยังไม่มีบทความที่เผยแพร่</p>
               <p className="text-xs">
                 ผู้เขียนท่านนี้ยังไม่มีบทความที่เผยแพร่สู่สาธารณะในขณะนี้
               </p>

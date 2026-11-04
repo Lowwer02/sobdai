@@ -227,11 +227,11 @@ export default function DownloadsPage() {
                 width: 52,
                 height: 52,
                 borderRadius: 14,
-                background: 'rgba(34, 197, 94, 0.1)',
+                background: 'var(--success-bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#22c55e',
+                color: 'var(--success)',
                 margin: '0 auto 16px',
               }}
             >
@@ -305,7 +305,7 @@ export default function DownloadsPage() {
                   justifyContent: 'center',
                   flexShrink: 0,
                   ...(item.status === 'done'
-                    ? { background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' }
+                    ? { background: 'var(--success-bg)', color: 'var(--success)' }
                     : { background: 'var(--gold-tint)', color: 'var(--gold-muted)' }),
                 }}
               >

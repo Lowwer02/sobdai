@@ -192,7 +192,7 @@ export default function PackageCatalogClient({
               onKeyDown={handleSearchKeyDown}
               className="w-full"
               style={{
-                backgroundColor: 'var(--bg-secondary)',
+                backgroundColor: 'var(--input)',
                 border: '1px solid var(--border-subtle)',
                 color: 'var(--text-primary)',
                 borderRadius: '12px',
@@ -211,7 +211,7 @@ export default function PackageCatalogClient({
                 type="button"
                 onClick={resetSearch}
                 aria-label="ล้างการค้นหา"
-                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 style={{
                   position: 'absolute',
                   right: '10px',
@@ -221,7 +221,7 @@ export default function PackageCatalogClient({
                   height: '28px',
                   borderRadius: '999px',
                   border: '1px solid var(--border-subtle)',
-                  background: 'rgba(255,255,255,0.04)',
+                  background: 'var(--hover)',
                   color: 'var(--text-muted)',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -243,7 +243,7 @@ export default function PackageCatalogClient({
                 role="radio"
                 aria-checked={activeFilter === option.value}
                 onClick={() => setActiveFilter(option.value)}
-                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 style={{
                   padding: '8px 16px',
                   borderRadius: '8px',
@@ -254,14 +254,14 @@ export default function PackageCatalogClient({
                   transition: 'all 0.2s',
                   ...(activeFilter === option.value
                     ? {
-                        backgroundColor: 'rgba(212,175,55,0.1)',
-                        borderColor: 'rgba(212,175,55,0.3)',
+                        backgroundColor: 'var(--wash)',
+                        borderColor: 'var(--border-hover)',
                         color: 'var(--gold)',
                       }
                     : {
                         backgroundColor: 'transparent',
                         borderColor: 'var(--border-subtle)',
-                        color: '#C5B097',
+                        color: 'var(--muted-foreground)',
                       }),
                 }}
               >
@@ -296,7 +296,7 @@ export default function PackageCatalogClient({
             <button
               type="button"
               onClick={resetSearch}
-              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               style={{
                 border: 0,
                 background: 'transparent',
@@ -366,12 +366,12 @@ export default function PackageCatalogClient({
                           key={suggestion}
                           type="button"
                           onClick={() => applySuggestedSearch(suggestion)}
-                          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
+                          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                           style={{
                             padding: '8px 13px',
                             borderRadius: '999px',
                             border: '1px solid var(--border-subtle)',
-                            background: 'rgba(255,255,255,0.03)',
+                            background: 'var(--hover)',
                             color: 'var(--text-secondary)',
                             cursor: 'pointer',
                             fontSize: '13px',

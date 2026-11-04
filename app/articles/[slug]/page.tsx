@@ -168,10 +168,10 @@ export default async function ArticleDetailPage({
   if (!res.success) {
     return (
       <main className="min-h-screen bg-background text-foreground py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-xl mx-auto bg-card border border-red-500/30 rounded-2xl p-8 text-center space-y-4 shadow-xl">
-          <AlertTriangle className="mx-auto text-red-400" size={48} />
-          <h1 className="text-xl font-bold text-red-300">เกิดข้อผิดพลาดในการโหลดบทความ</h1>
-          <p className="text-xs sm:text-sm text-red-200/80">
+        <div className="max-w-xl mx-auto bg-card border border-destructive-border rounded-2xl p-8 text-center space-y-4 shadow-xl">
+          <AlertTriangle className="mx-auto text-destructive" size={48} />
+          <h1 className="text-xl font-bold text-destructive">เกิดข้อผิดพลาดในการโหลดบทความ</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {res.error || 'ไม่สามารถโหลดข้อมูลบทความได้ในขณะนี้ กรุณาลองใหม่อีกครั้งในภายหลัง'}
           </p>
           <div className="pt-2">

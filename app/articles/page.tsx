@@ -132,10 +132,10 @@ export default async function ArticlesListPage({
 
         {/* Error State */}
         {!res.success && (
-          <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-2xl text-center space-y-3 my-8">
-            <AlertTriangle className="mx-auto text-red-400" size={36} />
-            <h2 className="text-lg font-bold text-red-300">เกิดข้อผิดพลาดในการโหลดบทความ</h2>
-            <p className="text-xs sm:text-sm text-red-200/80 max-w-md mx-auto">
+          <div className="bg-destructive-bg border border-destructive-border p-6 rounded-2xl text-center space-y-3 my-8">
+            <AlertTriangle className="mx-auto text-destructive" size={36} />
+            <h2 className="text-lg font-bold text-destructive">เกิดข้อผิดพลาดในการโหลดบทความ</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
               {res.error || 'ไม่สามารถดึงข้อมูลบทความได้ในขณะนี้ กรุณาลองใหม่อีกครั้งในภายหลัง'}
             </p>
             <div className="pt-2">

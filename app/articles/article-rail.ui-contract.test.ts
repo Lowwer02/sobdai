@@ -130,7 +130,7 @@ test('mobile spacing contract: shared wrapper margin, solo variant cancels it', 
 test('the mobile bottom section keeps its existing markup', () => {
   assert.match(
     bottomComponent,
-    /className="max-w-4xl mx-auto mt-12 pt-8 border-t border-\[#D4AF37\]\/15 space-y-6"/,
+    /className="max-w-4xl mx-auto mt-12 pt-8 border-t border-brand\/15 space-y-6"/,
   )
   assert.match(bottomComponent, /แพ็กเกจเตรียมสอบที่เกี่ยวข้อง/)
   assert.match(bottomComponent, /ดูแพ็กเกจ/)

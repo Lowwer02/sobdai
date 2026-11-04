@@ -51,14 +51,14 @@ export default async function PhakKhorPage({
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             <Link
               href="/positions"
-              className="inline-flex items-center gap-1.5 text-[13px] text-[#A1866B] transition-colors hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37] rounded-sm"
+              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand rounded-sm"
             >
               ดูตำแหน่งงานราชการ
               <ArrowRight size={13} aria-hidden="true" />
             </Link>
             <Link
               href="/agencies"
-              className="inline-flex items-center gap-1.5 text-[13px] text-[#A1866B] transition-colors hover:text-[#D4AF37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#D4AF37] rounded-sm"
+              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand rounded-sm"
             >
               ดูหน่วยงานราชการ
               <ArrowRight size={13} aria-hidden="true" />

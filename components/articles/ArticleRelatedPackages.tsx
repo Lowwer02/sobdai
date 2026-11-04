@@ -23,8 +23,8 @@ export default function ArticleRelatedPackages({
   if (error) {
     return (
       <section className="max-w-4xl mx-auto mt-12 pt-8 border-t border-brand/15">
-        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl text-center space-y-1">
-          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-red-300">
+        <div className="bg-destructive-bg border border-destructive-border p-4 rounded-xl text-center space-y-1">
+          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-destructive">
             <AlertTriangle size={16} />
             <span>{error || 'ไม่สามารถโหลดแพ็กเกจที่เกี่ยวข้องได้'}</span>
           </div>
@@ -39,7 +39,7 @@ export default function ArticleRelatedPackages({
   }
 
   return (
-    <section className="max-w-4xl mx-auto mt-12 pt-8 border-t border-[#D4AF37]/15 space-y-6">
+    <section className="max-w-4xl mx-auto mt-12 pt-8 border-t border-brand/15 space-y-6">
       <div className="flex items-center gap-2 text-lg sm:text-xl font-bold text-foreground">
         <Package className="text-brand" size={22} />
         <h2>แพ็กเกจเตรียมสอบที่เกี่ยวข้อง</h2>
