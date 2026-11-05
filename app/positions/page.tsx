@@ -116,33 +116,46 @@ export default async function PositionsHubPage() {
       <StructuredData data={breadcrumbJsonLd} />
       <StructuredData data={collectionJsonLd} />
 
-      <main className="bg-[#0F0A06] px-4 py-8 text-[#F7F3EC] sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+      <main className="bg-background px-4 py-8 text-foreground sm:px-6 sm:py-10 lg:px-8 lg:py-12">
         <div className="mx-auto max-w-6xl">
-        <nav aria-label="breadcrumb" className="mb-7 flex items-center text-sm text-[#C8BBA4] sm:mb-8">
+        <nav aria-label="breadcrumb" className="mb-7 flex items-center text-sm text-foreground-soft sm:mb-8">
           <Link
             href="/"
-            className="transition-colors hover:text-[#D4A63A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0A06]"
+            className="transition-colors hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             หน้าแรก
           </Link>
-          <span className="mx-2.5 text-[#7D6955]" aria-hidden="true">/</span>
-          <span aria-current="page" className="text-[#F7F3EC]">ตำแหน่งงานราชการ</span>
+          <span className="mx-2.5 text-muted-foreground" aria-hidden="true">/</span>
+          <span aria-current="page" className="text-foreground">ตำแหน่งงานราชการ</span>
         </nav>
 
-        <header className="relative border-b border-[#D4A63A]/20 pb-8 sm:pb-10 xl:grid xl:grid-cols-[minmax(0,1fr)_200px] xl:items-center xl:gap-4">
+        <header className="relative border-b border-brand/20 pb-8 sm:pb-10 xl:grid xl:grid-cols-[minmax(0,1fr)_200px] xl:items-center xl:gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A63A]">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand">
               Sobdai Position
             </p>
-            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-[#F7F3EC] sm:text-5xl">
+            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
               ตำแหน่งงานราชการ
             </h1>
-            <p className="mt-4 max-w-none text-base leading-8 text-[#C8BBA4] sm:text-lg xl:text-[1rem]">
+            <p className="mt-4 max-w-none text-base leading-8 text-foreground-soft sm:text-lg xl:text-[1rem]">
               ช่วยให้ผู้สมัครสอบทำความเข้าใจตำแหน่ง ดูหน่วยงานที่เกี่ยวข้อง ติดตามข่าวรับสมัคร
               และเตรียมสอบผ่านบทความกับแพ็กเกจของ Sobdai
             </p>
           </div>
-          <div className="pointer-events-none mt-7 hidden justify-self-end xl:mt-0 xl:block" aria-hidden="true">
+          <div
+            className="pointer-events-none mt-7 hidden justify-self-end xl:mt-0 xl:block"
+            aria-hidden="true"
+            // Approved decorative exception (Wave 3 mascot backing): the opaque
+            // mascot artwork is drawn with mix-blend-screen, which is visually
+            // dependent on the legacy Dark page canvas. This fixed-Dark halo
+            // restores the intended canvas locally; isolation keeps the blend
+            // compositing against this backing instead of the theme background.
+            style={{
+              background:
+                'radial-gradient(circle at center, #20150a 0%, #140d06 55%, rgba(15, 10, 6, 0) 78%)',
+              isolation: 'isolate',
+            }}
+          >
             <Image
               src="/images/positions/sobdai-position-mascot.webp"
               alt=""
@@ -156,23 +169,23 @@ export default async function PositionsHubPage() {
         </header>
 
         {pages.length > 0 && (
-          <section aria-label="สรุปข้อมูลตำแหน่งงานราชการ" className="mt-6 border-y border-[#D4A63A]/20">
-            <dl className="grid divide-y divide-[#D4A63A]/15 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <section aria-label="สรุปข้อมูลตำแหน่งงานราชการ" className="mt-6 border-y border-brand/20">
+            <dl className="grid divide-y divide-brand/15 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               <div className="py-4 sm:px-5 sm:first:pl-0">
-                <dt className="text-xs font-medium text-[#C8BBA4]">ในดัชนีปัจจุบัน</dt>
-                <dd className="mt-1.5 text-base font-semibold text-[#F7F3EC]">
+                <dt className="text-xs font-medium text-foreground-soft">ในดัชนีปัจจุบัน</dt>
+                <dd className="mt-1.5 text-base font-semibold text-foreground">
                   {pages.length} ตำแหน่งพร้อมสำรวจ
                 </dd>
               </div>
               <div className="py-4 sm:px-5">
-                <dt className="text-xs font-medium text-[#C8BBA4]">หน่วยงานที่เกี่ยวข้อง</dt>
-                <dd className="mt-1.5 text-base font-semibold text-[#F7F3EC]">
+                <dt className="text-xs font-medium text-foreground-soft">หน่วยงานที่เกี่ยวข้อง</dt>
+                <dd className="mt-1.5 text-base font-semibold text-foreground">
                   {organizationCount} หน่วยงาน
                 </dd>
               </div>
               <div className="py-4 sm:px-5 sm:pr-0">
-                <dt className="text-xs font-medium text-[#C8BBA4]">แพ็กเกจเตรียมสอบ</dt>
-                <dd className="mt-1.5 text-base font-semibold text-[#F7F3EC]">
+                <dt className="text-xs font-medium text-foreground-soft">แพ็กเกจเตรียมสอบ</dt>
+                <dd className="mt-1.5 text-base font-semibold text-foreground">
                   {packageCount} แพ็กเกจเตรียมสอบ
                 </dd>
               </div>
@@ -181,16 +194,16 @@ export default async function PositionsHubPage() {
         )}
 
         <section aria-labelledby="position-list-heading" className="mt-10 sm:mt-12">
-          <div className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border-subtle pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#D4A63A]">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand">
                 Position Directory
               </p>
-              <h2 id="position-list-heading" className="mt-2 font-display text-2xl font-bold tracking-tight text-[#F7F3EC] sm:text-3xl">
+              <h2 id="position-list-heading" className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 ตำแหน่งงานราชการทั้งหมด
               </h2>
             </div>
-            <p className="max-w-xl text-sm leading-6 text-[#C8BBA4]">
+            <p className="max-w-xl text-sm leading-6 text-foreground-soft">
               สำรวจข้อมูลตำแหน่ง หน่วยงาน และแหล่งเตรียมสอบที่เกี่ยวข้อง
             </p>
           </div>
@@ -205,50 +218,50 @@ export default async function PositionsHubPage() {
                   <Link
                     key={page.entity.id}
                     href={`/positions/${encodeURIComponent(page.entity.slug)}`}
-                    className="group block rounded-[1.75rem] border border-[#D4A63A]/25 bg-[#1A120B] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.24)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[#D4A63A]/70 hover:shadow-[0_24px_80px_rgba(0,0,0,0.34)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A63A] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F0A06] sm:p-8"
+                    className="group block rounded-[1.75rem] border border-brand/25 bg-card p-6 shadow-[0_20px_70px_rgba(0,0,0,0.24)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand/70 hover:shadow-[0_24px_80px_rgba(0,0,0,0.34)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:p-8"
                   >
                     <article>
                       <div className="flex items-start gap-4 sm:gap-5">
-                        <div className="rounded-2xl border border-[#D4A63A]/25 bg-[#0F0A06] p-3 text-[#D4A63A]">
+                        <div className="rounded-2xl border border-brand/25 bg-background p-3 text-brand">
                           <Briefcase size={21} aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#D4A63A]">
+                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand">
                             Position
                           </p>
-                          <h3 className="mt-2 font-display text-xl font-bold leading-tight text-[#F7F3EC] transition-colors group-hover:text-[#D4A63A] sm:text-2xl">
+                          <h3 className="mt-2 font-display text-xl font-bold leading-tight text-foreground transition-colors group-hover:text-brand sm:text-2xl">
                             {page.entity.name}
                           </h3>
                         </div>
                       </div>
 
-                      <p className="mt-5 max-w-3xl text-sm leading-7 text-[#C8BBA4] line-clamp-3 sm:text-base">
+                      <p className="mt-5 max-w-3xl text-sm leading-7 text-foreground-soft line-clamp-3 sm:text-base">
                         {buildPositionSeoDescription(page.entity)}
                       </p>
 
-                      <div className="mt-6 border-t border-white/10 pt-5">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-[#F7F3EC]">
+                      <div className="mt-6 border-t border-border-subtle pt-5">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-foreground">
                           <span className="inline-flex items-center gap-1.5">
-                            <Building2 size={15} className="text-[#D4A63A]" aria-hidden="true" />
+                            <Building2 size={15} className="text-brand" aria-hidden="true" />
                             {page.organizations.length} หน่วยงาน
                           </span>
-                          <span className="h-1 w-1 rounded-full bg-[#D4A63A]/70" aria-hidden="true" />
+                          <span className="h-1 w-1 rounded-full bg-brand/70" aria-hidden="true" />
                           <span className="inline-flex items-center gap-1.5">
-                            <BookOpen size={15} className="text-[#D4A63A]" aria-hidden="true" />
+                            <BookOpen size={15} className="text-brand" aria-hidden="true" />
                             {page.packages.length} แพ็กเกจเตรียมสอบ
                           </span>
                         </div>
 
                         {organizationPreview.length > 0 && (
-                          <p className="mt-4 text-sm leading-6 text-[#C8BBA4]">
-                            <span className="mr-2 text-[#F7F3EC]">หน่วยงานที่เกี่ยวข้อง</span>
+                          <p className="mt-4 text-sm leading-6 text-foreground-soft">
+                            <span className="mr-2 text-foreground">หน่วยงานที่เกี่ยวข้อง</span>
                             {organizationPreview.map(positionOrganizationsLabel).join(' · ')}
                             {remainingOrganizations > 0 && ` · +${remainingOrganizations} หน่วยงาน`}
                           </p>
                         )}
                       </div>
 
-                      <div className="mt-7 flex items-center justify-end gap-2 text-sm font-semibold text-[#F7F3EC] transition-colors group-hover:text-[#D4A63A]">
+                      <div className="mt-7 flex items-center justify-end gap-2 text-sm font-semibold text-foreground transition-colors group-hover:text-brand">
                         <span>ดูข้อมูลตำแหน่ง</span>
                         <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
                       </div>
@@ -258,7 +271,7 @@ export default async function PositionsHubPage() {
               })}
             </div>
           ) : (
-            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-[#1A120B] p-6 text-sm leading-7 text-[#C8BBA4] sm:p-8">
+            <div className="mt-6 rounded-[1.75rem] border border-border-subtle bg-card p-6 text-sm leading-7 text-foreground-soft sm:p-8">
               ขณะนี้ยังไม่มีตำแหน่งที่ผ่านเกณฑ์เผยแพร่สู่ดัชนีสาธารณะ
             </div>
           )}
@@ -266,20 +279,20 @@ export default async function PositionsHubPage() {
 
         <section
           aria-labelledby="position-explainer-heading"
-          className="mt-14 border-y border-[#D4A63A]/20 py-8 sm:mt-16 sm:py-10"
+          className="mt-14 border-y border-brand/20 py-8 sm:mt-16 sm:py-10"
         >
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A63A]">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand">
                 About Position
               </p>
               <h2
                 id="position-explainer-heading"
-                className="mt-2 font-display text-2xl font-bold tracking-tight text-[#F7F3EC] sm:text-3xl"
+                className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
               >
                 Sobdai Position คืออะไร?
               </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-[#C8BBA4] sm:text-base">
+              <p className="mt-4 max-w-xl text-sm leading-7 text-foreground-soft sm:text-base">
                 แต่ละหน้าตำแหน่งงานของ Sobdai รวบรวมข้อมูลที่ช่วยให้เข้าใจตำแหน่ง ดูหน่วยงานที่เกี่ยวข้อง ติดตามข่าวรับสมัคร และเตรียมสอบจากบทความกับแพ็กเกจที่เชื่อมโยงกัน โดยแสดงเฉพาะข้อมูลที่ผ่านเกณฑ์เผยแพร่และมีแหล่งอ้างอิง
               </p>
             </div>
@@ -289,12 +302,12 @@ export default async function PositionsHubPage() {
                 const Icon = item.icon
 
                 return (
-                  <div key={item.title} className="border-t border-white/10 py-4 first:border-t-0 sm:first:border-t">
+                  <div key={item.title} className="border-t border-border-subtle py-4 first:border-t-0 sm:first:border-t">
                     <div className="flex items-start gap-3">
-                      <Icon className="mt-0.5 shrink-0 text-[#D4A63A]" size={18} aria-hidden="true" />
+                      <Icon className="mt-0.5 shrink-0 text-brand" size={18} aria-hidden="true" />
                       <div>
-                        <h3 className="text-sm font-semibold text-[#F7F3EC]">{item.title}</h3>
-                        <p className="mt-1.5 text-sm leading-6 text-[#C8BBA4]">{item.description}</p>
+                        <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                        <p className="mt-1.5 text-sm leading-6 text-foreground-soft">{item.description}</p>
                       </div>
                     </div>
                   </div>

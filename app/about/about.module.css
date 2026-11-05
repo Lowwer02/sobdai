@@ -5,14 +5,14 @@
 /* ── Page Root ── */
 .root {
   min-height: 100vh;
-  background-color: #0f0a06;
-  color: #f7f3ec;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* ── Shared: Gold Hairline Separator ── */
 .hairline {
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(212, 168, 67, 0.18), transparent);
+  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--brand) 18%, transparent), transparent);
   margin: 0 auto;
   max-width: 64rem;
   width: 100%;
@@ -76,9 +76,9 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #d4a63a;
-  background: rgba(212, 168, 67, 0.08);
-  border: 1px solid rgba(212, 168, 67, 0.2);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
   border-radius: 999px;
   padding: 0.3rem 0.85rem;
   margin-bottom: 1.25rem;
@@ -89,7 +89,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   font-family: var(--font-supermarket), sans-serif;
   font-size: clamp(1.4rem, 3.5vw, 2rem);
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.35;
   margin-top: 0;
   margin-bottom: 1.5rem;
@@ -118,7 +118,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   font-family: var(--font-supermarket), sans-serif;
   font-size: clamp(1.75rem, 5vw, 2.75rem);
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.3;
   margin-top: 0;
   margin-bottom: 1.5rem;
@@ -128,7 +128,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 }
 .heroCopy {
   font-size: 1rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.9;
   max-width: 42rem;
 }
@@ -158,15 +158,15 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   width: 100%;
   max-width: 280px;
   aspect-ratio: 4 / 5;
-  background: #1a120b;
-  border: 1px solid rgba(212, 168, 67, 0.22);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
   border-radius: 1.25rem;
   overflow: hidden;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
   transition: border-color 250ms ease, box-shadow 250ms ease;
 }
 .personCard:hover {
-  border-color: rgba(212, 168, 67, 0.42);
+  border-color: color-mix(in srgb, var(--brand) 42%, transparent);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45);
 }
 @media (min-width: 768px) {
@@ -213,7 +213,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   font-family: var(--font-supermarket), sans-serif;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.3rem;
   line-height: 1.35;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
@@ -221,7 +221,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 .personTitle {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #d4a63a;
+  color: var(--brand);
   letter-spacing: 0.08em;
   margin: 0;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
@@ -241,21 +241,21 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 }
 .personNarrative p {
   font-size: 0.975rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.85;
   margin: 0;
 }
 
 /* Inline independence note */
 .independenceInline {
-  background: rgba(212, 168, 67, 0.05);
-  border: 1px solid rgba(212, 168, 67, 0.15);
+  background: color-mix(in srgb, var(--brand) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 15%, transparent);
   border-radius: 0.75rem;
   padding: 0.9rem 1.1rem;
 }
 .independenceInline p {
   font-size: 0.8rem;
-  color: #8e7b68;
+  color: var(--muted-foreground);
   line-height: 1.75;
   margin: 0;
 }
@@ -272,8 +272,8 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   }
 }
 .principleCard {
-  background: #1a120b;
-  border: 1px solid rgba(212, 168, 67, 0.12);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--brand) 12%, transparent);
   border-radius: 1rem;
   padding: 1.75rem 1.5rem;
   display: flex;
@@ -282,26 +282,26 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   transition: border-color 200ms ease;
 }
 .principleCard:hover {
-  border-color: rgba(212, 168, 67, 0.28);
+  border-color: color-mix(in srgb, var(--brand) 28%, transparent);
 }
 .principleNumber {
   font-family: var(--font-supermarket), sans-serif;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #d4a63a;
+  color: var(--brand);
   letter-spacing: 0.12em;
 }
 .principleTitle {
   font-family: var(--font-supermarket), sans-serif;
   font-size: 1rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.4;
   margin: 0;
 }
 .principleBody {
   font-size: 0.875rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.8;
   margin: 0;
 }
@@ -329,7 +329,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   width: 3px;
   min-height: 2.5rem;
   height: 100%;
-  background: linear-gradient(to bottom, #d4a63a, rgba(212, 168, 67, 0.2));
+  background: linear-gradient(to bottom, var(--brand), color-mix(in srgb, var(--brand) 20%, transparent));
   border-radius: 2px;
   flex-shrink: 0;
   align-self: stretch;
@@ -337,13 +337,13 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 .sourceTitle {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.4rem;
   line-height: 1.4;
 }
 .sourceBody {
   font-size: 0.825rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.8;
   margin: 0;
 }
@@ -351,8 +351,8 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 /* ── Section 05: Trust Card ── */
 .trustCard {
   position: relative;
-  background: #14100a;
-  border: 1px solid rgba(212, 168, 67, 0.18);
+  background: var(--surface-raised);
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent);
   border-radius: 1.5rem;
   overflow: hidden;
 }
@@ -362,7 +362,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   right: -4rem;
   width: 20rem;
   height: 20rem;
-  background: radial-gradient(ellipse at center, rgba(212, 168, 67, 0.06), transparent 70%);
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--brand) 6%, transparent), transparent 70%);
   pointer-events: none;
 }
 .trustContent {
@@ -386,7 +386,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 }
 .trustBody p {
   font-size: 0.9rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.85;
   margin: 0;
 }
@@ -398,25 +398,25 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 }
 .trustLink {
   font-size: 0.8rem;
-  color: #8e7b68;
+  color: var(--muted-foreground);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(142, 123, 104, 0.35);
+  text-decoration-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent);
   transition: color 150ms ease, text-decoration-color 150ms ease;
 }
 .trustLink:hover {
-  color: #d4a63a;
-  text-decoration-color: rgba(212, 168, 67, 0.5);
+  color: var(--brand);
+  text-decoration-color: color-mix(in srgb, var(--brand) 50%, transparent);
 }
 .trustSeparator {
-  color: rgba(142, 123, 104, 0.4);
+  color: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
   font-size: 0.8rem;
 }
 
 /* ── Section 06: Improvement ── */
 .improvementBody {
   font-size: 0.975rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.9;
   max-width: 40rem;
   margin: 0 auto;
@@ -431,7 +431,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   font-family: var(--font-supermarket), sans-serif;
   font-size: clamp(1.35rem, 3.5vw, 1.85rem);
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 2rem;
 }
 .ctaButtons {
@@ -452,8 +452,8 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   align-items: center;
   justify-content: center;
   padding: 0.75rem 2rem;
-  background: #d4a63a;
-  color: #0f0a06;
+  background: var(--brand-solid);
+  color: var(--brand-foreground);
   font-size: 0.9rem;
   font-weight: 700;
   border-radius: 0.6rem;
@@ -463,7 +463,7 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
 }
 .ctaPrimary:hover {
   background: #e8c46e;
-  box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.22);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
 }
 .ctaSecondary {
   display: inline-flex;
@@ -471,8 +471,8 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   justify-content: center;
   padding: 0.72rem 2rem;
   background: transparent;
-  color: #d4a63a;
-  border: 1.5px solid rgba(212, 168, 67, 0.4);
+  color: var(--brand);
+  border: 1.5px solid color-mix(in srgb, var(--brand) 40%, transparent);
   font-size: 0.9rem;
   font-weight: 700;
   border-radius: 0.6rem;
@@ -481,24 +481,24 @@ section[aria-labelledby="about-cta-heading"] .sectionInner {
   min-width: 14rem;
 }
 .ctaSecondary:hover {
-  border-color: rgba(212, 168, 67, 0.8);
-  background: rgba(212, 168, 67, 0.06);
-  color: #f1d17a;
+  border-color: color-mix(in srgb, var(--brand) 80%, transparent);
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  color: var(--brand-hover);
 }
 .ctaMicro {
   font-size: 0.8rem;
-  color: #8e7b68;
+  color: var(--muted-foreground);
   margin: 0;
 }
 .ctaFaqLink {
-  color: #d4a63a;
+  color: var(--brand);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(212, 168, 67, 0.35);
+  text-decoration-color: color-mix(in srgb, var(--brand) 35%, transparent);
   transition: color 150ms ease;
 }
 .ctaFaqLink:hover {
-  color: #f1d17a;
+  color: var(--brand-hover);
 }
 
 /* ── Bottom spacer ── */

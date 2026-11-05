@@ -81,6 +81,7 @@
   /* Canvas */
   --background: #0f0b07;
   --foreground: #f5e9d6;
+  --foreground-soft: #c8bba4;
 
   /* Surfaces */
   --surface: #0f0b07;
@@ -174,6 +175,7 @@
   /* Canonical */
   --background: #faf5ec;
   --foreground: #2b2118;
+  --foreground-soft: #6f5d47;
 
   --surface: #faf5ec;
   --surface-raised: #fffdf8;
@@ -288,6 +290,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-foreground-soft: var(--foreground-soft);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-muted: var(--surface-muted);

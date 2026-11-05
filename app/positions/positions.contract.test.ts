@@ -259,7 +259,7 @@ test('Position Detail links recruiting organizations to their canonical Agency p
   assert.match(positionAgencies, /<div className=\{styles\.agencyCard\}>\{cardBody\}<\/div>/)
   assert.doesNotMatch(positionAgencies, /styles\.agencyNameLink/, 'no nested name-level anchor inside the card link')
   assert.match(positionStyles, /\.agencyCardLink\s*\{[\s\S]*?color: inherit;/)
-  assert.match(positionStyles, /\.agencyCardLink:focus-visible\s*\{[\s\S]*?outline: 2px solid #D4A63A;/)
+  assert.match(positionStyles, /\.agencyCardLink:focus-visible\s*\{[\s\S]*?outline: 2px solid var\(--brand\);/)
   // The subtle hover must exist ONLY on the linked card, never on informational cards.
   assert.doesNotMatch(positionStyles, /\.agencyCard:hover/)
 

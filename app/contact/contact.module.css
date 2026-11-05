@@ -6,8 +6,8 @@
 /* ── Page Root ── */
 .root {
   min-height: 100vh;
-  background-color: #0f0a06;
-  color: #f7f3ec;
+  background-color: var(--background);
+  color: var(--foreground);
   overflow-x: hidden;
   position: relative;
 }
@@ -15,7 +15,7 @@
 /* ── Shared: Gold Hairline Separator ── */
 .hairline {
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(212, 168, 67, 0.18), transparent);
+  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--brand) 18%, transparent), transparent);
   margin: 0 auto;
   max-width: 64rem;
   width: 100%;
@@ -67,9 +67,9 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #d4a63a;
-  background: rgba(212, 168, 67, 0.08);
-  border: 1px solid rgba(212, 168, 67, 0.22);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
   border-radius: 999px;
   padding: 0.32rem 0.9rem;
   margin-bottom: 1.25rem;
@@ -80,7 +80,7 @@
   font-family: var(--font-supermarket), sans-serif;
   font-size: clamp(1.4rem, 3.5vw, 1.95rem);
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.35;
   margin-top: 0;
   margin-bottom: 1.25rem;
@@ -92,7 +92,7 @@
 }
 
 .sectionSubhead {
-  color: #c8bba4;
+  color: var(--foreground-soft);
   font-size: 0.95rem;
   line-height: 1.6;
   margin-top: -0.5rem;
@@ -128,7 +128,7 @@
   font-family: var(--font-supermarket), sans-serif;
   font-size: clamp(2rem, 5.2vw, 3rem);
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.25;
   margin-top: 0;
   margin-bottom: 1.25rem;
@@ -137,7 +137,7 @@
 
 .heroCopy {
   font-size: clamp(0.95rem, 2vw, 1.075rem);
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.75;
   margin-top: 0;
   margin-bottom: 1.25rem;
@@ -148,11 +148,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  background: rgba(212, 168, 67, 0.06);
-  border: 1px solid rgba(212, 168, 67, 0.16);
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 16%, transparent);
   border-radius: 0.75rem;
   padding: 0.65rem 1rem;
-  color: #f7f3ec;
+  color: var(--foreground);
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -161,20 +161,20 @@
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background-color: #d4a63a;
+  background-color: var(--brand-solid);
   opacity: 0.85;
   flex-shrink: 0;
 }
 
 /* ── Hero Visual (Right Column) ── */
 .heroVisualCard {
-  background: linear-gradient(145deg, rgba(26, 18, 11, 0.85) 0%, rgba(17, 12, 7, 0.9) 100%);
-  border: 1px solid rgba(212, 168, 67, 0.2);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--card) 85%, transparent) 0%, color-mix(in srgb, var(--background) 90%, transparent) 100%);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
   border-radius: 1.5rem;
   padding: 1.75rem 1.5rem;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(212, 168, 67, 0.15);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 color-mix(in srgb, var(--brand) 15%, transparent);
 }
 
 .heroVisualGlow {
@@ -183,7 +183,7 @@
   right: -20%;
   width: 180px;
   height: 180px;
-  background: radial-gradient(circle, rgba(212, 168, 67, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--brand) 15%, transparent) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -193,8 +193,8 @@
   gap: 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #d4a63a;
-  background: rgba(212, 168, 67, 0.1);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
   border-radius: 999px;
   padding: 0.25rem 0.75rem;
   margin-bottom: 1.25rem;
@@ -204,26 +204,26 @@
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(212, 168, 67, 0.2) 0%, rgba(212, 168, 67, 0.05) 100%);
-  border: 1px solid rgba(212, 168, 67, 0.35);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 20%, transparent) 0%, color-mix(in srgb, var(--brand) 5%, transparent) 100%);
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #d4a63a;
+  color: var(--brand);
   margin-bottom: 1.25rem;
-  box-shadow: 0 0 24px rgba(212, 168, 67, 0.15);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--brand) 15%, transparent);
 }
 
 .heroVisualTitle {
   font-family: var(--font-supermarket), sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.4rem 0;
 }
 
 .heroVisualDesc {
-  color: #c8bba4;
+  color: var(--foreground-soft);
   font-size: 0.85rem;
   line-height: 1.5;
   margin: 0 0 1.25rem 0;
@@ -233,7 +233,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  border-top: 1px solid rgba(212, 168, 67, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--brand) 12%, transparent);
   padding-top: 1.1rem;
 }
 
@@ -242,15 +242,15 @@
   align-items: center;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
 }
 
 .heroVisualListLabel {
-  color: #9c8e7c;
+  color: var(--muted-foreground);
 }
 
 .heroVisualListValue {
-  color: #f7f3ec;
+  color: var(--foreground);
   font-weight: 500;
   word-break: break-all;
 }
@@ -271,8 +271,8 @@
 }
 
 .quickCard {
-  background: rgba(26, 18, 11, 0.65);
-  border: 1px solid rgba(212, 168, 67, 0.15);
+  background: color-mix(in srgb, var(--card) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 15%, transparent);
   border-radius: 1.15rem;
   padding: 1.75rem 1.35rem;
   display: flex;
@@ -283,7 +283,7 @@
 }
 
 .quickCard:hover {
-  border-color: rgba(212, 168, 67, 0.35);
+  border-color: color-mix(in srgb, var(--brand) 35%, transparent);
   transform: translateY(-2px);
 }
 
@@ -291,19 +291,19 @@
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.75rem;
-  background: rgba(212, 168, 67, 0.08);
-  border: 1px solid rgba(212, 168, 67, 0.2);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #d4a63a;
+  color: var(--brand);
   margin-bottom: 1.1rem;
 }
 
 .quickLabel {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #9c8e7c;
+  color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 0.5rem 0;
@@ -313,13 +313,13 @@
   font-family: var(--font-supermarket), sans-serif;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.3;
   margin: 0 0 0.35rem 0;
 }
 
 .quickLink {
-  color: #f7f3ec;
+  color: var(--foreground);
   text-decoration: none;
   word-break: break-all;
   transition: color 0.15s ease;
@@ -327,12 +327,12 @@
 }
 
 .quickLink:hover {
-  color: #d4a63a;
+  color: var(--brand);
 }
 
 .quickSubtext {
   font-size: 0.825rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.5;
   margin: 0;
 }
@@ -354,8 +354,8 @@
 }
 
 .topicsCol {
-  background: rgba(26, 18, 11, 0.45);
-  border: 1px solid rgba(212, 168, 67, 0.14);
+  background: color-mix(in srgb, var(--card) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, transparent);
   border-radius: 1.25rem;
   padding: 2rem 1.5rem;
 }
@@ -372,7 +372,7 @@
   align-items: flex-start;
   gap: 0.85rem;
   padding-bottom: 1.15rem;
-  border-bottom: 1px solid rgba(212, 168, 67, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
 .topicItem:last-child {
@@ -384,8 +384,8 @@
   width: 2rem;
   height: 2rem;
   border-radius: 0.5rem;
-  background: rgba(212, 168, 67, 0.1);
-  color: #d4a63a;
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -396,21 +396,21 @@
 .topicTitle {
   font-size: 0.975rem;
   font-weight: 600;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.25rem 0;
 }
 
 .topicDesc {
   font-size: 0.85rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.5;
   margin: 0;
 }
 
 /* ── Checklist ── */
 .checklistCol {
-  background: rgba(26, 18, 11, 0.55);
-  border: 1px solid rgba(212, 168, 67, 0.18);
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent);
   border-radius: 1.25rem;
   padding: 2rem 1.5rem;
   position: relative;
@@ -433,9 +433,9 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 50%;
-  background: rgba(212, 168, 67, 0.15);
-  border: 1px solid rgba(212, 168, 67, 0.35);
-  color: #d4a63a;
+  background: color-mix(in srgb, var(--brand) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  color: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -446,13 +446,13 @@
 .checkTitle {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.2rem 0;
 }
 
 .checkDesc {
   font-size: 0.825rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.5;
   margin: 0;
 }
@@ -473,8 +473,8 @@
 }
 
 .selfServiceCard {
-  background: rgba(26, 18, 11, 0.6);
-  border: 1px solid rgba(212, 168, 67, 0.14);
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, transparent);
   border-radius: 1.15rem;
   padding: 1.75rem 1.35rem;
   text-decoration: none;
@@ -488,8 +488,8 @@
 }
 
 .selfServiceCard:hover {
-  border-color: rgba(212, 168, 67, 0.38);
-  background: rgba(26, 18, 11, 0.85);
+  border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+  background: color-mix(in srgb, var(--card) 85%, transparent);
   transform: translateY(-2px);
 }
 
@@ -504,20 +504,20 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 0.65rem;
-  background: rgba(212, 168, 67, 0.1);
-  color: #d4a63a;
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .selfServiceArrow {
-  color: #9c8e7c;
+  color: var(--muted-foreground);
   transition: color 0.15s ease, transform 0.15s ease;
 }
 
 .selfServiceCard:hover .selfServiceArrow {
-  color: #d4a63a;
+  color: var(--brand);
   transform: translateX(3px);
 }
 
@@ -525,13 +525,13 @@
   font-family: var(--font-supermarket), sans-serif;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.4rem 0;
 }
 
 .selfServiceDesc {
   font-size: 0.85rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.5;
   margin: 0;
 }
@@ -548,7 +548,7 @@
   font-family: var(--font-supermarket), sans-serif;
   font-size: clamp(1.5rem, 4vw, 2.2rem);
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   line-height: 1.3;
   margin-top: 0;
   margin-bottom: 1rem;
@@ -556,7 +556,7 @@
 
 .ctaCopy {
   font-size: 0.95rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   line-height: 1.7;
   margin-top: 0;
   margin-bottom: 2rem;
@@ -582,8 +582,8 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background-color: #d4a63a;
-  color: #0f0a06;
+  background-color: var(--brand-solid);
+  color: var(--brand-foreground);
   font-weight: 700;
   font-size: 0.95rem;
   padding: 0.8rem 1.6rem;
@@ -604,9 +604,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: rgba(26, 18, 11, 0.6);
-  border: 1px solid rgba(212, 168, 67, 0.28);
-  color: #f7f3ec;
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  color: var(--foreground);
   font-weight: 600;
   font-size: 0.95rem;
   padding: 0.8rem 1.5rem;
@@ -616,9 +616,9 @@
 }
 
 .btnSecondary:hover {
-  border-color: rgba(212, 168, 67, 0.5);
-  background: rgba(212, 168, 67, 0.08);
-  color: #d4a63a;
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  color: var(--brand);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -641,8 +641,8 @@
 }
 
 .socialCard {
-  background: rgba(26, 18, 11, 0.6);
-  border: 1px solid rgba(212, 168, 67, 0.16);
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 16%, transparent);
   border-radius: 1.15rem;
   padding: 1.35rem 1.5rem;
   display: flex;
@@ -655,8 +655,8 @@
 }
 
 .socialCard:hover {
-  border-color: rgba(212, 168, 67, 0.38);
-  background: rgba(26, 18, 11, 0.85);
+  border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+  background: color-mix(in srgb, var(--card) 85%, transparent);
   transform: translateY(-1px);
 }
 
@@ -670,8 +670,8 @@
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.75rem;
-  background: rgba(212, 168, 67, 0.1);
-  color: #d4a63a;
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -682,13 +682,13 @@
   font-family: var(--font-supermarket), sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #f7f3ec;
+  color: var(--foreground);
   margin: 0 0 0.2rem 0;
 }
 
 .socialHandle {
   font-size: 0.85rem;
-  color: #c8bba4;
+  color: var(--foreground-soft);
   margin: 0;
   word-break: break-all;
 }
@@ -699,7 +699,7 @@
   gap: 0.4rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #d4a63a;
+  color: var(--brand);
   flex-shrink: 0;
 }
 
