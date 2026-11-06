@@ -118,12 +118,16 @@ test('Shared detail module uses semantic variables for page-level styles', () =>
   assert.match(sharedModule, /background: var\(--card\);/)
   assert.match(sharedModule, /color: var\(--muted-foreground\);/)
   assert.match(sharedModule, /background: var\(--brand-solid\);|background: var\(--brand\);/)
-  // No old page-level hardcoded Dark literals remain (skip header comment and
-  // the fixed-Dark editorial island range, whose literals are intentional).
+  // No old page-level hardcoded Dark literals remain (skip header comment,
+  // the fixed-Dark editorial island range, and the Fix2 island wrapper whose
+  // own canvas literal is intentional and positively pinned by the Fix2 test).
   const islandStart = sharedModule.indexOf('.editorialMarkdown :global')
   const islandEnd = sharedModule.indexOf('.relatedSectionHeading')
+  const wrapperStart = sharedModule.indexOf('.editorialBody {')
+  const wrapperEnd = sharedModule.indexOf('.editorialMarkdown {')
   const sharedRules =
-    sharedModule.slice(sharedModule.indexOf('.page {'), islandStart) +
+    sharedModule.slice(sharedModule.indexOf('.page {'), wrapperStart) +
+    sharedModule.slice(wrapperEnd, islandStart) +
     sharedModule.slice(islandEnd)
   assert.doesNotMatch(sharedRules, /#0F0A06|#F7F3EC|#C8BBA4|#A1866B|#1A120B|#21170E|#14100a/i)
 })
@@ -163,6 +167,33 @@ test('Fixed-Dark editorial island literals remain byte-stable inside the shared 
   assert.match(island, /color: #C8BBA4;/)
   assert.match(island, /rgba\(212, 166, 58, 0\.16\)/)
   assert.doesNotMatch(island, /var\(--/)
+})
+
+test('Fix2 — editorial island carries its own fixed-Dark canvas (Light readability)', () => {
+  // Root cause of the Human-QA defect: the island's markdown rules keep
+  // fixed-Dark literals but the wrappers had NO background — they relied on
+  // the legacy fixed-Dark page. After the page became theme-aware, Light mode
+  // rendered #F7F3EC text on ivory (~1.06:1). The canvas is scoped to
+  // .editorialBody — the shared wrapper class carried by BOTH the Position
+  // and Agency island wrappers.
+  const wrapper = sharedModule.slice(
+    sharedModule.indexOf('.editorialBody {'),
+    sharedModule.indexOf('.editorialMarkdown {'),
+  )
+  assert.match(wrapper, /\.editorialBody \{[^}]*background: #0f0a06;[^}]*\}/)
+  // Reject the defective state (no canvas) and any themed-canvas mistake.
+  assert.match(wrapper, /min-width: 0;/)
+  assert.doesNotMatch(wrapper, /background: var\(--/)
+  // The other island wrapper class must NOT carry its own duplicate canvas.
+  const mdWrapper = sharedModule.slice(
+    sharedModule.indexOf('.editorialMarkdown {'),
+    sharedModule.indexOf('.editorialMarkdownSegment {'),
+  )
+  assert.doesNotMatch(mdWrapper, /background:/)
+  // The canvas must be scoped to the island wrapper, not the whole page.
+  const pageBlock = sharedModule.slice(sharedModule.indexOf('.page {'), sharedModule.indexOf('.container {'))
+  assert.match(pageBlock, /var\(--background\)/)
+  assert.doesNotMatch(pageBlock, /#0f0a06/i)
 })
 
 test('Editorial island wiring is unchanged', () => {

@@ -516,6 +516,14 @@
 .editorialBody {
   min-width: 0;
   max-width: 52rem;
+  /* Wave3 Fix2 — fixed-Dark editorial island canvas. This class is carried by
+     BOTH island wrappers (Position + Agency editorial sections), whose
+     markdown rules intentionally keep legacy Dark literals and previously
+     relied on the legacy fixed-Dark page background. When the page became
+     theme-aware, Light mode left that Dark text on ivory (~1.06:1). Restore
+     the island's own canvas so the intentional Dark editorial design stays
+     readable in both themes. */
+  background: #0f0a06;
 }
 
 .editorialMarkdown {
