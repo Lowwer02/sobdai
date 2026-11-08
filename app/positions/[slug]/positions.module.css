@@ -516,14 +516,15 @@
 .editorialBody {
   min-width: 0;
   max-width: 52rem;
-  /* Wave3 Fix2 — fixed-Dark editorial island canvas. This class is carried by
-     BOTH island wrappers (Position + Agency editorial sections), whose
-     markdown rules intentionally keep legacy Dark literals and previously
-     relied on the legacy fixed-Dark page background. When the page became
-     theme-aware, Light mode left that Dark text on ivory (~1.06:1). Restore
-     the island's own canvas so the intentional Dark editorial design stays
-     readable in both themes. */
-  background: #0f0a06;
+  /* Wave3 Fix3 — adaptive editorial island. This class is carried by BOTH
+     island wrappers (Position + Agency editorial sections). It deliberately
+     has NO background of its own: the canvas is the page's theme-aware
+     background, so Light mode shows the surrounding warm-ivory surface with
+     no painted rectangle and no edge-flush seam, and Dark keeps the accepted
+     near-black page canvas. Per-theme readability is guaranteed by the
+     [data-theme='light'] variable re-pin and color overrides at the bottom of
+     this file, while the Dark island literals in the island block above stay
+     byte-stable. */
 }
 
 .editorialMarkdown {
@@ -664,6 +665,83 @@
   color: #A1866B;
   font-size: 1rem;
   line-height: 1.8;
+}
+
+/* ===================== Wave3 Fix3 — adaptive editorial theming =====================
+   Owner Human-QA direction: the two detail-route editorial sections
+   (PositionEditorialSection + AgencyEditorialSection) keep their intentional
+   fixed-Dark island design in Dark mode, but in Light mode the editorial
+   canvas and its text must follow the active Light theme — no painted black
+   rectangle, cream literals readable, gold accents themed. Two scoped
+   mechanisms; every selector is prefixed with [data-theme='light'] so Dark is
+   byte-stable, and no forced-importance declarations are used.
+
+   1. Variable re-pin. .summary-markdown-dark-scope (app/globals.css) pins the
+      renderer variables on .summary-content to Dark values in EVERY theme at
+      (0,2,0) specificity — that island pin alone styles the whole Agency
+      editorial body (its wrapper carries no .editorialMarkdown rules). The
+      block below re-pins the same variables onto the Light token palette,
+      mirroring the [data-theme='light'] block in app/globals.css
+      byte-for-byte. Specificity (0,3,0) beats the island's (0,2,0), so every
+      semantic utility SummaryMarkdown emits (text-foreground /
+      text-prose-body / text-brand / bg-prose-surface / bg-background /
+      border-border-subtle / bg-hover / the alert palette) resolves to its
+      Light value. Other consumers of the island (the Admin area) are NOT
+      scoped by .editorialBody and stay pinned Dark. */
+:global([data-theme='light']) .editorialBody :global(.summary-content) {
+  /* Mirror of the [data-theme='light'] token block in app/globals.css. */
+  --background: #faf5ec;
+  --foreground: #2b2118;
+  --muted-foreground: #6f5d47;
+  --brand: #8a6914;
+  --border-subtle: #ebe0ca;
+  --hover: rgba(43, 33, 24, 0.05);
+  --prose-body: #6f5d47;
+  --prose-surface: #f1e9d8;
+  --gold: #8a6914;
+  --text-secondary: #6f5d47;
+  --destructive: #b3261e;
+}
+
+/* 2. Light overrides for the fixed-Dark literals this module pins on
+      .editorialMarkdown .summary-content descendants (Position editorial
+      island). (0,3,1) beats the Dark rules' (0,2,1); the Dark rules above
+      remain untouched and keep rendering the accepted Dark design. Values
+      are semantic variables resolved through the Light re-pin above. */
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content h2) {
+  color: var(--foreground);
+}
+
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content h3),
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content h4),
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content h5),
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content h6) {
+  color: var(--foreground);
+}
+
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content p) {
+  color: var(--prose-body);
+}
+
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content ul),
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content ol) {
+  color: var(--prose-body);
+}
+
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content strong) {
+  color: var(--foreground);
+}
+
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content a) {
+  color: var(--brand);
+}
+
+:global([data-theme='light']) .editorialMarkdown :global(.summary-content blockquote) {
+  color: var(--muted-foreground);
+}
+
+:global([data-theme='light']) .editorialFallback {
+  color: var(--muted-foreground);
 }
 
 .relatedContent {

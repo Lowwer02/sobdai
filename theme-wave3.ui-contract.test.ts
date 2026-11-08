@@ -11,7 +11,11 @@ import test from 'node:test'
  * CSS module and the About/Contact/Privacy/Cookies/Terms modules onto the
  * canonical semantic variables, adds the --foreground-soft token, fixes the
  * Positions mascot blend backing, and corrects one stale exact-color pin in
- * the positions contract. Presentation-only; no behavior/SEO changes.
+ * the positions contract. Fix3 supersedes the Fix2 fixed-Dark canvas: the two
+ * detail-route editorial islands (Position + Agency) are adaptive — the
+ * wrapper carries no background, Light mode re-pins the renderer variables to
+ * the Light palette and overrides the fixed literals, Dark island literals
+ * stay byte-stable. Presentation-only; no behavior/SEO changes.
  *
  * Deliberately NOT a blanket "no hex anywhere" test: the fixed-Dark editorial
  * island literals, decorative gold glows/shadows, portrait overlays, the
@@ -156,10 +160,12 @@ test('Shared detail module uses color-mix for gold-tinted borders and fills', ()
 
 test('Fixed-Dark editorial island literals remain byte-stable inside the shared module', () => {
   // The .editorialMarkdown :global(.summary-content…) rules style content
-  // inside the intentional Dark island; they must NOT be themed.
+  // inside the intentional Dark island for DARK mode; they must NOT be
+  // themed. Slice ends exactly at the fallback rule — the Wave3 Fix3 Light
+  // overrides live after it and are contract-covered separately.
   const island = sharedModule.slice(
     sharedModule.indexOf('.editorialMarkdown :global(.summary-content h2)') - 60,
-    sharedModule.indexOf('.editorialFallback') + 120,
+    sharedModule.indexOf('.editorialFallback {'),
   )
   assert.match(island, /color: #F7F3EC;/)
   assert.match(island, /color: #D6CBB8;/)
@@ -169,36 +175,190 @@ test('Fixed-Dark editorial island literals remain byte-stable inside the shared 
   assert.doesNotMatch(island, /var\(--/)
 })
 
-test('Fix2 — editorial island carries its own fixed-Dark canvas (Light readability)', () => {
-  // Root cause of the Human-QA defect: the island's markdown rules keep
-  // fixed-Dark literals but the wrappers had NO background — they relied on
-  // the legacy fixed-Dark page. After the page became theme-aware, Light mode
-  // rendered #F7F3EC text on ivory (~1.06:1). The canvas is scoped to
-  // .editorialBody — the shared wrapper class carried by BOTH the Position
-  // and Agency island wrappers.
+test('Fix3 — editorial island canvas is the page theme (no painted rectangle)', () => {
+  // Root cause of the Fix2 Human-QA rejection: the Fix2 fixed-Dark canvas
+  // (#0f0a06) on .editorialBody painted a padding-less black rectangle behind
+  // edge-flush editorial text in Light mode, with an abrupt ivory→black
+  // transition. Fix3 removes the canvas: the shared wrapper (carried by BOTH
+  // the Position and Agency editorial sections) is transparent in BOTH
+  // themes, so the page's own theme-aware background shows through and there
+  // is no rectangle, no seam and no edge-flush box anywhere.
   const wrapper = sharedModule.slice(
     sharedModule.indexOf('.editorialBody {'),
     sharedModule.indexOf('.editorialMarkdown {'),
   )
-  assert.match(wrapper, /\.editorialBody \{[^}]*background: #0f0a06;[^}]*\}/)
-  // Reject the defective state (no canvas) and any themed-canvas mistake.
-  assert.match(wrapper, /min-width: 0;/)
-  assert.doesNotMatch(wrapper, /background: var\(--/)
-  // The other island wrapper class must NOT carry its own duplicate canvas.
+  // Geometry is untouched; only the background is gone.
+  assert.match(wrapper, /\.editorialBody \{[^}]*min-width: 0;[^}]*\}/)
+  assert.match(wrapper, /\.editorialBody \{[^}]*max-width: 52rem;[^}]*\}/)
+  assert.doesNotMatch(wrapper, /background:/)
+  // The defective Fix2 literal must be gone from the whole module.
+  assert.doesNotMatch(sharedModule, /#0f0a06/i)
+  // The other island wrapper class must not grow a replacement canvas.
   const mdWrapper = sharedModule.slice(
     sharedModule.indexOf('.editorialMarkdown {'),
     sharedModule.indexOf('.editorialMarkdownSegment {'),
   )
   assert.doesNotMatch(mdWrapper, /background:/)
-  // The canvas must be scoped to the island wrapper, not the whole page.
+  // The outer page remains the theme-aware canvas.
   const pageBlock = sharedModule.slice(sharedModule.indexOf('.page {'), sharedModule.indexOf('.container {'))
   assert.match(pageBlock, /var\(--background\)/)
-  assert.doesNotMatch(pageBlock, /#0f0a06/i)
+})
+
+test('Fix3 — Light re-pin mirrors the Light token palette inside the editorial island', () => {
+  // .summary-markdown-dark-scope (app/globals.css) pins the renderer
+  // variables on .summary-content to Dark values in EVERY theme at (0,2,0)
+  // specificity — that pin alone styles the Agency editorial body (its
+  // wrapper carries no .editorialMarkdown rules). Fix3 re-pins the same
+  // variables onto the Light palette, scoped to
+  // [data-theme='light'] .editorialBody .summary-content at (0,3,0), so it
+  // wins the cascade for the two detail-route editorial sections only; the
+  // Admin island consumer is outside .editorialBody and stays pinned Dark.
+  const rePinStart = sharedModule.indexOf(".editorialBody :global(.summary-content) {")
+  assert.ok(rePinStart > -1, 'Fix3 Light re-pin block must exist')
+  const rePin = sharedModule.slice(
+    rePinStart,
+    sharedModule.indexOf(".editorialMarkdown :global(.summary-content h2)", rePinStart),
+  )
+  // Selector must be theme-prefixed (Dark mode never re-pins).
+  const selectorContext = sharedModule.slice(rePinStart - 40, rePinStart + 60)
+  assert.match(selectorContext, /:global\(\[data-theme='light'\]\) \.editorialBody :global\(\.summary-content\) \{/)
+  // Every pinned variable must carry the canonical Light value.
+  const lightTokens = [
+    '--background: #faf5ec;',
+    '--foreground: #2b2118;',
+    '--muted-foreground: #6f5d47;',
+    '--brand: #8a6914;',
+    '--border-subtle: #ebe0ca;',
+    '--hover: rgba(43, 33, 24, 0.05);',
+    '--prose-body: #6f5d47;',
+    '--prose-surface: #f1e9d8;',
+    '--gold: #8a6914;',
+    '--text-secondary: #6f5d47;',
+    '--destructive: #b3261e;',
+  ]
+  for (const token of lightTokens) {
+    assert.ok(rePin.includes(token), `Light re-pin must carry ${token}`)
+  }
+  // Byte-parity spot checks against the canonical [data-theme='light'] block
+  // in globals.css (the re-pin is a hand mirror and must not drift).
+  const lightGlobals = globalsCss.slice(globalsCss.indexOf("[data-theme='light'] {"))
+  for (const token of lightTokens) {
+    assert.ok(lightGlobals.includes(token), `globals Light block must define ${token}`)
+  }
+  // No scoped-away escape hatches inside the Fix3 additions.
+  assert.doesNotMatch(rePin, /!important/)
+  const fix3Section = sharedModule.slice(sharedModule.indexOf('Wave3 Fix3 — adaptive editorial theming'))
+  assert.ok(fix3Section.length > 0)
+  assert.doesNotMatch(fix3Section, /!important/)
+})
+
+test('Fix3 — Light editorial text overrides beat the Dark island literals', () => {
+  // The Position editorial island additionally has fixed-Dark literals on
+  // .editorialMarkdown .summary-content descendants at (0,2,1). Every Fix3
+  // override is [data-theme='light']-prefixed — (0,3,1) wins, no !important —
+  // and maps onto the semantic variables resolved by the Light re-pin. The
+  // Dark rules above stay byte-stable (see the byte-stability test).
+  const fix3 = sharedModule.slice(sharedModule.indexOf('Wave3 Fix3 — adaptive editorial theming'))
+  assert.ok(fix3.length > 0, 'Fix3 section must exist')
+  // Single-rule overrides: selector immediately followed by its declaration.
+  const singleOverrides: Array<[string, string]> = [
+    ['.summary-content h2', 'color: var(--foreground);'],
+    ['.summary-content p', 'color: var(--prose-body);'],
+    ['.summary-content strong', 'color: var(--foreground);'],
+    ['.summary-content a', 'color: var(--brand);'],
+    ['.summary-content blockquote', 'color: var(--muted-foreground);'],
+  ]
+  for (const [selector, declaration] of singleOverrides) {
+    const pattern = new RegExp(
+      `\\[data-theme='light'\\]\\) \\.editorialMarkdown :global\\(${selector.replace(/\./g, '\\.')}\\) \\{[^}]*${declaration.replace(/[()]/g, '\\$&')}`,
+    )
+    assert.match(fix3, pattern, `Missing Fix3 Light override for ${selector}`)
+  }
+  // Grouped heading override h3–h6 (one shared declaration block, mirroring
+  // the Dark island's own h3–h6 group rule).
+  assert.match(
+    fix3,
+    /\[data-theme='light'\]\) \.editorialMarkdown :global\(\.summary-content h3\),\n:global\(\[data-theme='light'\]\) \.editorialMarkdown :global\(\.summary-content h4\),\n:global\(\[data-theme='light'\]\) \.editorialMarkdown :global\(\.summary-content h5\),\n:global\(\[data-theme='light'\]\) \.editorialMarkdown :global\(\.summary-content h6\) \{\s*\n\s*color: var\(--foreground\);\s*\n\}/,
+    'Missing Fix3 Light heading group override (h3–h6)',
+  )
+  // Grouped list override ul/ol.
+  assert.match(
+    fix3,
+    /\[data-theme='light'\]\) \.editorialMarkdown :global\(\.summary-content ul\),\n:global\(\[data-theme='light'\]\) \.editorialMarkdown :global\(\.summary-content ol\) \{\s*\n\s*color: var\(--prose-body\);\s*\n\}/,
+    'Missing Fix3 Light list group override (ul/ol)',
+  )
+  // The fallback copy also follows the Light theme.
+  assert.match(fix3, /\[data-theme='light'\]\) \.editorialFallback \{[^}]*color: var\(--muted-foreground\);/)
+})
+
+test('Fix3 — other fixed-Dark islands stay untouched (Admin + globals pin block)', () => {
+  // The adaptive re-pin is scoped to .editorialBody. The Admin area and the
+  // globals island pin block are separate intentional Dark consumers and must
+  // survive unchanged.
+  const adminLayout = read('app/admin/layout.tsx')
+  assert.match(adminLayout, /summary-markdown-dark-scope/)
+  assert.match(globalsCss, /\.summary-markdown-dark-scope \.summary-content \{/)
+  assert.match(globalsCss, /--background: #0f0b07;\n  --foreground: #f5e9d6;|\-\-prose\-body: #d6cbb8;/)
 })
 
 test('Editorial island wiring is unchanged', () => {
-  assert.match(editorialSection, /editorialMarkdown} summary-markdown-dark-scope/)
-  assert.match(agenciesSection, /summary-markdown-dark-scope/)
+  // Max audit C1: the Fix3 adaptive styling is keyed on styles.editorialBody,
+  // so BOTH editorial component wrappers must actually APPLY that class on
+  // their editorial wrapper div — a mere import elsewhere in the file is not
+  // enough. The assertions are anchored to the real JSX structure (the
+  // Position wrapper's stable element id; the Agency wrapper's direct
+  // SummaryMarkdown child) so they cannot pass on an unrelated
+  // styles.editorialBody occurrence, and they tolerate attribute order and
+  // whitespace reformatting.
+  const positionWrapper = editorialSection.match(
+    /<div\s+id="position-editorial-body"[^>]*className=\{`([^`]*)`\}/,
+  )
+  assert.ok(
+    positionWrapper,
+    'Position editorial wrapper div (id="position-editorial-body") must exist with a template-literal className',
+  )
+  const positionWrapperClass = positionWrapper[1]
+  assert.ok(
+    positionWrapperClass.includes('${styles.editorialBody}'),
+    'Position editorial wrapper must apply styles.editorialBody',
+  )
+  assert.ok(
+    positionWrapperClass.includes('${styles.editorialMarkdown}'),
+    'Position editorial wrapper must keep the editorialMarkdown island class',
+  )
+  assert.ok(
+    positionWrapperClass.includes('summary-markdown-dark-scope'),
+    'Position editorial wrapper must keep the intentional summary-markdown-dark-scope island class',
+  )
+  // styles.editorialBody is applied exactly once per component — on the
+  // editorial wrapper itself, never on an unrelated element.
+  assert.equal(
+    (editorialSection.match(/styles\.editorialBody/g) || []).length,
+    1,
+    'styles.editorialBody must appear exactly once in PositionEditorialSection (the editorial wrapper)',
+  )
+
+  const agencyWrapper = agenciesSection.match(
+    /<div\s+className=\{`([^`]*)`\}>\s*<SummaryMarkdown/,
+  )
+  assert.ok(
+    agencyWrapper,
+    'Agency editorial wrapper div (direct SummaryMarkdown parent) must exist with a template-literal className',
+  )
+  const agencyWrapperClass = agencyWrapper[1]
+  assert.ok(
+    agencyWrapperClass.includes('${styles.editorialBody}'),
+    'Agency editorial wrapper must apply styles.editorialBody',
+  )
+  assert.ok(
+    agencyWrapperClass.includes('summary-markdown-dark-scope'),
+    'Agency editorial wrapper must keep the intentional summary-markdown-dark-scope island class',
+  )
+  assert.equal(
+    (agenciesSection.match(/styles\.editorialBody/g) || []).length,
+    1,
+    'styles.editorialBody must appear exactly once in AgencyEditorialSection (the editorial wrapper)',
+  )
 })
 
 // ---------------------------------------------------------------------------
